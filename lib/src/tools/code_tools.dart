@@ -4,6 +4,8 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'apply_patch.dart';
 import 'git_tools.dart';
 import 'list_files.dart';
+import 'run_command.dart';
+import 'run_tests.dart';
 
 /// 注册 conatus_code 新增的工具，返回已注册的工具。
 ///
@@ -30,6 +32,8 @@ List<Tool> provideCodeTools(
     registered.addAll(<Tool>[
       GitStatusTool(shell: resolvedShell),
       GitDiffTool(shell: resolvedShell),
+      RunCommandTool(shell: resolvedShell),
+      RunTestsTool(shell: resolvedShell),
     ]);
   }
   for (final Tool tool in registered) {

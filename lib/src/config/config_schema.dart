@@ -47,6 +47,7 @@ enum SandboxPreset { workspaceWrite, dangerFullAccess }
 /// 沙箱策略；由沙箱层（`src/sandbox/`）消费。
 class SandboxSettings {
   const SandboxSettings({
+    this.enabled = false,
     this.preset = SandboxPreset.workspaceWrite,
     this.allowNetwork = false,
     this.networkAllowlist = const <String>[],
@@ -54,6 +55,9 @@ class SandboxSettings {
     this.commandTimeoutMs = 120000,
     this.maxOutputBytes = 64000,
   });
+
+  /// 是否启用沙箱（jail fs + 沙箱命令执行）；缺省关闭。
+  final bool enabled;
 
   /// 缺省「工作区内可写」。
   final SandboxPreset preset;
