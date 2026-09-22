@@ -33,8 +33,10 @@ Future<void> main(List<String> args) async {
     path:
         '$cwd${Platform.pathSeparator}.conatus${Platform.pathSeparator}providers.json',
   ).load();
-  final bool configured = snapshot.providers.any((ProviderProfile p) =>
-      p.apiKey.isNotEmpty || envCredentials.get(p.credentialKey) != null);
+  final bool configured = snapshot.providers.any(
+    (ProviderProfile p) =>
+        p.apiKey.isNotEmpty || envCredentials.get(p.credentialKey) != null,
+  );
   if (!configured) {
     stdout.writeln('尚未配置任何 Key：以离线脚本模型运行 Demo。');
     stdout.writeln('在 .conatus/providers.json 的 provider 里填 apiKey（推荐），');
@@ -43,10 +45,11 @@ Future<void> main(List<String> args) async {
   // 有 Key 时由提供商注册表（`.conatus/providers.json`）的当前 provider 构造
   // LLM（--model 覆盖其默认模型名），/provider 与 /model 命令据此工作。
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
-      llm: configured ? null : FallbackLlm(<LlmProvider>[_OfflineProvider()]),
-      model: model,
-      modelLabel: configured ? null : '离线 Demo',
-      maxSteps: 200);
+    llm: configured ? null : FallbackLlm(<LlmProvider>[_OfflineProvider()]),
+    model: model,
+    modelLabel: configured ? null : '离线 Demo',
+    maxSteps: 200,
+  );
   final Context app = runtime.app;
   provideCodingForPlayground(app, cwd: cwd);
   app
@@ -57,7 +60,7 @@ Future<void> main(List<String> args) async {
     onExit: shutdownApp,
     name: 'Playground',
   );
-  await runApp(AgentTui(controller: controller, firstInput: options.first));
+  await runApp(AgentTui(controller: controller));
   await runtime.dispose();
 }
 
@@ -77,22 +80,28 @@ void provideCodingForPlayground(Context app, {required String cwd}) {
   );
   app.provide('codeRuntime', codeRuntime);
   app.onDispose(codeRuntime.dispose);
-  app.effect(() => app.tools.register(RunCodeTool(
-      runtime: codeRuntime,
-      tools: app.tools,
-      telemetry: app.get<Telemetry>('telemetry'))));
+  app.effect(
+    () => app.tools.register(
+      RunCodeTool(
+        runtime: codeRuntime,
+        tools: app.tools,
+        telemetry: app.get<Telemetry>('telemetry'),
+      ),
+    ),
+  );
 }
 
-const String kPlaygroundPersona = '你是 Playground 编码助手。你可以：\n'
+const String kPlaygroundPersona =
+    '你是 Playground 编码助手。你可以：\n'
     '- 用 read_file / write_file / edit_file 读写文件，用 glob / rg 搜索代码；\n'
     '- 用 run_code 执行一段 Dart 程序（高危，执行前会请你确认）；\n'
     '- 用户消息里的 <file path="..."> 块是用户引用的文件内容。\n'
     '需要信息时调用工具，否则直接简洁回答。';
 
-const String kPlaygroundUsage = '用法：dart run example/playground.dart '
-    '[--session <id>] [--first <文本>] [--cwd <目录>] [--model <名字>]\n'
+const String kPlaygroundUsage =
+    '用法：dart run example/playground.dart '
+    '[--session <id>] [--cwd <目录>] [--model <名字>]\n'
     '  --session <id>   启动会话 id（默认 $kTuiDefaultSession）\n'
-    '  --first <文本>   挂载后自动发一轮\n'
     '  --cwd <目录>     run_code 工作目录（默认当前目录）\n'
     '  --model <名字>   覆盖当前提供商的模型名（默认取 provider 配置）\n'
     '输入 @<路径> 可引用文件（如 @lib/foo.dart 帮我看下这个文件）。\n'
@@ -113,9 +122,11 @@ class _OfflineProvider implements LlmProvider {
   String get name => 'offline';
 
   @override
-  Future<LlmResult> chat(List<LlmMessage> messages,
-      {Map<String, dynamic>? options,
-      List<Map<String, dynamic>>? tools}) async {
+  Future<LlmResult> chat(
+    List<LlmMessage> messages, {
+    Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
+  }) async {
     final String user = _lastUser(messages);
     final bool toolUsed = messages.any((LlmMessage m) => m.role == 'tool');
     if (!toolUsed && _asksCode(user)) {
@@ -125,14 +136,16 @@ class _OfflineProvider implements LlmProvider {
         model: 'scripted',
         toolCalls: <LlmToolCall>[
           LlmToolCall(
-              id: 'offline-1',
-              name: 'run_code',
-              arguments: '{"program":${jsonEncode(_offlineProgram)}}')
+            id: 'offline-1',
+            name: 'run_code',
+            arguments: '{"program":${jsonEncode(_offlineProgram)}}',
+          ),
         ],
       );
     }
     return LlmResult(
-      content: '（离线 Demo）未接入真实模型。你说的是：「$user」。\n'
+      content:
+          '（离线 Demo）未接入真实模型。你说的是：「$user」。\n'
           '设置 ARK_API_KEY / DEEPSEEK_API_KEY 后重跑即可与真实模型对话。',
       provider: 'offline',
       model: 'scripted',
@@ -140,9 +153,11 @@ class _OfflineProvider implements LlmProvider {
   }
 
   @override
-  Stream<LlmStreamEvent> chatStream(List<LlmMessage> messages,
-          {Map<String, dynamic>? options, List<Map<String, dynamic>>? tools}) =>
-      const Stream<LlmStreamEvent>.empty();
+  Stream<LlmStreamEvent> chatStream(
+    List<LlmMessage> messages, {
+    Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}
@@ -158,7 +173,8 @@ class _OfflineProvider implements LlmProvider {
   }
 }
 
-const String _offlineProgram = 'import \'dart:io\';\n'
+const String _offlineProgram =
+    'import \'dart:io\';\n'
     'void main() {\n'
     '  print(\'当前时间: \' + DateTime.now().toIso8601String());\n'
     '  print(\'Playground run_code 执行成功。\');\n'

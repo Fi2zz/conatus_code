@@ -63,6 +63,6 @@ Future<void> main(List<String> args) async {
     initialPermissionMode: toTuiPermissionMode(config.approval.mode),
     onExit: shutdownApp,
   );
-  await runApp(AgentTui(controller: controller, firstInput: options.first));
+  await runApp(AgentTui(controller: controller));
   await runtime.dispose();
 }

@@ -1,4 +1,4 @@
-/// conatus_code 入口的命令行选项：解析 `--session` / `--first` / `--config` / `--help`。
+/// conatus_code 入口的命令行选项：解析 `--session` / `--config` / `--help`。
 ///
 /// 从入口 `main` 里提出来，调用方（自己的 `main` 或别的入口）因此能复用同一套
 /// 解析与用法文案，不必再抄一遍。
@@ -16,16 +16,12 @@ class TuiOptions {
   /// 构造选项。
   const TuiOptions({
     this.session = kTuiDefaultSession,
-    this.first,
     this.configPath,
     this.helpRequested = false,
   });
 
   /// 启动会话 id。
   final String session;
-
-  /// 挂载后自动发送的首轮输入；`null` 表示不发。
-  final String? first;
 
   /// `--config` 指定的配置文件路径；`null` 表示用默认位置。
   final String? configPath;
@@ -36,10 +32,10 @@ class TuiOptions {
   final bool helpRequested;
 
   /// 用法文案。
-  static const String usage = '用法：dart run conatus_code '
-      '[--session <id>] [--first <文本>] [--config <路径>]\n'
+  static const String usage =
+      '用法：dart run conatus_code '
+      '[--session <id>] [--config <路径>]\n'
       '  --session <id>   启动会话 id（默认 tui）\n'
-      '  --first <文本>   挂载后自动发一轮\n'
       '  --config <路径>  配置文件路径（默认 ~/.conatus-code/config.toml）\n';
 
   /// 解析命令行参数。
@@ -52,7 +48,6 @@ class TuiOptions {
     String sessionId = kTuiDefaultSession,
   }) {
     String session = sessionId;
-    String? first;
     String? configPath;
     bool helpRequested = false;
     for (int index = 0; index < args.length; index++) {
@@ -61,8 +56,6 @@ class TuiOptions {
         helpRequested = true;
       } else if (arg == '--session' && index + 1 < args.length) {
         session = args[++index];
-      } else if (arg == '--first' && index + 1 < args.length) {
-        first = args[++index];
       } else if (arg == '--config' && index + 1 < args.length) {
         configPath = args[++index];
       }
@@ -72,7 +65,6 @@ class TuiOptions {
     }
     return TuiOptions(
       session: session,
-      first: first,
       configPath: configPath,
       helpRequested: helpRequested,
     );

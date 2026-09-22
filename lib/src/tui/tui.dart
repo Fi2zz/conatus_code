@@ -36,17 +36,10 @@ import 'tui_views.dart';
 
 /// conatus TUI 根组件。
 class AgentTui extends StatefulComponent {
-  const AgentTui({
-    super.key,
-    required this.controller,
-    this.firstInput,
-  });
+  const AgentTui({super.key, required this.controller});
 
   /// 会话控制器（含屏上记录与斜杠命令状态）。
   final ConatusTuiController controller;
-
-  /// `--first <文本>`：挂载后自动发一轮，便于冒烟验证。
-  final String? firstInput;
 
   @override
   State<AgentTui> createState() => _AgentTuiState();
@@ -56,10 +49,10 @@ class _AgentTuiState extends State<AgentTui> {
   late final ConatusTuiController _controller = component.controller;
   final TextEditingController _input = TextEditingController();
   final AutoScrollController _scroll = AutoScrollController();
-  late final TuiCommandMenu _menu =
-      TuiCommandMenu(commands: () => _controller.commands);
-  late final AtRefMenu _atMenu =
-      AtRefMenu(cwd: () => Directory.current.path);
+  late final TuiCommandMenu _menu = TuiCommandMenu(
+    commands: () => _controller.commands,
+  );
+  late final AtRefMenu _atMenu = AtRefMenu(cwd: () => Directory.current.path);
   Timer? _spin;
   Timer? _exitTimer;
   int _tick = 0;
@@ -80,12 +73,7 @@ class _AgentTuiState extends State<AgentTui> {
         setState(() => _tick++);
       }
     });
-    unawaited(_controller.start().then((_) {
-      final String? first = component.firstInput;
-      if (first != null && first.isNotEmpty) {
-        unawaited(_controller.handleLine(first));
-      }
-    }));
+    unawaited(_controller.start());
   }
 
   @override
@@ -138,8 +126,9 @@ class _AgentTuiState extends State<AgentTui> {
       setState(() {});
       return;
     }
-    final List<TuiAttachment> attachments =
-        List<TuiAttachment>.of(_attachments);
+    final List<TuiAttachment> attachments = List<TuiAttachment>.of(
+      _attachments,
+    );
     _attachments.clear();
     unawaited(_controller.handleLine(text, attachments: attachments));
     setState(() {});
@@ -157,8 +146,10 @@ class _AgentTuiState extends State<AgentTui> {
     }
     final String? clipboard = ClipboardManager.paste();
     if (clipboard != null && clipboard.isNotEmpty) {
-      final List<TuiAttachment> found =
-          extractPathAttachments(clipboard, Directory.current.path);
+      final List<TuiAttachment> found = extractPathAttachments(
+        clipboard,
+        Directory.current.path,
+      );
       if (found.isNotEmpty) {
         _addAttachments(found);
         return true;
@@ -187,10 +178,7 @@ class _AgentTuiState extends State<AgentTui> {
     final LlmImage? image = await readClipboardImage();
     if (!mounted) return;
     if (image == null) {
-      _controller.transcript.add(
-        TuiRole.system,
-        '剪贴板中没有图片（复制截图后按 Ctrl+V 粘贴）。',
-      );
+      _controller.transcript.add(TuiRole.system, '剪贴板中没有图片（复制截图后按 Ctrl+V 粘贴）。');
       _refresh();
       return;
     }
@@ -385,8 +373,10 @@ class _AgentTuiState extends State<AgentTui> {
 
   /// 把选中候选补进输入框：目录停在路径末尾（继续列举），文件追加空格收尾。
   void _completeAtRef() {
-    final (String, int)? result =
-        _atMenu.complete(_input.text, cursor: _input.selection.baseOffset);
+    final (String, int)? result = _atMenu.complete(
+      _input.text,
+      cursor: _input.selection.baseOffset,
+    );
     if (result == null) {
       return;
     }
@@ -588,8 +578,9 @@ class _AgentTuiState extends State<AgentTui> {
   void _clearSelection() {
     _selectedText = '';
     if (!_input.selection.isCollapsed) {
-      _input.selection =
-          TextSelection.collapsed(offset: _input.selection.extentOffset);
+      _input.selection = TextSelection.collapsed(
+        offset: _input.selection.extentOffset,
+      );
     }
     setState(() => _selectionEpoch++);
   }
@@ -677,7 +668,8 @@ class _AgentTuiState extends State<AgentTui> {
           TeamStatusBar(snapshot: _controller.teamSnapshot),
           TuiInputBar(
             controller: _input,
-            focused: !_controller.picker.open &&
+            focused:
+                !_controller.picker.open &&
                 !_controller.choice.open &&
                 !_controller.providerPrompt.open &&
                 !_controller.formPrompt.open &&
@@ -705,10 +697,7 @@ class _AgentTuiState extends State<AgentTui> {
   Component _body() {
     if (!_controller.ready) {
       return const Center(
-        child: Text(
-          '正在加载会话…',
-          style: TextStyle(color: Colors.gray),
-        ),
+        child: Text('正在加载会话…', style: TextStyle(color: Colors.gray)),
       );
     }
     final List<TuiMessage> messages = _controller.transcript.messages;

@@ -8,9 +8,9 @@
 /// export DEEPSEEK_API_KEY="sk-..."
 /// dart run packages/conatus_tui/example/deepseek_demo.dart
 ///
-/// # 指定模型 / 会话 / 首轮
+/// # 指定模型 / 会话
 /// dart run packages/conatus_tui/example/deepseek_demo.dart \
-///   --model deepseek-chat --session demo --first "现在几点？"
+///   --model deepseek-chat --session demo
 /// ```
 library;
 
@@ -33,8 +33,9 @@ Future<void> main(List<String> args) async {
   final bool configured = credentials.get('DEEPSEEK_API_KEY') != null;
 
   final FallbackLlm llm = configured
-      ? FallbackLlm(
-          <LlmProvider>[DeepSeekProvider(model: model, credentials: credentials)])
+      ? FallbackLlm(<LlmProvider>[
+          DeepSeekProvider(model: model, credentials: credentials),
+        ])
       : FallbackLlm(<LlmProvider>[_OfflineProvider()]);
   final String label = configured
       ? (model ?? 'deepseek-flash')
@@ -54,21 +55,20 @@ Future<void> main(List<String> args) async {
     onExit: shutdownApp,
     name: 'DeepSeek Demo',
   );
-  await runApp(AgentTui(controller: controller, firstInput: options.first));
+  await runApp(AgentTui(controller: controller));
   await runtime.dispose();
 }
 
 /// 本 Demo 的用法文案。
-const String kDemoUsage = '用法：dart run example/deepseek_demo.dart '
-    '[--session <id>] [--model <name>] [--first <文本>]\n'
+const String kDemoUsage =
+    '用法：dart run example/deepseek_demo.dart '
+    '[--session <id>] [--model <name>]\n'
     '  --session <id>   启动会话 id（默认 $kTuiDefaultSession）\n'
-    '  --model <name>   DeepSeek 模型名（默认 deepseek-flash）\n'
-    '  --first <文本>   挂载后自动发一轮\n';
+    '  --model <name>   DeepSeek 模型名（默认 deepseek-flash）\n';
 
 /// 从参数里取 `--model` 的值；未出现或缺尾值时返回 `null`。
 ///
-/// `--session` / `--first` / `--help` 交给 [TuiOptions.parse]，这里只补 Demo
-/// 专属的模型开关。
+/// `--session` / `--help` 交给 [TuiOptions.parse]，这里只补 Demo 专属的模型开关。
 String? parseModelFlag(List<String> args) {
   for (int index = 0; index + 1 < args.length; index++) {
     if (args[index] == '--model') return args[index + 1];
@@ -100,7 +100,8 @@ class _OfflineProvider implements LlmProvider {
       );
     }
     return LlmResult(
-      content: '（离线 Demo）未接入真实模型。你说的是：「$user」。\n'
+      content:
+          '（离线 Demo）未接入真实模型。你说的是：「$user」。\n'
           '设置 DEEPSEEK_API_KEY 后重跑即可与 DeepSeek 对话。',
       provider: 'offline',
       model: 'scripted',
@@ -112,8 +113,7 @@ class _OfflineProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}
