@@ -19,6 +19,7 @@ import 'package:conatus_skill/conatus_skill.dart';
 import 'package:conatus_team/conatus_team.dart';
 import 'package:conatus_tts/conatus_tts.dart';
 
+import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
 import 'team_snapshot.dart';
@@ -962,6 +963,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     _session = session;
     final Context ctx = _app.plugin('tui-session:$id', (Context child) {
       provideAgentLoop(child, session: session, maxSteps: maxSteps);
+      // 计划闭环：plan_write 建计划，update_plan 在执行中推进。
+      providePlanTool(child, session: session);
+      provideUpdatePlanTool(child, session: session);
       providePlanMode(child, session: session);
       provideGoal(child, session: session);
       provideSessionSchedule(child, session: session, sessions: _sessions);

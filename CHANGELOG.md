@@ -4,6 +4,26 @@
 
 ## [未发布]
 
+- 自愈闭环（M4）：
+  - 新增预算模块 `lib/src/budget/`：`TurnBudget`（每轮墙钟 + 上下文 token 估算
+    护栏，默认 10 分钟 / 20 万 token，`estimateMessagesTokens` 粗口径只作护栏）；
+    `BudgetedLlmProvider` 包装 `'llm'` 服务，超限返回收口提示而非报错（空闲
+    2 分钟视为新一轮）；首个 `CostTracker` 实现 `CostTrackerImpl`（按用量与
+    粗略单价累计 `todayCost`），注册到 `'costTracker'` 供未来自主运行消费。
+    `ConatusTuiRuntime.create` 新增 `turnBudget` 参数（可显式关闭）。
+  - 新增 `update_plan` 工具：执行中按步骤序号标记完成 / 改写文案 / 追加步骤，
+    写回 `plan/updated` 事件；会话装配补齐 `plan_write`（此前未注册），
+    计划闭环成形。
+  - system prompt 增补「先规划后执行、失败反思重试」指引。
+- 新增 macOS 沙箱（M3，Seatbelt + dart_io_sandbox）：
+  - `lib/src/sandbox/`：`probeSandboxBackend`（launcher 定位 + chmod + 试跑，
+    fail-closed）、`CommandPolicy`（命令形状裁决）、`SandboxedShellExecutor`
+    （经 launcher 最小环境执行，不继承父环境）、`JailedFileSystem`
+    （conatus `FileSystem` 接 bound jail，越界映射 `sandboxDenied`）；
+    `run_command` / `run_tests` 走沙箱接缝（high 风险）。
+  - 配置新增 `[sandbox]`：`enabled`（默认 false）、`network_allowlist`、
+    `allowed_executables`、`command_timeout_ms`、`max_output_bytes`。
+  - `tool/sandbox_probe.dart` 输出后端探测结果。
 - 输入栏支持粘贴图片/文件：Ctrl+V 读系统剪贴板图片（macOS，经 osascript），
   粘贴文本中的文件路径（终端拖放 / `file://` URL）识别为附件；附件以 chip
   展示在输入栏上方（Backspace 可移除），提交时图片转 `LlmImage` 随消息发给

@@ -15,7 +15,10 @@
 - ⚡ 意图路由（高频命令零模型调用）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
-- 🔒 审批与沙箱（高危操作走审批）
+- 🔒 审批与沙箱（高危操作走审批；可选的 Seatbelt 进程沙箱 + 文件 jail）
+- 🗺️ 计划闭环（plan_write 建计划、update_plan 执行中推进、计划面板实时渲染）
+- 🩹 失败自愈（工具失败自动反思重试，可按需重规划）
+- ⏱️ 预算护栏（每轮墙钟 + 上下文 token 估算 + 成本跟踪）
 
 ## 快速开始
 
@@ -26,6 +29,55 @@ cd conatus_code
 dart pub get
 dart run bin/conatus_code.dart
 ```
+
+## 配置
+
+首次运行会读取 `~/.conatus-code/config.toml`（`CONATUS_CODE_HOME` /
+`--config` 可覆盖路径）。示例：
+
+```toml
+[agent]
+max_steps = 8                 # 单轮最大模型步数
+workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
+
+[approval]
+mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
+
+[sandbox]
+enabled = false               # 默认关闭；开启后走 jail fs + 沙箱命令执行
+network_allowlist = ["git fetch", "git pull"]
+command_timeout_ms = 120000
+max_output_bytes = 64000
+```
+
+## 沙箱分层与已知边界
+
+沙箱（`lib/src/sandbox/`，仅 macOS）由两层组成：
+
+- **命令层**：`CommandPolicy` 裁决命令形状（管道 / 重定向放行；`&&`、`;`、
+  `$()` 触发 review，当前按拒绝处理），再由 `SandboxedShellExecutor` 经
+  launcher 二进制在 Seatbelt 沙箱内执行，最小环境变量、不继承父进程环境。
+- **文件层**：`JailedFileSystem` 把 conatus `FileSystem` 接上
+  `dart_io_sandbox` 的 bound jail，读写限定在沙箱根内，越界映射为
+  `sandboxDenied`。
+
+已知边界：
+
+- launcher 默认无执行位，启动预检会 `chmod +x`；arm64 需 Rosetta 2，缺失时
+  预检 fail-closed 报错退出。
+- 审批判定 `REVIEW` 目前按拒绝处理（不启动进程），"REVIEW → 人工审批"
+  未接线。
+- 沙箱默认关闭（`[sandbox] enabled = false`），开启后进程隔离才生效。
+
+## 预算护栏
+
+每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 20 万估算 token 护栏；
+超限时模型收到收口提示而非直接报错。估算按约 4 字符 1 token 的粗口径
+（`estimateMessagesTokens`），**只作护栏，不用于计费**。成本跟踪
+（`CostTrackerImpl`）按用量与粗略单价累计 `todayCost`，供未来的自主运行
+预算检查消费。可用
+`ConatusTuiRuntime.create(turnBudget: TurnBudget(maxDuration: null, maxTokens: null))`
+关闭。
 
 ## 开发
 

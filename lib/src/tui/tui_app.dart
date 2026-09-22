@@ -17,6 +17,9 @@ import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 
 import '../../fs_tools.dart';
+import '../budget/budgeted_llm.dart';
+import '../budget/cost_tracker.dart';
+import '../budget/turn_budget.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
 import 'system_notifier.dart';
@@ -78,6 +81,8 @@ class ConatusTuiRuntime {
   /// [fs] / [shell] / [credentials] 是能力接缝的注入点：缺省用本地实现
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
+  /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
+  /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
   // REASON: 装配入口的参数聚合是既定形态（本参数已 15 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
@@ -92,6 +97,7 @@ class ConatusTuiRuntime {
     String? model,
     int maxSteps = 8,
     FallbackLlm? llm,
+    TurnBudget? turnBudget,
     String? modelLabel,
     FileSystem? fs,
     ShellExecutor? shell,
@@ -177,16 +183,29 @@ class ConatusTuiRuntime {
     }
     final LlmProvider? fromRegistry =
         registry?.buildLlm(registry.currentName ?? '', model: model);
-    Disposer llmDisposer = provideLlm(
+    // 预算护栏：包装 `'llm'` 服务（每轮墙钟 + 上下文 token 估算），并把首个
+    // CostTracker 实现注册到 `'costTracker'`（供未来 autonomous runner 消费）。
+    final CostTrackerImpl costTracker = CostTrackerImpl();
+    app.provide('costTracker', costTracker);
+    final TurnBudget resolvedBudget = turnBudget ?? const TurnBudget();
+    final FallbackLlm resolvedLlm = llm ??
+        (fromRegistry == null
+            ? defaultFallbackLlm(credentials: resolvedCredentials)
+            : FallbackLlm(<LlmProvider>[fromRegistry]));
+    Disposer llmDisposer = provideBudgetedLlm(
       app,
-      llm: llm ??
-          (fromRegistry == null
-              ? defaultFallbackLlm(credentials: resolvedCredentials)
-              : FallbackLlm(<LlmProvider>[fromRegistry])),
+      llm: resolvedLlm,
+      budget: resolvedBudget,
+      costTracker: costTracker,
     );
     void switchLlm(FallbackLlm next) {
       llmDisposer();
-      llmDisposer = provideLlm(app, llm: next);
+      llmDisposer = provideBudgetedLlm(
+        app,
+        llm: next,
+        budget: resolvedBudget,
+        costTracker: costTracker,
+      );
     }
     provideReflection(app);
     provideSpawnAgent(
@@ -208,6 +227,11 @@ class ConatusTuiRuntime {
     prompt.section(PromptSection(
       name: 'persona',
       text: () => '你是"助手"，一位耐心、务实的助手。需要实时信息或操作时调用工具；否则直接简洁回答。',
+    ));
+    prompt.section(PromptSection(
+      name: 'coding',
+      text: () => '编码任务先规划后执行：复杂任务先用 plan_write 制定执行计划，'
+          '执行中每完成一步用 update_plan 标记进度；工具失败时反思原因并重试或调整方案。',
     ));
     provideTimePrompt(app);
     provideMemory(

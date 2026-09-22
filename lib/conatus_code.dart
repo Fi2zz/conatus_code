@@ -6,6 +6,11 @@
 library;
 
 export 'src/assembly/permission_mode.dart' show toTuiPermissionMode;
+export 'src/budget/budgeted_llm.dart'
+    show BudgetedLlmProvider, kBudgetExhaustedReply, provideBudgetedLlm;
+export 'src/budget/cost_tracker.dart'
+    show CostTrackerImpl, kInputRatePerMillion, kOutputRatePerMillion;
+export 'src/budget/turn_budget.dart' show TurnBudget;
 export 'src/config/config_credentials.dart' show ConfigCredentials;
 export 'src/config/config_loader.dart' show ConfigException, loadConfig;
 export 'src/config/config_path.dart'
@@ -42,3 +47,5 @@ export 'src/tools/git_tools.dart' show GitDiffTool, GitRun, GitStatusTool, runGi
 export 'src/tools/list_files.dart' show ListFilesTool;
 export 'src/tools/run_command.dart' show RunCommandTool;
 export 'src/tools/run_tests.dart' show RunTestsTool;
+export 'src/tools/update_plan.dart'
+    show UpdatePlanTool, provideUpdatePlanTool;
