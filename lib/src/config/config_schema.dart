@@ -45,9 +45,14 @@ class ApprovalConfig {
 enum SandboxPreset { workspaceWrite, dangerFullAccess }
 
 /// 沙箱策略；由沙箱层（`src/sandbox/`）消费。
+///
+/// 分两层：Layer 1 应用层文件 jail（[fsJail]，防误操作，不依赖 OS 后端）；
+/// Layer 2 OS 级沙箱（[enabled]，命令执行经 Seatbelt 隔离，后端不可用时
+/// fail-closed 而非降级）。
 class SandboxSettings {
   const SandboxSettings({
     this.enabled = true,
+    this.fsJail = true,
     this.preset = SandboxPreset.workspaceWrite,
     this.allowNetwork = false,
     this.networkAllowlist = const <String>[],
@@ -56,8 +61,13 @@ class SandboxSettings {
     this.maxOutputBytes = 64000,
   });
 
-  /// 是否启用沙箱（jail fs + 沙箱命令执行）；缺省开启。
+  /// 是否启用 OS 级沙箱（命令执行）；缺省开启。后端不可用时命令执行
+  /// fail-closed（注入拒斥执行器，不降级本地 shell）。
   final bool enabled;
+
+  /// 是否启用应用层文件系统 jail（`JailedFileSystem`）；缺省开启。
+  /// 纯应用层防误操作，任何平台可用，不依赖 OS 沙箱后端。
+  final bool fsJail;
 
   /// 缺省「工作区内可写」。
   final SandboxPreset preset;

@@ -39,6 +39,10 @@ export 'src/diff/unified_diff.dart'
 export 'src/sandbox/command_policy.dart'
     show CommandDecision, CommandPolicy, CommandVerdict;
 export 'src/sandbox/jailed_file_system.dart' show JailedFileSystem;
+export 'src/sandbox/rejecting_shell.dart'
+    show RejectingShellExecutor, kSandboxUnavailable;
+export 'src/sandbox/sandbox_assembly.dart'
+    show SandboxLayers, resolveSandboxLayers;
 export 'src/sandbox/sandbox_probe.dart'
     show SandboxBackend, SandboxException, probeSandboxBackend;
 export 'src/sandbox/sandboxed_shell.dart' show SandboxedShellExecutor;

@@ -30,4 +30,15 @@ void main() {
         path: _writeConfig('[sandbox]\nallow_network = true\n'));
     expect(defaulted.sandbox.enabled, isTrue);
   });
+
+  test('sandbox.fs_jail：显式 false 生效，缺省 true（与 enabled 独立）', () {
+    final ConatusCodeConfig noJail = loadConfig(
+        path: _writeConfig('[sandbox]\nfs_jail = false\n'));
+    expect(noJail.sandbox.fsJail, isFalse);
+    expect(noJail.sandbox.enabled, isTrue);
+
+    final ConatusCodeConfig defaulted =
+        loadConfig(path: _writeConfig('[sandbox]\nenabled = false\n'));
+    expect(defaulted.sandbox.fsJail, isTrue);
+  });
 }

@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/tui.dart';
-import 'package:conatus_foundation/conatus_foundation.dart';
 
 Future<void> main(List<String> args) async {
   final TuiOptions options = TuiOptions.parse(args);
@@ -24,38 +23,24 @@ Future<void> main(List<String> args) async {
   final String workdir = config.agent.workdir ?? Directory.current.path;
   final String sep = Platform.pathSeparator;
 
-  // 沙箱装配：启用则 jail 文件系统 + 沙箱命令执行；后端不可用即 fail-closed。
-  final FileSystem? sandboxedFs;
-  final ShellExecutor? sandboxedShell;
+  // 分层沙箱装配：
+  // - Layer 1（fs_jail）：应用层文件 jail，纯应用层防误操作，任何平台可用；
+  // - Layer 2（enabled）：OS 级沙箱，后端不可用时 fail-closed —— 注入拒斥
+  //   执行器禁用命令，而不是整体退出或降级本地 shell。
+  final String canonicalRoot = Directory(workdir).resolveSymbolicLinksSync();
+  SandboxBackend? backend;
   if (config.sandbox.enabled) {
     try {
-      final SandboxBackend backend = probeSandboxBackend();
-      final String canonicalRoot = Directory(workdir).resolveSymbolicLinksSync();
-      final Set<String>? executables = config.sandbox.allowedExecutables.isEmpty
-          ? null
-          : config.sandbox.allowedExecutables.toSet();
-      sandboxedFs = JailedFileSystem(root: canonicalRoot);
-      sandboxedShell = SandboxedShellExecutor(
-        options: SandboxedShellOptions(
-          backend: backend,
-          root: canonicalRoot,
-          commandPolicy: CommandPolicy(
-            root: canonicalRoot,
-            allowedExecutables: executables,
-          ),
-          networkAllowlist: config.sandbox.networkAllowlist.toSet(),
-          maxOutputBytes: config.sandbox.maxOutputBytes,
-          maxTimeoutMs: config.sandbox.commandTimeoutMs,
-        ),
-      );
+      backend = probeSandboxBackend();
     } on SandboxException catch (error) {
-      stderr.writeln('沙箱不可用（fail-closed，未执行任何命令）：${error.message}');
-      exit(1);
+      stderr.writeln('OS 沙箱后端不可用（命令执行将禁用）：${error.message}');
     }
-  } else {
-    sandboxedFs = null;
-    sandboxedShell = null;
   }
+  final SandboxLayers layers = resolveSandboxLayers(
+    root: canonicalRoot,
+    settings: config.sandbox,
+    backend: backend,
+  );
 
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
     baseDir: '$workdir$sep${config.agent.projectDir}',
@@ -69,8 +54,8 @@ Future<void> main(List<String> args) async {
     ),
     credentials: ConfigCredentials(config),
     exaApiKey: Platform.environment['EXA_API_KEY'],
-    fs: sandboxedFs,
-    shell: sandboxedShell,
+    fs: layers.fs,
+    shell: layers.shell,
   );
 
   final ConatusTuiController controller = runtime.createController(

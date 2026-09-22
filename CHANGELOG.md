@@ -4,8 +4,15 @@
 
 ## [未发布]
 
-- 沙箱默认启用：`[sandbox] enabled` 缺省 `true`（jail fs + 沙箱命令执行，
-  仅 macOS；不支持环境的机器需显式关闭，否则启动预检 fail-closed 退出）。
+- 沙箱分层（Layer 1 / Layer 2 解耦）：
+  - 新增 `fs_jail`（Layer 1 应用层文件 jail，默认开启，纯应用层不依赖 OS
+    后端）；`enabled` 仅指 Layer 2 OS 级沙箱（命令执行）。
+  - fail-closed 只作用于 Layer 2 后端：后端不可用时新增
+    `RejectingShellExecutor` 禁用命令执行（不降级本地 shell、不整体退出），
+    Layer 1 文件 jail 照常生效。
+  - 新增 `resolveSandboxLayers`（`sandbox_assembly.dart`）统一两层装配。
+- 沙箱默认启用：`[sandbox] enabled`（Layer 2）与 `fs_jail`（Layer 1）缺省
+  `true`；不支持 OS 后端的机器命令执行自动禁用（fail-closed），文件 jail 保留。
 - 自愈闭环（M4）：
   - 新增预算模块 `lib/src/budget/`：`TurnBudget`（每轮墙钟 + 上下文 token 估算
     护栏，默认 10 分钟 / 20 万 token，`estimateMessagesTokens` 粗口径只作护栏）；

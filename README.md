@@ -44,7 +44,8 @@ workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
 mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
 
 [sandbox]
-enabled = true                # 默认开启；jail fs + 沙箱命令执行（仅 macOS）
+enabled = true                # Layer 2：OS 级沙箱（命令执行）；默认开启
+fs_jail = true                # Layer 1：应用层文件 jail（防误操作）；默认开启
 network_allowlist = ["git fetch", "git pull"]
 command_timeout_ms = 120000
 max_output_bytes = 64000
@@ -56,23 +57,30 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 
 ## 沙箱分层与已知边界
 
-沙箱（`lib/src/sandbox/`，仅 macOS）由两层组成：
+沙箱（`lib/src/sandbox/`）分两层，各自独立开关、独立失败语义：
 
-- **命令层**：`CommandPolicy` 裁决命令形状（管道 / 重定向放行；`&&`、`;`、
-  `$()` 触发 review，当前按拒绝处理），再由 `SandboxedShellExecutor` 经
-  launcher 二进制在 Seatbelt 沙箱内执行，最小环境变量、不继承父进程环境。
-- **文件层**：`JailedFileSystem` 把 conatus `FileSystem` 接上
-  `dart_io_sandbox` 的 bound jail，读写限定在沙箱根内，越界映射为
-  `sandboxDenied`。
+- **Layer 1 · 应用层文件 jail**（`fs_jail`，默认开启）：
+  `JailedFileSystem` 把 conatus `FileSystem` 接上 `dart_io_sandbox` 的 bound
+  jail，读写限定在沙箱根内，越界映射为 `sandboxDenied`。纯应用层防误操作，
+  **不依赖 OS 后端**，任何平台可用。
+- **Layer 2 · OS 级沙箱**（`enabled`，默认开启，仅 macOS）：
+  `CommandPolicy` 裁决命令形状（管道 / 重定向放行；`&&`、`;`、`$()` 触发
+  review，当前按拒绝处理），再由 `SandboxedShellExecutor` 经 launcher 二进制
+  在 Seatbelt 沙箱内执行，最小环境变量、不继承父进程环境。
+
+**fail-closed 只作用于 Layer 2 后端**：launcher / Rosetta / Seatbelt 不可用时，
+命令执行被拒斥执行器禁用（不降级为本地 shell），应用照常启动、Layer 1 文件
+jail 继续生效。Layer 1 与 Layer 2 可独立关闭。
 
 已知边界：
 
 - launcher 默认无执行位，启动预检会 `chmod +x`；arm64 需 Rosetta 2，缺失时
-  预检 fail-closed 报错退出（沙箱默认启用后，不满足条件的机器需在
-  `~/.conatus-code/config.toml` 里设 `[sandbox] enabled = false`）。
+  命令执行禁用（stderr 会提示，可在 config.toml 设 `[sandbox] enabled = false`
+  关闭 Layer 2，保留 Layer 1 文件 jail）。
 - 审批判定 `REVIEW` 目前按拒绝处理（不启动进程），"REVIEW → 人工审批"
   未接线。
-- 沙箱仅支持 macOS：其他平台请显式关闭 `[sandbox] enabled = false`。
+- Layer 2 仅支持 macOS：其他平台命令执行会禁用，请显式设
+  `[sandbox] enabled = false`。
 
 ## 预算护栏
 
