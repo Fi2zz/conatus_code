@@ -4,10 +4,8 @@ library;
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
 
-import 'provider_defaults.dart';
 import 'provider_profile.dart';
 import 'provider_registry.dart';
-import 'provider_store.dart';
 
 /// `ctx.providers`：当前上下文可见的注册表。
 extension ProvidersContext on Context {
@@ -15,19 +13,19 @@ extension ProvidersContext on Context {
   ProviderRegistry? get providers => get<ProviderRegistry>('providers');
 }
 
-/// 提供注册表为 `'providers'` 服务；调用方负责 [ProviderRegistry.load]。
+/// 提供注册表为 `'providers'` 服务（数据源是 config.toml 的 `[providers.*]`）。
 ///
-/// [credentials] 是 Key 的唯一来源（通常传 `provideCredentials(ctx)` 的结果）；
-/// 不注入时构造出的提供商没有 Key。
+/// [currentName] 缺省取列表首个；[credentials] 是 Key 的回退来源。
 ProviderRegistry provideProviders(
   Context ctx, {
-  required ProviderStore store,
-  List<ProviderProfile> builtin = kDefaultProviders,
+  required List<ProviderProfile> providers,
+  String? currentName,
   Credentials? credentials,
 }) {
   final ProviderRegistry registry = ProviderRegistry(
-    store: store,
-    builtin: builtin,
+    profiles: providers,
+    currentName:
+        currentName ?? (providers.isEmpty ? null : providers.first.name),
     credentials: credentials,
   );
   ctx.provide('providers', registry);
