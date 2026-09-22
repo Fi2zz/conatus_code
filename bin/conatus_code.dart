@@ -53,7 +53,6 @@ Future<void> main(List<String> args) async {
       maxTokens: config.budget.maxTurnTokens,
     ),
     credentials: ConfigCredentials(config),
-    exaApiKey: Platform.environment['EXA_API_KEY'],
     fs: layers.fs,
     shell: layers.shell,
   );

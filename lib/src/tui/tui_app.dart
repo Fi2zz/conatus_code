@@ -69,8 +69,9 @@ class ConatusTuiRuntime {
   /// 装配一个默认运行时。
   ///
   /// [sessionDir] / [memoryFile] / cron 任务与运行历史缺省落在 [baseDir]
-  /// （默认 `<cwd>/.conatus`）下；[webTools] 为 true 时注册 DuckDuckGo（有
-  /// [exaApiKey] 则 Exa 优先）；[skills] 为 true 时从 `.conatus/skills` 等目录
+  /// （默认 `<cwd>/.conatus`）下；[webTools] 为 true 时按 `kDefaultSearchOrder`
+  /// 装配搜索源（缺 Key 的自动跳过，见 `conatus_search`）；[skills] 为 true 时
+  /// 从 `.conatus/skills` 等目录
   /// 发现技能，注入目录段并注册 `skill` 工具。
   /// [llm] 缺省用注册表当前提供商构造的实例（[model] 覆盖其默认模型名，见
   /// `lib/providers.dart`）；显式传入则以传入者为准（如 DeepSeek-only 的 Demo）。
@@ -84,13 +85,12 @@ class ConatusTuiRuntime {
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 15 个），调用方是进程级
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 14 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
     String? memoryFile,
     String? baseDir,
-    String? exaApiKey,
     bool webTools = true,
     bool skills = true,
     bool providers = true,
@@ -161,16 +161,18 @@ class ConatusTuiRuntime {
           host: () => app.get<TuiUserPromptHost>('tuiController'),
         )));
 
-    if (webTools) {
-      provideSearch(app, exaApiKey: exaApiKey);
-      provideWebTools(app);
-    }
-
-    // ── 凭据 / 模型 / 自省 / 子 Agent ───────────────────────────
-    // Key 统一经凭据服务：provider 与注册表都不直接读环境变量，换 config.toml /
-    // File / Vault 等来源时只改这一处注入。缺省 EnvCredentials。
+    // ── 凭据（先于联网工具：搜索源要经凭据服务解析 Key）──────────
+    // Key 统一经凭据服务：provider、注册表与搜索源都不直接读环境变量，换
+    // config.toml / File / Vault 等来源时只改这一处注入。缺省 EnvCredentials。
     final Credentials resolvedCredentials =
         provideCredentials(app, credentials: credentials);
+
+    if (webTools) {
+      provideSearch(app, credentials: resolvedCredentials);
+      provideWebTools(app, credentials: resolvedCredentials);
+    }
+
+    // ── 模型 / 自省 / 子 Agent ─────────────────────────────────
     ProviderRegistry? registry;
     if (providers) {
       registry = provideProviders(
