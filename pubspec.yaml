@@ -4,77 +4,73 @@ description: >-
 version: 0.1.0
 repository: https://github.com/Fi2zz/conatus_code
 issue_tracker: https://github.com/Fi2zz/conatus_code/issues
+publish_to: none
 
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.6.0
 
+# 由 git filter 管理：工作区为生效状态，提交时自动注释掉，因此独立 clone 仍按
+# 下面的 git 依赖解析。见 README「在 conatus 仓库内开发」。
+# resolution: workspace
+
+# conatus 的各包尚未发布到 pub.dev，一律声明 git 源。在 conatus 仓库内解析时，
+# workspace 会用本地 packages/* 取代同名的 git 源依赖，因此无需 dependency_overrides。
 dependencies:
-  # 伞包：再导出所有稳定包
   conatus:
-    git:
-      url: https://github.com/Fi2zz/conatus.git
-      ref: master
-
-  # 实验性包：不在伞包内，需显式依赖
-  conatus_fs_tools:
-    git:
-      url: https://github.com/Fi2zz/conatus.git
-      ref: master
-      path: packages/conatus_fs_tools
-
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master}
+  conatus_agent:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_agent}
+  conatus_alerting:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_alerting}
+  conatus_asr:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_asr}
+  conatus_browser_use:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_browser_use}
   conatus_coding:
-    git:
-      url: https://github.com/Fi2zz/conatus.git
-      ref: master
-      path: packages/conatus_coding
-
-  conatus_tui:
-    git:
-      url: https://github.com/Fi2zz/conatus.git
-      ref: master
-      path: packages/conatus_tui
-
-dev_dependencies:
-  lints: ^4.0.0
-  test: ^1.25.0
-
-# conatus 的兄弟包尚未发布到 pub.dev，必须 override
-dependency_overrides:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_coding}
+  conatus_compaction:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_compaction}
+  conatus_computer_use:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_computer_use}
   conatus_core:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_core}
-  conatus_foundation:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_foundation}
   conatus_credentials:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_credentials}
+  conatus_cron:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_cron}
+  conatus_foundation:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_foundation}
+  conatus_fs_tools:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_fs_tools}
+  conatus_intent:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_intent}
   conatus_llm:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_llm}
+  conatus_mcp:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_mcp}
+  conatus_observability:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_observability}
+  conatus_ontology:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_ontology}
+  conatus_providers:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_providers}
+  conatus_schedule:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_schedule}
   conatus_search:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_search}
   conatus_skill:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_skill}
-  conatus_asr:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_asr}
-  conatus_tts:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tts}
-  conatus_mcp:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_mcp}
-  conatus_schedule:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_schedule}
-  conatus_cron:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_cron}
-  conatus_compaction:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_compaction}
-  conatus_agent:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_agent}
   conatus_tasks:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tasks}
-  conatus_observability:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_observability}
-  conatus_intent:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_intent}
   conatus_team:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_team}
+  conatus_tts:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tts}
+  conatus_tui:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tui}
   conatus_workflow:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_workflow}
-  nocterm:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tui}
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.25.0

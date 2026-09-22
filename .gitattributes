@@ -1,0 +1,4 @@
+# pubspec.yaml 里的 `resolution: workspace` 由 conatus-workspace filter 管理：
+# 工作区保持生效态，`git add` 时自动注释掉，使独立 clone 仍按 git 依赖解析。
+# filter 的配置不在版本控制内，需在 conatus 仓库执行 tool/setup_code_filter.sh。
+pubspec.yaml filter=conatus-workspace
