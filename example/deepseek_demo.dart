@@ -16,10 +16,10 @@ library;
 
 import 'dart:io';
 
+import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_llm/conatus_llm.dart';
-import 'package:conatus_providers/conatus_providers.dart';
 
 Future<void> main(List<String> args) async {
   final TuiOptions options = TuiOptions.parse(args);

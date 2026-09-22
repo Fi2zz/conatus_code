@@ -13,12 +13,12 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
-import 'package:conatus_providers/conatus_providers.dart';
 import 'package:conatus_schedule/conatus_schedule.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 import 'package:conatus_team/conatus_team.dart';
 import 'package:conatus_tts/conatus_tts.dart';
 
+import '../../providers.dart';
 import '../autonomous/autonomous_assembly.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';

@@ -9,6 +9,7 @@ import 'dart:math';
 import 'package:conatus/conatus.dart';
 import 'package:conatus_code/coding.dart';
 import 'package:conatus_code/fs_tools.dart';
+import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 
 String newSessionId() {

@@ -12,11 +12,11 @@ import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
-import 'package:conatus_providers/conatus_providers.dart';
 import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 
 import '../../fs_tools.dart';
+import '../../providers.dart';
 import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
@@ -72,11 +72,12 @@ class ConatusTuiRuntime {
   /// （默认 `<cwd>/.conatus`）下；[webTools] 为 true 时注册 DuckDuckGo（有
   /// [exaApiKey] 则 Exa 优先）；[skills] 为 true 时从 `.conatus/skills` 等目录
   /// 发现技能，注入目录段并注册 `skill` 工具。
-  /// [llm] 缺省用 `defaultFallbackLlm()`（豆包 → DeepSeek，见 conatus_providers）；传入后按注入的
-  /// 提供商为准（如 DeepSeek-only 的 Demo）。[modelLabel] 覆盖顶栏模型标签。
+  /// [llm] 缺省用注册表当前提供商构造的实例（[model] 覆盖其默认模型名，见
+  /// `lib/providers.dart`）；显式传入则以传入者为准（如 DeepSeek-only 的 Demo）。
+  /// 没有缺省回退链：两者都拿不到时抛 [StateError]。[modelLabel] 覆盖顶栏模型标签。
+  ///
   /// [providers] 为 true 时装配提供商注册表（`<baseDir>/providers.json`，
-  /// [providersFile] 可覆盖），`/provider` 命令据此可用；未显式传 [llm] 时优先
-  /// 用注册表当前提供商构造（[model] 覆盖其默认模型名）。
+  /// [providersFile] 可覆盖），`/provider` 命令据此可用。
   ///
   /// [fs] / [shell] / [credentials] 是能力接缝的注入点：缺省用本地实现
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
@@ -188,10 +189,11 @@ class ConatusTuiRuntime {
     final CostTrackerImpl costTracker = CostTrackerImpl();
     app.provide('costTracker', costTracker);
     final TurnBudget resolvedBudget = turnBudget ?? const TurnBudget();
-    final FallbackLlm resolvedLlm = llm ??
-        (fromRegistry == null
-            ? defaultFallbackLlm(credentials: resolvedCredentials)
-            : FallbackLlm(<LlmProvider>[fromRegistry]));
+    if (llm == null && fromRegistry == null) {
+      throw StateError('未装配 LLM：请配置 providers.json 的当前提供商，或显式传入 llm。');
+    }
+    final FallbackLlm resolvedLlm =
+        llm ?? FallbackLlm(<LlmProvider>[fromRegistry!]);
     Disposer llmDisposer = provideBudgetedLlm(
       app,
       llm: resolvedLlm,

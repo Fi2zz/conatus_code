@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+- `conatus_providers` 并入本包：`ProviderProfile` / `ProviderRegistry` /
+  `ProviderStore` / registry 导入与内置默认清单移入 `lib/src/providers/`，公开入口
+  为 `lib/providers.dart`（与 `tui.dart` / `fs_tools.dart` / `coding.dart` 并列）；
+  原独立包与根伞包的再导出一并移除。新增 `http` 直接依赖（registry 导入用）。
+- 去掉缺省回退链：不再提供 `defaultFallbackLlm`。`ConatusTuiRuntime.create` 未显式
+  传 `llm` 时用注册表当前提供商构造，两者都拿不到时抛 `StateError`；
+  `DoubaoProvider` / `DeepSeekProvider` 作为显式构造的便捷类保留。
 - 沙箱分层（Layer 1 / Layer 2 解耦）：
   - 新增 `fs_jail`（Layer 1 应用层文件 jail，默认开启，纯应用层不依赖 OS
     后端）；`enabled` 仅指 Layer 2 OS 级沙箱（命令执行）。

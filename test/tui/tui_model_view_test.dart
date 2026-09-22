@@ -3,11 +3,11 @@ library;
 
 import 'dart:io';
 
+import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
-import 'package:conatus_providers/conatus_providers.dart';
 import 'package:test/test.dart';
 
 /// 从不被调用的占位 provider。

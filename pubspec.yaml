@@ -14,8 +14,8 @@ environment:
 # 下面的 git 依赖解析。见 README「在 conatus 仓库内开发」。
 # resolution: workspace
 
-# conatus_tui / conatus_fs_tools / conatus_coding 已并入本包
-# （lib/{tui,fs_tools,coding}.dart），不再作为依赖列出。
+# conatus_tui / conatus_fs_tools / conatus_coding / conatus_providers 已并入本包
+# （lib/{tui,fs_tools,coding,providers}.dart），不再作为依赖列出。
 #
 # 伞包 `conatus` 供应用装配代码（bin/、lib/src/assembly/）使用；下面逐个列出的
 # 模块是并入的代码直接 import 的 —— lint 要求直接依赖必须显式声明。
@@ -37,8 +37,6 @@ dependencies:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_foundation}
   conatus_llm:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_llm}
-  conatus_providers:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_providers}
   conatus_schedule:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_schedule}
   conatus_search:
@@ -54,6 +52,7 @@ dependencies:
   dart_io_sandbox: ^1.2.3
   file: ^7.0.0
   glob: ^2.2.0
+  http: ^1.2.0
   nocterm: ^0.9.0
   toml: ^0.18.0
   workspace_sandbox: ^0.1.6
@@ -98,8 +97,6 @@ dependency_overrides:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_observability}
   conatus_ontology:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_ontology}
-  conatus_providers:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_providers}
   conatus_schedule:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_schedule}
   conatus_search:
