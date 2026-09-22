@@ -27,26 +27,25 @@ Future<void> main(List<String> args) async {
   final String cwd = parseFlag(args, '--cwd') ?? Directory.current.path;
   final String? model = parseFlag(args, '--model');
   final EnvCredentials envCredentials = EnvCredentials();
-  // 是否已配置 Key：providers.json 里任一 provider 带了 apiKey（推荐，一次
-  // 配置永久生效），或凭据服务（缺省环境变量）命中其 credentialKey。
-  final ProviderSnapshot snapshot = ProviderStore(
-    path:
-        '$cwd${Platform.pathSeparator}.conatus${Platform.pathSeparator}providers.json',
-  ).load();
-  final bool configured = snapshot.providers.any(
-    (ProviderProfile p) =>
-        p.apiKey.isNotEmpty || envCredentials.get(p.credentialKey) != null,
-  );
+  // 是否已配置 Key：凭据服务命中模型 Key（config.toml [credentials] / 环境变量）。
+  final bool configured = envCredentials.get('ARK_API_KEY') != null ||
+      envCredentials.get('DEEPSEEK_API_KEY') != null;
   if (!configured) {
     stdout.writeln('尚未配置任何 Key：以离线脚本模型运行 Demo。');
-    stdout.writeln('在 .conatus/providers.json 的 provider 里填 apiKey（推荐），');
-    stdout.writeln('或设置 ARK_API_KEY / DEEPSEEK_API_KEY 后重跑。');
+    stdout.writeln('设置 ARK_API_KEY / DEEPSEEK_API_KEY 后重跑即可接入真实模型。');
   }
-  // 有 Key 时由提供商注册表（`.conatus/providers.json`）的当前 provider 构造
-  // LLM（--model 覆盖其默认模型名），/provider 与 /model 命令据此工作。
+  // 有 Key 时显式构造豆包提供商（--model 覆盖默认模型名），不装配注册表：
+  // /provider 命令不可用，但不影响 run_code demo。未配置时离线脚本模型兜底。
+  final FallbackLlm llm = configured
+      ? FallbackLlm(<LlmProvider>[
+          DoubaoProvider(
+            apiKey: envCredentials.get('ARK_API_KEY')?.value,
+            model: model,
+          ),
+        ])
+      : FallbackLlm(<LlmProvider>[_OfflineProvider()]);
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
-    llm: configured ? null : FallbackLlm(<LlmProvider>[_OfflineProvider()]),
-    model: model,
+    llm: llm,
     modelLabel: configured ? null : '离线 Demo',
     maxSteps: 200,
   );
@@ -103,9 +102,9 @@ const String kPlaygroundUsage =
     '[--session <id>] [--cwd <目录>] [--model <名字>]\n'
     '  --session <id>   启动会话 id（默认 $kTuiDefaultSession）\n'
     '  --cwd <目录>     run_code 工作目录（默认当前目录）\n'
-    '  --model <名字>   覆盖当前提供商的模型名（默认取 provider 配置）\n'
+    '  --model <名字>   覆盖默认模型名（默认 doubao-seed-1-8-251228）\n'
     '输入 @<路径> 可引用文件（如 @lib/foo.dart 帮我看下这个文件）。\n'
-    '会话中用 /provider 管理提供商、/model 切换模型。\n';
+    '设置 ARK_API_KEY / DEEPSEEK_API_KEY 后接入真实模型；未配置以离线 Demo 运行。\n';
 
 /// 取 `--<名字>` 的值；未出现或缺尾值时返回 `null`。
 String? parseFlag(List<String> args, String name) {

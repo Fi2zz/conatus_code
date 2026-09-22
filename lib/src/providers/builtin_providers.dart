@@ -4,7 +4,7 @@
 /// 「有哪些具体提供商、各自的端点与默认模型」属于提供商管理（本模块）。
 ///
 /// 这里只提供显式构造的便捷类，**不含缺省回退链**：运行时用哪个提供商由
-/// 注册表配置（`providers.json`）或调用方注入的 `llm` 决定。
+/// 注册表配置（config.toml `[providers.*]`）或调用方注入的 `llm` 决定。
 library;
 
 import 'package:conatus_llm/conatus_llm.dart';

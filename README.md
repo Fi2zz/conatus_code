@@ -61,11 +61,20 @@ export PATH="$PWD/dist:$PATH"
 
 ```toml
 [credentials]
-ARK_API_KEY = "sk-..."        # 模型/搜索 Key 统一放这里（环境变量优先）
+ARK_API_KEY = "sk-..."        # 非模型 Key 也放这里（TAVILY_API_KEY 等）
 
 [llm]
-provider = "ark"              # 注册表里的提供商名：ark / deepseek / volcengine-coding-plan / ark-agent-plan
-# model = "doubao-seed-1-8-251228"
+default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"   # provider/model
+
+[providers.arkcli-agent-plan]
+api_key = "ark-..."
+base_url = "https://ark.cn-beijing.volces.com/api/plan/v3"
+type = "openai"
+
+[providers.deepseek]
+api_key = "sk-..."
+base_url = "https://api.deepseek.com/v1"
+type = "openai"
 
 [agent]
 max_steps = 8                 # 单轮最大模型步数
@@ -88,36 +97,46 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 
 ## 模型提供商（`/provider` / `/model`）
 
-提供商注册表（`lib/src/providers/`，公开入口 `lib/providers.dart`）管理可用模型
-端点，持久化在 `<baseDir>/providers.json`（默认 `<cwd>/.conatus/providers.json`）。
-**没有缺省回退链**：未显式注入 `llm` 时，运行时用注册表当前提供商构造实例；两者
-都拿不到时抛 `StateError`。
+提供商在 `~/.conatus-code/config.toml` 的 `[providers.<名字>]` 表里定义
+（实现 `lib/src/providers/`，公开入口 `lib/providers.dart`）；`[llm]
+default_model = "provider/model"` 同时定当前提供商与默认模型。`/provider` /
+`/model` 命令**只读展示**注册表——增删改直接编辑 config.toml。**没有缺省回退
+链**：未显式注入 `llm` 时，运行时用注册表当前提供商构造实例；两者都拿不到时
+抛 `StateError`。
+
+```toml
+[providers.my-gateway]
+api_key = "sk-..."      # 可省略；空时构造期报缺凭据
+base_url = "https://my-gateway.example/v1"   # OpenAI 兼容端点根地址（必填）
+type = "openai"         # openai→chat/completions；kimi→responses（缺省 openai）
+# [providers.my-gateway.oauth]   # 保留字段：OAuth 未实现，仅提示不可用
+# key = "oauth-key-name"
+```
+
+- `type` 决定请求形态：`openai` 走 `chat/completions`，`kimi` 走 `responses`。
+- `oauth` 子表：字段保留（`key`）但**不实现** OAuth 调用；配了 `oauth.key` 且
+  未配 `api_key` 的提供商启动时提示不可用，其余照常。
+- 以代码装配：`provideProviders(app, providers: <ProviderProfile>[...],
+  currentName: ..., credentials: ...)` 把注册表挂到 `'providers'` 服务，
+  `registry.buildLlm(name, model: ...)` 按 profile 构造 OpenAI 兼容
+  `LlmProvider`。Key 解析顺序：配置内 `apiKey` → 注入的凭据服务（缺省
+  `EnvCredentials`）。
 
 ```dart
 import 'package:conatus_code/providers.dart';
 
 final ProviderRegistry registry = provideProviders(
   app,
-  store: ProviderStore(path: '.conatus/providers.json'),
+  providers: <ProviderProfile>[
+    const ProviderProfile(
+      name: 'ark',
+      baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    ),
+  ],
+  currentName: 'ark',
 );
-await registry.load(); // 无文件时落盘内置默认
-final LlmProvider? llm = registry.buildLlm(registry.currentName ?? '');
+final LlmProvider? llm = registry.buildLlm('ark', model: 'doubao-seed-1-8-251228');
 ```
-
-- **`ProviderProfile`**：`name` / `baseUrl` / `credentialKey` / `models` /
-  `apiStyle`（chat / responses）/ `userAgent` / `apiKey`。密钥默认不进配置：
-  `credentialKey` 指向环境变量或 `conatus_credentials` 里的键名，由 LLM provider
-  构造期解析；也可直接写 `apiKey`（明文落在 `providers.json`，非空时优先于凭据
-  服务，请放在 gitignore 的目录）。`userAgent` 可空，缺省 `ConatusCode/0.16`，
-  可设成其他 harness 客户端的 UA（如 `dsh/0.1.2`）以通过 plan 端点的客户端校验。
-- **`ProviderRegistry`**（服务键 `'providers'`）：增删改查、当前选中、`load`
-  落盘、`importRegistry` 合并、`buildLlm` 按 profile 构造提供商。
-- **registry 导入**：GET `api.json`（带 `Authorization: Bearer <token>`），正文
-  接受 `{"providers": [...]}` 或顶层数组，字段同 `ProviderProfile`。
-
-首次运行（无 providers.json）落盘四个常见平台：火山方舟 `api/v3`、DeepSeek
-官方、火山方舟 Coding Plan（`api/coding/v3`）、Agent Plan（`api/plan/v3`）。
-未配置密钥的项仍会列出，调用时才报缺凭据。
 
 **Plan 端点只认订阅后生成的专属 Key**：`ark-agent-plan` 用
 `ARK_AGENT_PLAN_API_KEY`、`volcengine-coding-plan` 用 `ARK_CODING_PLAN_API_KEY`，

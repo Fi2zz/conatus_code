@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+- provider 配置收敛到 config.toml：新增 `[providers.<名字>]` 表（`api_key` /
+  `base_url` / `type` / 可选 `oauth` 子表）与 `[llm] default_model =
+  "provider/model"`；`providers.json` 不再读写，`[llm] provider` / `model`
+  两个字段被 `default_model` 替代，模型 Key 不再走 `[credentials]`/环境变量
+  （`[credentials]` 表保留给搜索等非模型 Key）
+- `/provider` 命令退化为只读展示；增删改直接编辑 config.toml
+- **破坏性**：`ConatusTuiRuntime.create` 移除 `providers`（bool）/`providersFile`
+  形参，新增 `List<ProviderConfig>? providers`；已有 `providers.json` 的用户
+  需把 provider 定义迁移到 config.toml 的 `[providers.xxx]`
 - 破坏性变更：移除 `--first` 启动参数与 `AgentTui.firstInput`。`TuiOptions.first` /
   `AgentTui.firstInput` 不再存在，`--first` 不再被识别（按未知参数忽略）。
 - `[llm] provider` 配置接线：`ConatusTuiRuntime.create` 新增 `provider` 形参，按

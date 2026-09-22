@@ -65,7 +65,7 @@ class ProviderProfile {
   /// harness 客户端，如 dsh）。
   final String userAgent;
 
-  /// 该提供商的 API Key（可选，落地在 providers.json）。
+  /// 该提供商的 API Key（可选，来自 config.toml `[providers.*]` 的 `api_key`）。
   ///
   /// 非空时优先于凭据服务（`credentialKey` → 环境变量 / Vault 等）；空串则
   /// 只经 [Credentials] 解析。**配置文件含明文 Key**：放在 gitignore 的目录
