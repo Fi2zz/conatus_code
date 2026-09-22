@@ -30,6 +30,30 @@ dart pub get
 dart run bin/conatus_code.dart
 ```
 
+## 打包成可执行文件
+
+```bash
+bash tool/build_binary.sh
+```
+
+产出 `dist/conatio`（自包含：内嵌 Dart runtime，目标机器不需要装 Dart SDK）。
+装到 PATH 的两种方式：
+
+```bash
+# 1. 软链到 PATH 上的目录
+ln -s "$PWD/dist/conatio" /usr/local/bin/conatio
+
+# 2. 或把 dist/ 加进 PATH
+export PATH="$PWD/dist:$PATH"
+```
+
+之后直接 `conatio` 启动，`conatio --help` 看用法。脚本默认写到
+`<包根>/dist/conatio`；第一个参数可覆盖输出路径，例如把产物写到
+`/tmp/conatio`。
+
+注意：OS 沙箱后端（launcher）仍在运行时从 pub 缓存定位，换机器或清理 pub 缓存后
+沙箱会 fail-closed（命令执行被禁用，文件 jail 保留），这与源码运行时的行为一致。
+
 ## 配置
 
 首次运行会读取 `~/.conatus-code/config.toml`（`CONATUS_CODE_HOME` /

@@ -33,7 +33,7 @@ class TuiOptions {
 
   /// 用法文案。
   static const String usage =
-      '用法：dart run conatus_code '
+      '用法：conatus_code '
       '[--session <id>] [--config <路径>]\n'
       '  --session <id>   启动会话 id（默认 tui）\n'
       '  --config <路径>  配置文件路径（默认 ~/.conatus-code/config.toml）\n';
