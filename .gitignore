@@ -10,6 +10,9 @@ pubspec.lock
 # 本地开发用：由 conatus 仓库的 tool/setup_code_filter.sh 生成（见 README）
 pubspec_overrides.yaml
 
+# conatus_code 运行期状态（会话 / 记忆 / 技能 / 快照），与 conatus 仓库根同名约定
+.conatus/
+
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.
 doc/api/
