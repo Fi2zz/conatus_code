@@ -22,6 +22,10 @@ String _writeConfig(String content) {
   return file.path;
 }
 
+/// 把 [toml] 写进临时文件并加载解析，返回配置。
+ConatusCodeConfig loadConfigFromToml(String toml) =>
+    loadConfig(path: _writeConfig(toml));
+
 /// 断言 [body] 抛 [ConfigException]，且消息包含 [fragment]。
 void _expectConfigError(String fragment, void Function() body) {
   expect(
@@ -87,8 +91,8 @@ void main() {
       final ConatusCodeConfig config =
           loadConfig(path: '${_tempDir().path}${sep}missing.toml');
 
-      expect(config.llm.provider, isNull);
-      expect(config.llm.model, isNull);
+      expect(config.llm.defaultModel, isNull);
+      expect(config.providers, isEmpty);
       expect(config.agent.maxSteps, 8);
       expect(config.agent.workdir, isNull);
       expect(config.agent.projectDir, '.conatus');
@@ -104,8 +108,7 @@ void main() {
     test('合法 TOML → 逐字段映射', () {
       final ConatusCodeConfig config = loadConfig(path: _writeConfig('''
 [llm]
-provider = "ark"
-model = "doubao-seed"
+default_model = "ark/doubao-seed"
 
 [agent]
 max_steps = 12
@@ -125,8 +128,7 @@ allowed_executables = ["git", "dart"]
 ARK_API_KEY = "from-file"
 '''));
 
-      expect(config.llm.provider, 'ark');
-      expect(config.llm.model, 'doubao-seed');
+      expect(config.llm.defaultModel, 'ark/doubao-seed');
       expect(config.agent.maxSteps, 12);
       expect(config.agent.workdir, '/tmp/work');
       expect(config.agent.projectDir, '.state');
@@ -196,5 +198,64 @@ ARK_API_KEY = "from-file"
             (CredentialsException error) => error.code, 'code', 'read-only')),
       );
     });
+  });
+
+  test('解析 [providers.*]：引号键、type 映射、oauth 子表', () {
+    final ConatusCodeConfig config = loadConfigFromToml('''
+[providers.arkcli-agent-plan]
+api_key = "ark-1"
+base_url = "https://ark.cn-beijing.volces.com/api/plan/v3"
+type = "openai"
+
+[providers."managed:kimi-code"]
+api_key = ""
+base_url = "https://api.kimi.com/coding/v1"
+type = "kimi"
+[providers."managed:kimi-code".oauth]
+key = "oauth/kimi-code"
+storage = "file"
+
+[llm]
+default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"
+''');
+
+    expect(config.providers, hasLength(2));
+    final ProviderConfig ark = config.providers[0];
+    expect(ark.name, 'arkcli-agent-plan');
+    expect(ark.apiKey, 'ark-1');
+    expect(ark.type, ProviderType.openai);
+
+    final ProviderConfig kimi = config.providers[1];
+    expect(kimi.name, 'managed:kimi-code');
+    expect(kimi.apiKey, '');
+    expect(kimi.type, ProviderType.kimi);
+    expect(kimi.oauthKey, 'oauth/kimi-code');
+    expect(config.llm.defaultModel, 'arkcli-agent-plan/doubao-seed-2-0-lite-260215');
+  });
+
+  test('default_model 格式非法抛 ConfigException', () {
+    expect(
+      () => loadConfigFromToml('[llm]\ndefault_model = "no-slash"'),
+      throwsA(isA<ConfigException>()),
+    );
+    expect(
+      () => loadConfigFromToml('[llm]\ndefault_model = "/model"'),
+      throwsA(isA<ConfigException>()),
+    );
+  });
+
+  test('未知 type 抛 ConfigException；base_url 缺失抛 ConfigException', () {
+    expect(
+      () => loadConfigFromToml('''
+[providers.x]
+base_url = "https://x"
+type = "anthropic"
+'''),
+      throwsA(isA<ConfigException>()),
+    );
+    expect(
+      () => loadConfigFromToml('[providers.x]\napi_key = "k"'),
+      throwsA(isA<ConfigException>()),
+    );
   });
 }

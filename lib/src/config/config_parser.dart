@@ -11,6 +11,7 @@ class ConfigParser extends ConfigValues {
   /// 解析整份配置。
   ConatusCodeConfig parse() => ConatusCodeConfig(
         llm: _readLlm(),
+        providers: _readProviders(),
         agent: _readAgent(),
         approval: _readApproval(),
         sandbox: _readSandbox(),
@@ -20,10 +21,65 @@ class ConfigParser extends ConfigValues {
 
   LlmConfig _readLlm() {
     final Map<String, dynamic> table = readTable('llm');
-    return LlmConfig(
-      provider: readString(table, 'provider'),
-      model: readString(table, 'model'),
+    final String? defaultModel = readString(table, 'default_model');
+    if (defaultModel != null && !_validDefaultModel(defaultModel)) {
+      throw ConfigException('$source：llm.default_model 必须是 "provider/model" 形式。');
+    }
+    return LlmConfig(defaultModel: defaultModel);
+  }
+
+  bool _validDefaultModel(String value) {
+    final int slash = value.indexOf('/');
+    return slash > 0 && slash < value.length - 1;
+  }
+
+  List<ProviderConfig> _readProviders() {
+    final Map<String, dynamic> table = readTable('providers');
+    return <ProviderConfig>[
+      for (final MapEntry<String, dynamic> entry in table.entries)
+        _readProvider(entry.key, entry.value),
+    ];
+  }
+
+  ProviderConfig _readProvider(String name, Object? raw) {
+    if (raw is! Map) {
+      throw ConfigException('$source：providers.$name 必须是表。');
+    }
+    final Map<String, dynamic> table = raw.cast<String, dynamic>();
+    final String baseUrl = readString(table, 'base_url') ?? '';
+    if (baseUrl.isEmpty) {
+      throw ConfigException('$source：providers.$name.base_url 不能为空。');
+    }
+    return ProviderConfig(
+      name: name,
+      baseUrl: baseUrl,
+      apiKey: readString(table, 'api_key') ?? '',
+      type: _providerType(table, name),
+      oauthKey: _readOauthKey(table, name),
     );
+  }
+
+  ProviderType _providerType(Map<String, dynamic> table, String name) {
+    final String? value = readString(table, 'type');
+    if (value == null) return ProviderType.openai;
+    return switch (value) {
+      'openai' => ProviderType.openai,
+      'kimi' => ProviderType.kimi,
+      _ => throw ConfigException('$source：providers.$name.type 取值 "$value" 不合法。'),
+    };
+  }
+
+  String? _readOauthKey(Map<String, dynamic> table, String name) {
+    final Object? oauth = table['oauth'];
+    if (oauth == null) return null;
+    if (oauth is! Map) {
+      throw ConfigException('$source：providers.$name.oauth 必须是表。');
+    }
+    final Object? key = oauth['key'];
+    if (key != null && key is! String) {
+      throw ConfigException('$source：providers.$name.oauth.key 必须是字符串。');
+    }
+    return key as String?;
   }
 
   AgentConfig _readAgent() {

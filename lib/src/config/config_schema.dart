@@ -1,15 +1,48 @@
 /// conatus_code 的配置模型，对应 `~/.conatus-code/config.toml`。
 library;
 
-/// LLM 选择：提供商注册名与模型覆盖。
+/// LLM 选择：`provider/model` 同时定当前提供商与默认模型。
 class LlmConfig {
-  const LlmConfig({this.provider, this.model});
+  const LlmConfig({this.defaultModel});
 
-  /// `ProviderRegistry` 中的注册名；`null` 表示沿用注册表当前项。
-  final String? provider;
+  /// `provider/model`（如 `'arkcli-agent-plan/doubao-seed-2-0-lite-260215'`）；
+  /// `null` 表示缺省取注册表首个提供商。
+  final String? defaultModel;
+}
 
-  /// 覆盖提供商的默认模型名。
-  final String? model;
+/// provider 类型：决定请求形态（都走 OpenAI 兼容客户端）。
+enum ProviderType {
+  /// `chat/completions` 形态。
+  openai,
+
+  /// `responses` 形态。
+  kimi,
+}
+
+/// 一个模型提供商的配置（对应 `[providers.<name>]` 表）。
+class ProviderConfig {
+  const ProviderConfig({
+    required this.name,
+    required this.baseUrl,
+    this.apiKey = '',
+    this.type = ProviderType.openai,
+    this.oauthKey,
+  });
+
+  /// 提供商名（`[providers.<name>]` 的键，可含 `.` / `:`）。
+  final String name;
+
+  /// OpenAI 兼容端点根地址。
+  final String baseUrl;
+
+  /// API Key；空串表示无 Key。
+  final String apiKey;
+
+  /// 请求形态。
+  final ProviderType type;
+
+  /// `oauth` 子表的 `key`；保留但不实现 OAuth 调用。
+  final String? oauthKey;
 }
 
 /// Agent Loop 行为。
@@ -106,6 +139,7 @@ class BudgetConfig {
 class ConatusCodeConfig {
   const ConatusCodeConfig({
     this.llm = const LlmConfig(),
+    this.providers = const <ProviderConfig>[],
     this.agent = const AgentConfig(),
     this.approval = const ApprovalConfig(),
     this.sandbox = const SandboxSettings(),
@@ -114,6 +148,10 @@ class ConatusCodeConfig {
   });
 
   final LlmConfig llm;
+
+  /// `[providers.<name>]` 表，保持 TOML 书写顺序。
+  final List<ProviderConfig> providers;
+
   final AgentConfig agent;
   final ApprovalConfig approval;
   final SandboxSettings sandbox;

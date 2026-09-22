@@ -29,6 +29,8 @@ export 'src/config/config_schema.dart'
         BudgetConfig,
         ConatusCodeConfig,
         LlmConfig,
+        ProviderConfig,
+        ProviderType,
         SandboxPreset,
         SandboxSettings;
 export 'src/diff/diff_parse.dart' show parseUnifiedDiff;
