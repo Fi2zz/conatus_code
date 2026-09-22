@@ -1,5 +1,7 @@
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../diff/unified_diff.dart';
+
 /// 编辑文件的工具。默认要求 old_string 唯一匹配，replace_all 可替换所有匹配。
 class EditFileTool extends Tool {
   const EditFileTool({required FileSystem fs}) : _fs = fs;
@@ -39,8 +41,8 @@ class EditFileTool extends Tool {
       if (oldString == newString) {
         return _error('FS_NO_CHANGE', 'old_string 与 new_string 相同');
       }
-      final String raw = await _fs.readText(target);
-      final int matches = oldString.allMatches(raw).length;
+      final String oldText = await _fs.readText(target);
+      final int matches = oldString.allMatches(oldText).length;
       if (matches == 0) {
         return _error('FS_NOT_FOUND', '未找到 old_string');
       }
@@ -59,11 +61,17 @@ class EditFileTool extends Tool {
         ),
         expectedVersion: ctx.optional<String>('expected_version'),
       );
+      final String newText = replaceAll
+          ? oldText.replaceAll(oldString, newString)
+          : oldText.replaceFirst(oldString, newString);
+      final String diff =
+          buildUnifiedDiff(oldText: oldText, newText: newText, path: path);
       final FsInfo? info = await _fs.stat(target);
       return ToolResult.success('已编辑 "$path"', value: <String, Object?>{
         'path': target.displayPath,
         'replacements': replaceAll ? matches : 1,
         'version': info?.version,
+        if (diff.isNotEmpty) 'diff': diff,
       });
     } on FsError catch (e) {
       return ToolResult.failure(e.message, error: ToolError(e.code.code, e.message));

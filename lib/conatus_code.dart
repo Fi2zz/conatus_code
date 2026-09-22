@@ -24,6 +24,12 @@ export 'src/config/config_schema.dart'
         LlmConfig,
         SandboxPreset,
         SandboxSettings;
+export 'src/diff/diff_parse.dart' show parseUnifiedDiff;
+export 'src/diff/diff_types.dart' show DiffFile, DiffHunk, DiffOp, DiffOpKind;
+export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
+export 'src/diff/unified_diff.dart'
+    show buildUnifiedDiff, kMaxDiffLines, splitLines;
+export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
 export 'src/tools/git_tools.dart' show GitDiffTool, GitRun, GitStatusTool, runGit;
 export 'src/tools/list_files.dart' show ListFilesTool;

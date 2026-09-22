@@ -1,5 +1,7 @@
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../diff/unified_diff.dart';
+
 /// 写入模式。
 enum WriteMode {
   /// 创建。文件已存在则失败。
@@ -50,17 +52,22 @@ class WriteFileTool extends Tool {
     try {
       final FsTarget target = await _fs.resolve(path);
       final WriteMode mode = _parseMode(ctx.optional<String>('mode'));
+      final String oldText = await _readExisting(target);
+      final String next = mode == WriteMode.append ? oldText + content : content;
       if (mode == WriteMode.append) {
-        await _fs.writeText(target, await _readExisting(target) + content);
+        await _fs.writeText(target, next);
       } else {
-        await _fs.writeText(target, content, expected: _guard(mode, ctx));
+        await _fs.writeText(target, next, expected: _guard(mode, ctx));
       }
       final FsInfo? info = await _fs.stat(target);
+      final String diff =
+          buildUnifiedDiff(oldText: oldText, newText: next, path: path);
       return ToolResult.success('已写入 "$path"', value: <String, Object?>{
         'path': target.displayPath,
         'mode': mode.name,
         'bytes': content.length,
         'version': info?.version,
+        if (diff.isNotEmpty) 'diff': diff,
       });
     } on FsError catch (e) {
       return ToolResult.failure(e.message, error: ToolError(e.code.code, e.message));

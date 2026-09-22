@@ -76,6 +76,33 @@ void main() {
     expect(gate.alwaysAllowed, isEmpty);
   });
 
+  test('apply_patch 请求的浮层选项展示 diff 预览；未知工具保持原描述', () async {
+    final _FsFixture fixture = _withFs();
+    final TuiChoicePrompt choice = fixture.choice;
+    final TuiPermissionGate gate = fixture.gate;
+    const String patch = '--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n';
+
+    final Future<bool> apply = gate.request(ApprovalRequest(
+      id: 'r3',
+      toolName: 'apply_patch',
+      description: '原始说明',
+      arguments: <String, Object?>{'patch': patch},
+    ));
+    await pumpEventQueue(); // 等预览计算完成、浮层弹出
+    expect(choice.request!.choices.first.description, patch);
+
+    final Future<bool> unknown = gate.request(ApprovalRequest(
+      id: 'r4',
+      toolName: 'unknown_tool',
+      description: '原始说明',
+    ));
+    expect(choice.request!.choices.first.description, '原始说明');
+
+    choice.cancel();
+    expect(await apply, isFalse);
+    expect(await unknown, isFalse);
+  });
+
   test('总是允许记住工具，后续调用不再弹浮层', () async {
     final TuiChoicePrompt choice = TuiChoicePrompt();
     final TuiPermissionGate gate = TuiPermissionGate(choice: choice);

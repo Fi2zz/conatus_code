@@ -122,5 +122,29 @@ void main() {
       expect(result.isError, isFalse);
       expect(File('${dir.path}/a.txt').readAsStringSync(), 'b');
     });
+
+    test('结果携带 diff：overwrite 含 --- a/ 头，create 新文件非空', () async {
+      File('${dir.path}/a.txt').writeAsStringSync('old\n');
+
+      final ToolResult overwritten = await tool.call(_context(<String, Object?>{
+        'path': 'a.txt',
+        'content': 'new\n',
+        'mode': 'overwrite',
+      }));
+      expect(overwritten.isError, isFalse);
+      final String overwriteDiff =
+          (overwritten.value! as Map<String, Object?>)['diff']! as String;
+      expect(overwriteDiff, contains('--- a/a.txt'));
+      expect(overwriteDiff, contains('-old'));
+      expect(overwriteDiff, contains('+new'));
+
+      final ToolResult created = await tool.call(
+          _context(<String, Object?>{'path': 'b.txt', 'content': 'hi\n'}));
+      expect(created.isError, isFalse);
+      final String createDiff =
+          (created.value! as Map<String, Object?>)['diff']! as String;
+      expect(createDiff, isNotEmpty);
+      expect(createDiff, contains('--- a/b.txt'));
+    });
   });
 }

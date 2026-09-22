@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../diff/preview.dart';
 import 'tui_choice.dart';
 import 'tui_permission.dart';
 
@@ -84,10 +85,14 @@ class TuiPermissionGate implements Approval {
     if (!_pending.isClosed) _pending.add(request);
     if (mode == TuiPermissionMode.neverAsk) return true;
     if (_alwaysAllowed.contains(request.toolName)) return true;
+    // 仅可预览工具走异步计算（避免改变其余工具的同步弹层时序）。
+    final ApprovalRequest effective = _previewable(request.toolName)
+        ? await _withPreview(request)
+        : request;
     final String? picked = await choice.ask(
       TuiChoiceRequest(
-        title: '是否允许执行 "${request.toolName}"？',
-        choices: _toolChoices(request),
+        title: '是否允许执行 "${effective.toolName}"？',
+        choices: _toolChoices(effective),
       ),
       timeout: kTuiDecisionTimeout,
     );
@@ -129,6 +134,27 @@ class TuiPermissionGate implements Approval {
   Future<void> close() async {
     choice.cancel();
     if (!_pending.isClosed) await _pending.close();
+  }
+
+  /// 哪些工具需要差异预览（其参数可推导出可读的 diff）。
+  bool _previewable(String toolName) =>
+      toolName == 'apply_patch' ||
+      toolName == 'write_file' ||
+      toolName == 'edit_file';
+
+  /// 用差异预览替换请求的静态描述；预览不可得时原样返回。
+  Future<ApprovalRequest> _withPreview(ApprovalRequest request) async {
+    final String? preview =
+        await buildApprovalPreview(_fs, request.toolName, request.arguments);
+    if (preview == null) return request;
+    return ApprovalRequest(
+      id: request.id,
+      toolName: request.toolName,
+      arguments: request.arguments,
+      description: preview,
+      pathArgs: request.pathArgs,
+      createdAt: request.createdAt,
+    );
   }
 
   /// 该工具是否已获授权访问 [path]（path 必须落在某个已信任目录内）。
