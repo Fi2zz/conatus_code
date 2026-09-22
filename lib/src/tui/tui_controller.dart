@@ -19,6 +19,7 @@ import 'package:conatus_skill/conatus_skill.dart';
 import 'package:conatus_team/conatus_team.dart';
 import 'package:conatus_tts/conatus_tts.dart';
 
+import '../autonomous/autonomous_assembly.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
@@ -968,6 +969,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       provideUpdatePlanTool(child, session: session);
       providePlanMode(child, session: session);
       provideGoal(child, session: session);
+      // 自主运行：独立 Agent Loop（无 goalDriver）+ 根上下文的 costTracker。
+      provideAutonomous(child, session: session, maxSteps: maxSteps);
       provideSessionSchedule(child, session: session, sessions: _sessions);
       provideScheduleTools(child);
       provideScheduleRuntime(child, deliver: _deliverReminder);

@@ -48,6 +48,10 @@ enabled = false               # 默认关闭；开启后走 jail fs + 沙箱命�
 network_allowlist = ["git fetch", "git pull"]
 command_timeout_ms = 120000
 max_output_bytes = 64000
+
+[budget]
+max_turn_seconds = 600        # 单轮墙钟上限（秒）；0 = 不限
+max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 ```
 
 ## 沙箱分层与已知边界
@@ -74,8 +78,8 @@ max_output_bytes = 64000
 每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 20 万估算 token 护栏；
 超限时模型收到收口提示而非直接报错。估算按约 4 字符 1 token 的粗口径
 （`estimateMessagesTokens`），**只作护栏，不用于计费**。成本跟踪
-（`CostTrackerImpl`）按用量与粗略单价累计 `todayCost`，供未来的自主运行
-预算检查消费。可用
+（`CostTrackerImpl`）按用量与粗略单价累计 `todayCost`，供自主运行
+（`provideAutonomous`）的预算检查消费。上限可用 `[budget]` 配置，或
 `ConatusTuiRuntime.create(turnBudget: TurnBudget(maxDuration: null, maxTokens: null))`
 关闭。
 

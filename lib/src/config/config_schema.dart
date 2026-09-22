@@ -78,6 +78,20 @@ class SandboxSettings {
   final int maxOutputBytes;
 }
 
+/// 预算护栏配置；对应 `[budget]` 表。
+class BudgetConfig {
+  const BudgetConfig({
+    this.maxTurnSeconds = 600,
+    this.maxTurnTokens = 200000,
+  });
+
+  /// 单轮墙钟上限（秒）；`0` 表示不限。
+  final int? maxTurnSeconds;
+
+  /// 单轮上下文 token 估算上限；`0` 表示不限。
+  final int? maxTurnTokens;
+}
+
 /// 完整配置。
 class ConatusCodeConfig {
   const ConatusCodeConfig({
@@ -85,6 +99,7 @@ class ConatusCodeConfig {
     this.agent = const AgentConfig(),
     this.approval = const ApprovalConfig(),
     this.sandbox = const SandboxSettings(),
+    this.budget = const BudgetConfig(),
     this.credentials = const <String, String>{},
   });
 
@@ -92,6 +107,7 @@ class ConatusCodeConfig {
   final AgentConfig agent;
   final ApprovalConfig approval;
   final SandboxSettings sandbox;
+  final BudgetConfig budget;
 
   /// `[credentials]` 表：任意键值，作为凭据来源（环境变量优先）。
   final Map<String, String> credentials;

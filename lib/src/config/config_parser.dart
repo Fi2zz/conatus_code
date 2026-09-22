@@ -14,6 +14,7 @@ class ConfigParser extends ConfigValues {
         agent: _readAgent(),
         approval: _readApproval(),
         sandbox: _readSandbox(),
+        budget: _readBudget(),
         credentials: _readCredentials(),
       );
 
@@ -49,6 +50,14 @@ class ConfigParser extends ConfigValues {
       allowedExecutables: readStringList(table, 'allowed_executables'),
       commandTimeoutMs: readPositiveInt(table, 'command_timeout_ms', 120000),
       maxOutputBytes: readPositiveInt(table, 'max_output_bytes', 64000),
+    );
+  }
+
+  BudgetConfig _readBudget() {
+    final Map<String, dynamic> table = readTable('budget');
+    return BudgetConfig(
+      maxTurnSeconds: readBudgetLimit(table, 'max_turn_seconds', 600),
+      maxTurnTokens: readBudgetLimit(table, 'max_turn_tokens', 200000),
     );
   }
 

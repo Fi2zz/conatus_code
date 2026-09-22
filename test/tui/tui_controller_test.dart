@@ -916,4 +916,20 @@ void main() {
     expect((await blocked).error!.code, 'APPROVAL_DENIED');
     app.dispose();
   });
+
+  test('会话装配提供 autonomousRunner（costTracker 惰性解析）', () async {
+    late Context sessionCtx;
+    final (ConatusTuiController controller, Context app) = await _build(
+      <LlmResult>[
+        const LlmResult(content: 'ok', provider: 'scripted', model: 'm'),
+      ],
+      configureSession: (Context ctx, Session session) {
+        sessionCtx = ctx;
+      },
+    );
+
+    expect(sessionCtx.get<AutonomousRunner>('autonomousRunner'), isNotNull);
+
+    app.dispose();
+  });
 }

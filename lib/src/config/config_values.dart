@@ -59,6 +59,16 @@ class ConfigValues {
     return value;
   }
 
+  /// 取非负整数上限；缺失返回 [fallback]，`0` 表示不限（返回 null）。
+  int? readBudgetLimit(Map<String, dynamic> table, String key, int fallback) {
+    final Object? value = table[key];
+    if (value == null) return fallback;
+    if (value is! int || value < 0) {
+      throw ConfigException('$source：$key 必须是非负整数。');
+    }
+    return value == 0 ? null : value;
+  }
+
   /// 取字符串数组；缺失返回空列表。
   List<String> readStringList(Map<String, dynamic> table, String key) {
     final Object? value = table[key];

@@ -61,6 +61,12 @@ Future<void> main(List<String> args) async {
     baseDir: '$workdir$sep${config.agent.projectDir}',
     model: config.llm.model,
     maxSteps: config.agent.maxSteps,
+    turnBudget: TurnBudget(
+      maxDuration: config.budget.maxTurnSeconds == null
+          ? null
+          : Duration(seconds: config.budget.maxTurnSeconds!),
+      maxTokens: config.budget.maxTurnTokens,
+    ),
     credentials: ConfigCredentials(config),
     exaApiKey: Platform.environment['EXA_API_KEY'],
     fs: sandboxedFs,

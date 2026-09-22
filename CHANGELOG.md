@@ -9,12 +9,17 @@
     护栏，默认 10 分钟 / 20 万 token，`estimateMessagesTokens` 粗口径只作护栏）；
     `BudgetedLlmProvider` 包装 `'llm'` 服务，超限返回收口提示而非报错（空闲
     2 分钟视为新一轮）；首个 `CostTracker` 实现 `CostTrackerImpl`（按用量与
-    粗略单价累计 `todayCost`），注册到 `'costTracker'` 供未来自主运行消费。
+    粗略单价累计 `todayCost`），注册到 `'costTracker'` 供自主运行消费。
     `ConatusTuiRuntime.create` 新增 `turnBudget` 参数（可显式关闭）。
   - 新增 `update_plan` 工具：执行中按步骤序号标记完成 / 改写文案 / 追加步骤，
     写回 `plan/updated` 事件；会话装配补齐 `plan_write`（此前未注册），
     计划闭环成形。
   - system prompt 增补「先规划后执行、失败反思重试」指引。
+  - 自主运行接线：新增 `provideAutonomous`（会话级装配 `'autonomousRunner'`，
+    独立 Agent Loop 避免与 goalDriver 双算），`costTracker` 惰性解析自根上下文，
+    预算超限触发 `budgetExceeded` 停止。
+  - 配置新增 `[budget]`：`max_turn_seconds` / `max_turn_tokens`（`0` = 不限），
+    由 `bin/conatus_code.dart` 映射为 `TurnBudget`。
 - 新增 macOS 沙箱（M3，Seatbelt + dart_io_sandbox）：
   - `lib/src/sandbox/`：`probeSandboxBackend`（launcher 定位 + chmod + 试跑，
     fail-closed）、`CommandPolicy`（命令形状裁决）、`SandboxedShellExecutor`

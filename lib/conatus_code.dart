@@ -6,6 +6,7 @@
 library;
 
 export 'src/assembly/permission_mode.dart' show toTuiPermissionMode;
+export 'src/autonomous/autonomous_assembly.dart' show provideAutonomous;
 export 'src/budget/budgeted_llm.dart'
     show BudgetedLlmProvider, kBudgetExhaustedReply, provideBudgetedLlm;
 export 'src/budget/cost_tracker.dart'
@@ -25,6 +26,7 @@ export 'src/config/config_schema.dart'
         AgentConfig,
         ApprovalConfig,
         ApprovalMode,
+        BudgetConfig,
         ConatusCodeConfig,
         LlmConfig,
         SandboxPreset,
