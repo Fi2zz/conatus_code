@@ -15,7 +15,7 @@
 - ⚡ 意图路由（高频命令零模型调用）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
-- 🔒 审批与沙箱（高危操作走审批；可选的 Seatbelt 进程沙箱 + 文件 jail）
+- 🔒 审批与沙箱（高危操作走审批；默认 Seatbelt 进程沙箱 + 文件 jail）
 - 🗺️ 计划闭环（plan_write 建计划、update_plan 执行中推进、计划面板实时渲染）
 - 🩹 失败自愈（工具失败自动反思重试，可按需重规划）
 - ⏱️ 预算护栏（每轮墙钟 + 上下文 token 估算 + 成本跟踪）
@@ -44,7 +44,7 @@ workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
 mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
 
 [sandbox]
-enabled = false               # 默认关闭；开启后走 jail fs + 沙箱命令执行
+enabled = true                # 默认开启；jail fs + 沙箱命令执行（仅 macOS）
 network_allowlist = ["git fetch", "git pull"]
 command_timeout_ms = 120000
 max_output_bytes = 64000
@@ -68,10 +68,11 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 已知边界：
 
 - launcher 默认无执行位，启动预检会 `chmod +x`；arm64 需 Rosetta 2，缺失时
-  预检 fail-closed 报错退出。
+  预检 fail-closed 报错退出（沙箱默认启用后，不满足条件的机器需在
+  `~/.conatus-code/config.toml` 里设 `[sandbox] enabled = false`）。
 - 审批判定 `REVIEW` 目前按拒绝处理（不启动进程），"REVIEW → 人工审批"
   未接线。
-- 沙箱默认关闭（`[sandbox] enabled = false`），开启后进程隔离才生效。
+- 沙箱仅支持 macOS：其他平台请显式关闭 `[sandbox] enabled = false`。
 
 ## 预算护栏
 

@@ -43,7 +43,7 @@ class ConfigParser extends ConfigValues {
   SandboxSettings _readSandbox() {
     final Map<String, dynamic> table = readTable('sandbox');
     return SandboxSettings(
-      enabled: readBool(table, 'enabled', false),
+      enabled: readBool(table, 'enabled', true),
       preset: _sandboxPreset(table),
       allowNetwork: readBool(table, 'allow_network', false),
       networkAllowlist: readStringList(table, 'network_allowlist'),

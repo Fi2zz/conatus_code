@@ -21,13 +21,13 @@ String _writeConfig(String content) {
 }
 
 void main() {
-  test('sandbox.enabled：显式 true 生效，缺省 false', () {
-    final ConatusCodeConfig enabled = loadConfig(
-        path: _writeConfig('[sandbox]\nenabled = true\n'));
-    expect(enabled.sandbox.enabled, isTrue);
+  test('sandbox.enabled：显式 false 生效，缺省 true', () {
+    final ConatusCodeConfig disabled = loadConfig(
+        path: _writeConfig('[sandbox]\nenabled = false\n'));
+    expect(disabled.sandbox.enabled, isFalse);
 
     final ConatusCodeConfig defaulted = loadConfig(
         path: _writeConfig('[sandbox]\nallow_network = true\n'));
-    expect(defaulted.sandbox.enabled, isFalse);
+    expect(defaulted.sandbox.enabled, isTrue);
   });
 }

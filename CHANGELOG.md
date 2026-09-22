@@ -4,6 +4,8 @@
 
 ## [未发布]
 
+- 沙箱默认启用：`[sandbox] enabled` 缺省 `true`（jail fs + 沙箱命令执行，
+  仅 macOS；不支持环境的机器需显式关闭，否则启动预检 fail-closed 退出）。
 - 自愈闭环（M4）：
   - 新增预算模块 `lib/src/budget/`：`TurnBudget`（每轮墙钟 + 上下文 token 估算
     护栏，默认 10 分钟 / 20 万 token，`estimateMessagesTokens` 粗口径只作护栏）；
@@ -26,7 +28,7 @@
     （经 launcher 最小环境执行，不继承父环境）、`JailedFileSystem`
     （conatus `FileSystem` 接 bound jail，越界映射 `sandboxDenied`）；
     `run_command` / `run_tests` 走沙箱接缝（high 风险）。
-  - 配置新增 `[sandbox]`：`enabled`（默认 false）、`network_allowlist`、
+  - 配置新增 `[sandbox]`：`enabled`（默认 true）、`network_allowlist`、
     `allowed_executables`、`command_timeout_ms`、`max_output_bytes`。
   - `tool/sandbox_probe.dart` 输出后端探测结果。
 - 输入栏支持粘贴图片/文件：Ctrl+V 读系统剪贴板图片（macOS，经 osascript），

@@ -93,6 +93,7 @@ void main() {
       expect(config.agent.workdir, isNull);
       expect(config.agent.projectDir, '.conatus');
       expect(config.approval.mode, ApprovalMode.askWhenNeeded);
+      expect(config.sandbox.enabled, isTrue);
       expect(config.sandbox.preset, SandboxPreset.workspaceWrite);
       expect(config.sandbox.allowNetwork, isFalse);
       expect(config.sandbox.networkAllowlist, isEmpty);
