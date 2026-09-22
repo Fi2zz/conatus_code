@@ -40,7 +40,7 @@ class TuiProviderView extends StatelessComponent {
             ),
           ),
           const Text(
-            '↑↓ 选择 · Enter 切换 · D 删除 · Esc 取消',
+            '↑↓ 选择 · Esc 取消',
             style: TextStyle(color: Colors.gray),
           ),
           const SizedBox(height: 1),

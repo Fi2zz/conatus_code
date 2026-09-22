@@ -45,7 +45,7 @@ class TuiModelView extends StatelessComponent {
             ),
           ),
           const Text(
-            'Tab 切换提供商 · ↑↓ 选择 · Enter 确认 · Esc 取消',
+            'Tab 切换提供商 · ↑↓ 选择 · Esc 取消',
             style: TextStyle(color: Colors.gray),
           ),
           _providerTabs(),

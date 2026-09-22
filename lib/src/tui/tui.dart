@@ -303,7 +303,7 @@ class _AgentTuiState extends State<AgentTui> {
     return true;
   }
 
-  /// 模型浮层按键：Tab 切提供商、↑↓ 选择、Enter 确认、Esc 关闭。
+  /// 模型浮层按键：Tab 切提供商、↑↓ 选择、Enter/Esc 关闭。
   bool _onModelKey(KeyboardEvent event) {
     final TuiModelPrompt prompt = _controller.modelPrompt;
     if (!prompt.open) {
@@ -316,7 +316,7 @@ class _AgentTuiState extends State<AgentTui> {
     } else if (event.logicalKey == LogicalKey.arrowDown) {
       prompt.move(1);
     } else if (event.logicalKey == LogicalKey.enter) {
-      unawaited(_controller.confirmModelItem());
+      prompt.close();
     } else if (event.logicalKey == LogicalKey.escape) {
       prompt.close();
     } else {
@@ -326,7 +326,7 @@ class _AgentTuiState extends State<AgentTui> {
     return true;
   }
 
-  /// provider 浮层按键：↑↓ 选择、Enter 确认、D 删除、Esc 关闭。
+  /// provider 浮层按键：↑↓ 选择、Enter/Esc 关闭。
   bool _onProviderKey(KeyboardEvent event) {
     final TuiProviderPrompt prompt = _controller.providerPrompt;
     if (!prompt.open) {
@@ -337,9 +337,7 @@ class _AgentTuiState extends State<AgentTui> {
     } else if (event.logicalKey == LogicalKey.arrowDown) {
       prompt.move(1);
     } else if (event.logicalKey == LogicalKey.enter) {
-      unawaited(_controller.confirmProviderItem());
-    } else if (event.logicalKey == LogicalKey.keyD) {
-      unawaited(_controller.deleteSelectedProvider());
+      prompt.close();
     } else if (event.logicalKey == LogicalKey.escape) {
       prompt.close();
     } else {

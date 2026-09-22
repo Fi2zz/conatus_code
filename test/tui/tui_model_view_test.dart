@@ -137,7 +137,7 @@ void main() {
     }
   });
 
-  test('按键到达浮层：↑↓ 移动、Enter 确认、Esc 取消', () async {
+  test('按键到达浮层：↑↓ 移动、Esc 取消', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _controller();
     final NoctermTester tester =
@@ -162,7 +162,7 @@ void main() {
     }
   });
 
-  test('Enter 确认切换模型（完整路径）', () async {
+  test('浮层只读展示：Enter 仅关闭；/model <名> 直接切换', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _controller(withProviders: true);
     final List<String> swapped = <String>[];
@@ -177,13 +177,21 @@ void main() {
 
       await controller.handleLine('/model');
       await tester.pump();
-      expect(controller.modelPrompt.open, isTrue);
+      expect(controller.modelPrompt.open, isFalse);
+      expect(controller.transcript.messages.last.text, contains('用法：/model'));
 
+      controller.modelPrompt.show(_items);
+      await tester.pump();
       await tester.sendArrowDown();
       await tester.sendEnter();
       await tester.pump();
 
       expect(controller.modelPrompt.open, isFalse);
+      expect(swapped, isEmpty);
+      expect(controller.modelLabel, 'a-small');
+
+      await controller.handleLine('/model a-large');
+      await tester.pump();
       expect(swapped, <String>['ark']);
       expect(controller.modelLabel, 'a-large');
     } finally {

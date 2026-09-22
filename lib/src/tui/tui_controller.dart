@@ -135,21 +135,20 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// LLM 服务替换钩子（由 `ConatusTuiRuntime.createController` 注入）。
   ///
-  /// `/provider` 与 `/model` 切换提供商 / 模型时调用；未注入时这两个命令
-  /// 只提示不可用。
+  /// `/model` 切换模型名时调用；未注入时该命令只提示不可用。
   void Function(FallbackLlm llm)? switchLlm;
 
-  /// provider 管理浮层（`/provider`）。
+  /// provider 管理浮层（`/provider`，只读展示）。
   late final TuiProviderPrompt providerPrompt =
       TuiProviderPrompt(onChanged: _refresh);
 
-  /// 模型选择浮层（`/model`）。
+  /// 模型选择浮层（保留：`/model` 已改为直接切换模型名）。
   late final TuiModelPrompt modelPrompt = TuiModelPrompt(onChanged: _refresh);
 
   /// Plan Mode 面板浮层（`/plan`）。
   late final TuiPlanPrompt planPrompt = TuiPlanPrompt(onChanged: _refresh);
 
-  /// 表单浮层（导入 registry）。
+  /// 表单浮层。
   late final TuiFormPrompt formPrompt = TuiFormPrompt(onChanged: _refresh);
 
   /// 屏上记录。
@@ -509,15 +508,6 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/model [名字]` 与 `/provider` 的实现见 part 文件
   /// `tui_controller_provider.dart`。
-
-  /// 确认 provider 浮层选中项（根组件按键调用）。
-  Future<void> confirmProviderItem() => _confirmProviderItem();
-
-  /// 删除 provider 浮层选中项（根组件按键调用）。
-  Future<void> deleteSelectedProvider() => _deleteSelectedProvider();
-
-  /// 确认模型浮层选中项（根组件按键调用）。
-  Future<void> confirmModelItem() => _confirmModelItem();
 
   /// Plan 面板 Enter：切换 Plan Mode 并刷新面板（根组件按键调用）。
   Future<void> confirmPlanPanel() => _confirmPlanPanel();
