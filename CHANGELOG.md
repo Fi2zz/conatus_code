@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- 破坏性变更：移除 `--first` 启动参数与 `AgentTui.firstInput`。`TuiOptions.first` /
+  `AgentTui.firstInput` 不再存在，`--first` 不再被识别（按未知参数忽略）。
+- `[llm] provider` 配置接线：`ConatusTuiRuntime.create` 新增 `provider` 形参，按
+  注册表名选提供商，缺省用当前项。
 - `conatus_providers` 并入本包：`ProviderProfile` / `ProviderRegistry` /
   `ProviderStore` / registry 导入与内置默认清单移入 `lib/src/providers/`，公开入口
   为 `lib/providers.dart`（与 `tui.dart` / `fs_tools.dart` / `coding.dart` 并列）；
