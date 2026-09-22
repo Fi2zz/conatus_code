@@ -85,7 +85,7 @@ class ConatusTuiRuntime {
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 14 个），调用方是进程级
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 15 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
