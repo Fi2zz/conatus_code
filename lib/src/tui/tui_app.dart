@@ -17,6 +17,7 @@ import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 
 import '../../fs_tools.dart';
+import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
 import 'system_notifier.dart';
 import 'tui_choice.dart';
@@ -129,6 +130,9 @@ class ConatusTuiRuntime {
     provideShellLocal(app, executor: shell);
     provideFsTools(app);
     provideToolResultEviction(app);
+    // conatus_code 自己的工具：list_files / git_status / git_diff（M3 起再加
+    // run_command / run_tests / apply_patch）。同样跟随上面的 fs / shell 接缝。
+    provideCodeTools(app);
 
     // ── 交互：选项浮层 + 工具审批 ────────────────────────────────
     // 浮层状态挂在根上下文：控制器构造时接上重绘回调，审批与 `ask_user`

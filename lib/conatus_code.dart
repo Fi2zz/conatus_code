@@ -24,3 +24,6 @@ export 'src/config/config_schema.dart'
         LlmConfig,
         SandboxPreset,
         SandboxSettings;
+export 'src/tools/code_tools.dart' show provideCodeTools;
+export 'src/tools/git_tools.dart' show GitDiffTool, GitRun, GitStatusTool, runGit;
+export 'src/tools/list_files.dart' show ListFilesTool;
