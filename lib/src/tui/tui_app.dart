@@ -201,8 +201,10 @@ class ConatusTuiRuntime {
         }
       }
     }
-    if (provider != null && registry?.byName(provider) == null) {
-      throw StateError('未知提供商：$provider（config.toml [providers] 里没有）');
+    if (provider != null && registry != null && registry.profiles.isNotEmpty) {
+      if (registry.byName(provider) == null) {
+        throw StateError('未知提供商：$provider（config.toml [providers] 里没有）');
+      }
     }
     final LlmProvider? fromRegistry = registry?.buildLlm(
       provider ?? registry.currentName ?? '',
