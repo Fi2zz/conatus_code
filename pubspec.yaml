@@ -13,11 +13,24 @@ environment:
 # 下面的 git 依赖解析。见 README「在 conatus 仓库内开发」。
 # resolution: workspace
 
-# conatus 的各包尚未发布到 pub.dev，一律声明 git 源。在 conatus 仓库内解析时，
-# workspace 会用本地 packages/* 取代同名的 git 源依赖，因此无需 dependency_overrides。
 dependencies:
   conatus:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master}
+  conatus_coding:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_coding}
+  conatus_fs_tools:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_fs_tools}
+  conatus_tui:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tui}
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.25.0
+
+# conatus 的包尚未发布到 pub.dev，上面 git 依赖的传递依赖以 hosted 声明，独立
+# clone 时必须统一到 git 源。在 conatus 仓库内开发时，本地 pubspec_overrides.yaml
+# （由 tool/setup_code_filter.sh 生成）会清空本节 —— workspace 禁止 override 成员包。
+dependency_overrides:
   conatus_agent:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_agent}
   conatus_alerting:
@@ -26,8 +39,6 @@ dependencies:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_asr}
   conatus_browser_use:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_browser_use}
-  conatus_coding:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_coding}
   conatus_compaction:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_compaction}
   conatus_computer_use:
@@ -40,8 +51,6 @@ dependencies:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_cron}
   conatus_foundation:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_foundation}
-  conatus_fs_tools:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_fs_tools}
   conatus_intent:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_intent}
   conatus_llm:
@@ -66,11 +75,5 @@ dependencies:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_team}
   conatus_tts:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tts}
-  conatus_tui:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tui}
   conatus_workflow:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_workflow}
-
-dev_dependencies:
-  lints: ^4.0.0
-  test: ^1.25.0

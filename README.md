@@ -33,16 +33,17 @@ dart run bin/conatus_code.dart
 `dart pub get` 即可。
 
 在 [conatus](https://github.com/Fi2zz/conatus) 仓库内开发时，本仓库作为 submodule
-挂在 `packages/conatus_code`。该仓库的 `tool/setup_code_filter.sh` 会装一个 git
-clean/smudge filter，让 `pubspec.yaml` 里的 `resolution: workspace`：
+挂在 `packages/conatus_code`。该仓库的 `tool/setup_code_filter.sh` 会：
 
-- 在工作区保持生效 —— 本包成为 conatus pub workspace 的成员，依赖解析到本地
-  `packages/*`，改框架对这里立即生效，不必先推送；
-- 在 `git add` 时自动注释掉 —— 推送出去的内容不带 `resolution`，独立 clone 因此
-  照常走 git 依赖。
+- 装一个 git clean/smudge filter，让 `pubspec.yaml` 里的 `resolution: workspace`
+  在工作区保持生效 —— 本包成为 conatus pub workspace 的成员，依赖解析到本地
+  `packages/*`，改框架对这里立即生效，不必先推送；而 `git add` 时该行会被自动
+  注释掉，推送出去的内容因此不带 `resolution`；
+- 生成一个本地 `pubspec_overrides.yaml`（已进 `.gitignore`），清空 `pubspec.yaml`
+  的 `dependency_overrides` —— workspace 内禁止 override 成员包。
 
-未装 filter 的 clone（例如直接 clone 本仓库）拿到的就是注释态，行为与上面「独立使用」
-一致。
+未装 filter 的 clone（例如直接 clone 本仓库）拿到的是注释态、且 override 原样生效，
+行为与上面「独立使用」一致。
 
 ## 依赖
 
