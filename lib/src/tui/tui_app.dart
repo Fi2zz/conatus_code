@@ -85,7 +85,7 @@ class ConatusTuiRuntime {
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 15 个），调用方是进程级
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 16 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
@@ -95,6 +95,7 @@ class ConatusTuiRuntime {
     bool skills = true,
     bool providers = true,
     String? providersFile,
+    String? provider,
     String? model,
     int maxSteps = 8,
     FallbackLlm? llm,
@@ -184,8 +185,10 @@ class ConatusTuiRuntime {
       );
       await registry.load();
     }
-    final LlmProvider? fromRegistry =
-        registry?.buildLlm(registry.currentName ?? '', model: model);
+    final LlmProvider? fromRegistry = registry?.buildLlm(
+      provider ?? registry.currentName ?? '',
+      model: model,
+    );
     // 预算护栏：包装 `'llm'` 服务（每轮墙钟 + 上下文 token 估算），并把首个
     // CostTracker 实现注册到 `'costTracker'`（供未来 autonomous runner 消费）。
     final CostTrackerImpl costTracker = CostTrackerImpl();

@@ -60,6 +60,13 @@ export PATH="$PWD/dist:$PATH"
 `--config` 可覆盖路径）。示例：
 
 ```toml
+[credentials]
+ARK_API_KEY = "sk-..."        # 模型/搜索 Key 统一放这里（环境变量优先）
+
+[llm]
+provider = "ark"              # 注册表里的提供商名：ark / deepseek / volcengine-coding-plan / ark-agent-plan
+# model = "doubao-seed-1-8-251228"
+
 [agent]
 max_steps = 8                 # 单轮最大模型步数
 workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录

@@ -44,6 +44,7 @@ Future<void> main(List<String> args) async {
 
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
     baseDir: '$workdir$sep${config.agent.projectDir}',
+    provider: config.llm.provider,
     model: config.llm.model,
     maxSteps: config.agent.maxSteps,
     turnBudget: TurnBudget(
