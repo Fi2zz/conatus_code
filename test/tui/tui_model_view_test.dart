@@ -43,10 +43,9 @@ Future<(ConatusTuiController, Context, Directory)> _controller({
   provideTools(app);
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_NoopProvider()]));
   if (withProviders) {
-    final ProviderRegistry registry = provideProviders(
+    provideProviders(
       app,
-      store: ProviderStore(path: '${dir.path}/providers.json'),
-      builtin: <ProviderProfile>[
+      providers: <ProviderProfile>[
         const ProviderProfile(
           name: 'ark',
           baseUrl: 'https://ark.example/v1',
@@ -58,8 +57,8 @@ Future<(ConatusTuiController, Context, Directory)> _controller({
           models: <String>['b-small'],
         ),
       ],
+      currentName: 'ark',
     );
-    await registry.load();
   }
   final SessionStore sessions = provideSessions(app);
   final ConatusTuiController controller = ConatusTuiController(

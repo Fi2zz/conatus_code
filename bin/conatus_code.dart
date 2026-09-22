@@ -42,10 +42,19 @@ Future<void> main(List<String> args) async {
     backend: backend,
   );
 
+  final String? defaultModel = config.llm.defaultModel;
+  String? provider;
+  String? model;
+  if (defaultModel != null) {
+    final int slash = defaultModel.indexOf('/');
+    provider = defaultModel.substring(0, slash);
+    model = defaultModel.substring(slash + 1);
+  }
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
     baseDir: '$workdir$sep${config.agent.projectDir}',
-    provider: config.llm.provider,
-    model: config.llm.model,
+    providers: config.providers,
+    provider: provider,
+    model: model,
     maxSteps: config.agent.maxSteps,
     turnBudget: TurnBudget(
       maxDuration: config.budget.maxTurnSeconds == null

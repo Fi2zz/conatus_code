@@ -20,6 +20,7 @@ import '../../providers.dart';
 import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
+import '../config/config_schema.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
 import 'system_notifier.dart';
@@ -77,15 +78,16 @@ class ConatusTuiRuntime {
   /// `lib/providers.dart`）；显式传入则以传入者为准（如 DeepSeek-only 的 Demo）。
   /// 没有缺省回退链：两者都拿不到时抛 [StateError]。[modelLabel] 覆盖顶栏模型标签。
   ///
-  /// [providers] 为 true 时装配提供商注册表（`<baseDir>/providers.json`，
-  /// [providersFile] 可覆盖），`/provider` 命令据此可用。
+  /// [providers] 传配置的 `[providers.*]` 列表时装配提供商注册表（`/provider`
+  /// 命令据此可用）；[provider] 定当前提供商（`[llm] default_model` 的
+  /// `provider/model` 拆分）。
   ///
   /// [fs] / [shell] / [credentials] 是能力接缝的注入点：缺省用本地实现
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 16 个），调用方是进程级
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 15 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
@@ -93,8 +95,7 @@ class ConatusTuiRuntime {
     String? baseDir,
     bool webTools = true,
     bool skills = true,
-    bool providers = true,
-    String? providersFile,
+    List<ProviderConfig>? providers,
     String? provider,
     String? model,
     int maxSteps = 8,
@@ -175,15 +176,33 @@ class ConatusTuiRuntime {
 
     // ── 模型 / 自省 / 子 Agent ─────────────────────────────────
     ProviderRegistry? registry;
-    if (providers) {
+    if (providers != null) {
       registry = provideProviders(
         app,
-        store: ProviderStore(
-          path: providersFile ?? '$resolvedBaseDir${sep}providers.json',
-        ),
+        providers: <ProviderProfile>[
+          for (final ProviderConfig config in providers)
+            ProviderProfile(
+              name: config.name,
+              baseUrl: config.baseUrl,
+              apiKey: config.apiKey,
+              apiStyle: config.type == ProviderType.kimi
+                  ? LlmApiStyle.responses
+                  : LlmApiStyle.chat,
+            ),
+        ],
+        currentName: provider,
         credentials: resolvedCredentials,
       );
-      await registry.load();
+      for (final ProviderConfig config in providers) {
+        if (config.apiKey.isEmpty && config.oauthKey != null) {
+          // REASON: 启动提示走 stdout，与其它装配警告一致（OAuth 未实现，
+          // 该 provider 不可用但其余照常）。
+          print('OAuth 未实现：请为 ${config.name} 配置 api_key。');
+        }
+      }
+    }
+    if (provider != null && registry?.byName(provider) == null) {
+      throw StateError('未知提供商：$provider（config.toml [providers] 里没有）');
     }
     final LlmProvider? fromRegistry = registry?.buildLlm(
       provider ?? registry.currentName ?? '',
@@ -195,7 +214,8 @@ class ConatusTuiRuntime {
     app.provide('costTracker', costTracker);
     final TurnBudget resolvedBudget = turnBudget ?? const TurnBudget();
     if (llm == null && fromRegistry == null) {
-      throw StateError('未装配 LLM：请配置 providers.json 的当前提供商，或显式传入 llm。');
+      throw StateError(
+          '未装配 LLM：请在 config.toml 配置 [providers.xxx] 与 [llm] default_model。');
     }
     final FallbackLlm resolvedLlm =
         llm ?? FallbackLlm(<LlmProvider>[fromRegistry!]);
