@@ -54,6 +54,7 @@ Future<void> main(List<String> args) async {
     baseDir: '$workdir$sep${config.agent.projectDir}',
     configPath: resolveConfigPath(explicit: options.configPath),
     providers: config.providers,
+    models: config.models,
     provider: provider,
     model: model,
     maxSteps: config.agent.maxSteps,

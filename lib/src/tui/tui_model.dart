@@ -108,12 +108,12 @@ class TuiModelPrompt {
         : start;
   }
 
-  /// 打开并载入候选（默认选中当前模型）。
-  void show(List<TuiModelItem> items) {
+  /// 打开并载入候选（默认选中当前模型）；[initialQuery] 预填搜索框。
+  void show(List<TuiModelItem> items, {String initialQuery = ''}) {
     _all = items;
-    _query = '';
+    _query = initialQuery.trim();
     _provider = null;
-    search.text = '';
+    search.text = _query;
     _index = items.indexWhere((TuiModelItem item) => item.current);
     if (_index < 0) {
       _index = 0;
@@ -124,11 +124,12 @@ class TuiModelPrompt {
 
   /// 选择模式：打开面板并等待用户选中（Enter）或取消（Esc）。
   ///
-  /// 面板关闭前调用方等待返回；取消返回 `null`。
-  Future<TuiModelItem?> choose(List<TuiModelItem> items) {
+  /// 面板关闭前调用方等待返回；取消返回 `null`。空候选也照常打开面板
+  /// （渲染「无匹配模型」，用户可 Esc 取消）。
+  Future<TuiModelItem?> choose(List<TuiModelItem> items, {String initialQuery = ''}) {
     final Completer<TuiModelItem?> completer = Completer<TuiModelItem?>();
     _pending = completer;
-    show(items);
+    show(items, initialQuery: initialQuery);
     return completer.future;
   }
 

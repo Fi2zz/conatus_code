@@ -1,4 +1,4 @@
-/// `/provider` 展示与新增、`/model` 直接切换模型名。
+/// `/provider` 展示与新增、`/model` 打开模型浮层选择。
 library;
 
 import 'dart:io';
@@ -81,6 +81,58 @@ Future<(ConatusTuiController, Context, Directory)> _build({
   return (controller, app, dir);
 }
 
+/// 无模型清单的 provider 装配（`/model` 兜底与空列表用例）。
+///
+/// [devCatalog] 非空时注入 models.dev 桩，避免测试触网。
+Future<(ConatusTuiController, Context, Directory)> _buildBare({
+  String modelLabel = '',
+  Map<String, List<ModelsDevModel>>? devCatalog,
+}) async {
+  final Directory dir = Directory.systemTemp.createTempSync('tui-model-');
+  final Context app = Context.root();
+  provideTools(app);
+  provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider('initial')]));
+  provideMemory(app);
+  provideProviders(
+    app,
+    providers: <ProviderProfile>[
+      const ProviderProfile(
+        name: 'a',
+        baseUrl: 'https://a.example/v1',
+        credentialKey: 'A_API_KEY',
+      ),
+    ],
+    currentName: 'a',
+  );
+  final SessionStore sessions = provideSessions(app);
+  final ConatusTuiController controller = ConatusTuiController(
+    app: app,
+    sessions: sessions,
+    name: 'test',
+    initialSession: 's1',
+    modelLabel: modelLabel,
+    onExit: () {},
+  );
+  if (devCatalog != null) {
+    controller.modelsDevLoader = () async => devCatalog;
+  }
+  await controller.start();
+  return (controller, app, dir);
+}
+
+/// models.dev 桩模型（默认支持工具调用与推理，即能进编码清单）。
+ModelsDevModel _devModel(String id, {bool toolCall = true}) => ModelsDevModel(
+      id: id,
+      name: id,
+      toolCall: toolCall,
+      reasoning: true,
+      attachment: false,
+      contextLength: 16000,
+      costInput: 0,
+      costOutput: 0,
+      inputModalities: const <String>['text'],
+    );
+
 void main() {
   test('未装配注册表时 /provider 提示未装配', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
@@ -145,14 +197,40 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  test('/model <名字> 直接切换：换 LLM 服务、更新标签、重绑', () async {
+  test('/model 打开浮层：列出当前提供商的模型', () async {
+    final (ConatusTuiController controller, Context app, Directory dir) =
+        await _build();
+    final Future<void> pending = controller.handleLine('/model');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.modelPrompt.open, isTrue);
+    final List<String> models = controller.modelPrompt.matches
+        .map((TuiModelItem i) => i.model)
+        .toList();
+    expect(models, <String>['a-small', 'a-large']);
+    expect(
+      controller.modelPrompt.matches.where((TuiModelItem i) => i.current),
+      hasLength(1),
+    );
+
+    controller.modelPrompt.cancel();
+    await pending;
+    app.dispose();
+    dir.deleteSync(recursive: true);
+  });
+
+  test('/model 浮层 Enter 选中切换模型', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _build();
     final List<String> swapped = <String>[];
     controller.switchLlm =
         (FallbackLlm llm) => swapped.add(llm.providers.first.name);
+    final Future<void> pending = controller.handleLine('/model');
+    await Future<void>.delayed(Duration.zero);
 
-    await controller.handleLine('/model a-large');
+    controller.modelPrompt.move(1); // a-small → a-large
+    controller.modelPrompt.confirm();
+    await pending;
 
     expect(swapped, <String>['a']);
     expect(controller.modelLabel, 'a-large');
@@ -162,37 +240,77 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  test('/model 名字不在清单：提示但继续切换', () async {
+  test('/model 浮层 Esc 取消：不切换', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _build();
     final List<String> swapped = <String>[];
     controller.switchLlm =
         (FallbackLlm llm) => swapped.add(llm.providers.first.name);
+    final Future<void> pending = controller.handleLine('/model');
+    await Future<void>.delayed(Duration.zero);
 
-    await controller.handleLine('/model a-unknown');
+    controller.modelPrompt.cancel();
+    await pending;
 
-    expect(swapped, <String>['a']);
-    expect(controller.modelLabel, 'a-unknown');
-    expect(
-      controller.transcript.messages
-          .map((TuiMessage m) => m.text)
-          .where((String t) => t.contains('不在')),
-      isNotEmpty,
-    );
-    expect(controller.transcript.messages.last.text, contains('已切换到 a'));
+    expect(swapped, isEmpty);
+    expect(controller.modelPrompt.open, isFalse);
+    expect(controller.transcript.messages.last.text, contains('已取消模型切换'));
     app.dispose();
     dir.deleteSync(recursive: true);
   });
 
-  test('/model 无参：提示当前提供商与用法，不打开浮层', () async {
+  test('/model <片段> 预填搜索框过滤', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _build();
+    final Future<void> pending = controller.handleLine('/model a-');
+    await Future<void>.delayed(Duration.zero);
 
-    await controller.handleLine('/model');
+    expect(controller.modelPrompt.open, isTrue);
+    expect(controller.modelPrompt.query, 'a-');
+    expect(controller.modelPrompt.search.text, 'a-');
+    expect(controller.modelPrompt.matches, hasLength(2));
 
-    expect(controller.modelPrompt.open, isFalse);
-    expect(controller.transcript.messages.last.text, contains('当前提供商：a'));
-    expect(controller.transcript.messages.last.text, contains('用法：/model <模型名>'));
+    controller.modelPrompt.cancel();
+    await pending;
+    app.dispose();
+    dir.deleteSync(recursive: true);
+  });
+
+  test('/model 列表为空仍打开浮层', () async {
+    final (ConatusTuiController controller, Context app, Directory dir) =
+        await _buildBare(devCatalog: <String, List<ModelsDevModel>>{});
+    final Future<void> pending = controller.handleLine('/model');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.modelPrompt.open, isTrue);
+    expect(controller.modelPrompt.matches, isEmpty);
+
+    controller.modelPrompt.cancel();
+    await pending;
+    app.dispose();
+    dir.deleteSync(recursive: true);
+  });
+
+  test('/model 配置无清单时从 models.dev 兜底', () async {
+    final (ConatusTuiController controller, Context app, Directory dir) =
+        await _buildBare(
+      modelLabel: 'x-current',
+      devCatalog: <String, List<ModelsDevModel>>{
+        'a': <ModelsDevModel>[_devModel('c-m1'), _devModel('c-m2', toolCall: false)],
+      },
+    );
+    final Future<void> pending = controller.handleLine('/model');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.modelPrompt.open, isTrue);
+    final List<String> models = controller.modelPrompt.matches
+        .map((TuiModelItem i) => i.model)
+        .toList();
+    // c-m2 不支持工具调用，被 keepForCoding 过滤。
+    expect(models, <String>['x-current', 'c-m1']);
+
+    controller.modelPrompt.cancel();
+    await pending;
     app.dispose();
     dir.deleteSync(recursive: true);
   });
@@ -208,9 +326,11 @@ void main() {
     expect(model.takesArgs, isFalse);
     expect(provider.takesArgs, isFalse);
 
-    await controller.handleLine(model.token);
-    expect(controller.modelPrompt.open, isFalse);
-    expect(controller.transcript.messages.last.text, contains('用法：/model'));
+    final Future<void> pending = controller.handleLine(model.token);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.modelPrompt.open, isTrue);
+    controller.modelPrompt.cancel();
+    await pending;
 
     await controller.handleLine(provider.token);
     expect(controller.providerPrompt.open, isTrue);

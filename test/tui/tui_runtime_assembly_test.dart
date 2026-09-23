@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -7,6 +9,39 @@ import 'package:conatus_llm/conatus_llm.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('[models.*] 按 provider 填入注册表模型清单，/model 浮层候选由此而来', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String sep = Platform.pathSeparator;
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      providers: <ProviderConfig>[
+        const ProviderConfig(
+          name: 'deepseek',
+          baseUrl: 'https://api.deepseek.com/v1',
+        ),
+      ],
+      models: <ModelConfig>[
+        const ModelConfig(provider: 'deepseek', model: 'deepseek-chat'),
+        const ModelConfig(provider: 'deepseek', model: 'deepseek-reasoner'),
+        const ModelConfig(provider: 'other', model: 'not-mine'),
+      ],
+      provider: 'deepseek',
+    );
+
+    final ProviderRegistry? registry = runtime.providers;
+    expect(registry, isNotNull);
+    expect(registry!.current?.models,
+        <String>['deepseek-chat', 'deepseek-reasoner']);
+
+    await runtime.dispose();
+  });
+
   test('装配后 system 带日期锚点，get_time 返回带偏移的时刻', () async {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));

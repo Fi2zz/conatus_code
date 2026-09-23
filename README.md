@@ -106,7 +106,10 @@ default_model = "provider/model"` 同时定当前提供商与默认模型。
   新增（表单只填 **base_url / model**，`name` 可选留空自动从 base_url 推导、
   `type` 固定 `openai`，写回 config.toml；**第一个** provider 会同时设为
   `default_model`）；删除与切换默认仍直接编辑 config.toml
-- `/model <名字>`：切换当前提供商的模型
+- `/model`：打开当前提供商的模型选择浮层——候选优先取 config.toml 的
+  `[models."<provider>/<model>"]` 清单（kimi 兼容格式；`/model <片段>` 预填搜索框，
+  搜索过滤后 Enter 切换）；配置无清单时从 models.dev 拉取该 provider 的清单兜底
+  （缓存 24h，失败仅展示配置内模型）；没有候选也照常打开浮层
 - 未配置任何 provider 时启动进入引导：TUI 照常启动并自动弹出 provider 面板，
   模型调用会提示先用 `/provider` 添加或编辑 config.toml——**没有缺省回退链**
 

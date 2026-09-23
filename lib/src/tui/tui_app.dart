@@ -80,7 +80,8 @@ class ConatusTuiRuntime {
   ///
   /// [providers] 传配置的 `[providers.*]` 列表时装配提供商注册表（`/provider`
   /// 命令据此可用）；[provider] 定当前提供商（`[llm] default_model` 的
-  /// `provider/model` 拆分）。
+  /// `provider/model` 拆分）。[models] 传 `[models."provider/model"]` 清单时按
+  /// provider 名填入各 profile 的模型 id 列表（`/model` 浮层候选）。
   ///
   /// [fs] / [shell] / [credentials] 是能力接缝的注入点：缺省用本地实现
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
@@ -97,6 +98,7 @@ class ConatusTuiRuntime {
     bool webTools = true,
     bool skills = true,
     List<ProviderConfig>? providers,
+    List<ModelConfig>? models,
     String? provider,
     String? model,
     int maxSteps = 8,
@@ -176,6 +178,12 @@ class ConatusTuiRuntime {
     }
 
     // ── 模型 / 自省 / 子 Agent ─────────────────────────────────
+    // `[models."provider/model"]`（kimi 格式）按 provider 名展开成模型 id 清单，
+    // 供 `/model` 浮层候选与 registry 默认模型使用；没有该表时清单为空。
+    final Map<String, List<String>> modelsByProvider = <String, List<String>>{};
+    for (final ModelConfig config in models ?? const <ModelConfig>[]) {
+      modelsByProvider.putIfAbsent(config.provider, () => <String>[]).add(config.model);
+    }
     ProviderRegistry? registry;
     if (providers != null) {
       registry = provideProviders(
@@ -189,6 +197,7 @@ class ConatusTuiRuntime {
               apiStyle: config.type == ProviderType.kimi
                   ? LlmApiStyle.responses
                   : LlmApiStyle.chat,
+              models: modelsByProvider[config.name] ?? const <String>[],
             ),
         ],
         currentName: provider,

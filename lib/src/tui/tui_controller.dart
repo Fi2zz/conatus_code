@@ -141,11 +141,16 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// `/model` 切换模型名时调用；未注入时该命令只提示不可用。
   void Function(FallbackLlm llm)? switchLlm;
 
+  /// models.dev 目录拉取器（测试可注入桩）；缺省从本地缓存拉取。
+  ///
+  /// `/model` 打开浮层时，当前提供商没有配置模型清单（`[models.*]`）时兜底拉取。
+  Future<Map<String, List<ModelsDevModel>>> Function()? modelsDevLoader;
+
   /// provider 管理浮层（`/provider`，只读展示）。
   late final TuiProviderPrompt providerPrompt =
       TuiProviderPrompt(onChanged: _refresh);
 
-  /// 模型选择浮层（保留：`/model` 已改为直接切换模型名）。
+  /// 模型选择浮层（`/model` 打开；搜索过滤，Enter 切换）。
   late final TuiModelPrompt modelPrompt = TuiModelPrompt(onChanged: _refresh);
 
   /// Plan Mode 面板浮层（`/plan`）。

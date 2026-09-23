@@ -41,7 +41,7 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(
     name: 'model',
-    description: '打开模型选择浮层（/model <名字> 可直接切换）',
+    description: '打开模型选择浮层（搜索过滤，Enter 切换）',
   ),
   TuiCommand(
     name: 'provider',

@@ -162,7 +162,7 @@ void main() {
     }
   });
 
-  test('浮层只读展示：Enter 仅关闭；/model <名> 直接切换', () async {
+  test('/model 打开浮层：↑↓ 选择、Enter 切换当前提供商模型', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _controller(withProviders: true);
     final List<String> swapped = <String>[];
@@ -175,25 +175,23 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      await controller.handleLine('/model');
+      final Future<void> pending = controller.handleLine('/model');
       await tester.pump();
-      expect(controller.modelPrompt.open, isFalse);
-      expect(controller.transcript.messages.last.text, contains('用法：/model'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.modelPrompt.open, isTrue);
+      expect(
+        controller.modelPrompt.matches.map((TuiModelItem i) => i.model),
+        <String>['a-small', 'a-large'],
+      );
 
-      controller.modelPrompt.show(_items);
-      await tester.pump();
       await tester.sendArrowDown();
       await tester.sendEnter();
       await tester.pump();
 
       expect(controller.modelPrompt.open, isFalse);
-      expect(swapped, isEmpty);
-      expect(controller.modelLabel, 'a-small');
-
-      await controller.handleLine('/model a-large');
-      await tester.pump();
       expect(swapped, <String>['ark']);
       expect(controller.modelLabel, 'a-large');
+      await pending;
     } finally {
       tester.dispose();
       app.dispose();

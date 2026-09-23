@@ -50,14 +50,23 @@ extension _ProviderCommands on ConatusTuiController {
     _refresh();
   }
 
-  /// `/model [名字]`：查看 / 切换当前提供商的模型。
+  /// `/model [搜索词]`：打开模型选择浮层；选中后切换当前提供商的模型。
   ///
-  /// 装配了注册表时直接切换模型名；否则委托宿主的 [onModelCommand] 钩子。
+  /// 候选优先取配置内模型（`[models.*]`），配置无清单时从 models.dev 兜底；
+  /// 参数作为初始搜索词预填。未装配注册表时委托宿主的 [onModelCommand] 钩子，
   /// 两者都不可用时提示先配置提供商（没有缺省回退链，见 README）。
   Future<void> _handleModel(String arg) async {
     final ProviderRegistry? registry = _app.providers;
-    if (registry?.current != null) {
-      await _handleModelOf(registry!, arg);
+    final ProviderProfile? current = registry?.current;
+    if (current != null) {
+      final List<TuiModelItem> items = await _modelCandidates(registry!);
+      final TuiModelItem? item = await modelPrompt.choose(items, initialQuery: arg);
+      if (item == null) {
+        transcript.add(TuiRole.system, '已取消模型切换。');
+        return;
+      }
+      transcript.add(TuiRole.system,
+          await _applyLlm(registry, registry.currentName ?? '', model: item.model));
       return;
     }
     final Future<String?> Function(String)? hook = onModelCommand;
@@ -72,24 +81,64 @@ extension _ProviderCommands on ConatusTuiController {
         '或编辑 config.toml 的 [providers]。');
   }
 
-  Future<void> _handleModelOf(ProviderRegistry registry, String arg) async {
-    if (arg.isEmpty) {
-      transcript.add(TuiRole.system, '当前提供商：${registry.currentName}\n'
-          '用法：/model <模型名>');
-      return;
+  /// `/model` 浮层候选：配置内模型优先；配置无清单时从 models.dev 兜底。
+  Future<List<TuiModelItem>> _modelCandidates(ProviderRegistry registry) async {
+    final String provider = registry.currentName ?? '';
+    final List<TuiModelItem> items = <TuiModelItem>[];
+    final Set<String> seen = <String>{};
+    for (final String model in registry.current?.models ?? const <String>[]) {
+      if (!seen.add(model)) continue;
+      items.add(TuiModelItem(
+        provider: provider,
+        model: model,
+        current: model == modelLabel,
+      ));
     }
-    // models 是可选清单（首个为默认）不是白名单：清单非空且不在其中时只警告
-    // 不拦截——config 型 provider 不传清单，add 流程也只写首个模型。
-    // 警告与结果合并为一条消息：_applyLlm 内部 rebind 会重建屏上记录，
-    // 提前单独添加会被清掉。
-    final List<String> known = registry.current?.models ?? const <String>[];
-    final String? warning = known.isNotEmpty && !known.contains(arg)
-        ? '模型 $arg 不在 ${registry.currentName} 的已知清单'
-            '（${known.join('、')}）里；若调用失败请检查模型名。'
-        : null;
-    final String result =
-        await _applyLlm(registry, registry.currentName ?? '', model: arg);
-    transcript.add(TuiRole.system, warning == null ? result : '$warning\n$result');
+    if (modelLabel.isNotEmpty && seen.add(modelLabel)) {
+      items.add(TuiModelItem(provider: provider, model: modelLabel, current: true));
+    }
+    if (registry.current?.models.isNotEmpty ?? false) {
+      return items; // 配置已有清单：不拉 models.dev。
+    }
+    await _enrichFromModelsDev(provider, items, seen);
+    return items;
+  }
+
+  /// 从 models.dev 补充候选：`keepForCoding` 过滤、按 id 去重，失败 fail-open。
+  Future<void> _enrichFromModelsDev(
+    String provider,
+    List<TuiModelItem> items,
+    Set<String> seen,
+  ) async {
+    transcript.add(TuiRole.system, '正在从 models.dev 获取 $provider 模型…');
+    final Future<Map<String, List<ModelsDevModel>>> Function() loader =
+        modelsDevLoader ?? _defaultModelsDevLoader;
+    try {
+      final Map<String, List<ModelsDevModel>> catalog = await loader();
+      for (final ModelsDevModel model
+          in catalog[provider] ?? const <ModelsDevModel>[]) {
+        if (!keepForCoding(model.toolCall, model.reasoning)) continue;
+        if (!seen.add(model.id)) continue;
+        items.add(TuiModelItem(
+          provider: provider,
+          model: model.id,
+          contextLength: model.contextLength,
+          vision: model.supportsImage,
+        ));
+      }
+    } on ModelsDevException catch (error) {
+      transcript.add(
+          TuiRole.system, '模型清单拉取失败：${error.message}（仅展示配置内模型）。');
+    }
+  }
+
+  Future<Map<String, List<ModelsDevModel>>> _defaultModelsDevLoader() async {
+    final ModelsDevClient client = ModelsDevClient(cachePath: _modelsDevCache());
+    try {
+      return await client.fetch();
+    } finally {
+      client.close();
+    }
   }
 
   /// 浮层列表项（末尾为新增入口）。
