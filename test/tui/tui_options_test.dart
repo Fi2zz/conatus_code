@@ -5,22 +5,22 @@ import 'package:conatus_code/tui.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('缺省：会话 tui，无首轮，不请求帮助', () {
+  test('缺省：无 --session 视为新建会话', () {
     final TuiOptions options = TuiOptions.parse(const <String>[]);
 
-    expect(options.session, kTuiDefaultSession);
+    expect(options.session, isNull);
     expect(options.helpRequested, isFalse);
   });
 
-  test('解析 --session', () {
+  test('解析 --session 规范格式', () {
     final TuiOptions options = TuiOptions.parse(const <String>[
       '--session',
-      'demo',
+      'session_c8898262-4a76-4bd4-93dc-f757fd4ef666',
       '--first',
       '现在几点？',
     ]);
 
-    expect(options.session, 'demo');
+    expect(options.session, 'session_c8898262-4a76-4bd4-93dc-f757fd4ef666');
   });
 
   test('解析 --config', () {
@@ -44,18 +44,39 @@ void main() {
 
     final TuiOptions options = TuiOptions.parse(const <String>[
       '--session',
-      'a',
+      'session_11111111-1111-4111-8111-111111111111',
       '--help',
     ]);
 
     expect(options.helpRequested, isTrue);
-    expect(options.session, 'a');
+    expect(options.session, 'session_11111111-1111-4111-8111-111111111111');
   });
 
-  test('尾值缺失时保持缺省', () {
+  test('--session 缺尾值视为新建会话', () {
     final TuiOptions options = TuiOptions.parse(const <String>['--session']);
 
-    expect(options.session, kTuiDefaultSession);
+    expect(options.session, isNull);
+  });
+
+  test('--session 后跟开关参数视为未指定会话，开关照常解析', () {
+    final TuiOptions options = TuiOptions.parse(const <String>[
+      '--session',
+      '--config',
+      '/tmp/a.toml',
+    ]);
+
+    expect(options.session, isNull);
+    expect(options.configPath, '/tmp/a.toml');
+  });
+
+  test('--session 取值非规范格式视为新建会话，不抛错', () {
+    expect(TuiOptions.parse(const <String>['--session', 'tui']).session, isNull);
+    expect(
+      TuiOptions.parse(const <String>['--session', 'session-1727083200-1'])
+          .session,
+      isNull,
+    );
+    expect(TuiOptions.parse(const <String>['--session', 'a b']).session, isNull);
   });
 
   test('未知参数忽略', () {
@@ -64,7 +85,7 @@ void main() {
       'x',
     ]);
 
-    expect(options.session, kTuiDefaultSession);
+    expect(options.session, isNull);
   });
 
   test('用法文案列出全部开关', () {
@@ -72,48 +93,29 @@ void main() {
     expect(TuiOptions.usage, contains('--config <路径>'));
   });
 
-  test('传入 sessionId 且无 --session 时以它为准', () {
-    final TuiOptions options = TuiOptions.parse(
-      const <String>[],
-      sessionId: 'custom',
-    );
-
-    expect(options.session, 'custom');
-  });
-
-  test('--session 合法时覆盖传入的 sessionId', () {
-    final TuiOptions options = TuiOptions.parse(const <String>[
-      '--session',
-      'cli',
-    ], sessionId: 'custom');
-
-    expect(options.session, 'cli');
-  });
-
-  test('--session 非法时抛 ArgumentError', () {
+  test('isCanonicalSessionId 识别 session_<uuid> 格式', () {
     expect(
-      () => TuiOptions.parse(const <String>['--session', 'a b']),
-      throwsArgumentError,
+      isCanonicalSessionId('session_c8898262-4a76-4bd4-93dc-f757fd4ef666'),
+      isTrue,
     );
+    // 大小写均可（UUID 十六进制）。
     expect(
-      () => TuiOptions.parse(<String>['--session', 'x' * 65]),
-      throwsArgumentError,
+      isCanonicalSessionId('session_C8898262-4A76-4BD4-93DC-F757FD4EF666'),
+      isTrue,
     );
-  });
-
-  test('传入的 sessionId 非法且无 --session 时抛 ArgumentError', () {
+    // 非规范：缺前缀、旧格式、短 id、分叉后缀、空串。
     expect(
-      () => TuiOptions.parse(const <String>[], sessionId: 'a b'),
-      throwsArgumentError,
+      isCanonicalSessionId('c8898262-4a76-4bd4-93dc-f757fd4ef666'),
+      isFalse,
     );
-  });
-
-  test('传入的 sessionId 非法但 --session 合法时用 --session 的值', () {
-    final TuiOptions options = TuiOptions.parse(const <String>[
-      '--session',
-      'ok',
-    ], sessionId: 'a b');
-
-    expect(options.session, 'ok');
+    expect(isCanonicalSessionId('tui'), isFalse);
+    expect(isCanonicalSessionId('session-1727083200123456-1'), isFalse);
+    expect(isCanonicalSessionId('session_xxx'), isFalse);
+    expect(
+      isCanonicalSessionId(
+          'session_c8898262-4a76-4bd4-93dc-f757fd4ef666-fork-1'),
+      isFalse,
+    );
+    expect(isCanonicalSessionId(''), isFalse);
   });
 }

@@ -68,7 +68,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     required Context app,
     required SessionStore sessions,
     required this.name,
-    required String initialSession,
+    String? initialSession,
     required this.modelLabel,
     this.maxSteps = 8,
     this.onExit,
@@ -77,7 +77,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.initialPermissionMode = TuiPermissionMode.askWhenNeeded,
   })  : _app = app,
         _sessions = sessions,
-        _sessionId = initialSession {
+        _sessionId = initialSession ?? '' {
     picker = TuiSessionPicker(sessions, onChanged: _refresh);
     _app.provide('tuiController', this);
     final TuiPermissionGate? gate = app.get<TuiPermissionGate>('approval');
@@ -250,7 +250,13 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// 绑定初始会话；未配置 provider 时自动打开引导面板。
+  ///
+  /// 未指定会话 id（构造时 `initialSession` 为 `null`）时，先经会话仓库新建
+  /// 一个 `session_<uuid>` 会话再绑定，不会恢复历史会话。
   Future<void> start() async {
+    if (_sessionId.isEmpty) {
+      _sessionId = _sessions.create().id;
+    }
     await _bind(_sessionId);
     _refresh();
     if (_app.get<bool>('providerSetupNeeded') ?? false) {

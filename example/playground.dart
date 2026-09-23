@@ -5,21 +5,14 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:conatus/conatus.dart';
 import 'package:conatus_code/coding.dart';
 import 'package:conatus_code/fs_tools.dart';
 import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 
-String newSessionId() {
-  final String millis = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
-  final String rand = Random().nextInt(0x100000).toRadixString(36);
-  return 'tui-$millis-$rand';
-}
-
 Future<void> main(List<String> args) async {
-  final TuiOptions options = TuiOptions.parse(args, sessionId: newSessionId());
+  final TuiOptions options = TuiOptions.parse(args);
   if (options.helpRequested) {
     stdout.write(kPlaygroundUsage);
     return;
@@ -100,7 +93,7 @@ const String kPlaygroundPersona =
 const String kPlaygroundUsage =
     '用法：dart run example/playground.dart '
     '[--session <id>] [--cwd <目录>] [--model <名字>]\n'
-    '  --session <id>   启动会话 id（默认 $kTuiDefaultSession）\n'
+    '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
     '  --cwd <目录>     run_code 工作目录（默认当前目录）\n'
     '  --model <名字>   覆盖默认模型名（默认 doubao-seed-1-8-251228）\n'
     '输入 @<路径> 可引用文件（如 @lib/foo.dart 帮我看下这个文件）。\n'

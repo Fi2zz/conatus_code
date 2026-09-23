@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+- 会话 id 统一为 `session_<uuid>`（如 `session_c8898262-4a76-4bd4-93dc-f757fd4ef666`）：
+  - `nava` 不带 `--session`、`--session` 无值、或取值不是 `session_<uuid>` 格式时，
+    一律**新建会话**，不再回落到 `tui` / 恢复历史会话；只有显式传规范格式 id 才
+    打开/恢复对应会话。
+  - **破坏性**：`TuiOptions.session` 改为可空（`null` = 新建会话），`parse` 移除
+    `sessionId` 参数，常量 `kTuiDefaultSession` 删除；`ConatusTuiRuntime.createController`
+    的 `initialSession` 缺省为 `null`（新建会话）。旧会话文件（`tui.jsonl` 等）不删除，
+    TUI 内 `/session` / `/sessions` 仍可访问。
 - provider 配置收敛到 config.toml：新增 `[providers.<名字>]` 表（`api_key` /
   `base_url` / `type` / 可选 `oauth` 子表）与 `[llm] default_model =
   "provider/model"`；`providers.json` 不再读写，`[llm] provider` / `model`

@@ -108,6 +108,7 @@ Future<(ConatusTuiController, Context)> _build(
   bool withCron = false,
   bool withApproval = false,
   TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,
+  String? initialSession = 's1',
 }) async {
   final Context app = Context.root();
   provideTools(app);
@@ -135,7 +136,7 @@ Future<(ConatusTuiController, Context)> _build(
     app: app,
     sessions: sessions,
     name: 'test',
-    initialSession: 's1',
+    initialSession: initialSession,
     modelLabel: 'scripted',
     initialPermissionMode: initialPermissionMode,
     onExit: () {},
@@ -418,6 +419,20 @@ void main() {
     expect(
       controller.transcript.messages.last.text,
       contains('已切换到会话 work'),
+    );
+    app.dispose();
+  });
+
+  test('未指定会话时 start 新建 session_<uuid> 会话', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+      initialSession: null,
+    );
+
+    expect(
+      controller.sessionId,
+      matches(r'^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-'
+          r'[0-9a-f]{12}$'),
     );
     app.dispose();
   });

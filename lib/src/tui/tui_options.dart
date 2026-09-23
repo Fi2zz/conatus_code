@@ -5,23 +5,31 @@
 library;
 
 /// 会话 id 规则：字母 / 数字 / 下划线 / 中文 / 短横，长度 1—64。
+///
+/// 这是 TUI 内部（`/session` 切换、会话面板）的宽松校验；CLI 恢复判定用的是
+/// [isCanonicalSessionId]。
 bool isValidSessionId(String id) =>
     RegExp(r'^[A-Za-z0-9_\-\u4e00-\u9fff]{1,64}$').hasMatch(id);
 
-/// 缺省启动会话 id。
-const String kTuiDefaultSession = 'tui';
+/// 规范会话 id：`session_` + UUID（如 `session_c8898262-4a76-4bd4-93dc-f757fd4ef666`）。
+///
+/// 只有命中该格式的 id 才可被 `nava --session <id>` 打开/恢复；其余一律视为
+/// 新建会话。
+bool isCanonicalSessionId(String id) => RegExp(
+    r'^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    caseSensitive: false).hasMatch(id);
 
 /// 命令行选项。
 class TuiOptions {
   /// 构造选项。
   const TuiOptions({
-    this.session = kTuiDefaultSession,
+    this.session,
     this.configPath,
     this.helpRequested = false,
   });
 
-  /// 启动会话 id。
-  final String session;
+  /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
+  final String? session;
 
   /// `--config` 指定的配置文件路径；`null` 表示用默认位置。
   final String? configPath;
@@ -35,33 +43,35 @@ class TuiOptions {
   static const String usage =
       '用法：nava '
       '[--session <id>] [--config <路径>]\n'
-      '  --session <id>   启动会话 id（默认 tui）\n'
+      '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
       '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n';
 
   /// 解析命令行参数。
   ///
-  /// [sessionId] 是 `--session` 未出现时的启动会话；`--session` 出现且取值合法
-  /// 时以它为准。最终选中的会话 id 不是合法会话 id 时抛 [ArgumentError]。
+  /// `--session <id>` 出现且 id 为规范格式（`session_<uuid>`）时用它；`--session`
+  /// 无值、后一个参数以 `-` 开头、或取值不是规范格式时，都视为未指定会话
+  /// （返回 `session: null`，由调用方新建会话），不抛错。
   // REASON: 命令行选项解析天然是 if-else 链（一个选项一个分支），表驱动反而更难读。
-  static TuiOptions parse(
-    List<String> args, {
-    String sessionId = kTuiDefaultSession,
-  }) {
-    String session = sessionId;
+  static TuiOptions parse(List<String> args) {
+    String? session;
     String? configPath;
     bool helpRequested = false;
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
         helpRequested = true;
-      } else if (arg == '--session' && index + 1 < args.length) {
-        session = args[++index];
+      } else if (arg == '--session') {
+        final bool hasValue =
+            index + 1 < args.length && !args[index + 1].startsWith('-');
+        if (hasValue) {
+          final String candidate = args[++index];
+          if (isCanonicalSessionId(candidate)) {
+            session = candidate;
+          }
+        }
       } else if (arg == '--config' && index + 1 < args.length) {
         configPath = args[++index];
       }
-    }
-    if (!isValidSessionId(session)) {
-      throw ArgumentError.value(session, 'sessionId', '必须是合法会话 id');
     }
     return TuiOptions(
       session: session,

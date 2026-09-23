@@ -332,9 +332,10 @@ class ConatusTuiRuntime {
 
   /// 构造一个绑定到 [initialSession] 的会话控制器。
   ///
+  /// [initialSession] 是要打开/恢复的会话 id；`null`（缺省）表示新建会话。
   /// [initialPermissionMode] 是会话自身没有权限记录时采用的模式（来自配置）。
   ConatusTuiController createController({
-    String initialSession = 'tui',
+    String? initialSession,
     required void Function() onExit,
     String name = '默认',
     TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,

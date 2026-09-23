@@ -10,7 +10,7 @@
 ///
 /// # 指定模型 / 会话
 /// dart run packages/conatus_tui/example/deepseek_demo.dart \
-///   --model deepseek-chat --session demo
+///   --model deepseek-chat --session session_<uuid>
 /// ```
 library;
 
@@ -63,7 +63,7 @@ Future<void> main(List<String> args) async {
 const String kDemoUsage =
     '用法：dart run example/deepseek_demo.dart '
     '[--session <id>] [--model <name>]\n'
-    '  --session <id>   启动会话 id（默认 $kTuiDefaultSession）\n'
+    '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
     '  --model <name>   DeepSeek 模型名（默认 deepseek-flash）\n';
 
 /// 从参数里取 `--model` 的值；未出现或缺尾值时返回 `null`。
