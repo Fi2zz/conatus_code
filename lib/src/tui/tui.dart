@@ -69,6 +69,9 @@ class _AgentTuiState extends State<AgentTui> {
   void initState() {
     super.initState();
     _controller.onChanged = _refresh;
+    _controller.onOpenTeamView = () => setState(() {
+          _view = ViewMode.team;
+        });
     _input.addListener(_onInputChanged);
     _spin = Timer.periodic(const Duration(milliseconds: 120), (_) {
       if (_controller.busy && mounted) {
@@ -84,6 +87,7 @@ class _AgentTuiState extends State<AgentTui> {
     _exitTimer?.cancel();
     _controller
       ..onChanged = null
+      ..onOpenTeamView = null
       ..dispose();
     _input
       ..removeListener(_onInputChanged)
@@ -209,7 +213,11 @@ class _AgentTuiState extends State<AgentTui> {
   /// 均先于文本域消费。
   bool _onInputKey(KeyboardEvent event) {
     if (event.matches(LogicalKey.keyT, ctrl: true)) {
-      _toggleView();
+      _controller.togglePlanExpanded();
+      return true;
+    }
+    if (event.matches(LogicalKey.keyO, ctrl: true)) {
+      _controller.toggleToolExpanded();
       return true;
     }
     if (event.logicalKey == LogicalKey.backspace &&
@@ -500,9 +508,14 @@ class _AgentTuiState extends State<AgentTui> {
   }
 
   bool _onKey(KeyboardEvent event) {
-    // Ctrl+T 切换对话/团队视图（兜底：输入框聚焦时由 _onInputKey 先行处理）。
+    // Ctrl+T 展开 / 收起 TODO 列表（兜底：输入框聚焦时由 _onInputKey 先行处理）。
     if (event.matches(LogicalKey.keyT, ctrl: true)) {
-      _toggleView();
+      _controller.togglePlanExpanded();
+      return true;
+    }
+    // Ctrl+O 展开 / 收起最近一条工具结果。
+    if (event.matches(LogicalKey.keyO, ctrl: true)) {
+      _controller.toggleToolExpanded();
       return true;
     }
     // Ctrl+C / Alt+C：平台差异化语义，见 _onCopyKey。

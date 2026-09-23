@@ -40,7 +40,7 @@ Future<void> _flush() async {
 }
 
 void main() {
-  test('团队事件驱动状态栏出现；Ctrl+T 切换对话/团队视图', () async {
+  test('团队事件驱动状态栏出现；/team 进入团队视图', () async {
     final Context app = Context.root();
     provideTools(app);
     provideLlm(app, llm: FallbackLlm(<LlmProvider>[_NoopProvider()]));
@@ -76,20 +76,14 @@ void main() {
       expect(tester.terminalState, containsText('团队: 1 成员'));
       expect(tester.terminalState, containsText('任务: 0/0 完成'));
 
-      // Ctrl+T：切到团队视图。
-      await tester.sendKeyEvent(const KeyboardEvent(
-        logicalKey: LogicalKey.keyT,
-        modifiers: ModifierKeys(ctrl: true),
-      ));
+      // /team：进入团队视图。
+      await controller.handleLine('/team');
       await tester.pump();
       expect(tester.terminalState, containsText('团队视图'));
       expect(tester.terminalState, containsText('reviewer'));
 
-      // 再按 Ctrl+T：返回对话视图。
-      await tester.sendKeyEvent(const KeyboardEvent(
-        logicalKey: LogicalKey.keyT,
-        modifiers: ModifierKeys(ctrl: true),
-      ));
+      // Esc：返回对话视图。
+      await tester.sendEscape();
       await tester.pump();
       expect(tester.terminalState, isNot(containsText('团队视图')));
     } finally {

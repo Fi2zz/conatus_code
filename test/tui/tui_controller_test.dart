@@ -203,6 +203,60 @@ void main() {
     app.dispose();
   });
 
+  test('ctrl+o 展开 / 收起最近一条工具结果', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      <LlmResult>[
+        const LlmResult(
+          content: '',
+          provider: 'scripted',
+          model: 'm',
+          toolCalls: <LlmToolCall>[LlmToolCall(id: '1', name: 'get_time')],
+        ),
+        const LlmResult(content: '好了。', provider: 'scripted', model: 'm'),
+      ],
+    );
+
+    await controller.handleLine('几点？');
+
+    final TuiMessage tool = controller.transcript.messages
+        .firstWhere((TuiMessage m) => m.role == TuiRole.tool);
+    expect(tool.expanded, isFalse);
+
+    controller.toggleToolExpanded();
+    expect(tool.expanded, isTrue);
+
+    controller.toggleToolExpanded();
+    expect(tool.expanded, isFalse);
+    app.dispose();
+  });
+
+  test('ctrl+t 展开 / 收起 TODO 列表', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+    );
+    controller.transcript.apply(SessionEvent(
+      seq: 0,
+      type: kPlanEvent,
+      time: DateTime.fromMillisecondsSinceEpoch(0),
+      data: <String, Object?>{
+        'goal': '修 bug',
+        'steps': <Map<String, Object?>>[
+          <String, Object?>{'id': 's1', 'text': '复现', 'done': false},
+        ],
+      },
+    ));
+
+    final TuiMessage plan = controller.transcript.planMessage!;
+    expect(plan.expanded, isTrue);
+
+    controller.togglePlanExpanded();
+    expect(plan.expanded, isFalse);
+
+    controller.togglePlanExpanded();
+    expect(plan.expanded, isTrue);
+    app.dispose();
+  });
+
   test('未知命令给出提示，不进入对话链路', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],

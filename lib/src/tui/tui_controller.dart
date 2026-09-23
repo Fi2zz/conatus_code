@@ -58,7 +58,8 @@ const String kCronUsage = '用法：/cron [list|add <内容> <at|every|daily|cro
     '每周X=HH:MM；cron=5 段表达式';
 
 /// `/team` 用法提示。
-const String kTeamUsage = '用法：/team [status|interrupt <成员 id>]';
+const String kTeamUsage =
+    '用法：/team（进入团队视图）[status|interrupt <成员 id>]';
 
 /// `/task` 用法提示。
 const String kTaskUsage = '用法：/task [claim <任务 id>|release <任务 id>]';
@@ -146,6 +147,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   ///
   /// `/model` 打开浮层时，当前提供商没有配置模型清单（`[models.*]`）时兜底拉取。
   Future<Map<String, List<ModelsDevModel>>> Function()? modelsDevLoader;
+
+  /// `/team`（无参）进入团队视图的宿主回调；由根组件注入切换视图。
+  void Function()? onOpenTeamView;
 
   /// provider 管理浮层（`/provider`，只读展示）。
   late final TuiProviderPrompt providerPrompt =
@@ -923,7 +927,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     final String rest = space < 0 ? '' : arg.substring(space + 1).trim();
     try {
       switch (sub) {
-        case '' || 'status':
+        case '':
+          // 无参进入团队视图（Esc 返回对话）。
+          onOpenTeamView?.call();
+        case 'status':
           transcript.add(TuiRole.system, summarizeTeamProgress(teamSnapshot));
         case 'interrupt':
           if (rest.isEmpty) {
@@ -994,6 +1001,27 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     applyPermissionMode(mode);
+  }
+
+  /// 展开 / 收起最近一条工具结果（ctrl+o；无工具结果时不动作）。
+  void toggleToolExpanded() {
+    for (final TuiMessage message in transcript.messages.reversed) {
+      if (message.role == TuiRole.tool) {
+        message.expanded = !message.expanded;
+        _refresh();
+        return;
+      }
+    }
+  }
+
+  /// 展开 / 收起 TODO 列表（ctrl+t；无计划时不动作）。
+  void togglePlanExpanded() {
+    final TuiMessage? message = transcript.planMessage;
+    if (message == null) {
+      return;
+    }
+    message.expanded = !message.expanded;
+    _refresh();
   }
 
   Future<void> _bind(String id) async {

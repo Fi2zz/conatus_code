@@ -20,14 +20,30 @@ class Transcript {
   /// `/help` 弹出的帮助消息（Esc 可关闭）；null = 未打开。
   TuiMessage? help;
 
+  /// 当前计划的 TODO 列表消息（`plan/updated` 时新建或就地更新）。
+  TuiMessage? _plan;
+
   /// 清空屏上记录（不改动会话数据）。
   void clear() {
     messages.clear();
     help = null;
+    _plan = null;
   }
 
   /// 追加一条消息。
   void add(TuiRole role, String text) => messages.add(TuiMessage(role, text));
+
+  /// 当前计划的 TODO 列表消息；尚无计划为 `null`。
+  TuiMessage? get planMessage => _plan;
+
+  /// 展开 / 收起 TODO 列表（ctrl+t）；无计划不动作。
+  void togglePlanExpanded() {
+    final TuiMessage? message = _plan;
+    if (message == null) {
+      return;
+    }
+    message.expanded = !message.expanded;
+  }
 
   /// 打开帮助弹出并记录引用，供 [closeHelp] 移除；已打开时先关闭旧的。
   void openHelp(String text) {
@@ -51,6 +67,7 @@ class Transcript {
   void rebuildFrom(Session session) {
     messages.clear();
     help = null;
+    _plan = null;
     for (final SessionEvent event in session.events) {
       apply(event);
     }
@@ -63,10 +80,11 @@ class Transcript {
       case kUserMessageEvent:
         add(TuiRole.user, '${collapseSkillPrompt(_text(data))}${_imageMarker(data)}');
       case kAssistantMessageEvent:
+        // 文本与工具调用各自成行：有文本先出助手行，再逐条列工具调用名，
+        // 让执行过程（调了哪些工具）始终可见，而不是被助手文本吞掉。
         final String text = _text(data);
         if (text.trim().isNotEmpty) {
           add(TuiRole.assistant, text);
-          return;
         }
         for (final LlmToolCall call in _toolCalls(data)) {
           add(TuiRole.stage, '· 调用工具 ${call.name}');
@@ -75,12 +93,33 @@ class Transcript {
         final String name = _field(data, 'name');
         final bool failed = data is Map && data['isError'] == true;
         final String mark = failed ? '✗' : '✓';
-        add(TuiRole.tool, '· 工具 $mark $name${_preview(data)}');
+        // 完整内容存进消息正文；过长时由视图折叠，ctrl+o 展开。
+        final String content = _field(data, 'content').trim();
+        add(TuiRole.tool, content.isEmpty
+            ? '· 工具 $mark $name'
+            : '· 工具 $mark $name\n$content');
       case kPlanEvent:
-        add(TuiRole.stage, '· 计划已更新');
+        _upsertPlan(data);
       default:
         // 其余事件（含自定义）不投射。
         return;
+    }
+  }
+
+  /// 计划事件：把 TODO 列表消息设为当前计划（无则新建，有则就地更新正文），
+  /// 默认展开显示完整步骤，ctrl+t 折叠。
+  void _upsertPlan(Object? data) {
+    if (data is! Map) {
+      return;
+    }
+    final Plan plan = Plan.fromJson(Map<String, Object?>.from(data));
+    final TuiMessage? current = _plan;
+    final TuiMessage message =
+        current ?? (TuiMessage(TuiRole.plan, '')..expanded = true);
+    message.text = plan.summary();
+    if (current == null) {
+      _plan = message;
+      messages.add(message);
     }
   }
 
@@ -104,15 +143,5 @@ class Transcript {
     if (data is! Map) return '';
     final int count = imagesFromJson(data['images']).length;
     return count > 0 ? ' [图片 ×$count]' : '';
-  }
-
-  static String _preview(Object? data) {
-    if (data is! Map) return '';
-    final String content = '${data['content'] ?? ''}'.trim();
-    if (content.isEmpty) return '';
-    final String firstLine = content.split('\n').first.trim();
-    final String trimmed =
-        firstLine.length > 80 ? '${firstLine.substring(0, 80)}…' : firstLine;
-    return ' → $trimmed';
   }
 }

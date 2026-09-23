@@ -78,7 +78,7 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   TuiCommand(name: 'telemetry', description: '显示最近的可观测性事件'),
   TuiCommand(
     name: 'team',
-    description: '团队视图/成员管理（status / interrupt <成员 id>）',
+    description: '进入团队视图（Esc 返回）；status 摘要 / interrupt <成员 id> 中断',
     argHint: '<子命令>',
   ),
   TuiCommand(

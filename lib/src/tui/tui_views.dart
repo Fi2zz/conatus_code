@@ -66,7 +66,9 @@ class MessageView extends StatelessComponent {
           MarkdownText(message.text),
         );
       case TuiRole.tool:
-        return _indent(message.text, Colors.cyan);
+        return _indent(_foldTool(message), Colors.cyan);
+      case TuiRole.plan:
+        return _indent(_foldPlan(message), Colors.brightBlue);
       case TuiRole.stage:
         return _indent(message.text, Colors.brightBlack);
       case TuiRole.system:
@@ -94,6 +96,27 @@ class MessageView extends StatelessComponent {
       padding: const EdgeInsets.only(left: 2),
       child: Text(text, style: TextStyle(color: color)),
     );
+  }
+
+  /// 工具结果正文：折叠时只显示前 [kToolPreviewLines] 行并提示，展开显示全文。
+  String _foldTool(TuiMessage message) {
+    final List<String> lines = message.text.split('\n');
+    if (message.expanded || lines.length <= kToolPreviewLines) {
+      return message.text;
+    }
+    final String head = lines.take(kToolPreviewLines).join('\n');
+    return '$head\n…（已折叠，共 ${lines.length} 行，按 ctrl+o 展开）';
+  }
+
+  /// TODO 列表：默认展开显示完整步骤；折叠成一行摘要（ctrl+t 展开）。
+  String _foldPlan(TuiMessage message) {
+    if (message.expanded) {
+      return message.text;
+    }
+    final List<String> lines = message.text.split('\n');
+    final String goal = lines.isEmpty ? '' : lines.first;
+    final int steps = lines.length > 1 ? lines.length - 1 : 0;
+    return '$goal（$steps 步 · 按 ctrl+t 展开）';
   }
 }
 

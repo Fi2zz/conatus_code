@@ -15,6 +15,9 @@ enum TuiRole {
   /// 阶段提示（思考、计划等暗色行）。
   stage,
 
+  /// 计划 / TODO 列表（`plan/updated` 事件投影，ctrl+t 展开/折叠）。
+  plan,
+
   /// 命令回执 / 提示信息。
   system,
 
@@ -31,4 +34,10 @@ class TuiMessage {
 
   /// 正文；可增量更新。
   String text;
+
+  /// 工具结果是否展开显示全文（默认折叠，见 [kToolPreviewLines]）。
+  bool expanded = false;
 }
+
+/// 工具结果折叠时可见的最大行数；超出部分按 ctrl+o 展开。
+const int kToolPreviewLines = 8;
