@@ -197,25 +197,43 @@ extension _ProviderCommands on ConatusTuiController {
     await _addProvider(registry);
   }
 
-  /// 新增 provider 的「来源选择」列表：常见 provider + custom 入口。
-  List<TuiProviderItem> sourceItems() => <TuiProviderItem>[
+  /// 新增 provider 的「来源选择」列表：知名第三方 / 自定义入口。
+  List<TuiProviderItem> sourceItems() => const <TuiProviderItem>[
+        TuiProviderItem(
+          name: 'Known third-party provider',
+          baseUrl: '',
+          current: false,
+          isKnown: true,
+        ),
+        TuiProviderItem(
+          name: 'Custom registry (api.json)',
+          baseUrl: '',
+          current: false,
+          isCustom: true,
+        ),
+      ];
+
+  /// 知名第三方 provider 预设列表（选 api_key 后模型清单自动取 models.dev）。
+  List<TuiProviderItem> presetItems() => <TuiProviderItem>[
         for (final ProviderPreset preset in kProviderPresets)
           TuiProviderItem(
             name: preset.id,
             baseUrl: preset.baseUrl,
             current: false,
           ),
-        const TuiProviderItem(
-            name: 'custom', baseUrl: '', current: false, isCustom: true),
       ];
 
-  /// 新增 provider：先选来源（常见 provider 或 custom），再走对应流程。
+  /// 新增 provider：先选来源（知名第三方 / 自定义），再走对应流程。
   ///
-  /// 常见 provider 从 models.dev 拉模型清单供选择；custom 手填 base_url /
-  /// api_key / model。写回 config.toml；第一个 provider 同时设为
+  /// 知名第三方再选具体 provider，从 models.dev 拉模型清单供选择；custom 手填
+  /// base_url / api_key / model。写回 config.toml；第一个 provider 同时设为
   /// `default_model`（后续不改它）。
   Future<void> _addProvider(ProviderRegistry registry) async {
-    final TuiProviderItem? source = await providerPrompt.choose(sourceItems());
+    final TuiProviderItem? source = await providerPrompt.choose(
+      sourceItems(),
+      title: 'Add provider',
+      hint: '↑↓ navigate · Enter select · Esc cancel',
+    );
     if (source == null) {
       transcript.add(TuiRole.system, '已取消新增。');
       return;
@@ -229,6 +247,20 @@ extension _ProviderCommands on ConatusTuiController {
   ) async {
     if (source.isCustom) {
       await _addCustomProvider(registry);
+      return;
+    }
+    if (source.isKnown) {
+      // 第二级：从预设列表选具体 provider。
+      final TuiProviderItem? preset = await providerPrompt.choose(
+        presetItems(),
+        title: 'Add provider',
+        hint: '↑↓ navigate · Enter select · Esc cancel',
+      );
+      if (preset == null) {
+        transcript.add(TuiRole.system, '已取消新增。');
+        return;
+      }
+      await _addRegisteredProvider(registry, preset);
       return;
     }
     await _addRegisteredProvider(registry, source);

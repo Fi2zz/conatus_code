@@ -13,10 +13,12 @@ class TuiProviderItem {
     required this.current,
     this.isAdd = false,
     this.isCustom = false,
+    this.isKnown = false,
   });
 
   /// 提供商名；[isAdd] 为 true 时是「[ Add New Platform ]」占位项，
-  /// [isCustom] 为 true 时是「[ custom ]」来源项。
+  /// [isCustom] 为 true 时是「自定义来源」项，[isKnown] 为 true 时是
+  /// 「知名第三方来源」入口项。
   final String name;
 
   /// 端点地址（列表第二行灰字）。
@@ -31,13 +33,16 @@ class TuiProviderItem {
   /// 是否为「自定义 provider」来源项（只填 base_url / api_key / model）。
   final bool isCustom;
 
+  /// 是否为「知名第三方 provider」来源入口项（进入后列出全部预设）。
+  final bool isKnown;
+
   /// 列表展示名。
   String get label {
     if (isAdd) {
       return '[ Add New Platform ]';
     }
     if (isCustom) {
-      return '[ custom ]';
+      return name.isEmpty ? '[ custom ]' : name;
     }
     return name;
   }
@@ -53,10 +58,18 @@ class TuiProviderPrompt {
   List<TuiProviderItem> _items = const <TuiProviderItem>[];
   int _index = 0;
   bool _open = false;
+  String _title = 'Providers';
+  String _hint = '↑↓ 选择 · Enter 切换 / 新增 · Esc 取消';
   Completer<TuiProviderItem?>? _pending;
 
   /// 浮层是否可见。
   bool get open => _open;
+
+  /// 面板标题（管理面板 `Providers`，新增来源面板 `Add provider`）。
+  String get title => _title;
+
+  /// 面板按键提示行。
+  String get hint => _hint;
 
   /// 是否有待收口的选择请求（[choose] 发起的）。
   bool get awaiting => _pending != null;
@@ -71,8 +84,10 @@ class TuiProviderPrompt {
   TuiProviderItem? get selected => _items.isEmpty ? null : _items[_index];
 
   /// 打开并载入列表（默认选中当前提供商）。
-  void show(List<TuiProviderItem> items) {
+  void show(List<TuiProviderItem> items, {String? title, String? hint}) {
     _items = items;
+    _title = title ?? 'Providers';
+    _hint = hint ?? '↑↓ 选择 · Enter 切换 / 新增 · Esc 取消';
     _open = true;
     final int current =
         items.indexWhere((TuiProviderItem item) => item.current);
@@ -83,10 +98,14 @@ class TuiProviderPrompt {
   /// 选择模式：打开面板并等待用户选中（Enter）或取消（Esc）。
   ///
   /// 面板关闭前调用方等待返回；取消返回 `null`。
-  Future<TuiProviderItem?> choose(List<TuiProviderItem> items) {
+  Future<TuiProviderItem?> choose(
+    List<TuiProviderItem> items, {
+    String? title,
+    String? hint,
+  }) {
     final Completer<TuiProviderItem?> completer = Completer<TuiProviderItem?>();
     _pending = completer;
-    show(items);
+    show(items, title: title, hint: hint);
     return completer.future;
   }
 

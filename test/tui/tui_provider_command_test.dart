@@ -197,6 +197,28 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
+  test('/provider 新增：Add New Platform 后先选来源（Known / Custom）', () async {
+    final (ConatusTuiController controller, Context app, Directory dir) =
+        await _build();
+
+    await controller.handleLine('/provider');
+    controller.providerPrompt.move(2); // a、b → [ Add New Platform ]
+    final Future<void> adding = controller.confirmProviderItem();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.providerPrompt.open, isTrue);
+    expect(controller.providerPrompt.title, 'Add provider');
+    expect(
+      controller.providerPrompt.items.map((TuiProviderItem i) => i.label),
+      <String>['Known third-party provider', 'Custom registry (api.json)'],
+    );
+
+    controller.providerPrompt.cancel();
+    await adding;
+    app.dispose();
+    dir.deleteSync(recursive: true);
+  });
+
   test('/model 打开浮层：列出所有注册提供商的模型', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _build();

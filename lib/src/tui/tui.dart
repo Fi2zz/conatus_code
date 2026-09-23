@@ -690,6 +690,8 @@ class _AgentTuiState extends State<AgentTui> {
             TuiProviderView(
               items: _controller.providerPrompt.items,
               selected: _controller.providerPrompt.index,
+              title: _controller.providerPrompt.title,
+              hint: _controller.providerPrompt.hint,
             ),
           if (_controller.modelPrompt.open)
             TuiModelView(

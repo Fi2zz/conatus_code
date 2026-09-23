@@ -13,6 +13,8 @@ class TuiProviderView extends StatelessComponent {
     super.key,
     required this.items,
     required this.selected,
+    this.title = 'Providers',
+    this.hint = '↑↓ 选择 · Enter 切换 / 新增 · Esc 取消',
   });
 
   /// 列表项。
@@ -20,6 +22,12 @@ class TuiProviderView extends StatelessComponent {
 
   /// 当前选中下标。
   final int selected;
+
+  /// 面板标题（管理面板 `Providers`，新增来源面板 `Add provider`）。
+  final String title;
+
+  /// 面板按键提示行。
+  final String hint;
 
   @override
   Component build(BuildContext context) {
@@ -32,17 +40,14 @@ class TuiProviderView extends StatelessComponent {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
-          const Text(
-            'Providers',
-            style: TextStyle(
+          Text(
+            title,
+            style: const TextStyle(
               color: Colors.brightBlue,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Text(
-            '↑↓ 选择 · Enter 切换 / 新增 · Esc 取消',
-            style: TextStyle(color: Colors.gray),
-          ),
+          Text(hint, style: const TextStyle(color: Colors.gray)),
           const SizedBox(height: 1),
           for (int i = 0; i < items.length; i++)
             _row(items[i], i == selected),
