@@ -22,6 +22,65 @@ void main() {
     return file;
   }
 
+  group('附件占位', () {
+    test('图片占位带 PNG 尺寸：宽×高', () {
+      // 8 字节 PNG 签名 + IHDR 宽高（大端 683×416）。
+      final List<int> png = <int>[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        ...List<int>.filled(8, 0),
+        0x00, 0x00, 0x02, 0xAB, // 683
+        0x00, 0x00, 0x01, 0xA0, // 416
+      ];
+      final File file = makeFile('shot.png', png);
+
+      expect(
+        attachmentPlaceholder(
+            TuiAttachment(path: file.path, mimeType: 'image/png'), 3),
+        '[image #3 (683×416)]',
+      );
+    });
+
+    test('非图片占位带文件名', () {
+      final File file = makeFile('note.txt', utf8.encode('hi'));
+
+      expect(
+        attachmentPlaceholder(
+            TuiAttachment(path: file.path, mimeType: 'text/plain'), 1),
+        '[file #1 (note.txt)]',
+      );
+    });
+
+    test('extractAttachmentRefs 提取序号并移除占位', () {
+      final AttachmentRefs refs = extractAttachmentRefs(
+        '看一下 [image #1 (683×416)] 和 [file #2 (note.txt)] 谢谢',
+      );
+
+      expect(refs.text, '看一下 和 谢谢');
+      expect(refs.indices, <int>[1, 2]);
+    });
+
+    test('同序号占位去重；无占位文本原样返回', () {
+      final AttachmentRefs dup = extractAttachmentRefs(
+        '[image #2 (1×1)] 重复 [image #2]',
+      );
+      expect(dup.indices, <int>[2]);
+      expect(dup.text, '重复');
+
+      final AttachmentRefs none = extractAttachmentRefs('普通文本');
+      expect(none.indices, isEmpty);
+      expect(none.text, '普通文本');
+    });
+
+    test('imageDimensions 识别 PNG / JPEG，非图片返回 null', () {
+      final List<int> png = <int>[
+        0x89, 0x50, 0x4E, 0x47, ...List<int>.filled(12, 0),
+        0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x80,
+      ];
+      expect(imageDimensions(png), '256×128');
+      expect(imageDimensions(utf8.encode('plain text')), isNull);
+    });
+  });
+
   group('extractPathAttachments', () {
     test('全部 token 都是存在的文件路径时识别为附件', () {
       final File png = makeFile('a.png', [1]);

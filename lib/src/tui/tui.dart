@@ -122,20 +122,25 @@ class _AgentTuiState extends State<AgentTui> {
   }
 
   void _submit() {
-    final String text = _input.text;
-    if (text.trim().isEmpty && _attachments.isEmpty) {
+    final String raw = _input.text;
+    if (raw.trim().isEmpty && _attachments.isEmpty) {
       return;
     }
     _input.clear();
+    // 占位标记映射回附件：文本里未出现的占位对应的附件（悬空）随清空丢弃。
+    final AttachmentRefs refs = extractAttachmentRefs(raw);
+    final List<TuiAttachment> attachments = <TuiAttachment>[
+      for (final int index in refs.indices)
+        if (index >= 1 && index <= _attachments.length)
+          _attachments[index - 1],
+    ];
+    _attachments.clear();
+    final String text = refs.text;
     if (text.trim().startsWith('/')) {
       unawaited(_controller.handleLine(text));
       setState(() {});
       return;
     }
-    final List<TuiAttachment> attachments = List<TuiAttachment>.of(
-      _attachments,
-    );
-    _attachments.clear();
     unawaited(_controller.handleLine(text, attachments: attachments));
     setState(() {});
   }
@@ -166,7 +171,8 @@ class _AgentTuiState extends State<AgentTui> {
     return true;
   }
 
-  /// 登记附件；超出上限时截断并提示。
+  /// 登记附件并往输入框插入占位标记（`[image #N (宽×高)]` / `[file #N (名)]`）；
+  /// 超出上限时截断并提示。
   void _addAttachments(List<TuiAttachment> found) {
     final int room = kAttachmentMaxCount - _attachments.length;
     final List<TuiAttachment> accepted = found.take(room).toList();
@@ -176,7 +182,14 @@ class _AgentTuiState extends State<AgentTui> {
         '附件已达上限（$kAttachmentMaxCount 个），多余部分忽略。',
       );
     }
-    setState(() => _attachments.addAll(accepted));
+    setState(() {
+      final StringBuffer buffer = StringBuffer(_input.text);
+      for (final TuiAttachment attachment in accepted) {
+        _attachments.add(attachment);
+        buffer.write('${attachmentPlaceholder(attachment, _attachments.length)} ');
+      }
+      _input.text = buffer.toString();
+    });
   }
 
   /// 从系统剪贴板读图片并登记为附件（macOS）。
@@ -722,7 +735,6 @@ class _AgentTuiState extends State<AgentTui> {
             busy: _controller.busy,
             onSubmitted: (_) => _submit(),
             onKeyEvent: _onInputKey,
-            attachments: _attachments,
           ),
           TuiStatusBar(
             pickerOpen: _controller.picker.open,

@@ -3,7 +3,6 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
-import 'tui_attachment.dart';
 import 'tui_views.dart';
 
 /// 顶栏：应用名 / 当前会话 / 模型。
@@ -56,7 +55,10 @@ class TuiHeader extends StatelessComponent {
   }
 }
 
-/// 输入栏：附件行（如有）+ `> ` 前缀 + 单行输入框（思考中置灰只读，避免丢输入）。
+/// 输入栏：`> ` 前缀 + 单行输入框（思考中置灰只读，避免丢输入）。
+///
+/// 附件以占位标记（`[image #N (宽×高)]`）形式留在输入框文本里，随文本提交时
+/// 提取（见 `tui_attachment.dart`），不再单独渲染附件行。
 class TuiInputBar extends StatelessComponent {
   const TuiInputBar({
     super.key,
@@ -65,7 +67,6 @@ class TuiInputBar extends StatelessComponent {
     required this.busy,
     required this.onSubmitted,
     this.onKeyEvent,
-    this.attachments = const <TuiAttachment>[],
   });
 
   /// 文本控制器。
@@ -83,9 +84,6 @@ class TuiInputBar extends StatelessComponent {
   /// 文本框按键拦截（返回 true 吞掉）：`/` 菜单打开时用于 ↑↓/Enter/Esc/Tab。
   final bool Function(KeyboardEvent event)? onKeyEvent;
 
-  /// 待发送附件（随下一条消息一起提交）。
-  final List<TuiAttachment> attachments;
-
   @override
   Component build(BuildContext context) {
     return Container(
@@ -94,53 +92,23 @@ class TuiInputBar extends StatelessComponent {
         color: Color.fromRGB(20, 20, 40),
         border: BoxBorder(top: BorderSide(color: Colors.blue)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: <Component>[
-          TuiAttachmentChips(attachments: attachments),
-          Row(
-            children: <Component>[
-              const Text('> ', style: TextStyle(color: Colors.green)),
-              Expanded(
-                child: TextField(
-                  key: ValueKey<bool>(busy),
-                  controller: controller,
-                  focused: focused,
-                  readOnly: busy,
-                  style: const TextStyle(color: Colors.white),
-                  placeholder: busy ? '思考中…' : '输入消息，/help 查看命令',
-                  onSubmitted: onSubmitted,
-                  onKeyEvent: onKeyEvent,
-                ),
-              ),
-            ],
+          const Text('> ', style: TextStyle(color: Colors.green)),
+          Expanded(
+            child: TextField(
+              key: ValueKey<bool>(busy),
+              controller: controller,
+              focused: focused,
+              readOnly: busy,
+              style: const TextStyle(color: Colors.white),
+              placeholder: busy ? '思考中…' : '输入消息，/help 查看命令',
+              onSubmitted: onSubmitted,
+              onKeyEvent: onKeyEvent,
+            ),
           ),
         ],
       ),
-    );
-  }
-}
-
-/// 附件行：逐个展示文件名；无附件时占位不占行。
-class TuiAttachmentChips extends StatelessComponent {
-  const TuiAttachmentChips({super.key, required this.attachments});
-
-  /// 待发送附件。
-  final List<TuiAttachment> attachments;
-
-  @override
-  Component build(BuildContext context) {
-    if (attachments.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Row(
-      children: <Component>[
-        for (final TuiAttachment attachment in attachments)
-          Text(
-            '[${attachment.name}] ',
-            style: const TextStyle(color: Colors.yellow),
-          ),
-      ],
     );
   }
 }
