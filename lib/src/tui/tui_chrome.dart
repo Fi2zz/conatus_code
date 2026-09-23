@@ -1,6 +1,8 @@
 /// TUI 外框组件：顶栏、输入栏与状态栏。
 library;
 
+import 'dart:io';
+
 import 'package:nocterm/nocterm.dart';
 
 import 'tui_views.dart';
@@ -124,6 +126,7 @@ class TuiStatusBar extends StatelessComponent {
     this.choiceOpen = false,
     this.exitPending = false,
     this.permissionLabel = '',
+    this.hasSelection = false,
   });
 
   /// 会话面板是否打开。
@@ -147,6 +150,9 @@ class TuiStatusBar extends StatelessComponent {
   /// 当前权限模式名；空则不显示。
   final String permissionLabel;
 
+  /// 消息区是否有鼠标选区（提示可复制）。
+  final bool hasSelection;
+
   @override
   Component build(BuildContext context) {
     final String hint;
@@ -160,6 +166,10 @@ class TuiStatusBar extends StatelessComponent {
       hint = '[↑↓] 选择命令 | [Enter] 运行 | [Tab] 补全 | [Esc] 关闭';
     } else if (busy) {
       hint = '${tuiSpinner(tick)} 思考中${tuiDots(tick)}';
+    } else if (hasSelection) {
+      hint = Platform.isMacOS
+          ? '选中后 ⌥C（Option+C）/ Ctrl+C 复制 | /help 命令'
+          : '选中后 Ctrl+C 复制 | /help 命令';
     } else {
       hint = '回车发送 | /help 命令 | /sessions 会话 | Ctrl+C 退出';
     }

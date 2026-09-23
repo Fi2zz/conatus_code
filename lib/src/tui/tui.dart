@@ -482,38 +482,37 @@ class _AgentTuiState extends State<AgentTui> {
     return true; // 浮层打开时吞掉按键，避免误输入。
   }
 
-  /// Ctrl+C / Alt+C：平台差异化按键语义。
+  /// Ctrl+C / Alt+C / Cmd+C：平台差异化按键语义。
   ///
   /// 输入框有内容时 Ctrl+C 恒为清空输入（shell 习惯）。
-  /// macOS：Ctrl+C 忙时打断在飞轮次、空闲连按两次退出；复制走 Alt+C
-  /// （Option+C）。其他平台：Ctrl+C 有选中文本时复制，否则连按两次退出。
-  /// Alt+C 无选区也吞掉，避免 Option+C 被当作字符输入。
+  /// macOS：Ctrl+C 忙时打断在飞轮次；空闲时有选区先复制、无选区连按两次
+  /// 退出；复制还可走 Alt+C（Option+C，终端必转发）或 Cmd+C（取决于终端
+  /// 是否把 Cmd 键转发给应用）。其他平台：Ctrl+C 有选中文本时复制，
+  /// 否则连按两次退出。Alt+C / Cmd+C 无选区也吞掉，避免被当作字符输入。
   bool _onCopyKey(KeyboardEvent event) {
-    if (event.logicalKey == LogicalKey.keyC && event.isControlPressed) {
+    if (event.logicalKey != LogicalKey.keyC) {
+      return false;
+    }
+    if (event.isControlPressed) {
       if (_input.text.isNotEmpty) {
         _input.clear();
-        return true;
-      }
-      if (!Platform.isMacOS &&
-          !_controller.choice.open &&
-          !_controller.picker.open &&
-          _copySelection()) {
         return true;
       }
       if (Platform.isMacOS && _controller.busy) {
         _controller.interrupt();
         return true;
       }
-      _confirmExitChord();
-      return true;
-    }
-    if (Platform.isMacOS &&
-        event.logicalKey == LogicalKey.keyC &&
-        event.isAltPressed) {
       if (!_controller.choice.open &&
           !_controller.picker.open &&
           _copySelection()) {
         return true;
+      }
+      _confirmExitChord();
+      return true;
+    }
+    if (Platform.isMacOS && (event.isAltPressed || event.isMetaPressed)) {
+      if (!_controller.choice.open && !_controller.picker.open) {
+        _copySelection();
       }
       return true;
     }
@@ -744,6 +743,7 @@ class _AgentTuiState extends State<AgentTui> {
             choiceOpen: _controller.choice.open,
             exitPending: _confirmExit,
             permissionLabel: _controller.permissionLabel,
+            hasSelection: _selectedText.isNotEmpty,
           ),
         ],
       ),
@@ -785,7 +785,10 @@ class _AgentTuiState extends State<AgentTui> {
     // key 变化时重建，用于复制后撤销鼠标选区（nocterm 无公开清除 API）。
     return SelectionArea(
       key: ValueKey<int>(_selectionEpoch),
-      onSelectionChanged: (String text) => _selectedText = text,
+      onSelectionChanged: (String text) {
+        _selectedText = text;
+        _refresh(); // 让状态栏「可复制」提示随选区出现/消失。
+      },
       child: child,
     );
   }

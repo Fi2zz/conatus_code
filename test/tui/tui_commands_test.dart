@@ -1,6 +1,8 @@
 /// `/` 命令菜单与帮助文案。
 library;
 
+import 'dart:io';
+
 import 'package:conatus_code/tui.dart';
 import 'package:test/test.dart';
 
@@ -72,6 +74,15 @@ void main() {
     expect(tuiHelpText, contains('/team <子命令>'));
     expect(tuiHelpText, contains('/task <子命令>'));
     expect(tuiHelpText, contains('其他输入直接进入 Agent 对话链路。'));
+  });
+
+  test('帮助文案写明复制快捷键（平台相关）', () {
+    if (Platform.isMacOS) {
+      expect(tuiHelpText, contains('Option+C'));
+      expect(tuiHelpText, contains('复制'));
+    } else {
+      expect(tuiHelpText, contains('选中后 Ctrl+C 复制'));
+    }
   });
 
   test('可见窗口跟随选中：短列表不滚动，长列表钳在范围内', () {

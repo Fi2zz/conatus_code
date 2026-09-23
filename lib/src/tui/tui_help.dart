@@ -1,6 +1,8 @@
 /// TUI 帮助文案：由命令表 [tuiCommands] 生成，与 `/` 菜单共用同一份数据。
 library;
 
+import 'dart:io';
+
 import 'tui_commands.dart';
 
 /// 生成帮助文本；[extra] 是技能命令这类运行时才有的条目。
@@ -11,7 +13,10 @@ String buildTuiHelpText({List<TuiCommand> extra = const <TuiCommand>[]}) {
   }
   buffer.writeln('技能也可以直接调用：/skill:<技能名> [补充要求]。');
   buffer.writeln('其他输入直接进入 Agent 对话链路。');
-  buffer.write('按键：Esc 关闭面板/视图；Ctrl+C 选中文本时复制，连按两次退出。');
+  buffer.write(Platform.isMacOS
+      ? '按键：Esc 关闭面板/视图；鼠标选中后 ⌥C（Option+C）或 Ctrl+C 复制到'
+          '系统剪贴板；Ctrl+C 无选区时连按两次退出。'
+      : '按键：Esc 关闭面板/视图；选中后 Ctrl+C 复制，无选区连按两次退出。');
   return buffer.toString();
 }
 
