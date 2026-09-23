@@ -56,8 +56,9 @@ export PATH="$PWD/dist:$PATH"
 
 ## 配置
 
-首次运行会读取 `~/.nava/config.toml`（`NAVA_HOME` /
-`--config` 可覆盖路径）。示例：
+首次运行会读取 `~/.nava/config.toml`（`NAVA_HOME` / `--config` 可覆盖路径）。
+**文件不存在时自动生成模板，并弹出 provider 面板引导添加**（会话内 `/provider`
+也可随时新增，写回 config.toml）。示例：
 
 ```toml
 [credentials]
@@ -99,10 +100,15 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 
 提供商在 `~/.nava/config.toml` 的 `[providers.<名字>]` 表里定义
 （实现 `lib/src/providers/`，公开入口 `lib/providers.dart`）；`[llm]
-default_model = "provider/model"` 同时定当前提供商与默认模型。`/provider` /
-`/model` 命令**只读展示**注册表——增删改直接编辑 config.toml。**没有缺省回退
-链**：未显式注入 `llm` 时，运行时用注册表当前提供商构造实例；两者都拿不到时
-抛 `StateError`。
+default_model = "provider/model"` 同时定当前提供商与默认模型。
+
+- `/provider`：展示注册表；`/provider add` 或面板里 `[ Add New Platform ]`
+  新增（表单填 name / base_url / api_key / type / model，写回 config.toml；
+  **第一个** provider 会同时设为 `default_model`）；删除与切换默认仍直接编辑
+  config.toml
+- `/model <名字>`：切换当前提供商的模型
+- 未配置任何 provider 时启动进入引导：TUI 照常启动并自动弹出 provider 面板，
+  模型调用会提示先用 `/provider` 添加或编辑 config.toml——**没有缺省回退链**
 
 ```toml
 [providers.my-gateway]
