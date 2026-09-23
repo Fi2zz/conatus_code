@@ -66,7 +66,7 @@ extension _ProviderCommands on ConatusTuiController {
         return;
       }
       transcript.add(TuiRole.system,
-          await _applyLlm(registry, registry.currentName ?? '', model: item.model));
+          await _applyLlm(registry, item.provider, model: item.model));
       return;
     }
     final Future<String?> Function(String)? hook = onModelCommand;

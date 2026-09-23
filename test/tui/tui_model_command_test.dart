@@ -1,6 +1,7 @@
 /// `/model` 命令与 [ConatusTuiController.rebind]：运行时换模型。
 library;
 
+import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -105,6 +106,44 @@ void main() {
           .where((TuiMessage m) => m.role == TuiRole.user),
       hasLength(2),
     );
+    app.dispose();
+  });
+
+  test('/model 跨提供商选择：按选中项的 provider 切换（regression）', () async {
+    final (ConatusTuiController controller, Context app, Disposer _) =
+        await _build('回复');
+    provideProviders(app, providers: <ProviderProfile>[
+      const ProviderProfile(
+        name: 'moonshotai',
+        baseUrl: 'https://api.moonshot.cn/v1',
+        apiKey: 'sk-moon',
+        models: <String>['kimi-k2'],
+      ),
+      const ProviderProfile(
+        name: 'volcengine',
+        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        apiKey: 'sk-volc',
+        models: <String>['doubao-seed-2-0-lite-260428'],
+      ),
+    ], currentName: 'moonshotai');
+    FallbackLlm? captured;
+    controller.switchLlm = (FallbackLlm llm) => captured = llm;
+
+    final Future<void> pending = controller.handleLine('/model');
+    for (int i = 0; i < 50 && !controller.modelPrompt.open; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(controller.modelPrompt.open, isTrue);
+
+    // 候选含当前模型补充项（moonshotai/scripted），直接按模型名过滤到目标项。
+    controller.modelPrompt.setQuery('doubao');
+    controller.modelPrompt.confirm();
+    await pending;
+
+    expect(controller.transcript.messages.last.text,
+        contains('已切换到 volcengine · doubao-seed-2-0-lite-260428'));
+    expect(controller.modelLabel, 'doubao-seed-2-0-lite-260428');
+    expect(captured?.providers.single.name, 'volcengine');
     app.dispose();
   });
 }
