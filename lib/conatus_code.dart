@@ -53,7 +53,12 @@ export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
 export 'src/diff/unified_diff.dart'
     show buildUnifiedDiff, kMaxDiffLines, splitLines;
 export 'src/sandbox/command_policy.dart'
-    show CommandDecision, CommandPolicy, CommandVerdict;
+    show
+        CommandDecision,
+        CommandPolicy,
+        CommandVerdict,
+        resolveAllowedExecutables,
+        resolveReadAllowedPaths;
 export 'src/sandbox/jailed_file_system.dart' show JailedFileSystem;
 export 'src/sandbox/rejecting_shell.dart'
     show RejectingShellExecutor, kSandboxUnavailable;
@@ -63,6 +68,12 @@ export 'src/sandbox/sandbox_probe.dart'
     show SandboxBackend, SandboxException, probeSandboxBackend;
 export 'src/sandbox/sandboxed_shell.dart' show SandboxedShellExecutor;
 export 'src/sandbox/sandboxed_shell_options.dart' show SandboxedShellOptions;
+export 'src/sandbox/seatbelt_profile.dart'
+    show
+        buildSandboxParams,
+        buildSeatbeltProfile,
+        defaultWritableCaches,
+        seatbeltMachAllowlist;
 export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
 export 'src/tools/git_tools.dart' show GitDiffTool, GitRun, GitStatusTool, runGit;

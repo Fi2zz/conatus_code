@@ -2,9 +2,10 @@
 ///
 /// - Layer 1（`SandboxSettings.fsJail`）：`JailedFileSystem`，纯应用层防误操作，
 ///   不依赖 OS 后端，任何平台可用；
-/// - Layer 2（`SandboxSettings.enabled`）：`SandboxedShellExecutor`，OS 级沙箱；
-///   后端（[SandboxBackend]）不可用时 fail-closed，注入 [RejectingShellExecutor]
-///   而非降级本地 shell。
+/// - Layer 2（`SandboxSettings.enabled`）：`SandboxedShellExecutor`，直调系统
+///   sandbox-exec + 自建 Seatbelt profile；后端（[SandboxBackend]）不可用时
+///   fail-closed，注入 [RejectingShellExecutor] 而非降级本地 shell；
+///   `preset = danger_full_access` 时显式不注入 OS 沙箱（回本地直执）。
 library;
 
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -36,20 +37,24 @@ SandboxLayers resolveSandboxLayers({
   final FileSystem? fs =
       settings.fsJail ? JailedFileSystem(root: root) : null;
   if (!settings.enabled) return SandboxLayers(fs: fs);
+  if (settings.preset == SandboxPreset.dangerFullAccess) {
+    // 显式无 OS 沙箱：shell 为 null 表示回本地直执；Layer 1 与命令策略不受影响。
+    return SandboxLayers(fs: fs);
+  }
   if (backend == null) {
     return SandboxLayers(fs: fs, shell: RejectingShellExecutor(kSandboxUnavailable));
   }
-  final Set<String>? executables = settings.allowedExecutables.isEmpty
-      ? null
-      : settings.allowedExecutables.toSet();
   final ShellExecutor shell = SandboxedShellExecutor(
     options: SandboxedShellOptions(
       backend: backend,
       root: root,
       commandPolicy: CommandPolicy(
         root: root,
-        allowedExecutables: executables,
+        allowedExecutables: resolveAllowedExecutables(settings.allowedExecutables),
+        readAllowedPaths: resolveReadAllowedPaths(settings.writablePaths),
       ),
+      allowNetwork: settings.allowNetwork,
+      writablePaths: settings.writablePaths.toSet(),
       networkAllowlist: settings.networkAllowlist.toSet(),
       maxOutputBytes: settings.maxOutputBytes,
       maxTimeoutMs: settings.commandTimeoutMs,

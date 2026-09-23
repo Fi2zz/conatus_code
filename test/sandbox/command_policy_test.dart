@@ -44,4 +44,31 @@ void main() {
   test('git status → allow', () {
     expect(policy.decide('git status').decision, CommandDecision.allow);
   });
+
+  group('resolveAllowedExecutables', () {
+    test('空输入 → 仅缺省集合', () {
+      final Set<String> set = resolveAllowedExecutables(const <String>[]);
+      expect(set, containsAll(<String>['dart', 'git', 'rg']));
+    });
+
+    test('用户项与缺省集合并（扩展语义）', () {
+      final Set<String> set =
+          resolveAllowedExecutables(<String>['npx', 'kubectl']);
+      expect(set, containsAll(<String>['dart', 'git', 'npx', 'kubectl']));
+    });
+
+    test('忽略空字符串项', () {
+      final Set<String> set = resolveAllowedExecutables(<String>['']);
+      expect(set.length, resolveAllowedExecutables(const <String>[]).length);
+    });
+  });
+
+  group('resolveReadAllowedPaths', () {
+    test('用户路径并入缺省只读集', () {
+      final Set<String> set =
+          resolveReadAllowedPaths(<String>['~/cc-sb-writable']);
+      expect(set, contains('~/.pub-cache'));
+      expect(set, contains('~/cc-sb-writable'));
+    });
+  });
 }

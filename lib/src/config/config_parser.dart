@@ -118,6 +118,7 @@ class ConfigParser extends ConfigValues {
       allowNetwork: readBool(table, 'allow_network', false),
       networkAllowlist: readStringList(table, 'network_allowlist'),
       allowedExecutables: readStringList(table, 'allowed_executables'),
+      writablePaths: readStringList(table, 'writable_paths'),
       commandTimeoutMs: readPositiveInt(table, 'command_timeout_ms', 120000),
       maxOutputBytes: readPositiveInt(table, 'max_output_bytes', 64000),
     );

@@ -87,7 +87,11 @@ mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
 [sandbox]
 enabled = true                # Layer 2：OS 级沙箱（命令执行）；默认开启
 fs_jail = true                # Layer 1：应用层文件 jail（防误操作）；默认开启
+preset = "workspace_write"    # workspace_write / danger_full_access（无 OS 沙箱）
+allow_network = false         # true = 全部命令放行网络（默认拒绝，见 network_allowlist）
 network_allowlist = ["git fetch", "git pull"]
+allowed_executables = ["npx"] # 与内置默认白名单合并（扩展语义，只增不减）
+writable_paths = []           # 额外可写路径（~ 展开、相对基于工作目录）
 command_timeout_ms = 120000
 max_output_bytes = 64000
 
@@ -161,18 +165,26 @@ final LlmProvider? llm = registry.buildLlm('ark', model: 'doubao-seed-1-8-251228
   **不依赖 OS 后端**，任何平台可用。
 - **Layer 2 · OS 级沙箱**（`enabled`，默认开启，仅 macOS）：
   `CommandPolicy` 裁决命令形状（管道 / 重定向放行；`&&`、`;`、`$()` 触发
-  review，当前按拒绝处理），再由 `SandboxedShellExecutor` 经 launcher 二进制
-  在 Seatbelt 沙箱内执行，最小环境变量、不继承父进程环境。
+  review，当前按拒绝处理），再由 `SandboxedShellExecutor` 直调系统
+  `/usr/bin/sandbox-exec` + 自建的 Seatbelt profile 执行：deny-default 基线、
+  可写根经 `-D` 参数注入（工作区、/tmp 真实路径、常用 HOME 缓存、`writable_paths`），
+  `/dev/null` 按字符设备放行，mach-lookup 收敛为系统服务白名单，最小环境变量、
+  不继承父进程环境。设计对齐 OpenAI Codex CLI / Claude Code 的 seatbelt 方案。
 
-**fail-closed 只作用于 Layer 2 后端**：launcher / Rosetta / Seatbelt 不可用时，
+**fail-closed 只作用于 Layer 2 后端**：sandbox-exec / Seatbelt 不可用时，
 命令执行被拒斥执行器禁用（不降级为本地 shell），应用照常启动、Layer 1 文件
-jail 继续生效。Layer 1 与 Layer 2 可独立关闭。
+jail 继续生效。Layer 1 与 Layer 2 可独立关闭；`preset = "danger_full_access"`
+显式关闭 OS 沙箱回本地直执（Layer 1 与命令策略仍生效）。
 
 已知边界：
 
-- launcher 默认无执行位，启动预检会 `chmod +x`；arm64 需 Rosetta 2，缺失时
-  命令执行禁用（stderr 会提示，可在 config.toml 设 `[sandbox] enabled = false`
-  关闭 Layer 2，保留 Layer 1 文件 jail）。
+- `sandbox-exec` 在 macOS 上标记 deprecated 但系统自带可用；启动预检会 smoke
+  试跑，失败时命令执行禁用（stderr 会提示，可在 config.toml 设
+  `[sandbox] enabled = false` 关闭 Layer 2，保留 Layer 1 文件 jail）。
+- 沙箱定位是防 LLM 乱跑命令的**护栏**：写默认限定在工作区 + 缓存目录，网络
+  默认拒绝，读不限面（与 Codex / Claude Code 同姿态）；对抗决心攻击者不是其目标。
+- mach-lookup 白名单是维护点：个别工具若因缺服务报错，按报错扩展
+  `seatbeltMachAllowlist` 即可（TLS 所需的 trustd/ocspd 已内置）。
 - 审批判定 `REVIEW` 目前按拒绝处理（不启动进程），"REVIEW → 人工审批"
   未接线。
 - Layer 2 仅支持 macOS：其他平台命令执行会禁用，请显式设

@@ -90,6 +90,7 @@ class SandboxSettings {
     this.allowNetwork = false,
     this.networkAllowlist = const <String>[],
     this.allowedExecutables = const <String>[],
+    this.writablePaths = const <String>[],
     this.commandTimeoutMs = 120000,
     this.maxOutputBytes = 64000,
   });
@@ -105,14 +106,17 @@ class SandboxSettings {
   /// 缺省「工作区内可写」。
   final SandboxPreset preset;
 
-  /// 命令执行是否放行网络；缺省关闭。
+  /// 命令执行是否放行网络；缺省关闭。为 true 时所有命令都不附加网络拒绝规则。
   final bool allowNetwork;
 
   /// 放行网络的命令前缀白名单（[allowNetwork] 为 false 时生效）。
   final List<String> networkAllowlist;
 
-  /// 可执行文件白名单。
+  /// 可执行文件白名单；与内置缺省集合**合并**（扩展语义，只增不减）。
   final List<String> allowedExecutables;
+
+  /// 额外可写路径（`~` 展开、相对路径基于沙箱根解析），进 Seatbelt 可写根。
+  final List<String> writablePaths;
 
   /// 单条命令的超时上限（毫秒）。
   final int commandTimeoutMs;

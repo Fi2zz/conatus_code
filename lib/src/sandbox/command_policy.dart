@@ -117,9 +117,7 @@ class CommandPolicy {
 
 /// 路径是否在 [parent] 之内（含自身）。
 bool _within(String path, String parent) =>
-    path == parent || path.startsWith('$parent/');
-
-String _normalize(String path) => Uri.file(path).normalizePath().toFilePath();
+    path == parent || path.startsWith('$parent/');String _normalize(String path) => Uri.file(path).normalizePath().toFilePath();
 
 String _normalizeWithHome(String path) {
   if (!path.startsWith('~/')) return _normalize(path);
@@ -139,6 +137,24 @@ String? _sdkRoot() {
   return exe.substring(0, sdkCut);
 }
 
+/// 合并缺省可执行白名单与用户扩展项。
+///
+/// 扩展语义：用户配置只增不减——避免"授权一个工具却静默丢掉全部默认项"。
+Set<String> resolveAllowedExecutables(Iterable<String> userProvided) =>
+    <String>{
+      ..._defaultExecutables,
+      for (final String name in userProvided)
+        if (name.isNotEmpty) name,
+    };
+
+/// 合并缺省只读放行路径与用户扩展项（`writable_paths` 经此进入命令路径裁决）。
+Set<String> resolveReadAllowedPaths(Iterable<String> userProvided) =>
+    <String>{
+      ..._defaultReadPaths,
+      for (final String path in userProvided)
+        if (path.isNotEmpty) path,
+    };
+
 /// 缺省可执行白名单：coding 常用命令集合。
 const Set<String> _defaultExecutables = <String>{
   'dart', 'flutter', 'git', 'rg', 'ls', 'cat', 'sed', 'grep',
@@ -146,8 +162,10 @@ const Set<String> _defaultExecutables = <String>{
   'head', 'tail', 'sort', 'uniq', 'wc', 'sh', 'bash', 'python3', 'node',
 };
 
-/// 缺省只读放行路径：系统与工具缓存目录（`~` 构造时展开）。
+/// 缺省只读放行路径：系统与工具缓存目录、tmp 真实路径、设备文件（`~`
+/// 构造时展开）。与 Seatbelt 可写面保持一致，避免策略层先于 OS 层误拒。
 const Set<String> _defaultReadPaths = <String>{
   '~/.pub-cache', '~/.dart_tool', '~/.m2', '~/.gradle',
-  '/tmp', '/private/var/folders',
+  '/tmp', '/private/tmp', '/var/tmp', '/private/var/folders',
+  '/dev/null', '/dev/zero', '/dev/stdout', '/dev/stderr', '/dev/tty',
 };

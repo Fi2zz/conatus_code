@@ -46,18 +46,31 @@ void main() {
     final SandboxLayers layers = resolveSandboxLayers(
       root: canonical,
       settings: const SandboxSettings(),
-      backend: const SandboxBackend(launcherPath: '/fake/launcher'),
+      backend: const SandboxBackend(sandboxExecPath: '/fake/sandbox-exec'),
     );
 
     expect(layers.fs, isA<JailedFileSystem>());
     expect(layers.shell, isA<SandboxedShellExecutor>());
   });
 
+  test('preset = danger_full_access：不注入 OS 沙箱（回本地直执），L1 仍生效', () {
+    final SandboxLayers layers = resolveSandboxLayers(
+      root: canonical,
+      settings: const SandboxSettings(
+        preset: SandboxPreset.dangerFullAccess,
+      ),
+      backend: const SandboxBackend(sandboxExecPath: '/fake/sandbox-exec'),
+    );
+
+    expect(layers.fs, isA<JailedFileSystem>());
+    expect(layers.shell, isNull);
+  });
+
   test('L2 启用、L1 关闭：只沙箱命令，文件走本地', () {
     final SandboxLayers layers = resolveSandboxLayers(
       root: canonical,
       settings: const SandboxSettings(fsJail: false),
-      backend: const SandboxBackend(launcherPath: '/fake/launcher'),
+      backend: const SandboxBackend(sandboxExecPath: '/fake/sandbox-exec'),
     );
 
     expect(layers.fs, isNull);

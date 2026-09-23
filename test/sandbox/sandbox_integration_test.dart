@@ -1,6 +1,6 @@
-/// 沙箱执行的集成测试：真实 launcher + Seatbelt（macOS 本机）。
+/// 沙箱执行的集成测试：真实 sandbox-exec + Seatbelt（macOS 本机）。
 ///
-/// 后端不可用时整体跳过（markTestSkipped），保证 CI 无 launcher 环境不红。
+/// 后端不可用时整体跳过（markTestSkipped），保证 CI 无沙箱环境不红。
 library;
 
 import 'dart:io';
@@ -9,12 +9,15 @@ import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
-/// 集成策略：默认白名单外加 curl（断网用例需要它真正执行到 Seatbelt 层）。
+/// 集成用可执行白名单（含回归用例需要的 git/mkdir）。
+const Set<String> _integrationExecutables = <String>{
+  'sh', 'bash', 'curl', 'echo', 'touch', 'rm', 'ls', 'cat', 'pwd', 'git',
+  'mkdir',
+};
+
 CommandPolicy _integrationPolicy(String root) => CommandPolicy(
       root: root,
-      allowedExecutables: <String>{
-        'sh', 'bash', 'curl', 'echo', 'touch', 'rm', 'ls', 'cat', 'pwd',
-      },
+      allowedExecutables: _integrationExecutables,
     );
 
 void main() {
@@ -22,6 +25,7 @@ void main() {
   String? root;
   SandboxedShellExecutor? defaultShell;
   SandboxedShellExecutor? integrationShell;
+  SandboxedShellExecutor? writableShell;
 
   setUpAll(() {
     try {
@@ -43,14 +47,26 @@ void main() {
           commandPolicy: _integrationPolicy(root!),
         ),
       );
+      writableShell = SandboxedShellExecutor(
+        options: SandboxedShellOptions(
+          backend: found,
+          root: root!,
+          commandPolicy: CommandPolicy(
+            root: root!,
+            allowedExecutables: _integrationExecutables,
+            readAllowedPaths:
+                resolveReadAllowedPaths(<String>['~/cc-sb-writable']),
+          ),
+          writablePaths: <String>{'~/cc-sb-writable'},
+        ),
+      );
     } on SandboxException {
       // 后端不可用：各用例跳过。
     }
   });
 
   /// 取集成 shell；后端不可用时跳过当前测试（markTestSkipped 抛异常）。
-  SandboxedShellExecutor requireIntegrationShell() {
-    final SandboxedShellExecutor? executor = integrationShell;
+  SandboxedShellExecutor requireShell(SandboxedShellExecutor? executor) {
     if (executor == null) {
       markTestSkipped('沙箱后端不可用，跳过集成测试');
       return executor!;
@@ -58,37 +74,74 @@ void main() {
     return executor;
   }
 
-  /// 取默认策略 shell（命令拒绝用例需要默认白名单）。
-  SandboxedShellExecutor requireDefaultShell() {
-    final SandboxedShellExecutor? executor = defaultShell;
-    if (executor == null) {
-      markTestSkipped('沙箱后端不可用，跳过集成测试');
-      return executor!;
-    }
-    return executor;
-  }
+  String home() => Platform.environment['HOME'] ?? '';
 
-  test('probeSandboxBackend 定位 launcher', () {
+  test('probeSandboxBackend 定位 sandbox-exec', () {
     final SandboxBackend? found = backend;
     if (found == null) {
       markTestSkipped('沙箱后端不可用，跳过集成测试');
       return;
     }
-    expect(found.launcherPath, endsWith('workspace_launcher'));
+    expect(found.sandboxExecPath, endsWith('sandbox-exec'));
   });
 
-  test('echo hello：exit 0 且 stderr 剥离 [Launcher] 日志', () async {
-    final SandboxedShellExecutor shell = requireIntegrationShell();
+  test('echo hello：exit 0', () async {
+    final SandboxedShellExecutor shell = requireShell(integrationShell);
     final ShellRunResult result =
         await shell.run(shell.resolve(const ShellExecRequest(command: 'echo hello')));
 
     expect(result.exitCode, 0);
     expect(result.stdout.text, contains('hello'));
-    expect(result.stderr.text, isNot(contains('[Launcher]')));
+  });
+
+  test('重定向 /dev/null：exit 0（flutter shim 的 git 探测回归）', () async {
+    final SandboxedShellExecutor shell = requireShell(integrationShell);
+    final ShellRunResult result = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'echo hi >/dev/null 2>&1')));
+
+    expect(result.exitCode, 0);
+  });
+
+  test('git --version >/dev/null 2>&1：exit 0', () async {
+    final SandboxedShellExecutor shell = requireShell(integrationShell);
+    final ShellRunResult result = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'git --version >/dev/null 2>&1')));
+
+    expect(result.exitCode, 0);
+  });
+
+  test('写 pub 缓存（touch ~/.pub-cache/cc-sb-probe）→ exit 0 且落盘', () async {
+    final SandboxedShellExecutor shell = requireShell(integrationShell);
+    final File probe = File('${home()}/.pub-cache/cc-sb-probe');
+    addTearDown(() {
+      if (probe.existsSync()) probe.deleteSync();
+    });
+    final ShellRunResult result = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'touch ~/.pub-cache/cc-sb-probe')));
+
+    expect(result.exitCode, 0);
+    expect(probe.existsSync(), isTrue);
+  });
+
+  test('writable_paths 自定义目录可写', () async {
+    final SandboxedShellExecutor shell = requireShell(writableShell);
+    final Directory dir = Directory('${home()}/cc-sb-writable');
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+    ShellRunResult result = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'mkdir -p ~/cc-sb-writable')));
+    expect(result.exitCode, 0);
+
+    result = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'touch ~/cc-sb-writable/probe.txt')));
+
+    expect(result.exitCode, 0);
+    expect(File('${dir.path}/probe.txt').existsSync(), isTrue);
   });
 
   test('断网：curl 网络白名单外 → 非零退出', () async {
-    final SandboxedShellExecutor shell = requireIntegrationShell();
+    final SandboxedShellExecutor shell = requireShell(integrationShell);
     final ShellRunResult result = await shell.run(shell.resolve(
         const ShellExecRequest(command: 'curl -s --max-time 5 https://example.com')));
 
@@ -96,7 +149,7 @@ void main() {
   });
 
   test('命令策略拒绝（rm -rf /）→ exitCode null 且 stderr 含拒绝', () async {
-    final SandboxedShellExecutor shell = requireDefaultShell();
+    final SandboxedShellExecutor shell = requireShell(defaultShell);
     final ShellRunResult result = await shell.run(shell.resolve(
         const ShellExecRequest(command: 'rm -rf /')));
 
@@ -104,16 +157,21 @@ void main() {
     expect(result.stderr.text, contains('拒绝'));
   });
 
-  test('越界写（touch /tmp/cc-sb-out.txt）→ 非零（Seatbelt 拦截）', () async {
-    final SandboxedShellExecutor shell = requireIntegrationShell();
+  test('越界写（touch ~/cc-sb-out.txt）→ 非零（Seatbelt 拦截）', () async {
+    final SandboxedShellExecutor shell = requireShell(integrationShell);
+    final File probe = File('${home()}/cc-sb-out.txt');
+    addTearDown(() {
+      if (probe.existsSync()) probe.deleteSync();
+    });
     final ShellRunResult result = await shell.run(shell.resolve(
-        const ShellExecRequest(command: 'touch /tmp/cc-sb-out.txt')));
+        const ShellExecRequest(command: 'touch ~/cc-sb-out.txt')));
 
     expect(result.exitCode, isNot(0));
+    expect(probe.existsSync(), isFalse);
   });
 
   test('沙箱内写（touch in.txt）→ exit 0', () async {
-    final SandboxedShellExecutor shell = requireIntegrationShell();
+    final SandboxedShellExecutor shell = requireShell(integrationShell);
     final ShellRunResult result = await shell.run(shell.resolve(
         const ShellExecRequest(command: 'touch in.txt')));
 
@@ -122,7 +180,7 @@ void main() {
   });
 
   test('cwd 越界 → 拒绝（exitCode null 且 stderr 含越界）', () async {
-    final SandboxedShellExecutor shell = requireDefaultShell();
+    final SandboxedShellExecutor shell = requireShell(defaultShell);
     final ShellRunResult result = await shell.run(shell.resolve(
         const ShellExecRequest(command: 'echo hi', workdir: '/etc')));
 

@@ -1,4 +1,4 @@
-/// 沙箱后台进程句柄与流工具（内部实现，不对外导出）。
+/// 沙箱后台进程句柄与缓冲工具（内部实现，不对外导出）。
 library;
 
 import 'dart:async';
@@ -7,35 +7,16 @@ import 'dart:io';
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-/// 把 [chunk] 追加到 [bytes]，超过 [maxBytes] 时截断并返回是否发生截断。
-bool appendBytes(List<int> bytes, List<int> chunk, int maxBytes) {
-  if (bytes.length >= maxBytes) return true;
-  final int remaining = maxBytes - bytes.length;
-  if (chunk.length <= remaining) {
-    bytes.addAll(chunk);
-    return false;
-  }
-  bytes.addAll(chunk.sublist(0, remaining));
-  return true;
-}
+import 'sandboxed_launcher.dart';
 
-/// 丢弃文本中以 `[Launcher] ` 开头的日志行。
-String stripLauncherLines(String text) {
-  final List<String> kept = <String>[
-    for (final String line in text.split('\n'))
-      if (!line.startsWith('[Launcher] ')) line,
-  ];
-  return kept.join('\n');
-}
-
-/// 沙箱后台进程句柄：缓冲输出（stderr 剥离 launcher 日志行），增量读取。
+/// 沙箱后台进程句柄：缓冲输出，增量读取。
 class SandboxedShellProcess implements ShellProcess {
   SandboxedShellProcess(this._process, int maxBytes) {
     _process.stdout.listen((List<int> chunk) {
       _lossy = appendBytes(_stdout, chunk, maxBytes) || _lossy;
     });
     _process.stderr.listen((List<int> chunk) {
-      _lossy = _appendStripped(chunk, maxBytes) || _lossy;
+      _lossy = appendBytes(_stderr, chunk, maxBytes) || _lossy;
     });
     _done = _process.exitCode.then((int code) {
       _exitCode = code;
@@ -48,7 +29,6 @@ class SandboxedShellProcess implements ShellProcess {
   final Process _process;
   final List<int> _stdout = <int>[];
   final List<int> _stderr = <int>[];
-  String _lineBuffer = '';
   late final Future<void> _done;
   ShellProcessStatus _status = ShellProcessStatus.running;
   int? _exitCode;
@@ -86,23 +66,6 @@ class SandboxedShellProcess implements ShellProcess {
       _process.kill(ProcessSignal.sigkill);
     });
     return true;
-  }
-
-  /// 增量消费 stderr：按行缓冲，丢弃 launcher 日志行。
-  bool _appendStripped(List<int> chunk, int maxBytes) {
-    _lineBuffer += utf8.decode(chunk, allowMalformed: true);
-    bool lossy = false;
-    int start = 0;
-    while (true) {
-      final int nl = _lineBuffer.indexOf('\n', start);
-      if (nl < 0) break;
-      final String line = _lineBuffer.substring(start, nl);
-      start = nl + 1;
-      if (line.startsWith('[Launcher] ')) continue;
-      lossy = appendBytes(_stderr, utf8.encode('$line\n'), maxBytes) || lossy;
-    }
-    _lineBuffer = _lineBuffer.substring(start);
-    return lossy;
   }
 
   static String _joinOutput(String out, String err) {
