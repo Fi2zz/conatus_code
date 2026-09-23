@@ -174,54 +174,20 @@ extension _ProviderCommands on ConatusTuiController {
       name: name,
       baseUrl: baseUrl,
       apiKey: apiKey,
-      model: model,
+      models: <String>[model],
     );
   }
 
-  /// 已注册 provider：从 models.dev 拉该 provider 的模型清单 → 用户选模型 →
-  /// 填 api_key。拉取失败（离线 / 缓存缺失）时降级 custom 表单并提示。
+  /// 已注册 provider：只填 api_key，模型清单自动取自 models.dev
+  /// （取过滤后首个作默认，不展示选择面板）。拉取失败则只写端点 + key，
+  /// 提示稍后补模型。
   Future<void> _addRegisteredProvider(
     ProviderRegistry registry,
     TuiProviderItem source,
   ) async {
-    final Map<String, List<ModelsDevModel>> catalog;
-    final ModelsDevClient client = ModelsDevClient(cachePath: _modelsDevCache());
-    try {
-      transcript.add(TuiRole.system, '正在从 models.dev 拉取 ${source.name} 模型清单…');
-      catalog = await client.fetch();
-    } on ModelsDevException catch (error) {
-      transcript.add(TuiRole.system, '无法拉取模型清单（${error.message}）。'
-          '可改用 custom 手填 base_url。');
-      await _addCustomProvider(registry);
-      return;
-    } finally {
-      client.close();
-    }
-    final List<ModelsDevModel> coding = <ModelsDevModel>[
-      for (final ModelsDevModel model in catalog[source.name] ?? const <ModelsDevModel>[])
-        if (keepForCoding(model.toolCall, model.reasoning)) model,
-    ];
-    if (coding.isEmpty) {
-      transcript.add(TuiRole.system,
-          '${source.name} 没有可用于编码的模型（需同时支持工具调用与推理）。');
-      return;
-    }
-    final TuiModelItem? picked = await modelPrompt.choose(<TuiModelItem>[
-      for (final ModelsDevModel model in coding)
-        TuiModelItem(
-          provider: source.name,
-          model: model.id,
-          contextLength: model.contextLength,
-          vision: model.supportsImage,
-        ),
-    ]);
-    if (picked == null) {
-      transcript.add(TuiRole.system, '已取消新增。');
-      return;
-    }
     final Map<String, String>? values = await formPrompt.ask(TuiFormRequest(
       title: 'API key for ${source.name}',
-      hint: '写入 config.toml 的 api_key；可留空稍后补。',
+      hint: '模型清单自动取自 models.dev，无需填写 model。',
       fields: <TuiFormField>[
         TuiFormField(label: 'api_key', obscure: true),
       ],
@@ -230,13 +196,40 @@ extension _ProviderCommands on ConatusTuiController {
       transcript.add(TuiRole.system, '已取消新增。');
       return;
     }
+    final String apiKey = (values['api_key'] ?? '').trim();
+    final String? defaultModel = await _firstCodingModel(source.name);
+    if (defaultModel == null) {
+      transcript.add(TuiRole.system, '未能从 models.dev 获取 ${source.name} 的模型清单，'
+          '已只写入端点与 api_key；请稍后用 /model 或编辑 config.toml 指定模型。');
+    }
     await _commitProvider(
       registry,
       name: source.name,
       baseUrl: source.baseUrl,
-      apiKey: (values['api_key'] ?? '').trim(),
-      model: picked.model,
+      apiKey: apiKey,
+      models: defaultModel == null ? const <String>[] : <String>[defaultModel],
     );
+  }
+
+  /// 从 models.dev 取该 provider 过滤后的首个模型 id；拉取失败 / 无可用模型
+  /// 返回 `null`（不打断添加流程）。
+  Future<String?> _firstCodingModel(String provider) async {
+    final ModelsDevClient client = ModelsDevClient(cachePath: _modelsDevCache());
+    try {
+      transcript.add(TuiRole.system, '正在从 models.dev 获取 $provider 模型…');
+      final Map<String, List<ModelsDevModel>> catalog = await client.fetch();
+      for (final ModelsDevModel model
+          in catalog[provider] ?? const <ModelsDevModel>[]) {
+        if (keepForCoding(model.toolCall, model.reasoning)) {
+          return model.id;
+        }
+      }
+      return null;
+    } on ModelsDevException {
+      return null;
+    } finally {
+      client.close();
+    }
   }
 
   /// 写回 config.toml + 更新内存注册表 + 切换 LLM（统一收尾）。
@@ -245,7 +238,7 @@ extension _ProviderCommands on ConatusTuiController {
     required String name,
     required String baseUrl,
     required String apiKey,
-    required String model,
+    required List<String> models,
   }) async {
     final String? path = _app.get<String>('configPath');
     if (path != null) {
@@ -255,19 +248,21 @@ extension _ProviderCommands on ConatusTuiController {
         baseUrl: baseUrl,
         apiKey: apiKey,
         type: 'openai',
-        defaultModel: registry.profiles.isEmpty ? '$name/$model' : null,
+        defaultModel: registry.profiles.isEmpty && models.isNotEmpty
+            ? '$name/${models.first}'
+            : null,
       );
     }
     registry.add(ProviderProfile(
       name: name,
       baseUrl: baseUrl,
       apiKey: apiKey,
-      models: <String>[model],
+      models: models,
     ));
     providerPrompt.refresh(providerItems(registry));
     transcript.add(TuiRole.system, '已添加提供商 $name（写入 config.toml）');
-    transcript.add(
-        TuiRole.system, await _applyLlm(registry, name, model: model));
+    transcript.add(TuiRole.system, await _applyLlm(
+        registry, name, model: models.isEmpty ? null : models.first));
   }
 
   /// models.dev 缓存放 config 同目录（如 `~/.nava/models.dev.json`）。
