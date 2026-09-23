@@ -49,8 +49,7 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   ),
   TuiCommand(
     name: 'permission',
-    description: '查看或切换权限模式（alwaysAsk / askWhenNeeded / neverAsk）',
-    argHint: '<模式>',
+    description: '打开权限模式选择面板（始终询问 / 按需询问 / 从不询问）',
   ),
   TuiCommand(
     name: 'plan',

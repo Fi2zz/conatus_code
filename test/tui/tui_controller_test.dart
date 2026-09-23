@@ -472,53 +472,60 @@ void main() {
     app.dispose();
   });
 
-  test('/permission 无参展示当前模式与可用模式', () async {
+  test('/permission 打开权限模式选择面板', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
     );
 
-    await controller.handleLine('/permission');
+    final Future<void> line = controller.handleLine('/permission');
 
-    final String text = controller.transcript.messages.single.text;
-    expect(text, contains('当前权限模式'));
-    expect(text, contains('按需询问'));
-    expect(text, contains('始终询问'));
-    expect(text, contains('从不询问'));
+    expect(controller.permissionPrompt.open, isTrue);
+    expect(
+      controller.permissionPrompt.current,
+      TuiPermissionMode.askWhenNeeded,
+    );
+    expect(controller.permissionPrompt.selected, TuiPermissionMode.askWhenNeeded);
+    controller.permissionPrompt.cancel();
+    await line;
     app.dispose();
   });
 
-  test('/permission <模式> 切换并持久化到会话', () async {
+  test('/permission 选中模式后切换并持久化到会话', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
     );
     final SessionStore sessions = app.require<SessionStore>('sessions');
 
-    await controller.handleLine('/permission neverAsk');
+    final Future<void> line = controller.handleLine('/permission');
+    controller.permissionPrompt.move(2); // 移到 neverAsk
+    controller.permissionPrompt.confirm();
+    await line;
 
     expect(controller.permissionMode, TuiPermissionMode.neverAsk);
     expect(
-      controller.transcript.messages.single.text,
+      controller.transcript.messages.last.text,
       contains('权限模式已切换为「从不询问」'),
     );
-    final SessionEvent last =
-        sessions.get('s1')!.ownEvents.last;
+    final SessionEvent last = sessions.get('s1')!.ownEvents.last;
     expect(last.type, kPermissionModeEvent);
     expect(last.data, <String, Object?>{'mode': 'neverAsk'});
     app.dispose();
   });
 
-  test('/permission 非法参数给用法提示', () async {
+  test('/permission 取消不切换', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
     );
 
-    await controller.handleLine('/permission bogus');
+    final Future<void> line = controller.handleLine('/permission');
+    controller.permissionPrompt.cancel();
+    await line;
 
+    expect(controller.permissionMode, TuiPermissionMode.askWhenNeeded);
     expect(
       controller.transcript.messages.single.text,
-      contains('用法：/permission'),
+      contains('已取消权限模式切换'),
     );
-    expect(controller.permissionMode, TuiPermissionMode.askWhenNeeded);
     app.dispose();
   });
 

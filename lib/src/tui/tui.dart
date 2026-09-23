@@ -27,6 +27,8 @@ import 'tui_form_view.dart';
 import 'tui_message.dart';
 import 'tui_model.dart';
 import 'tui_model_view.dart';
+import 'tui_permission_prompt.dart';
+import 'tui_permission_view.dart';
 import 'tui_plan.dart';
 import 'tui_plan_view.dart';
 import 'tui_provider.dart';
@@ -234,6 +236,9 @@ class _AgentTuiState extends State<AgentTui> {
     if (_onModelKey(event)) {
       return true;
     }
+    if (_onPermissionKey(event)) {
+      return true;
+    }
     if (_onProviderKey(event)) {
       return true;
     }
@@ -321,6 +326,27 @@ class _AgentTuiState extends State<AgentTui> {
       prompt.cancel();
     } else {
       return false; // 其余按键交给搜索框（type to search）。
+    }
+    _refresh();
+    return true;
+  }
+
+  /// 权限浮层按键：↑↓ 选择、Enter 确认、Esc 取消；未打开返回 false。
+  bool _onPermissionKey(KeyboardEvent event) {
+    final TuiPermissionPrompt prompt = _controller.permissionPrompt;
+    if (!prompt.open) {
+      return false;
+    }
+    if (event.logicalKey == LogicalKey.arrowUp) {
+      prompt.move(-1);
+    } else if (event.logicalKey == LogicalKey.arrowDown) {
+      prompt.move(1);
+    } else if (event.logicalKey == LogicalKey.enter) {
+      prompt.confirm();
+    } else if (event.logicalKey == LogicalKey.escape) {
+      prompt.cancel();
+    } else {
+      return false;
     }
     _refresh();
     return true;
@@ -657,6 +683,8 @@ class _AgentTuiState extends State<AgentTui> {
               prompt: _controller.modelPrompt,
               onKeyEvent: _onModelKey,
             ),
+          if (_controller.permissionPrompt.open)
+            TuiPermissionView(prompt: _controller.permissionPrompt),
           if (_controller.planPrompt.open)
             TuiPlanView(prompt: _controller.planPrompt),
           if (_menu.open)
