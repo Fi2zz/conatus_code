@@ -162,6 +162,28 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
+  test('/model 名字不在清单：提示但继续切换', () async {
+    final (ConatusTuiController controller, Context app, Directory dir) =
+        await _build();
+    final List<String> swapped = <String>[];
+    controller.switchLlm =
+        (FallbackLlm llm) => swapped.add(llm.providers.first.name);
+
+    await controller.handleLine('/model a-unknown');
+
+    expect(swapped, <String>['a']);
+    expect(controller.modelLabel, 'a-unknown');
+    expect(
+      controller.transcript.messages
+          .map((TuiMessage m) => m.text)
+          .where((String t) => t.contains('不在')),
+      isNotEmpty,
+    );
+    expect(controller.transcript.messages.last.text, contains('已切换到 a'));
+    app.dispose();
+    dir.deleteSync(recursive: true);
+  });
+
   test('/model 无参：提示当前提供商与用法，不打开浮层', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _build();

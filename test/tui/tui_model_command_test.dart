@@ -58,14 +58,14 @@ Future<(ConatusTuiController, Context, Disposer)> _build(String reply) async {
 }
 
 void main() {
-  test('/model 未注入钩子时提示未装配', () async {
+  test('/model 未配置提供商时提示先添加', () async {
     final (ConatusTuiController controller, Context app, Disposer _) =
         await _build('回复');
 
     await controller.handleLine('/model');
 
     expect(controller.transcript.messages.single.role, TuiRole.system);
-    expect(controller.transcript.messages.single.text, contains('未装配'));
+    expect(controller.transcript.messages.single.text, contains('尚未配置模型提供商'));
     app.dispose();
   });
 

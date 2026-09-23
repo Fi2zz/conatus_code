@@ -131,7 +131,8 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/model [名字]` 钩子：返回给用户的提示文本（null 表示不提示）。
   ///
-  /// 缺省 null 时该命令提示"未装配"。宿主（如 playground）在此切换 LLM 提供商：
+  /// 缺省 null 时该命令提示先配置提供商（/provider add 或编辑 config.toml）。
+  /// 宿主（如 playground）在此切换 LLM 提供商：
   /// 替换根上下文服务后调 [rebind] 让 Agent Loop 用上新提供商。
   Future<String?> Function(String arg)? onModelCommand;
 

@@ -53,6 +53,7 @@ extension _ProviderCommands on ConatusTuiController {
   /// `/model [名字]`：查看 / 切换当前提供商的模型。
   ///
   /// 装配了注册表时直接切换模型名；否则委托宿主的 [onModelCommand] 钩子。
+  /// 两者都不可用时提示先配置提供商（没有缺省回退链，见 README）。
   Future<void> _handleModel(String arg) async {
     final ProviderRegistry? registry = _app.providers;
     if (registry?.current != null) {
@@ -60,14 +61,15 @@ extension _ProviderCommands on ConatusTuiController {
       return;
     }
     final Future<String?> Function(String)? hook = onModelCommand;
-    if (hook == null) {
-      transcript.add(TuiRole.system, '模型切换未装配：宿主未注入 /model 钩子。');
+    if (hook != null) {
+      final String? message = await hook(arg);
+      if (message != null) {
+        transcript.add(TuiRole.system, message);
+      }
       return;
     }
-    final String? message = await hook(arg);
-    if (message != null) {
-      transcript.add(TuiRole.system, message);
-    }
+    transcript.add(TuiRole.system, '尚未配置模型提供商：用 /provider add 添加，'
+        '或编辑 config.toml 的 [providers]。');
   }
 
   Future<void> _handleModelOf(ProviderRegistry registry, String arg) async {
@@ -76,8 +78,18 @@ extension _ProviderCommands on ConatusTuiController {
           '用法：/model <模型名>');
       return;
     }
-    transcript.add(TuiRole.system,
-        await _applyLlm(registry, registry.currentName ?? '', model: arg));
+    // models 是可选清单（首个为默认）不是白名单：清单非空且不在其中时只警告
+    // 不拦截——config 型 provider 不传清单，add 流程也只写首个模型。
+    // 警告与结果合并为一条消息：_applyLlm 内部 rebind 会重建屏上记录，
+    // 提前单独添加会被清掉。
+    final List<String> known = registry.current?.models ?? const <String>[];
+    final String? warning = known.isNotEmpty && !known.contains(arg)
+        ? '模型 $arg 不在 ${registry.currentName} 的已知清单'
+            '（${known.join('、')}）里；若调用失败请检查模型名。'
+        : null;
+    final String result =
+        await _applyLlm(registry, registry.currentName ?? '', model: arg);
+    transcript.add(TuiRole.system, warning == null ? result : '$warning\n$result');
   }
 
   /// 浮层列表项（末尾为新增入口）。
