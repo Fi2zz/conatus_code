@@ -81,54 +81,85 @@ extension _ProviderCommands on ConatusTuiController {
         '或编辑 config.toml 的 [providers]。');
   }
 
-  /// `/model` 浮层候选：配置内模型优先；配置无清单时从 models.dev 兜底。
+  /// `/model` 浮层候选：所有已注册 provider 的配置模型 + models.dev 兜底。
+  ///
+  /// 跨 provider 聚合，浮层的 provider 过滤标签（Tab）随之可用——注册了
+  /// 某 provider 的 Key 后即可在此面板选它的模型，无需先切到该 provider。
   Future<List<TuiModelItem>> _modelCandidates(ProviderRegistry registry) async {
-    final String provider = registry.currentName ?? '';
     final List<TuiModelItem> items = <TuiModelItem>[];
     final Set<String> seen = <String>{};
-    for (final String model in registry.current?.models ?? const <String>[]) {
-      if (!seen.add(model)) continue;
-      items.add(TuiModelItem(
-        provider: provider,
-        model: model,
-        current: model == modelLabel,
-      ));
+    for (final ProviderProfile profile in registry.profiles) {
+      for (final String model in profile.models) {
+        if (!seen.add('${profile.name}/$model')) continue;
+        items.add(TuiModelItem(
+          provider: profile.name,
+          model: model,
+          current: profile.name == registry.currentName && model == modelLabel,
+        ));
+      }
     }
-    if (modelLabel.isNotEmpty && seen.add(modelLabel)) {
-      items.add(TuiModelItem(provider: provider, model: modelLabel, current: true));
+    // 当前模型不在清单里（如 provider 无清单或手工指定）时补一条 current 项。
+    final String? currentName = registry.currentName;
+    if (modelLabel.isNotEmpty && currentName != null) {
+      if (seen.add('$currentName/$modelLabel')) {
+        items.add(TuiModelItem(
+          provider: currentName,
+          model: modelLabel,
+          current: true,
+        ));
+      }
     }
-    if (registry.current?.models.isNotEmpty ?? false) {
-      return items; // 配置已有清单：不拉 models.dev。
-    }
-    await _enrichFromModelsDev(provider, items, seen);
+    await _enrichFromModelsDev(registry, items, seen);
     return items;
   }
 
-  /// 从 models.dev 补充候选：`keepForCoding` 过滤、按 id 去重，失败 fail-open。
+  /// 从 models.dev 补充候选：一次拉取共享 catalog，对缺清单的 provider 兜底。
   Future<void> _enrichFromModelsDev(
-    String provider,
+    ProviderRegistry registry,
     List<TuiModelItem> items,
     Set<String> seen,
   ) async {
-    transcript.add(TuiRole.system, '正在从 models.dev 获取 $provider 模型…');
+    final List<ProviderProfile> need = <ProviderProfile>[
+      for (final ProviderProfile p in registry.profiles) if (p.models.isEmpty) p,
+    ];
+    if (need.isEmpty) {
+      return;
+    }
+    transcript.add(TuiRole.system, '正在从 models.dev 获取模型…');
     final Future<Map<String, List<ModelsDevModel>>> Function() loader =
         modelsDevLoader ?? _defaultModelsDevLoader;
+    final Map<String, List<ModelsDevModel>> catalog;
     try {
-      final Map<String, List<ModelsDevModel>> catalog = await loader();
-      for (final ModelsDevModel model
-          in catalog[provider] ?? const <ModelsDevModel>[]) {
-        if (!keepForCoding(model.toolCall, model.reasoning)) continue;
-        if (!seen.add(model.id)) continue;
-        items.add(TuiModelItem(
-          provider: provider,
-          model: model.id,
-          contextLength: model.contextLength,
-          vision: model.supportsImage,
-        ));
-      }
+      catalog = await loader();
     } on ModelsDevException catch (error) {
       transcript.add(
           TuiRole.system, '模型清单拉取失败：${error.message}（仅展示配置内模型）。');
+      return;
+    }
+    for (final ProviderProfile profile in need) {
+      _appendModelsDev(profile, catalog, items, seen);
+    }
+  }
+
+  /// 把 models.dev 里某 provider 的编码可用模型追加进候选（按 id 去重）。
+  void _appendModelsDev(
+    ProviderProfile profile,
+    Map<String, List<ModelsDevModel>> catalog,
+    List<TuiModelItem> items,
+    Set<String> seen,
+  ) {
+    for (final ModelsDevModel model
+        in catalog[profile.name] ?? const <ModelsDevModel>[]) {
+      if (!keepForCoding(model.toolCall, model.reasoning)) continue;
+      if (!seen.add('${profile.name}/${model.id}')) continue;
+      items.add(TuiModelItem(
+        provider: profile.name,
+        model: model.id,
+        contextLength: model.contextLength,
+        vision: model.supportsImage,
+        current: profile.name == _app.providers?.currentName &&
+            model.id == modelLabel,
+      ));
     }
   }
 

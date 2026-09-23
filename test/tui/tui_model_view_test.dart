@@ -179,9 +179,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       expect(controller.modelPrompt.open, isTrue);
+      // 跨 provider 聚合：ark 与 deepseek 的模型都在候选里。
       expect(
         controller.modelPrompt.matches.map((TuiModelItem i) => i.model),
-        <String>['a-small', 'a-large'],
+        <String>['a-small', 'a-large', 'b-small'],
       );
 
       await tester.sendArrowDown();

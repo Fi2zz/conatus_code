@@ -197,7 +197,7 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  test('/model 打开浮层：列出当前提供商的模型', () async {
+  test('/model 打开浮层：列出所有注册提供商的模型', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _build();
     final Future<void> pending = controller.handleLine('/model');
@@ -207,7 +207,8 @@ void main() {
     final List<String> models = controller.modelPrompt.matches
         .map((TuiModelItem i) => i.model)
         .toList();
-    expect(models, <String>['a-small', 'a-large']);
+    // 跨 provider 聚合：a 与 b 的模型都在候选里。
+    expect(models, <String>['a-small', 'a-large', 'b-small', 'b-large']);
     expect(
       controller.modelPrompt.matches.where((TuiModelItem i) => i.current),
       hasLength(1),
