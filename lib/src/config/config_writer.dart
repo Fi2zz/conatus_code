@@ -59,6 +59,67 @@ String upsertDefaultModel(String toml, String value) {
   return lines.join('\n');
 }
 
+/// 注册进 config.toml 的模型条目，对应 `[models."<provider>/<model>"]` 表
+/// （kimi-code-config 格式）。
+class ModelEntry {
+  const ModelEntry({
+    required this.id,
+    this.displayName = '',
+    this.maxContextSize = 0,
+    this.thinking = false,
+    this.toolUse = true,
+  });
+
+  /// 模型 id（如 `doubao-seed-2-1-turbo`）。
+  final String id;
+
+  /// 展示名（可空）。
+  final String displayName;
+
+  /// 最大上下文窗口（token）；`0` 表示未知，不写该字段。
+  final int maxContextSize;
+
+  /// 是否带思考（写 `thinking` 能力与 `reasoning_key`）。
+  final bool thinking;
+
+  /// 是否支持工具调用（写 `tool_use` 能力）。
+  final bool toolUse;
+}
+
+/// 追加 `[models."<provider>/<model>"]` 段，返回新内容。
+///
+/// 模型按 provider 归组：provider 字段记录归属，浮层据此展开候选。
+String appendModelSection(
+  String toml, {
+  required String provider,
+  required ModelEntry entry,
+}) {
+  final String qualified = '$provider/${entry.id}';
+  final StringBuffer buffer = StringBuffer(toml);
+  if (toml.isNotEmpty && !toml.endsWith('\n')) {
+    buffer.write('\n');
+  }
+  buffer
+    ..write('\n[models."${_tomlString(qualified)}"]\n')
+    ..write('provider = "${_tomlString(provider)}"\n')
+    ..write('model = "${_tomlString(entry.id)}"\n');
+  if (entry.displayName.isNotEmpty) {
+    buffer.write('display_name = "${_tomlString(entry.displayName)}"\n');
+  }
+  if (entry.maxContextSize > 0) {
+    buffer.write('max_context_size = ${entry.maxContextSize}\n');
+  }
+  final List<String> capabilities = <String>[
+    if (entry.toolUse) 'tool_use',
+    if (entry.thinking) 'thinking',
+  ];
+  buffer.write('capabilities = [ ${capabilities.map((c) => '"$c"').join(', ')} ]\n');
+  if (entry.thinking) {
+    buffer.write('reasoning_key = "reasoning_content"\n');
+  }
+  return buffer.toString();
+}
+
 /// 写入文件（父目录自动创建）。
 void writeConfigFile(String path, String content) {
   final File file = File(path);
@@ -66,15 +127,15 @@ void writeConfigFile(String path, String content) {
   file.writeAsStringSync(content);
 }
 
-/// 读 [path] → 追加 provider 段（[defaultModel] 非空时一并设置）→ 写回。
-///
-/// 文件不存在时按空内容起头（等价于新建）。
+/// 读 [path] → 追加 provider 段（[models] 非空时逐个写模型段）→ 设置
+/// [defaultModel]（非空时）→ 写回。文件不存在时按空内容起头。
 void appendProviderToFile(
   String path, {
   required String name,
   required String baseUrl,
   required String apiKey,
   required String type,
+  List<ModelEntry> models = const <ModelEntry>[],
   String? defaultModel,
 }) {
   final File file = File(path);
@@ -86,6 +147,9 @@ void appendProviderToFile(
     apiKey: apiKey,
     type: type,
   );
+  for (final ModelEntry entry in models) {
+    toml = appendModelSection(toml, provider: name, entry: entry);
+  }
   if (defaultModel != null) {
     toml = upsertDefaultModel(toml, defaultModel);
   }

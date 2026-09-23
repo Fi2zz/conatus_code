@@ -298,13 +298,13 @@ extension _ProviderCommands on ConatusTuiController {
       name: name,
       baseUrl: baseUrl,
       apiKey: apiKey,
-      models: <String>[model],
+      models: <ModelEntry>[ModelEntry(id: model)],
     );
   }
 
-  /// 已注册 provider：只填 api_key，模型清单自动取自 models.dev
-  /// （取过滤后首个作默认，不展示选择面板）。拉取失败则只写端点 + key，
-  /// 提示稍后补模型。
+  /// 已注册 provider：只填 api_key，模型清单（带元数据）自动取自 models.dev，
+  /// 逐个写入 `[models."<provider>/<model>"]` 段注册进 config.toml。拉取失败
+  /// 则只写端点 + key，提示稍后补模型。
   Future<void> _addRegisteredProvider(
     ProviderRegistry registry,
     TuiProviderItem source,
@@ -321,8 +321,8 @@ extension _ProviderCommands on ConatusTuiController {
       return;
     }
     final String apiKey = (values['api_key'] ?? '').trim();
-    final String? defaultModel = await _firstCodingModel(source.name);
-    if (defaultModel == null) {
+    final List<ModelsDevModel> metas = await _codingModels(source.name);
+    if (metas.isEmpty) {
       transcript.add(TuiRole.system, '未能从 models.dev 获取 ${source.name} 的模型清单，'
           '已只写入端点与 api_key；请稍后用 /model 或编辑 config.toml 指定模型。');
     }
@@ -331,38 +331,46 @@ extension _ProviderCommands on ConatusTuiController {
       name: source.name,
       baseUrl: source.baseUrl,
       apiKey: apiKey,
-      models: defaultModel == null ? const <String>[] : <String>[defaultModel],
+      models: <ModelEntry>[
+        for (final ModelsDevModel meta in metas)
+          ModelEntry(
+            id: meta.id,
+            displayName: meta.name,
+            maxContextSize: meta.contextLength,
+            thinking: meta.reasoning,
+            toolUse: meta.toolCall,
+          ),
+      ],
     );
   }
 
-  /// 从 models.dev 取该 provider 过滤后的首个模型 id；拉取失败 / 无可用模型
-  /// 返回 `null`（不打断添加流程）。
-  Future<String?> _firstCodingModel(String provider) async {
+  /// 从 models.dev 取该 provider 过滤后的全部编码可用模型；拉取失败 / 无
+  /// 可用模型返回空列表（不打断添加流程）。
+  Future<List<ModelsDevModel>> _codingModels(String provider) async {
     final ModelsDevClient client = ModelsDevClient(cachePath: _modelsDevCache());
     try {
       transcript.add(TuiRole.system, '正在从 models.dev 获取 $provider 模型…');
       final Map<String, List<ModelsDevModel>> catalog = await client.fetch();
-      for (final ModelsDevModel model
-          in catalog[provider] ?? const <ModelsDevModel>[]) {
-        if (keepForCoding(model.toolCall, model.reasoning)) {
-          return model.id;
-        }
-      }
-      return null;
+      return <ModelsDevModel>[
+        for (final ModelsDevModel model
+            in catalog[provider] ?? const <ModelsDevModel>[])
+          if (keepForCoding(model.toolCall, model.reasoning)) model,
+      ];
     } on ModelsDevException {
-      return null;
+      return const <ModelsDevModel>[];
     } finally {
       client.close();
     }
   }
 
-  /// 写回 config.toml + 更新内存注册表 + 切换 LLM（统一收尾）。
+  /// 写回 config.toml（provider 段 + 逐个 `[models."<p>/<m>"]` 模型段）+ 更新
+  /// 内存注册表 + 切换 LLM（统一收尾）。
   Future<void> _commitProvider(
     ProviderRegistry registry, {
     required String name,
     required String baseUrl,
     required String apiKey,
-    required List<String> models,
+    required List<ModelEntry> models,
   }) async {
     final String? path = _app.get<String>('configPath');
     if (path != null) {
@@ -372,8 +380,9 @@ extension _ProviderCommands on ConatusTuiController {
         baseUrl: baseUrl,
         apiKey: apiKey,
         type: 'openai',
+        models: models,
         defaultModel: registry.profiles.isEmpty && models.isNotEmpty
-            ? '$name/${models.first}'
+            ? '$name/${models.first.id}'
             : null,
       );
     }
@@ -381,12 +390,12 @@ extension _ProviderCommands on ConatusTuiController {
       name: name,
       baseUrl: baseUrl,
       apiKey: apiKey,
-      models: models,
+      models: <String>[for (final ModelEntry entry in models) entry.id],
     ));
     providerPrompt.refresh(providerItems(registry));
     transcript.add(TuiRole.system, '已添加提供商 $name（写入 config.toml）');
     transcript.add(TuiRole.system, await _applyLlm(
-        registry, name, model: models.isEmpty ? null : models.first));
+        registry, name, model: models.isEmpty ? null : models.first.id));
   }
 
   /// models.dev 缓存放 config 同目录（如 `~/.nava/models.dev.json`）。

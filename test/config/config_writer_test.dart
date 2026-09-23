@@ -74,6 +74,72 @@ void main() {
     });
   });
 
+  group('appendModelSection', () {
+    test('带元数据的模型段：qualified name + provider/model + capabilities', () {
+      final String result = appendModelSection(
+        '[llm]\n',
+        provider: 'volcengine-coding-plan',
+        entry: const ModelEntry(
+          id: 'doubao-seed-2-1-turbo',
+          displayName: 'Seed 2.1 Turbo',
+          maxContextSize: 256000,
+          thinking: true,
+        ),
+      );
+
+      expect(result, contains('[models."volcengine-coding-plan/'
+          'doubao-seed-2-1-turbo"]'));
+      expect(result, contains('provider = "volcengine-coding-plan"'));
+      expect(result, contains('model = "doubao-seed-2-1-turbo"'));
+      expect(result, contains('display_name = "Seed 2.1 Turbo"'));
+      expect(result, contains('max_context_size = 256000'));
+      expect(result, contains('"tool_use"'));
+      expect(result, contains('"thinking"'));
+      expect(result, contains('reasoning_key = "reasoning_content"'));
+    });
+
+    test('元数据缺省时省略 display_name / max_context_size / reasoning_key', () {
+      final String result = appendModelSection(
+        '',
+        provider: 'deepseek',
+        entry: const ModelEntry(id: 'deepseek-chat'),
+      );
+
+      expect(result, contains('[models."deepseek/deepseek-chat"]'));
+      expect(result, isNot(contains('display_name')));
+      expect(result, isNot(contains('max_context_size')));
+      expect(result, isNot(contains('reasoning_key')));
+      expect(result, contains('capabilities = [ "tool_use" ]'));
+    });
+  });
+
+  group('appendProviderToFile 写模型段', () {
+    test('models 非空时逐个写 [models."<p>/<m>"] 段', () {
+      final Directory dir = Directory.systemTemp.createTempSync('nava-writer-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final String path = '${dir.path}/config.toml';
+      writeConfigFile(path, '[llm]\n');
+
+      appendProviderToFile(
+        path,
+        name: 'ark',
+        baseUrl: 'https://ark.example/v1',
+        apiKey: 'sk-1',
+        type: 'openai',
+        models: const <ModelEntry>[
+          ModelEntry(id: 'm1', maxContextSize: 1000),
+          ModelEntry(id: 'm2', thinking: true),
+        ],
+      );
+
+      final String content = File(path).readAsStringSync();
+      expect(content, contains('[providers.ark]'));
+      expect(content, contains('[models."ark/m1"]'));
+      expect(content, contains('[models."ark/m2"]'));
+      expect(content, contains('max_context_size = 1000'));
+    });
+  });
+
   group('deriveProviderName', () {
     test('标准 api 域名取 host 倒数第二段', () {
       expect(deriveProviderName('https://api.deepseek.com/v1'), 'deepseek');

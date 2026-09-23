@@ -40,6 +40,8 @@ export 'src/config/config_schema.dart'
         ThinkingConfig;
 export 'src/config/config_writer.dart'
     show
+        ModelEntry,
+        appendModelSection,
         appendProviderSection,
         appendProviderToFile,
         deriveProviderName,
