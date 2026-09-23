@@ -18,7 +18,7 @@ const String kDefaultConfigToml = '''
 # 模型提供商定义在 [providers.<名字>]；当前提供商与默认模型用 [llm] default_model。
 
 [llm]
-default_model = ""
+# default_model = "provider/model"
 
 # 非模型 Key（搜索等）仍走 [credentials]
 [credentials]
