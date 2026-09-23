@@ -195,4 +195,39 @@ void main() {
     expect(transcript.messages.single.text, contains('看下这张图'));
     expect(transcript.messages.single.text, contains('[image #1 (683×416)]'));
   });
+
+  test('流式思考边到边累积；事件 apply 内容一致时不重复追加', () {
+    final Transcript transcript = Transcript();
+    transcript.appendStream(reasoning: '想一');
+    transcript.appendStream(reasoning: '想二');
+    transcript.endStream();
+
+    expect(transcript.messages, hasLength(1));
+    expect(transcript.messages.single.text, '· 思考：想一想二');
+
+    transcript.apply(SessionEvent(
+      seq: 0,
+      type: kAssistantMessageEvent,
+      time: DateTime.fromMillisecondsSinceEpoch(0),
+      data: <String, Object?>{
+        'text': '',
+        'reasoning': '想一想二',
+        'toolCalls': <Object>[],
+      },
+    ));
+
+    expect(transcript.messages, hasLength(1));
+    expect(transcript.messages.single.text, '· 思考：想一想二');
+  });
+
+  test('新一步流式重置消息引用（不追加到上一步）', () {
+    final Transcript transcript = Transcript();
+    transcript.appendStream(reasoning: '第一步');
+    transcript.endStream();
+    transcript.appendStream(reasoning: '第二步');
+
+    expect(transcript.messages, hasLength(2));
+    expect(transcript.messages[0].text, '· 思考：第一步');
+    expect(transcript.messages[1].text, '· 思考：第二步');
+  });
 }

@@ -1020,6 +1020,20 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
   }
 
+  /// 流式增量透传：思考 / 正文 delta 实时追加到屏上消息（同一条边到边增长），
+  /// 终态结束本步流式。
+  void _onLlmStream(LlmStreamEvent event) {
+    if (event is LlmReasoningDelta) {
+      transcript.appendStream(reasoning: event.text);
+      _refresh();
+    } else if (event is LlmTextDelta) {
+      transcript.appendStream(text: event.text);
+      _refresh();
+    } else if (event is LlmStreamDone) {
+      transcript.endStream();
+    }
+  }
+
   /// 展开 / 收起 TODO 列表（ctrl+t；无计划时不动作）。
   void togglePlanExpanded() {
     final TuiMessage? message = transcript.planMessage;
@@ -1035,7 +1049,12 @@ class ConatusTuiController implements TuiUserPromptHost {
     _session = session;
     final Context ctx = _app.plugin('tui-session:$id', (Context child) {
       provideAgentLoop(
-          child, session: session, maxSteps: maxSteps, planning: planning);
+        child,
+        session: session,
+        maxSteps: maxSteps,
+        planning: planning,
+        onStream: _onLlmStream,
+      );
       // 计划闭环：plan_write 建计划，update_plan 在执行中推进。
       providePlanTool(child, session: session);
       provideUpdatePlanTool(child, session: session);

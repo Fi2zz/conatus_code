@@ -26,11 +26,21 @@ class Transcript {
   /// 当前计划的 TODO 列表消息（`plan/updated` 时新建或就地更新）。
   TuiMessage? _plan;
 
+  /// 流式渲染：当前步的思考 / 正文消息引用（delta 边到边追加到同一条）。
+  TuiMessage? _streamThinking;
+  TuiMessage? _streamAssistant;
+
+  /// 流式是否进行中（endStream 后下一步的首个 delta 重建消息引用）。
+  bool _streamLive = false;
+
   /// 清空屏上记录（不改动会话数据）。
   void clear() {
     messages.clear();
     help = null;
     _plan = null;
+    _streamThinking = null;
+    _streamAssistant = null;
+    _streamLive = false;
   }
 
   /// 追加一条消息。
@@ -71,9 +81,48 @@ class Transcript {
     messages.clear();
     help = null;
     _plan = null;
+    _streamThinking = null;
+    _streamAssistant = null;
+    _streamLive = false;
     for (final SessionEvent event in session.events) {
       apply(event);
     }
+  }
+
+  /// 追加流式增量：同一步的 delta 边到边累积进同一条思考 / 正文消息；
+  /// 新一步的首个 delta 自动重建消息引用（上一步的引用已被 apply 消费）。
+  void appendStream({String reasoning = '', String text = ''}) {
+    if (!_streamLive) {
+      _streamThinking = null;
+      _streamAssistant = null;
+      _streamLive = true;
+    }
+    if (reasoning.isNotEmpty) {
+      final TuiMessage? current = _streamThinking;
+      if (current == null) {
+        final TuiMessage message =
+            TuiMessage(TuiRole.thinking, '· 思考：$reasoning');
+        _streamThinking = message;
+        messages.add(message);
+      } else {
+        current.text += reasoning;
+      }
+    }
+    if (text.isNotEmpty) {
+      final TuiMessage? current = _streamAssistant;
+      if (current == null) {
+        final TuiMessage message = TuiMessage(TuiRole.assistant, text);
+        _streamAssistant = message;
+        messages.add(message);
+      } else {
+        current.text += text;
+      }
+    }
+  }
+
+  /// 流式结束（一步收口）：保留消息引用供随后的 assistant 事件 apply 去重。
+  void endStream() {
+    _streamLive = false;
   }
 
   /// 增量投射一条会话事件。
@@ -84,14 +133,20 @@ class Transcript {
         add(TuiRole.user, '${collapseSkillPrompt(_text(data))}${_imageMarker(data)}');
       case kAssistantMessageEvent:
         // 思考过程（Kimi 等 `reasoning_content`）先单独成行，再是正文与
-        // 工具调用名，让执行过程与推理过程都可见。
+        // 工具调用名；流式已实时显示的内容（引用文本一致）不重复追加。
         final String reasoning = _field(data, 'reasoning').trim();
         if (reasoning.isNotEmpty) {
-          add(TuiRole.thinking, '· 思考：$reasoning');
+          final TuiMessage? streamed = _streamThinking;
+          if (streamed == null || streamed.text != '· 思考：$reasoning') {
+            add(TuiRole.thinking, '· 思考：$reasoning');
+          }
         }
         final String text = _text(data);
         if (text.trim().isNotEmpty) {
-          add(TuiRole.assistant, text);
+          final TuiMessage? streamed = _streamAssistant;
+          if (streamed == null || streamed.text != text) {
+            add(TuiRole.assistant, text);
+          }
         }
         for (final LlmToolCall call in _toolCalls(data)) {
           add(TuiRole.stage, '· 调用工具 ${call.name}');
