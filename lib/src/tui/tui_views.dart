@@ -54,17 +54,11 @@ class MessageView extends StatelessComponent {
   Component build(BuildContext context) {
     switch (message.role) {
       case TuiRole.user:
-        return _bubble(
-          '你',
-          Colors.brightGreen,
+        return _line(
           Text(message.text, style: const TextStyle(color: Colors.white)),
         );
       case TuiRole.assistant:
-        return _bubble(
-          '助手',
-          Colors.brightCyan,
-          MarkdownText(message.text),
-        );
+        return _line(MarkdownText(message.text));
       case TuiRole.tool:
         return _indent(_foldTool(message), Colors.cyan);
       case TuiRole.plan:
@@ -80,16 +74,12 @@ class MessageView extends StatelessComponent {
     }
   }
 
-  Component _bubble(String label, Color color, Component body) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Component>[
-        Text(
-          '$label：',
-          style: TextStyle(color: color, fontWeight: FontWeight.bold),
-        ),
-        Expanded(child: body),
-      ],
+  /// 一条顶格消息（用户 / 助手正文，无「你：/助手：」气泡前缀，
+  /// 与 kimi-code 的记录风格一致）。
+  Component _line(Component body) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 2),
+      child: body,
     );
   }
 

@@ -149,7 +149,7 @@ class Transcript {
           }
         }
         for (final LlmToolCall call in _toolCalls(data)) {
-          add(TuiRole.stage, '· 调用工具 ${call.name}');
+          add(TuiRole.stage, '● ${call.name}${callSummary(call)}');
         }
       case kToolResultEvent:
         final String name = _field(data, 'name');
@@ -157,9 +157,7 @@ class Transcript {
         final String mark = failed ? '✗' : '✓';
         // 完整内容存进消息正文；过长时由视图折叠，ctrl+o 展开。
         final String content = _field(data, 'content').trim();
-        add(TuiRole.tool, content.isEmpty
-            ? '· 工具 $mark $name'
-            : '· 工具 $mark $name\n$content');
+        add(TuiRole.tool, content.isEmpty ? '$mark $name' : '$mark $name\n$content');
       case kPlanEvent:
         _upsertPlan(data);
       default:
@@ -218,5 +216,42 @@ class Transcript {
   static String _imageDims(LlmImage image) {
     final String? dims = imageDimensions(base64Decode(image.base64Data));
     return dims == null ? '' : ' ($dims)';
+  }
+}
+
+/// 工具调用的参数摘要：` · <第一个字符串参数>`（截断 40 字符；run/code 类
+/// 工具加 `$ ` 前缀，与 kimi-code 的 `● Ran a command · $ …` 风格一致）。
+/// 解析失败或没有字符串参数时返回空串。
+String callSummary(LlmToolCall call) {
+  final Object? decoded = jsonDecodeOrNull(call.arguments);
+  if (decoded is! Map) {
+    return '';
+  }
+  for (final Object? value in decoded.values) {
+    if (value is! String || value.isEmpty) {
+      continue;
+    }
+    final String flat = value.replaceAll('\n', ' ').trim();
+    if (flat.isEmpty) {
+      continue;
+    }
+    final String cut =
+        flat.length > 40 ? '${flat.substring(0, 40)}…' : flat;
+    final bool shellLike =
+        call.name.contains('code') || call.name.contains('run');
+    return ' · ${shellLike ? '\$ ' : ''}$cut';
+  }
+  return '';
+}
+
+/// 解析 JSON 字符串；非法时返回 `null`（不抛异常）。
+Object? jsonDecodeOrNull(String raw) {
+  if (raw.isEmpty) {
+    return null;
+  }
+  try {
+    return jsonDecode(raw);
+  } on FormatException {
+    return null;
   }
 }
