@@ -131,19 +131,12 @@ class LoadingView extends StatelessComponent {
 
   @override
   Component build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Component>[
-        const Text(
-          '助手：',
-          style:
-              TextStyle(color: Colors.brightCyan, fontWeight: FontWeight.bold),
-        ),
-        Text(
-          '${tuiSpinner(tick)} 思考中${tuiDots(tick)}',
-          style: const TextStyle(color: Colors.brightYellow),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.only(left: 2),
+      child: Text(
+        '${tuiSpinner(tick)} 思考中${tuiDots(tick)}',
+        style: const TextStyle(color: Colors.brightYellow),
+      ),
     );
   }
 }
