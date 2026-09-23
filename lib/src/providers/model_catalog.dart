@@ -100,6 +100,7 @@ const List<ProviderPreset> kProviderPresets = <ProviderPreset>[
   ProviderPreset(id: 'stepfun', name: 'StepFun', baseUrl: 'https://api.stepfun.com/v1'),
   ProviderPreset(id: 'alibaba', name: 'Alibaba (Qwen)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1'),
   ProviderPreset(id: 'volcengine', name: 'Volcengine Ark', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3'),
+  ProviderPreset(id: 'volcengine-ark-coding', name: 'Ark Coding Plan', baseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3'),
   ProviderPreset(id: 'mistral', name: 'Mistral', baseUrl: 'https://api.mistral.ai/v1'),
   ProviderPreset(id: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1'),
   ProviderPreset(id: 'cerebras', name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1'),
