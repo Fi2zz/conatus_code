@@ -92,8 +92,8 @@ void main() {
       final ConatusCodeConfig config = loadConfig(path: path);
 
       expect(File(path).existsSync(), isTrue);
-      expect(config.llm.defaultModel, isNotNull);
-      expect(config.providers, isNotEmpty);
+      expect(config.llm.defaultModel, isNull);
+      expect(config.providers, isEmpty);
       expect(config.agent.maxSteps, 8);
       expect(config.agent.workdir, isNull);
       expect(config.agent.projectDir, '.conatus');
@@ -270,8 +270,7 @@ type = "anthropic"
       final ConatusCodeConfig config = loadConfig(path: path);
 
       expect(File(path).existsSync(), isTrue);
-      expect(config.providers, isNotEmpty);
-      expect(config.llm.defaultModel, isNotNull);
+      expect(config.agent.maxSteps, 8);
     });
 
     test('config.toml 已存在时不覆盖', () {

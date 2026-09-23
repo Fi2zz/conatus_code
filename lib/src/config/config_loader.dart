@@ -20,7 +20,6 @@ const String kDefaultConfigToml = '''
 [llm]
 default_model = ""
 
-
 # 非模型 Key（搜索等）仍走 [credentials]
 [credentials]
 # TAVILY_API_KEY = "tvly-..."
