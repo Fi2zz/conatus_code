@@ -48,6 +48,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '打开提供商管理浮层（add 导入 / <名字> 切换 / remove 删除）',
   ),
   TuiCommand(
+    name: 'permission',
+    description: '查看或切换权限模式（alwaysAsk / askWhenNeeded / neverAsk）',
+    argHint: '<模式>',
+  ),
+  TuiCommand(
     name: 'plan',
     description: '进入 / 退出 Plan Mode（先规划，经 exit_plan_mode 提交后执行）',
   ),

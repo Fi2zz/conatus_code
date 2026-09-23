@@ -62,6 +62,10 @@ const String kTeamUsage = '用法：/team [status|interrupt <成员 id>]';
 /// `/task` 用法提示。
 const String kTaskUsage = '用法：/task [claim <任务 id>|release <任务 id>]';
 
+/// `/permission` 用法提示。
+const String kPermissionUsage =
+    '用法：/permission [alwaysAsk|askWhenNeeded|neverAsk]';
+
 /// TUI 会话控制器。
 class ConatusTuiController implements TuiUserPromptHost {
   ConatusTuiController({
@@ -459,6 +463,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleModel(arg);
       case 'provider':
         await _handleProvider(arg);
+      case 'permission':
+        _handlePermission(arg);
       case 'plan':
         _openPlanPanel();
       case 'goal':
@@ -970,6 +976,31 @@ class ConatusTuiController implements TuiUserPromptHost {
     } on TeamException catch (e) {
       transcript.add(TuiRole.system, '任务操作失败：${e.message}');
     }
+  }
+
+  /// `/permission [模式]`：查看或切换当前会话的权限模式（不经模型）。
+  ///
+  /// 无参时展示当前模式与可用模式；带参时经 [applyPermissionMode] 持久化到
+  /// 会话并重挂审批中间件。
+  void _handlePermission(String arg) {
+    final String mode = arg.trim();
+    if (mode.isEmpty) {
+      transcript.add(
+        TuiRole.system,
+        '当前权限模式：「${permissionMode.label}」${permissionMode.description}\n'
+        '可用模式：${TuiPermissionMode.values.map((m) => m.label).join('、')}\n'
+        '$kPermissionUsage',
+      );
+      _refresh();
+      return;
+    }
+    final TuiPermissionMode? parsed = parsePermissionMode(mode);
+    if (parsed == null) {
+      transcript.add(TuiRole.system, kPermissionUsage);
+      _refresh();
+      return;
+    }
+    applyPermissionMode(parsed);
   }
 
   Future<void> _bind(String id) async {

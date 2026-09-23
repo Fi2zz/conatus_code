@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- 新增 `/permission [模式]` 命令：无参查看当前权限模式与可用模式，带参
+  （`alwaysAsk` / `askWhenNeeded` / `neverAsk`）即时切换并持久化到当前会话
+  （与审批浮层里的切换选项共用同一机制）。
 - 会话 id 统一为 `session_<uuid>`（如 `session_c8898262-4a76-4bd4-93dc-f757fd4ef666`）：
   - `nava` 不带 `--session`、`--session` 无值、或取值不是 `session_<uuid>` 格式时，
     一律**新建会话**，不再回落到 `tui` / 恢复历史会话；只有显式传规范格式 id 才

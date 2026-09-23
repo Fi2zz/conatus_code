@@ -472,6 +472,56 @@ void main() {
     app.dispose();
   });
 
+  test('/permission 无参展示当前模式与可用模式', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+    );
+
+    await controller.handleLine('/permission');
+
+    final String text = controller.transcript.messages.single.text;
+    expect(text, contains('当前权限模式'));
+    expect(text, contains('按需询问'));
+    expect(text, contains('始终询问'));
+    expect(text, contains('从不询问'));
+    app.dispose();
+  });
+
+  test('/permission <模式> 切换并持久化到会话', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+    );
+    final SessionStore sessions = app.require<SessionStore>('sessions');
+
+    await controller.handleLine('/permission neverAsk');
+
+    expect(controller.permissionMode, TuiPermissionMode.neverAsk);
+    expect(
+      controller.transcript.messages.single.text,
+      contains('权限模式已切换为「从不询问」'),
+    );
+    final SessionEvent last =
+        sessions.get('s1')!.ownEvents.last;
+    expect(last.type, kPermissionModeEvent);
+    expect(last.data, <String, Object?>{'mode': 'neverAsk'});
+    app.dispose();
+  });
+
+  test('/permission 非法参数给用法提示', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+    );
+
+    await controller.handleLine('/permission bogus');
+
+    expect(
+      controller.transcript.messages.single.text,
+      contains('用法：/permission'),
+    );
+    expect(controller.permissionMode, TuiPermissionMode.askWhenNeeded);
+    app.dispose();
+  });
+
   test('interrupt 打断在飞轮次：busy 复位且不产回复', () async {
     final _HangingProvider provider = _HangingProvider();
     final Context app = Context.root();
