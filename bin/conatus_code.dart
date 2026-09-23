@@ -71,6 +71,7 @@ Future<void> main(List<String> args) async {
 
   final ConatusTuiController controller = runtime.createController(
     initialSession: options.session,
+    planning: true,
     initialPermissionMode: toTuiPermissionMode(config.approval.mode),
     onExit: shutdownApp,
   );

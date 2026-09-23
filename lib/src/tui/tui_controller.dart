@@ -73,6 +73,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     String? initialSession,
     required this.modelLabel,
     this.maxSteps = 8,
+    this.planning = false,
     this.onExit,
     this.tts,
     this.ttsSink,
@@ -114,6 +115,10 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// Agent Loop 单轮最大步数。
   final int maxSteps;
+
+  /// 会话是否先跑规划轮（`plan_write`）再执行；开启后每条新任务会先产出
+  /// TODO 计划（屏上 `plan` 消息），执行过程从第一步可见。
+  final bool planning;
 
   /// 退出请求（`/exit`、`/quit`、Ctrl+C）；由宿主接 `shutdownApp`。
   final void Function()? onExit;
@@ -1028,7 +1033,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     final Session session = await _sessions.open(id);
     _session = session;
     final Context ctx = _app.plugin('tui-session:$id', (Context child) {
-      provideAgentLoop(child, session: session, maxSteps: maxSteps);
+      provideAgentLoop(
+          child, session: session, maxSteps: maxSteps, planning: planning);
       // 计划闭环：plan_write 建计划，update_plan 在执行中推进。
       providePlanTool(child, session: session);
       provideUpdatePlanTool(child, session: session);

@@ -338,6 +338,7 @@ class ConatusTuiRuntime {
     String? initialSession,
     required void Function() onExit,
     String name = '默认',
+    bool planning = false,
     TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,
   }) {
     final ConatusTuiController controller = ConatusTuiController(
@@ -347,6 +348,7 @@ class ConatusTuiRuntime {
       initialSession: initialSession,
       modelLabel: modelLabel,
       maxSteps: maxSteps,
+      planning: planning,
       onExit: onExit,
       initialPermissionMode: initialPermissionMode,
     );

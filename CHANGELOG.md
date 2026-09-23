@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- 开启规划轮（`planning`）：nava 对每条新任务先让模型用 `plan_write` 产出执行
+  计划，屏上 TODO 列表（目标 + 步骤 + 完成标记）随之出现，执行过程从第一步可见；
+  `ConatusTuiRuntime.createController` / `ConatusTuiController` 新增 `planning`
+  参数（缺省 `false`，nava 入口开启）。
 - 对话流展示 agent 执行过程，不再只是一问一答：
   - 工具调用名始终逐条显示（此前会被助手文本吞掉），工具结果保留完整内容；
     超过 8 行折叠为摘要，`Ctrl+O` 展开 / 收起最近一条工具详情。
