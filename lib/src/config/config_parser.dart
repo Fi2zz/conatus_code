@@ -12,18 +12,29 @@ class ConfigParser extends ConfigValues {
   ConatusCodeConfig parse() => ConatusCodeConfig(
         llm: _readLlm(),
         providers: _readProviders(),
+        models: _readModels(),
         agent: _readAgent(),
         approval: _readApproval(),
         sandbox: _readSandbox(),
         budget: _readBudget(),
         credentials: _readCredentials(),
+        thinking: _readThinking(),
+        services: _readServices(),
+        background: _readBackground(),
+        loopControl: _readLoopControl(),
+        defaultPlanMode: readBool(raw, 'default_plan_mode', false),
+        extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
+        mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
+        telemetry: readBool(raw, 'telemetry', false),
       );
 
+  /// 顶层 `default_model`（kimi 风格）优先，回退 `[llm] default_model`。
   LlmConfig _readLlm() {
     final Map<String, dynamic> table = readTable('llm');
-    final String? defaultModel = readString(table, 'default_model');
+    final String? defaultModel =
+        readString(raw, 'default_model') ?? readString(table, 'default_model');
     if (defaultModel != null && !_validDefaultModel(defaultModel)) {
-      throw ConfigException('$source：llm.default_model 必须是 "provider/model" 形式。');
+      throw ConfigException('$source：default_model 必须是 "provider/model" 形式。');
     }
     return LlmConfig(defaultModel: defaultModel);
   }
@@ -93,7 +104,9 @@ class ConfigParser extends ConfigValues {
 
   ApprovalConfig _readApproval() {
     final Map<String, dynamic> table = readTable('approval');
-    return ApprovalConfig(mode: _approvalMode(table));
+    final String? mode = readString(raw, 'default_permission_mode') ??
+        readString(table, 'mode');
+    return ApprovalConfig(mode: _approvalMode(mode));
   }
 
   SandboxSettings _readSandbox() {
@@ -126,14 +139,103 @@ class ConfigParser extends ConfigValues {
     };
   }
 
-  ApprovalMode _approvalMode(Map<String, dynamic> table) {
-    final String? value = readString(table, 'mode');
+  List<ModelConfig> _readModels() {
+    final Map<String, dynamic> table = readTable('models');
+    return <ModelConfig>[
+      for (final MapEntry<String, dynamic> entry in table.entries)
+        _readModel(entry.key, entry.value),
+    ];
+  }
+
+  ModelConfig _readModel(String qualifiedName, Object? raw) {
+    if (raw is! Map) {
+      throw ConfigException('$source：models.$qualifiedName 必须是表。');
+    }
+    final Map<String, dynamic> table = raw.cast<String, dynamic>();
+    final int slash = qualifiedName.indexOf('/');
+    final String defaultProvider =
+        slash > 0 ? qualifiedName.substring(0, slash) : '';
+    final String defaultModel =
+        slash > 0 ? qualifiedName.substring(slash + 1) : qualifiedName;
+    return ModelConfig(
+      provider: readString(table, 'provider') ?? defaultProvider,
+      model: readString(table, 'model') ?? defaultModel,
+      displayName: readString(table, 'display_name') ?? '',
+      capabilities: readStringList(table, 'capabilities'),
+      maxContext: readNonNegativeInt(table, 'max_context_size', 0),
+      maxOutputSize: readNonNegativeInt(table, 'max_output_size', 0),
+      reasoningKey: readString(table, 'reasoning_key') ?? '',
+      supportEfforts: readStringList(table, 'support_efforts'),
+      defaultEffort: readString(table, 'default_effort') ?? '',
+      offEffort: readString(table, 'off_effort') ?? '',
+      protocol: readString(table, 'protocol') ?? '',
+      baseUrl: readString(table, 'base_url') ?? '',
+    );
+  }
+
+  ThinkingConfig _readThinking() {
+    final Map<String, dynamic> table = readTable('thinking');
+    return ThinkingConfig(
+      enabled: readBool(table, 'enabled', true),
+      effort: readString(table, 'effort') ?? '',
+    );
+  }
+
+  List<ServiceConfig> _readServices() {
+    final Map<String, dynamic> table = readTable('services');
+    return <ServiceConfig>[
+      for (final MapEntry<String, dynamic> entry in table.entries)
+        _readService(entry.key, entry.value),
+    ];
+  }
+
+  ServiceConfig _readService(String name, Object? raw) {
+    if (raw is! Map) {
+      throw ConfigException('$source：services.$name 必须是表。');
+    }
+    final Map<String, dynamic> table = raw.cast<String, dynamic>();
+    final Object? oauth = table['oauth'];
+    String? oauthKey;
+    if (oauth is Map) {
+      final Object? key = oauth['key'];
+      oauthKey = key is String ? key : null;
+    }
+    return ServiceConfig(
+      name: name,
+      baseUrl: readString(table, 'base_url') ?? '',
+      apiKey: readString(table, 'api_key') ?? '',
+      oauthKey: oauthKey,
+    );
+  }
+
+  BackgroundConfig _readBackground() {
+    final Map<String, dynamic> table = readTable('background');
+    return BackgroundConfig(
+      keepAliveOnExit: readBool(table, 'keep_alive_on_exit', false),
+      maxRunningTasks: readPositiveInt(table, 'max_running_tasks', 4),
+    );
+  }
+
+  LoopControlConfig _readLoopControl() {
+    final Map<String, dynamic> table = readTable('loop_control');
+    return LoopControlConfig(
+      compactionTriggerRatio:
+          readDouble(table, 'compaction_trigger_ratio', 0.85),
+      maxStepsPerTurn: readPositiveInt(table, 'max_steps_per_turn', 200),
+      reservedContextSize: readPositiveInt(table, 'reserved_context_size', 50000),
+    );
+  }
+
+  ApprovalMode _approvalMode(String? value) {
     if (value == null) return ApprovalMode.askWhenNeeded;
     return switch (value) {
-      'always_ask' => ApprovalMode.alwaysAsk,
-      'ask_when_needed' => ApprovalMode.askWhenNeeded,
-      'never_ask' => ApprovalMode.neverAsk,
-      _ => throw ConfigException('$source：approval.mode 取值 "$value" 不合法。'),
+      'always_ask' || 'alwaysAsk' => ApprovalMode.alwaysAsk,
+      'ask_when_needed' || 'askWhenNeeded' || 'default' ||
+          'acceptEdits' || 'plan' =>
+        ApprovalMode.askWhenNeeded,
+      'never_ask' || 'neverAsk' || 'yolo' || 'bypassPermissions' =>
+        ApprovalMode.neverAsk,
+      _ => throw ConfigException('$source：permission 模式 "$value" 不合法。'),
     };
   }
 

@@ -15,10 +15,16 @@ export 'config_values.dart' show ConfigException;
 /// 首次启动写入的配置模板（文件不存在时由 [loadConfig] 初始化）。
 const String kDefaultConfigToml = '''
 # nava 的唯一配置入口（~/.nava/config.toml）
-# 模型提供商定义在 [providers.<名字>]；当前提供商与默认模型用 [llm] default_model。
+# 兼容 kimi-code-config 格式：顶层 default_model（provider/model）定当前提供商
+# 与默认模型；模型定义放 [models."provider/model"]；提供商放 [providers.<名字>]。
 
-[llm]
-# default_model = "provider/model"
+# default_model = "deepseek/deepseek-chat"
+
+# [models."deepseek/deepseek-chat"]
+# capabilities = [ "always_thinking", "tool_use" ]
+# max_context_size = 1000000
+# reasoning_key = "reasoning_content"
+# support_efforts = [ "low", "high", "max" ]
 
 # 非模型 Key（搜索等）仍走 [credentials]
 [credentials]

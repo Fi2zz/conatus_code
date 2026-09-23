@@ -161,7 +161,7 @@ ARK_API_KEY = "from-file"
     });
 
     test('枚举取值非法 → ConfigException', () {
-      _expectConfigError('approval.mode 取值 "sometimes" 不合法', () {
+      _expectConfigError('permission 模式 "sometimes" 不合法', () {
         loadConfig(path: _writeConfig('[approval]\nmode = "sometimes"\n'));
       });
       _expectConfigError('sandbox.preset 取值 "nope" 不合法', () {

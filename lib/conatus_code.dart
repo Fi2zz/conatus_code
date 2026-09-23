@@ -26,13 +26,18 @@ export 'src/config/config_schema.dart'
         AgentConfig,
         ApprovalConfig,
         ApprovalMode,
+        BackgroundConfig,
         BudgetConfig,
         ConatusCodeConfig,
         LlmConfig,
+        LoopControlConfig,
+        ModelConfig,
         ProviderConfig,
         ProviderType,
         SandboxPreset,
-        SandboxSettings;
+        SandboxSettings,
+        ServiceConfig,
+        ThinkingConfig;
 export 'src/config/config_writer.dart'
     show
         appendProviderSection,
