@@ -3,6 +3,8 @@
 /// 渲染与按键由根组件驱动（见 `tui.dart`）；本状态只管候选、过滤与选中。
 library;
 
+import 'dart:async';
+
 import 'package:nocterm/nocterm.dart';
 
 /// 一个可选模型（含所属提供商）。
@@ -11,6 +13,8 @@ class TuiModelItem {
     required this.provider,
     required this.model,
     this.current = false,
+    this.contextLength = 0,
+    this.vision = false,
   });
 
   /// 所属提供商名。
@@ -21,6 +25,12 @@ class TuiModelItem {
 
   /// 是否为当前模型（渲染 `← 当前`）。
   final bool current;
+
+  /// 上下文窗口（token）；`0` 表示未知。
+  final int contextLength;
+
+  /// 是否支持图像输入。
+  final bool vision;
 }
 
 /// 浮层同时可见的模型行数（超出滚动）。
@@ -41,6 +51,7 @@ class TuiModelPrompt {
   String? _provider;
   int _index = 0;
   bool _open = false;
+  Completer<TuiModelItem?>? _pending;
 
   /// 浮层是否可见。
   bool get open => _open;
@@ -109,6 +120,35 @@ class TuiModelPrompt {
     }
     _open = true;
     onChanged?.call();
+  }
+
+  /// 选择模式：打开面板并等待用户选中（Enter）或取消（Esc）。
+  ///
+  /// 面板关闭前调用方等待返回；取消返回 `null`。
+  Future<TuiModelItem?> choose(List<TuiModelItem> items) {
+    final Completer<TuiModelItem?> completer = Completer<TuiModelItem?>();
+    _pending = completer;
+    show(items);
+    return completer.future;
+  }
+
+  /// 确认当前选中项并关闭（Enter）。
+  void confirm() {
+    final Completer<TuiModelItem?>? pending = _pending;
+    final TuiModelItem? item = selected;
+    close();
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(item);
+    }
+  }
+
+  /// 取消选择并关闭（Esc）。
+  void cancel() {
+    final Completer<TuiModelItem?>? pending = _pending;
+    close();
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(null);
+    }
   }
 
   /// 设置搜索词（搜索框变化时调用）。

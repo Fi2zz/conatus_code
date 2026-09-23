@@ -3,6 +3,8 @@
 /// 只持有屏上状态；数据源是 config.toml，新增写回文件（见 `tui_controller.dart`）。
 library;
 
+import 'dart:async';
+
 /// 列表里的一项。
 class TuiProviderItem {
   const TuiProviderItem({
@@ -10,9 +12,11 @@ class TuiProviderItem {
     required this.baseUrl,
     required this.current,
     this.isAdd = false,
+    this.isCustom = false,
   });
 
-  /// 提供商名；[isAdd] 为 true 时是「[ Add New Platform ]」占位项。
+  /// 提供商名；[isAdd] 为 true 时是「[ Add New Platform ]」占位项，
+  /// [isCustom] 为 true 时是「[ custom ]」来源项。
   final String name;
 
   /// 端点地址（列表第二行灰字）。
@@ -24,8 +28,19 @@ class TuiProviderItem {
   /// 是否为新增入口项。
   final bool isAdd;
 
+  /// 是否为「自定义 provider」来源项（只填 base_url / api_key / model）。
+  final bool isCustom;
+
   /// 列表展示名。
-  String get label => isAdd ? '[ Add New Platform ]' : name;
+  String get label {
+    if (isAdd) {
+      return '[ Add New Platform ]';
+    }
+    if (isCustom) {
+      return '[ custom ]';
+    }
+    return name;
+  }
 }
 
 /// provider 浮层状态。
@@ -38,9 +53,13 @@ class TuiProviderPrompt {
   List<TuiProviderItem> _items = const <TuiProviderItem>[];
   int _index = 0;
   bool _open = false;
+  Completer<TuiProviderItem?>? _pending;
 
   /// 浮层是否可见。
   bool get open => _open;
+
+  /// 是否有待收口的选择请求（[choose] 发起的）。
+  bool get awaiting => _pending != null;
 
   /// 列表项。
   List<TuiProviderItem> get items => _items;
@@ -59,6 +78,35 @@ class TuiProviderPrompt {
         items.indexWhere((TuiProviderItem item) => item.current);
     _index = current < 0 ? 0 : current;
     onChanged?.call();
+  }
+
+  /// 选择模式：打开面板并等待用户选中（Enter）或取消（Esc）。
+  ///
+  /// 面板关闭前调用方等待返回；取消返回 `null`。
+  Future<TuiProviderItem?> choose(List<TuiProviderItem> items) {
+    final Completer<TuiProviderItem?> completer = Completer<TuiProviderItem?>();
+    _pending = completer;
+    show(items);
+    return completer.future;
+  }
+
+  /// 确认当前选中项并关闭（Enter）。
+  void confirm() {
+    final Completer<TuiProviderItem?>? pending = _pending;
+    final TuiProviderItem? item = selected;
+    close();
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(item);
+    }
+  }
+
+  /// 取消选择并关闭（Esc）。
+  void cancel() {
+    final Completer<TuiProviderItem?>? pending = _pending;
+    close();
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(null);
+    }
   }
 
   /// 刷新列表（删除后保持下标有效）。

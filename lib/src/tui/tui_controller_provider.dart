@@ -92,7 +92,9 @@ extension _ProviderCommands on ConatusTuiController {
         const TuiProviderItem(name: '', baseUrl: '', current: false, isAdd: true),
       ];
 
-  /// 面板 Enter：选中新增入口时打开表单。
+  /// 面板 Enter：非「选择来源」模式时，选中新增入口则打开添加流程。
+  ///
+  /// 「选择来源」模式（[choose] 进行中）由按键层直接 confirm，不进这里。
   Future<void> _confirmProviderItem() async {
     final ProviderRegistry? registry = _app.providers;
     final TuiProviderItem? item = providerPrompt.selected;
@@ -103,15 +105,51 @@ extension _ProviderCommands on ConatusTuiController {
     await _addProvider(registry);
   }
 
-  /// 新增 provider：填 base_url / model（name 可选、type 固定 openai）。
+  /// 新增 provider 的「来源选择」列表：常见 provider + custom 入口。
+  List<TuiProviderItem> sourceItems() => <TuiProviderItem>[
+        for (final ProviderPreset preset in kProviderPresets)
+          TuiProviderItem(
+            name: preset.id,
+            baseUrl: preset.baseUrl,
+            current: false,
+          ),
+        const TuiProviderItem(
+            name: 'custom', baseUrl: '', current: false, isCustom: true),
+      ];
+
+  /// 新增 provider：先选来源（常见 provider 或 custom），再走对应流程。
   ///
-  /// 写回 config.toml；第一个 provider 同时设为 `default_model`（后续不改它）。
+  /// 常见 provider 从 models.dev 拉模型清单供选择；custom 手填 base_url /
+  /// api_key / model。写回 config.toml；第一个 provider 同时设为
+  /// `default_model`（后续不改它）。
   Future<void> _addProvider(ProviderRegistry registry) async {
+    final TuiProviderItem? source = await providerPrompt.choose(sourceItems());
+    if (source == null) {
+      transcript.add(TuiRole.system, '已取消新增。');
+      return;
+    }
+    await _continueAdd(registry, source);
+  }
+
+  Future<void> _continueAdd(
+    ProviderRegistry registry,
+    TuiProviderItem source,
+  ) async {
+    if (source.isCustom) {
+      await _addCustomProvider(registry);
+      return;
+    }
+    await _addRegisteredProvider(registry, source);
+  }
+
+  /// custom 入口：手填 base_url / api_key / model（name 可选自动推导）。
+  Future<void> _addCustomProvider(ProviderRegistry registry) async {
     final Map<String, String>? values = await formPrompt.ask(TuiFormRequest(
-      title: 'Add provider',
+      title: 'Add custom provider',
       hint: '写回 config.toml；第一个 provider 同时设为 default_model。',
       fields: <TuiFormField>[
         TuiFormField(label: 'base_url', placeholder: 'https://api.deepseek.com'),
+        TuiFormField(label: 'api_key', obscure: true),
         TuiFormField(label: 'model', placeholder: 'deepseek-chat'),
         TuiFormField(label: 'name (可选)', placeholder: '留空自动从 base_url 推导'),
       ],
@@ -130,13 +168,92 @@ extension _ProviderCommands on ConatusTuiController {
     final String name = typedName.isEmpty
         ? registry.uniqueName(deriveProviderName(baseUrl))
         : registry.uniqueName(typedName);
+    final String apiKey = (values['api_key'] ?? '').trim();
+    await _commitProvider(
+      registry,
+      name: name,
+      baseUrl: baseUrl,
+      apiKey: apiKey,
+      model: model,
+    );
+  }
+
+  /// 已注册 provider：从 models.dev 拉该 provider 的模型清单 → 用户选模型 →
+  /// 填 api_key。拉取失败（离线 / 缓存缺失）时降级 custom 表单并提示。
+  Future<void> _addRegisteredProvider(
+    ProviderRegistry registry,
+    TuiProviderItem source,
+  ) async {
+    final Map<String, List<ModelsDevModel>> catalog;
+    final ModelsDevClient client = ModelsDevClient(cachePath: _modelsDevCache());
+    try {
+      transcript.add(TuiRole.system, '正在从 models.dev 拉取 ${source.name} 模型清单…');
+      catalog = await client.fetch();
+    } on ModelsDevException catch (error) {
+      transcript.add(TuiRole.system, '无法拉取模型清单（${error.message}）。'
+          '可改用 custom 手填 base_url。');
+      await _addCustomProvider(registry);
+      return;
+    } finally {
+      client.close();
+    }
+    final List<ModelsDevModel> coding = <ModelsDevModel>[
+      for (final ModelsDevModel model in catalog[source.name] ?? const <ModelsDevModel>[])
+        if (keepForCoding(model.toolCall, model.reasoning)) model,
+    ];
+    if (coding.isEmpty) {
+      transcript.add(TuiRole.system,
+          '${source.name} 没有可用于编码的模型（需同时支持工具调用与推理）。');
+      return;
+    }
+    final TuiModelItem? picked = await modelPrompt.choose(<TuiModelItem>[
+      for (final ModelsDevModel model in coding)
+        TuiModelItem(
+          provider: source.name,
+          model: model.id,
+          contextLength: model.contextLength,
+          vision: model.supportsImage,
+        ),
+    ]);
+    if (picked == null) {
+      transcript.add(TuiRole.system, '已取消新增。');
+      return;
+    }
+    final Map<String, String>? values = await formPrompt.ask(TuiFormRequest(
+      title: 'API key for ${source.name}',
+      hint: '写入 config.toml 的 api_key；可留空稍后补。',
+      fields: <TuiFormField>[
+        TuiFormField(label: 'api_key', obscure: true),
+      ],
+    ));
+    if (values == null) {
+      transcript.add(TuiRole.system, '已取消新增。');
+      return;
+    }
+    await _commitProvider(
+      registry,
+      name: source.name,
+      baseUrl: source.baseUrl,
+      apiKey: (values['api_key'] ?? '').trim(),
+      model: picked.model,
+    );
+  }
+
+  /// 写回 config.toml + 更新内存注册表 + 切换 LLM（统一收尾）。
+  Future<void> _commitProvider(
+    ProviderRegistry registry, {
+    required String name,
+    required String baseUrl,
+    required String apiKey,
+    required String model,
+  }) async {
     final String? path = _app.get<String>('configPath');
     if (path != null) {
       appendProviderToFile(
         path,
         name: name,
         baseUrl: baseUrl,
-        apiKey: '',
+        apiKey: apiKey,
         type: 'openai',
         defaultModel: registry.profiles.isEmpty ? '$name/$model' : null,
       );
@@ -144,12 +261,23 @@ extension _ProviderCommands on ConatusTuiController {
     registry.add(ProviderProfile(
       name: name,
       baseUrl: baseUrl,
+      apiKey: apiKey,
       models: <String>[model],
     ));
     providerPrompt.refresh(providerItems(registry));
     transcript.add(TuiRole.system, '已添加提供商 $name（写入 config.toml）');
     transcript.add(
         TuiRole.system, await _applyLlm(registry, name, model: model));
+  }
+
+  /// models.dev 缓存放 config 同目录（如 `~/.nava/models.dev.json`）。
+  String? _modelsDevCache() {
+    final String? path = _app.get<String>('configPath');
+    if (path == null) {
+      return null;
+    }
+    final File file = File(path);
+    return '${file.parent.path}${Platform.pathSeparator}models.dev.json';
   }
 
   /// 按 provider（可指定模型）替换 LLM 服务并重绑；返回提示文本。

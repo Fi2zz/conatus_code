@@ -9,6 +9,10 @@ library;
 
 export 'src/providers/builtin_providers.dart'
     show DeepSeekProvider, DoubaoProvider;
+export 'src/providers/model_catalog.dart'
+    show ModelCapability, ModelSpec, ProviderPreset, kProviderPresets;
+export 'src/providers/models_dev.dart'
+    show ModelsDevClient, ModelsDevException, ModelsDevModel, keepForCoding;
 export 'src/providers/provider_profile.dart' show ProviderProfile;
 export 'src/providers/provider_registry.dart' show ProviderRegistry;
 export 'src/providers/providers_provider.dart'

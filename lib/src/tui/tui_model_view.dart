@@ -105,6 +105,9 @@ class TuiModelView extends StatelessComponent {
   }
 
   Component _row(TuiModelItem item, bool isSelected) {
+    final String contextLabel = item.contextLength > 0
+        ? '${(item.contextLength / 1000).round()}k'
+        : '';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
       color: isSelected ? const Color.fromRGB(30, 40, 60) : null,
@@ -127,8 +130,12 @@ class TuiModelView extends StatelessComponent {
               style: TextStyle(color: isSelected ? Colors.white : Colors.gray),
             ),
           ),
+          if (item.vision)
+            const Text('图 ', style: TextStyle(color: Colors.brightGreen)),
+          if (contextLabel.isNotEmpty)
+            Text(contextLabel, style: const TextStyle(color: Colors.gray)),
           if (item.current)
-            const Text('← 当前', style: TextStyle(color: Colors.brightYellow)),
+            const Text(' ← 当前', style: TextStyle(color: Colors.brightYellow)),
         ],
       ),
     );
