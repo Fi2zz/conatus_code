@@ -38,13 +38,13 @@ void _expectConfigError(String fragment, void Function() body) {
 
 void main() {
   test('常量：目录名、文件名、环境变量名', () {
-    expect(kConfigDirName, '.conatus-code');
+    expect(kConfigDirName, '.nava');
     expect(kConfigFileName, 'config.toml');
-    expect(kConfigHomeEnv, 'CONATUS_CODE_HOME');
+    expect(kConfigHomeEnv, 'NAVA_HOME');
   });
 
   group('resolveConfigDir', () {
-    test('CONATUS_CODE_HOME 优先于 HOME', () {
+    test('NAVA_HOME 优先于 HOME', () {
       expect(
         resolveConfigDir(env: <String, String>{
           kConfigHomeEnv: '/tmp/custom',
@@ -86,13 +86,14 @@ void main() {
   });
 
   group('loadConfig', () {
-    test('文件不存在 → 全默认值', () {
+    test('文件不存在 → 初始化模板并返回其配置', () {
       final String sep = Platform.pathSeparator;
-      final ConatusCodeConfig config =
-          loadConfig(path: '${_tempDir().path}${sep}missing.toml');
+      final String path = '${_tempDir().path}${sep}missing.toml';
+      final ConatusCodeConfig config = loadConfig(path: path);
 
-      expect(config.llm.defaultModel, isNull);
-      expect(config.providers, isEmpty);
+      expect(File(path).existsSync(), isTrue);
+      expect(config.llm.defaultModel, isNotNull);
+      expect(config.providers, isNotEmpty);
       expect(config.agent.maxSteps, 8);
       expect(config.agent.workdir, isNull);
       expect(config.agent.projectDir, '.conatus');
@@ -100,7 +101,8 @@ void main() {
       expect(config.sandbox.enabled, isTrue);
       expect(config.sandbox.preset, SandboxPreset.workspaceWrite);
       expect(config.sandbox.allowNetwork, isFalse);
-      expect(config.sandbox.networkAllowlist, isEmpty);
+      expect(
+          config.sandbox.networkAllowlist, <String>['git fetch', 'git pull']);
       expect(config.sandbox.allowedExecutables, isEmpty);
       expect(config.credentials, isEmpty);
     });
@@ -257,5 +259,30 @@ type = "anthropic"
       () => loadConfigFromToml('[providers.x]\napi_key = "k"'),
       throwsA(isA<ConfigException>()),
     );
+  });
+
+  group('loadConfig 初始化', () {
+    test('config.toml 不存在时写入模板并返回可解析配置', () {
+      final Directory dir = Directory.systemTemp.createTempSync('nava-cfg-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final String path = '${dir.path}${Platform.pathSeparator}config.toml';
+
+      final ConatusCodeConfig config = loadConfig(path: path);
+
+      expect(File(path).existsSync(), isTrue);
+      expect(config.providers, isNotEmpty);
+      expect(config.llm.defaultModel, isNotNull);
+    });
+
+    test('config.toml 已存在时不覆盖', () {
+      final Directory dir = Directory.systemTemp.createTempSync('nava-cfg-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final String path = '${dir.path}${Platform.pathSeparator}config.toml';
+      File(path).writeAsStringSync('[llm]\ndefault_model = "x/y"\n');
+
+      loadConfig(path: path);
+
+      expect(File(path).readAsStringSync(), contains('default_model = "x/y"'));
+    });
   });
 }

@@ -49,19 +49,20 @@ class SubprocessCodeRuntime implements CodeRuntime {
   Future<CodeRunResult> run(CodeRunRequest request) async {
     final Completer<void> cancel = Completer<void>();
     _cancel = cancel;
-    final Directory tmp =
-        await Directory.systemTemp.createTemp('conatus-code-');
+    final Directory tmp = await Directory.systemTemp.createTemp('nava-');
     try {
       final File file = File('${tmp.path}/program$extension');
       await file.writeAsString(request.program);
       final CodeRunLimits limits = request.limits ?? const CodeRunLimits();
-      final ShellExecSpec spec = _shell.resolve(ShellExecRequest(
-        command: _command(file.path),
-        workdir: workingDirectory,
-        timeoutMs: (request.timeout ?? limits.maxDuration).inMilliseconds,
-        stdoutMaxBytes: limits.maxOutputBytes,
-        cancelSignal: cancel.future,
-      ));
+      final ShellExecSpec spec = _shell.resolve(
+        ShellExecRequest(
+          command: _command(file.path),
+          workdir: workingDirectory,
+          timeoutMs: (request.timeout ?? limits.maxDuration).inMilliseconds,
+          stdoutMaxBytes: limits.maxOutputBytes,
+          cancelSignal: cancel.future,
+        ),
+      );
       final ShellRunResult result = await _shell.run(spec);
       if (cancel.isCompleted) {
         return CodeRunResult.failure(CodeRunFailureKind.abort, '执行已取消');
@@ -83,10 +84,10 @@ class SubprocessCodeRuntime implements CodeRuntime {
   void dispose() {}
 
   String _command(String filePath) => <String>[
-        _quote(executable),
-        ...baseArgs.map(_quote),
-        _quote(filePath),
-      ].join(' ');
+    _quote(executable),
+    ...baseArgs.map(_quote),
+    _quote(filePath),
+  ].join(' ');
 
   CodeRunResult _mapResult(ShellRunResult result) {
     if (result.timedOut) {

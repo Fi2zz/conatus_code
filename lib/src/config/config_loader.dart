@@ -1,4 +1,4 @@
-/// 读取 `config.toml`：定位 → 解析 → 校验。
+/// 读取 `config.toml`：定位 →（不存在则初始化）→ 解析 → 校验。
 library;
 
 import 'dart:io';
@@ -12,17 +12,63 @@ import 'config_values.dart';
 
 export 'config_values.dart' show ConfigException;
 
+/// 首次启动写入的配置模板（文件不存在时由 [loadConfig] 初始化）。
+const String kDefaultConfigToml = '''
+# nava 的唯一配置入口（~/.nava/config.toml）
+# 模型提供商定义在 [providers.<名字>]；当前提供商与默认模型用 [llm] default_model。
+
+[llm]
+default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"
+
+[providers.arkcli-agent-plan]
+api_key = "ark-你的火山方舟 Key"
+base_url = "https://ark.cn-beijing.volces.com/api/plan/v3"
+type = "openai"
+
+[providers.deepseek]
+api_key = "sk-你的 DeepSeek Key"
+base_url = "https://api.deepseek.com/v1"
+type = "openai"
+
+# 非模型 Key（搜索等）仍走 [credentials]
+[credentials]
+# TAVILY_API_KEY = "tvly-..."
+# BRAVE_API_KEY = "..."
+# FIRECRAWL_API_KEY = "fc-..."
+
+[agent]
+# workdir = "/path/to/your/project"
+max_steps = 8
+
+[approval]
+mode = "ask_when_needed"
+
+[sandbox]
+enabled = true
+fs_jail = true
+network_allowlist = ["git fetch", "git pull"]
+command_timeout_ms = 120000
+max_output_bytes = 64000
+
+[budget]
+max_turn_seconds = 600
+max_turn_tokens = 200000
+''';
+
 /// 加载配置。
 ///
-/// [path] 缺省按 [resolveConfigPath] 定位（`~/.conatus-code/config.toml`）。
-/// 文件不存在返回默认配置；文件存在但语法或类型不合法时抛 [ConfigException]，
-/// **不静默降级**。
+/// [path] 缺省按 [resolveConfigPath] 定位（`~/.nava/config.toml`）。
+/// **文件不存在时先写入 [kDefaultConfigToml] 模板**（首次启动初始化），再照常
+/// 解析；文件存在但语法或类型不合法时抛 [ConfigException]，**不静默降级**。
 ///
 /// 注意：本函数读工作目录之外的路径，必须在沙箱 zone 之外调用（启动期即可）。
 ConatusCodeConfig loadConfig({String? path, Map<String, String>? env}) {
   final String file = resolveConfigPath(explicit: path, env: env);
   final File source = File(file);
-  if (!source.existsSync()) return const ConatusCodeConfig();
+  if (!source.existsSync()) {
+    source.parent.createSync(recursive: true);
+    source.writeAsStringSync(kDefaultConfigToml);
+  }
   return ConfigParser(decodeToml(source), file).parse();
 }
 

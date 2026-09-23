@@ -1,4 +1,4 @@
-/// conatus_code 的配置模型，对应 `~/.conatus-code/config.toml`。
+/// conatus_code 的配置模型，对应 `~/.nava/config.toml`。
 library;
 
 /// LLM 选择：`provider/model` 同时定当前提供商与默认模型。
@@ -123,10 +123,7 @@ class SandboxSettings {
 
 /// 预算护栏配置；对应 `[budget]` 表。
 class BudgetConfig {
-  const BudgetConfig({
-    this.maxTurnSeconds = 600,
-    this.maxTurnTokens = 200000,
-  });
+  const BudgetConfig({this.maxTurnSeconds = 600, this.maxTurnTokens = 200000});
 
   /// 单轮墙钟上限（秒）；`0` 表示不限。
   final int? maxTurnSeconds;

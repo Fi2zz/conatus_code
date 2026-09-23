@@ -1,4 +1,4 @@
-/// 配置文件位置解析：`~/.conatus-code/config.toml`。
+/// 配置文件位置解析：`~/.nava/config.toml`。
 ///
 /// 覆盖顺序（后者优先）：系统默认位置 → [kConfigHomeEnv] → `--config` 参数。
 library;
@@ -6,15 +6,15 @@ library;
 import 'dart:io';
 
 /// 用户级配置目录名，放在系统默认位置（macOS 为 `$HOME`）下。
-const String kConfigDirName = '.conatus-code';
+const String kConfigDirName = '.nava';
 
 /// 配置文件名。
 const String kConfigFileName = 'config.toml';
 
 /// 覆盖配置目录的环境变量名。
-const String kConfigHomeEnv = 'CONATUS_CODE_HOME';
+const String kConfigHomeEnv = 'NAVA_HOME';
 
-/// 解析配置目录：`CONATUS_CODE_HOME` 优先，否则 `$HOME/.conatus-code`。
+/// 解析配置目录：`NAVA_HOME` 优先，否则 `$HOME/.nava`。
 String resolveConfigDir({Map<String, String>? env}) {
   final Map<String, String> source = env ?? Platform.environment;
   final String? override = cleanConfigValue(source[kConfigHomeEnv]);

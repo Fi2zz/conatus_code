@@ -1,4 +1,4 @@
-# conatus_code
+# Nava
 
 > A terminal coding agent built on the conatus runtime.
 
@@ -36,27 +36,27 @@ dart run bin/conatus_code.dart
 bash tool/build_binary.sh
 ```
 
-产出 `dist/conatio`（自包含：内嵌 Dart runtime，目标机器不需要装 Dart SDK）。
+产出 `dist/nava`（自包含：内嵌 Dart runtime，目标机器不需要装 Dart SDK）。
 装到 PATH 的两种方式：
 
 ```bash
 # 1. 软链到 PATH 上的目录
-ln -s "$PWD/dist/conatio" /usr/local/bin/conatio
+ln -s "$PWD/dist/nava" /usr/local/bin/nava
 
 # 2. 或把 dist/ 加进 PATH
 export PATH="$PWD/dist:$PATH"
 ```
 
-之后直接 `conatio` 启动，`conatio --help` 看用法。脚本默认写到
-`<包根>/dist/conatio`；第一个参数可覆盖输出路径，例如把产物写到
-`/tmp/conatio`。
+之后直接 `nava` 启动，`nava --help` 看用法。脚本默认写到
+`<包根>/dist/nava`；第一个参数可覆盖输出路径，例如把产物写到
+`/tmp/nava`。
 
 注意：OS 沙箱后端（launcher）仍在运行时从 pub 缓存定位，换机器或清理 pub 缓存后
 沙箱会 fail-closed（命令执行被禁用，文件 jail 保留），这与源码运行时的行为一致。
 
 ## 配置
 
-首次运行会读取 `~/.conatus-code/config.toml`（`CONATUS_CODE_HOME` /
+首次运行会读取 `~/.nava/config.toml`（`NAVA_HOME` /
 `--config` 可覆盖路径）。示例：
 
 ```toml
@@ -97,7 +97,7 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 
 ## 模型提供商（`/provider` / `/model`）
 
-提供商在 `~/.conatus-code/config.toml` 的 `[providers.<名字>]` 表里定义
+提供商在 `~/.nava/config.toml` 的 `[providers.<名字>]` 表里定义
 （实现 `lib/src/providers/`，公开入口 `lib/providers.dart`）；`[llm]
 default_model = "provider/model"` 同时定当前提供商与默认模型。`/provider` /
 `/model` 命令**只读展示**注册表——增删改直接编辑 config.toml。**没有缺省回退
@@ -117,7 +117,7 @@ type = "openai"         # openai→chat/completions；kimi→responses（缺省 
 - `oauth` 子表：字段保留（`key`）但**不实现** OAuth 调用；配了 `oauth.key` 且
   未配 `api_key` 的提供商启动时提示不可用，其余照常。
 - 以代码装配：`provideProviders(app, providers: <ProviderProfile>[...],
-  currentName: ..., credentials: ...)` 把注册表挂到 `'providers'` 服务，
+currentName: ..., credentials: ...)` 把注册表挂到 `'providers'` 服务，
   `registry.buildLlm(name, model: ...)` 按 profile 构造 OpenAI 兼容
   `LlmProvider`。Key 解析顺序：配置内 `apiKey` → 注入的凭据服务（缺省
   `EnvCredentials`）。

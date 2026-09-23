@@ -1,6 +1,6 @@
 /// conatus_code 的模型提供商管理：`ProviderProfile` 装配与只读注册表。
 ///
-/// 数据源是 `~/.conatus-code/config.toml` 的 `[providers.*]` 表（见
+/// 数据源是 `~/.nava/config.toml` 的 `[providers.*]` 表（见
 /// `lib/src/config/`）；本入口供 `/provider`（只读展示）与按 profile 构造
 /// OpenAI 兼容 `LlmProvider`。
 ///
