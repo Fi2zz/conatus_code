@@ -18,17 +18,8 @@ const String kDefaultConfigToml = '''
 # 模型提供商定义在 [providers.<名字>]；当前提供商与默认模型用 [llm] default_model。
 
 [llm]
-default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"
+default_model = ""
 
-[providers.arkcli-agent-plan]
-api_key = "ark-你的火山方舟 Key"
-base_url = "https://ark.cn-beijing.volces.com/api/plan/v3"
-type = "openai"
-
-[providers.deepseek]
-api_key = "sk-你的 DeepSeek Key"
-base_url = "https://api.deepseek.com/v1"
-type = "openai"
 
 # 非模型 Key（搜索等）仍走 [credentials]
 [credentials]
