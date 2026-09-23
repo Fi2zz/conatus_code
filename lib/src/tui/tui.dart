@@ -22,6 +22,7 @@ import 'tui_clipboard_image.dart';
 import 'tui_command_menu_view.dart';
 import 'tui_commands.dart';
 import 'tui_controller.dart';
+import 'tui_copy.dart';
 import 'tui_form.dart';
 import 'tui_form_view.dart';
 import 'tui_message.dart';
@@ -613,7 +614,7 @@ class _AgentTuiState extends State<AgentTui> {
     if (text.isEmpty) {
       return false;
     }
-    ClipboardManager.copy(text);
+    unawaited(copySelectionToSystemClipboard(text));
     _clearSelection();
     return true;
   }
@@ -789,6 +790,10 @@ class _AgentTuiState extends State<AgentTui> {
         _selectedText = text;
         _refresh(); // 让状态栏「可复制」提示随选区出现/消失。
       },
+      // 选区完成即复制（copy-on-select）：与 Kimi Code 一致，选中后
+      // 无需按复制键即可在系统任意处粘贴；macOS 经 pbcopy 直写剪贴板。
+      onSelectionCompleted: (String text) =>
+          unawaited(copySelectionToSystemClipboard(text)),
       child: child,
     );
   }

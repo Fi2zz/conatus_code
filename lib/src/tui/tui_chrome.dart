@@ -168,7 +168,7 @@ class TuiStatusBar extends StatelessComponent {
       hint = '${tuiSpinner(tick)} 思考中${tuiDots(tick)}';
     } else if (hasSelection) {
       hint = Platform.isMacOS
-          ? '选中后 ⌥C（Option+C）/ Ctrl+C 复制 | /help 命令'
+          ? '已自动复制到系统剪贴板 | /help 命令'
           : '选中后 Ctrl+C 复制 | /help 命令';
     } else {
       hint = '回车发送 | /help 命令 | /sessions 会话 | Ctrl+C 退出';

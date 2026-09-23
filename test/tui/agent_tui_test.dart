@@ -250,6 +250,29 @@ void main() {
     }
   });
 
+  test('拖选完成即自动复制（copy-on-select，无需按复制键）', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      ClipboardManager.clear();
+      controller.transcript.add(TuiRole.system, 'auto copy on select');
+      controller.onChanged?.call();
+      await tester.pump();
+
+      final TextMatch match =
+          tester.terminalState.findText('auto copy on select').first;
+      await tester.mouseMove(match.x + 5, match.y, match.x + 9, match.y);
+      // 直接松开鼠标、不按任何键：剪贴板已就位。
+      await tester.release(match.x + 9, match.y);
+
+      expect(ClipboardManager.paste(), 'copy');
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('忙时 Esc 打断并提示', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui(provider: _HangingProvider());
