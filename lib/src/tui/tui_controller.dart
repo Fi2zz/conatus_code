@@ -113,6 +113,16 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 顶栏展示的模型标签；`/model` 切换后可更新。
   String modelLabel;
 
+  /// 当前模型上下文窗口（token）；0 表示未知（状态栏只显示估算值）。
+  /// 由 `/model` 选中项或 models.dev 元数据回填。
+  int modelContextLength = 0;
+
+  /// 当前会话消息体量的粗估 token（chars/4 口径，只作状态栏展示）。
+  int get contextTokens => estimateMessagesTokens(<LlmMessage>[
+        for (final TuiMessage message in transcript.messages)
+          LlmMessage(message.role.name, message.text),
+      ]);
+
   /// Agent Loop 单轮最大步数。
   final int maxSteps;
 
@@ -273,6 +283,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     await _bind(_sessionId);
     _refresh();
+    // 回填当前模型的上下文窗口（models.dev 缓存优先，失败保持未知）。
+    unawaited(seedModelContextLength());
     if (_app.get<bool>('providerSetupNeeded') ?? false) {
       final ProviderRegistry? registry = _app.providers;
       if (registry != null) {

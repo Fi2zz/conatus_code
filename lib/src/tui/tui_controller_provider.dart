@@ -50,8 +50,7 @@ extension _ProviderCommands on ConatusTuiController {
     _refresh();
   }
 
-  /// `/model [搜索词]`：打开模型选择浮层；选中后切换当前提供商的模型。
-  ///
+  /// `/model [搜索词]`：打开模型选择浮层；选中后切换当前提供商的模型。  ///
   /// 候选优先取配置内模型（`[models.*]`），配置无清单时从 models.dev 兜底；
   /// 参数作为初始搜索词预填。未装配注册表时委托宿主的 [onModelCommand] 钩子，
   /// 两者都不可用时提示先配置提供商（没有缺省回退链，见 README）。
@@ -65,6 +64,8 @@ extension _ProviderCommands on ConatusTuiController {
         transcript.add(TuiRole.system, '已取消模型切换。');
         return;
       }
+      // 回填上下文窗口不阻塞切换：models.dev 冷缓存时联网可达 30s。
+      unawaited(_resolveModelContext(item));
       transcript.add(TuiRole.system,
           await _applyLlm(registry, item.provider, model: item.model));
       return;
@@ -406,6 +407,45 @@ extension _ProviderCommands on ConatusTuiController {
     }
     final File file = File(path);
     return '${file.parent.path}${Platform.pathSeparator}models.dev.json';
+  }
+
+  /// 启动时回填当前模型的上下文窗口（缓存优先；无缓存/离线保持 0）。
+  Future<void> seedModelContextLength() async {
+    final ProviderRegistry? registry = _app.providers;
+    final String? provider = registry?.currentName;
+    if (provider == null || modelLabel.isEmpty) {
+      return;
+    }
+    modelContextLength = await _lookupContextLength(provider, modelLabel);
+  }
+
+  /// 异步回填选中模型的上下文窗口（不阻塞切换；查不到保持原值）。
+  Future<void> _resolveModelContext(TuiModelItem item) async {
+    final int length = item.contextLength > 0
+        ? item.contextLength
+        : await _lookupContextLength(item.provider, item.model);
+    if (length > 0) {
+      modelContextLength = length;
+      _refresh();
+    }
+  }
+
+  /// 在 models.dev 目录里查模型的上下文窗口；查不到返回 0。
+  Future<int> _lookupContextLength(String provider, String model) async {
+    final Future<Map<String, List<ModelsDevModel>>> Function() loader =
+        modelsDevLoader ?? _defaultModelsDevLoader;
+    try {
+      final Map<String, List<ModelsDevModel>> catalog = await loader();
+      for (final ModelsDevModel meta
+          in catalog[provider] ?? const <ModelsDevModel>[]) {
+        if (meta.id == model) {
+          return meta.contextLength;
+        }
+      }
+    } on ModelsDevException {
+      // 无缓存且离线：状态栏只显示估算值。
+    }
+    return 0;
   }
 
   /// 按 provider（可指定模型）替换 LLM 服务并重绑；返回提示文本。

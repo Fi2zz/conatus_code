@@ -35,6 +35,7 @@ import 'tui_plan_view.dart';
 import 'tui_provider.dart';
 import 'tui_provider_view.dart';
 import 'tui_session_picker_view.dart';
+import 'tui_status_info.dart';
 import 'tui_views.dart';
 
 /// conatus TUI 根组件。
@@ -64,6 +65,7 @@ class _AgentTuiState extends State<AgentTui> {
   ViewMode _view = ViewMode.chat;
   String _selectedText = '';
   int _selectionEpoch = 0;
+  String _location = '';
   final List<TuiAttachment> _attachments = <TuiAttachment>[];
 
   @override
@@ -80,6 +82,15 @@ class _AgentTuiState extends State<AgentTui> {
       }
     });
     unawaited(_controller.start());
+    unawaited(_resolveLocation());
+  }
+
+  /// 解析状态栏位置信息（目录 + 分支）；失败时保持空串不显示右段。
+  Future<void> _resolveLocation() async {
+    final String location = await resolveWorkspaceLocation();
+    if (mounted) {
+      setState(() => _location = location);
+    }
   }
 
   @override
@@ -674,7 +685,6 @@ class _AgentTuiState extends State<AgentTui> {
           TuiHeader(
             name: _controller.name,
             sessionId: _controller.sessionId,
-            modelLabel: _controller.modelLabel,
           ),
           Expanded(
             child: _view == ViewMode.chat
@@ -740,6 +750,12 @@ class _AgentTuiState extends State<AgentTui> {
             pickerOpen: _controller.picker.open,
             busy: _controller.busy,
             tick: _tick,
+            modelLabel: _controller.modelLabel,
+            location: _location,
+            contextText: formatContextUsage(
+              _controller.contextTokens,
+              _controller.modelContextLength,
+            ),
             menuOpen: _menu.open,
             choiceOpen: _controller.choice.open,
             exitPending: _confirmExit,

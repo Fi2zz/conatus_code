@@ -7,13 +7,12 @@ import 'package:nocterm/nocterm.dart';
 
 import 'tui_views.dart';
 
-/// 顶栏：应用名 / 当前会话 / 模型。
+/// 顶栏：应用名 / 当前会话。模型与上下文信息在底部状态栏展示。
 class TuiHeader extends StatelessComponent {
   const TuiHeader({
     super.key,
     required this.name,
     required this.sessionId,
-    required this.modelLabel,
   });
 
   /// 应用 / 场景名。
@@ -21,9 +20,6 @@ class TuiHeader extends StatelessComponent {
 
   /// 当前会话 id。
   final String sessionId;
-
-  /// 模型标签。
-  final String modelLabel;
 
   @override
   Component build(BuildContext context) {
@@ -46,10 +42,6 @@ class TuiHeader extends StatelessComponent {
           Text(
             '会话：$sessionId',
             style: const TextStyle(color: Colors.yellow),
-          ),
-          Text(
-            '模型：$modelLabel',
-            style: const TextStyle(color: Colors.gray),
           ),
         ],
       ),
@@ -115,13 +107,16 @@ class TuiInputBar extends StatelessComponent {
   }
 }
 
-/// 状态栏：思考动画 / 操作提示 / 面板按键说明。
+/// 状态栏：左（权限 + 模型）/ 中（操作提示）/ 右（目录 + 分支 + 上下文用量）。
 class TuiStatusBar extends StatelessComponent {
   const TuiStatusBar({
     super.key,
     required this.pickerOpen,
     required this.busy,
     required this.tick,
+    required this.modelLabel,
+    this.location = '',
+    this.contextText = '',
     this.menuOpen = false,
     this.choiceOpen = false,
     this.exitPending = false,
@@ -137,6 +132,15 @@ class TuiStatusBar extends StatelessComponent {
 
   /// 动画帧计数。
   final int tick;
+
+  /// 当前模型标签（左段）。
+  final String modelLabel;
+
+  /// 工作目录 + git 分支（右段）；空则不显示。
+  final String location;
+
+  /// 上下文用量文本（右段）；空则不显示。
+  final String contextText;
 
   /// `/` 命令菜单是否打开。
   final bool menuOpen;
@@ -179,21 +183,69 @@ class TuiStatusBar extends StatelessComponent {
         color: Color.fromRGB(0, 20, 40),
         border: BoxBorder(top: BorderSide(color: Colors.cyan)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Component>[
-          Text(
-            permissionLabel.isEmpty ? '' : '权限：$permissionLabel',
-            style: const TextStyle(color: Colors.brightYellow),
-          ),
-          Text(
-            hint,
-            style: TextStyle(
-              color: busy ? Colors.brightYellow : Colors.gray,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final String left = _leftText();
+          final String right = _rightText();
+          final int width = constraints.maxWidth.toInt();
+          final int leftWidth = _displayWidth(left);
+          // 窄终端先舍右段（环境信息），保住左段与中间操作提示。
+          final bool showRight =
+              leftWidth + _displayWidth(right) + 12 <= width;
+          final int spare = width - leftWidth - (showRight ? _displayWidth(right) : 0);
+          final bool showHint = spare >= 12;
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Component>[
+              Text(
+                left,
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(color: Colors.brightYellow),
+              ),
+              Expanded(
+                child: showHint
+                    ? Text(
+                        hint,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          color: busy ? Colors.brightYellow : Colors.gray,
+                        ),
+                      )
+                    : const SizedBox(),
+              ),
+              Text(
+                showRight ? right : '',
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(color: Colors.gray),
+              ),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  /// 左段：权限模式 + 模型标签。
+  String _leftText() {
+    final String model = '模型：$modelLabel';
+    return permissionLabel.isEmpty ? model : '权限：$permissionLabel · $model';
+  }
+
+  /// 右段：目录 + 分支 + 上下文用量。
+  String _rightText() {
+    final String context = contextText.isEmpty ? '' : ' · $contextText';
+    return '$location$context';
+  }
+
+  /// 估算屏上宽度：CJK 全角按两列，其余按一列（近似）。
+  int _displayWidth(String text) {
+    int width = 0;
+    for (final int code in text.codeUnits) {
+      width += code >= 0x2E80 ? 2 : 1;
+    }
+    return width;
   }
 }
