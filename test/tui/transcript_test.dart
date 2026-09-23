@@ -85,6 +85,24 @@ void main() {
     expect(transcript.messages[1].text, contains('get_time'));
   });
 
+  test('助手事件携带 reasoning 时先渲染思考行', () {
+    final Session session = Session(id: 's');
+    session.append(kAssistantMessageEvent, data: <String, Object?>{
+      'text': '回答。',
+      'reasoning': '先分析再回答',
+      'toolCalls': <Object>[],
+    });
+
+    final Transcript transcript = Transcript()..rebuildFrom(session);
+
+    expect(
+      transcript.messages.map((TuiMessage m) => m.role).toList(),
+      <TuiRole>[TuiRole.thinking, TuiRole.assistant],
+    );
+    expect(transcript.messages[0].text, contains('先分析再回答'));
+    expect(transcript.messages[1].text, '回答。');
+  });
+
   test('工具结果正文保留完整多行内容', () {
     final Session session = Session(id: 's');
     session.append(kToolResultEvent, data: <String, Object?>{

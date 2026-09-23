@@ -15,6 +15,9 @@ enum TuiRole {
   /// 阶段提示（思考、计划等暗色行）。
   stage,
 
+  /// 模型的思考过程（如 Kimi `reasoning_content`，`assistant/...` 事件携带）。
+  thinking,
+
   /// 计划 / TODO 列表（`plan/updated` 事件投影，ctrl+t 展开/折叠）。
   plan,
 

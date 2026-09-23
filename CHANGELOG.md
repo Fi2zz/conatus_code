@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- 对话流展示模型**思考过程**：Kimi 等模型的 `reasoning_content` 经流式接口
+  捕获，在每步正文/工具调用前以「· 思考：…」独立成行渲染（屏上 `TuiRole.thinking`）；
+  底层 LLM 调用由非流式改为**流式**端点（`chat()` 内部走 `chatStream` 累积，
+  思考过程不再丢失）。
 - 开启规划轮（`planning`）：nava 对每条新任务先让模型用 `plan_write` 产出执行
   计划，屏上 TODO 列表（目标 + 步骤 + 完成标记）随之出现，执行过程从第一步可见；
   `ConatusTuiRuntime.createController` / `ConatusTuiController` 新增 `planning`

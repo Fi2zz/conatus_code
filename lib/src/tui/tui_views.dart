@@ -69,6 +69,8 @@ class MessageView extends StatelessComponent {
         return _indent(_foldTool(message), Colors.cyan);
       case TuiRole.plan:
         return _indent(_foldPlan(message), Colors.brightBlue);
+      case TuiRole.thinking:
+        return _indent(message.text, Colors.brightBlack);
       case TuiRole.stage:
         return _indent(message.text, Colors.brightBlack);
       case TuiRole.system:

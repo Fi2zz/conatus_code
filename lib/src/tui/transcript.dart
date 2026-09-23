@@ -80,8 +80,12 @@ class Transcript {
       case kUserMessageEvent:
         add(TuiRole.user, '${collapseSkillPrompt(_text(data))}${_imageMarker(data)}');
       case kAssistantMessageEvent:
-        // 文本与工具调用各自成行：有文本先出助手行，再逐条列工具调用名，
-        // 让执行过程（调了哪些工具）始终可见，而不是被助手文本吞掉。
+        // 思考过程（Kimi 等 `reasoning_content`）先单独成行，再是正文与
+        // 工具调用名，让执行过程与推理过程都可见。
+        final String reasoning = _field(data, 'reasoning').trim();
+        if (reasoning.isNotEmpty) {
+          add(TuiRole.thinking, '· 思考：$reasoning');
+        }
         final String text = _text(data);
         if (text.trim().isNotEmpty) {
           add(TuiRole.assistant, text);
