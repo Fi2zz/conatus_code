@@ -5,10 +5,13 @@
 /// 之后由 [apply] 增量追加，因此与持久化历史天然一致。
 library;
 
+import 'dart:convert';
+
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 
+import 'tui_attachment.dart';
 import 'tui_message.dart';
 import 'tui_skill_command.dart';
 
@@ -143,9 +146,22 @@ class Transcript {
   }
 
   /// 用户消息携带图片时追加的屏上标记（如 ` [图片 ×2]`）。
+  /// 图片占位块：每条图片跟随用户消息正文，独立成行 `[image #N (宽×高)]`
+  /// （尺寸从图片字节解析；解析不到则省略尺寸段）。
   static String _imageMarker(Object? data) {
     if (data is! Map) return '';
-    final int count = imagesFromJson(data['images']).length;
-    return count > 0 ? ' [图片 ×$count]' : '';
+    final List<LlmImage> images = imagesFromJson(data['images']);
+    if (images.isEmpty) return '';
+    final List<String> blocks = <String>[
+      for (int index = 0; index < images.length; index++)
+        '[image #${index + 1}${_imageDims(images[index])}]',
+    ];
+    return '\n${blocks.join('\n')}';
+  }
+
+  /// 从图片 base64 字节解析 `宽×高`；失败返回空串。
+  static String _imageDims(LlmImage image) {
+    final String? dims = imageDimensions(base64Decode(image.base64Data));
+    return dims == null ? '' : ' ($dims)';
   }
 }

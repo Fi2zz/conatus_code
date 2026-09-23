@@ -70,7 +70,7 @@ class MessageView extends StatelessComponent {
       case TuiRole.plan:
         return _indent(_foldPlan(message), Colors.brightBlue);
       case TuiRole.thinking:
-        return _indent(message.text, Colors.brightBlack);
+        return _indent(_foldThinking(message), Colors.brightBlack);
       case TuiRole.stage:
         return _indent(message.text, Colors.brightBlack);
       case TuiRole.system:
@@ -119,6 +119,16 @@ class MessageView extends StatelessComponent {
     final String goal = lines.isEmpty ? '' : lines.first;
     final int steps = lines.length > 1 ? lines.length - 1 : 0;
     return '$goal（$steps 步 · 按 ctrl+t 展开）';
+  }
+
+  /// 思考过程：折叠时只显示前 [kToolPreviewLines] 行并提示，展开显示全文。
+  String _foldThinking(TuiMessage message) {
+    final List<String> lines = message.text.split('\n');
+    if (message.expanded || lines.length <= kToolPreviewLines) {
+      return message.text;
+    }
+    final String head = lines.take(kToolPreviewLines).join('\n');
+    return '$head\n…（思考共 ${lines.length} 行，按 ctrl+o 展开）';
   }
 }
 

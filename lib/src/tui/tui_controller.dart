@@ -1008,10 +1008,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     applyPermissionMode(mode);
   }
 
-  /// 展开 / 收起最近一条工具结果（ctrl+o；无工具结果时不动作）。
+  /// 展开 / 收起最近一条可折叠详情（工具结果 / 思考过程，ctrl+o；无可折叠
+  /// 消息时不动作）。
   void toggleToolExpanded() {
     for (final TuiMessage message in transcript.messages.reversed) {
-      if (message.role == TuiRole.tool) {
+      if (message.role == TuiRole.tool || message.role == TuiRole.thinking) {
         message.expanded = !message.expanded;
         _refresh();
         return;

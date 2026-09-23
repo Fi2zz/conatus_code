@@ -1,9 +1,12 @@
 /// 会话事件 → 屏上消息的投射。
 library;
 
+import 'dart:convert';
+
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
+import 'package:conatus_llm/conatus_llm.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -168,5 +171,28 @@ void main() {
     expect(transcript.planMessage!.expanded, isFalse);
     transcript.togglePlanExpanded();
     expect(transcript.planMessage!.expanded, isTrue);
+  });
+
+  test('用户消息带图片时渲染占位块（序号 + 尺寸）', () {
+    // 8 字节 PNG 签名 + IHDR 宽高（大端 683×416）。
+    final List<int> png = <int>[
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+      ...List<int>.filled(8, 0),
+      0x00, 0x00, 0x02, 0xAB, // 683
+      0x00, 0x00, 0x01, 0xA0, // 416
+    ];
+    final Session session = Session(id: 's');
+    session.append(kUserMessageEvent, data: <String, Object?>{
+      'text': '看下这张图',
+      'images': imagesToJson(<LlmImage>[
+        LlmImage(mimeType: 'image/png', base64Data: base64Encode(png)),
+      ]),
+    });
+
+    final Transcript transcript = Transcript()..rebuildFrom(session);
+
+    expect(transcript.messages.single.role, TuiRole.user);
+    expect(transcript.messages.single.text, contains('看下这张图'));
+    expect(transcript.messages.single.text, contains('[image #1 (683×416)]'));
   });
 }
