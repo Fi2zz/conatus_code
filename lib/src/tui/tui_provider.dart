@@ -1,6 +1,6 @@
-/// provider 管理浮层状态：只读展示 config 配置的提供商（列表选择）。
+/// provider 管理浮层状态：展示 config 配置的提供商 + 新增入口。
 ///
-/// 只持有屏上状态；数据源是 config.toml（见 `tui_controller.dart`）。
+/// 只持有屏上状态；数据源是 config.toml，新增写回文件（见 `tui_controller.dart`）。
 library;
 
 /// 列表里的一项。
@@ -9,9 +9,10 @@ class TuiProviderItem {
     required this.name,
     required this.baseUrl,
     required this.current,
+    this.isAdd = false,
   });
 
-  /// 提供商名。
+  /// 提供商名；[isAdd] 为 true 时是「[ Add New Platform ]」占位项。
   final String name;
 
   /// 端点地址（列表第二行灰字）。
@@ -20,8 +21,11 @@ class TuiProviderItem {
   /// 是否为当前选中的提供商（渲染 `← 当前`）。
   final bool current;
 
+  /// 是否为新增入口项。
+  final bool isAdd;
+
   /// 列表展示名。
-  String get label => name;
+  String get label => isAdd ? '[ Add New Platform ]' : name;
 }
 
 /// provider 浮层状态。

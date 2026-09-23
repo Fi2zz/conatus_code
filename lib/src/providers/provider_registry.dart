@@ -47,6 +47,14 @@ class ProviderRegistry {
     return null;
   }
 
+  /// 内存中追加一个提供商；同名已存在时忽略（写回 config.toml 由调用方负责）。
+  void add(ProviderProfile profile) {
+    if (byName(profile.name) != null) {
+      return;
+    }
+    _profiles.add(profile);
+  }
+
   /// 按名构造 OpenAI 兼容提供商；无此 provider 或没有模型名时返回 `null`。
   ///
   /// Key 解析顺序：配置内 `apiKey` → 注入的 [Credentials]。

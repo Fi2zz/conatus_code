@@ -1,4 +1,4 @@
-/// `/provider` 只读展示与 `/model` 直接切换模型名。
+/// `/provider` 展示与新增、`/model` 直接切换模型名。
 library;
 
 import 'dart:io';
@@ -48,6 +48,8 @@ ProviderProfile _profile(String name) => ProviderProfile(
 
 Future<(ConatusTuiController, Context, Directory)> _build({
   bool withProviders = true,
+  bool emptyProviders = false,
+  bool providerSetupNeeded = false,
 }) async {
   final Directory dir = Directory.systemTemp.createTempSync('tui-provider-');
   final Context app = Context.root();
@@ -57,9 +59,14 @@ Future<(ConatusTuiController, Context, Directory)> _build({
   if (withProviders) {
     provideProviders(
       app,
-      providers: <ProviderProfile>[_profile('a'), _profile('b')],
-      currentName: 'a',
+      providers: emptyProviders
+          ? const <ProviderProfile>[]
+          : <ProviderProfile>[_profile('a'), _profile('b')],
+      currentName: emptyProviders ? null : 'a',
     );
+  }
+  if (providerSetupNeeded) {
+    app.provide('providerSetupNeeded', true);
   }
   final SessionStore sessions = provideSessions(app);
   final ConatusTuiController controller = ConatusTuiController(
@@ -86,7 +93,20 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  test('/provider 只读展示：列出 provider 与当前标记', () async {
+  test('未配置 provider 时启动自动打开引导面板', () async {
+    final (ConatusTuiController controller, Context app, Directory dir) =
+        await _build(emptyProviders: true, providerSetupNeeded: true);
+
+    expect(controller.providerPrompt.open, isTrue);
+    expect(
+      controller.providerPrompt.items.map((TuiProviderItem i) => i.label),
+      <String>['[ Add New Platform ]'],
+    );
+    app.dispose();
+    dir.deleteSync(recursive: true);
+  });
+
+  test('/provider 展示：列出 provider、当前标记与新增入口', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _build();
 
@@ -95,13 +115,13 @@ void main() {
     expect(controller.providerPrompt.open, isTrue);
     expect(
       controller.providerPrompt.items.map((TuiProviderItem i) => i.label),
-      <String>['a', 'b'],
+      <String>['a', 'b', '[ Add New Platform ]'],
     );
     expect(controller.providerPrompt.selected?.name, 'a');
     expect(controller.providerPrompt.selected?.current, isTrue);
     expect(
       controller.providerPrompt.items.map((TuiProviderItem i) => i.current),
-      <bool>[true, false],
+      <bool>[true, false, false],
     );
     app.dispose();
     dir.deleteSync(recursive: true);

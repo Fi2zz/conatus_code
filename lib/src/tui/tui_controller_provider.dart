@@ -5,11 +5,17 @@ part of 'tui_controller.dart';
 /// 拆成 part 是为了让 `tui_controller.dart` 只保留命令分派：这里集中注册表
 /// 读取、浮层数据与 LLM 服务替换。
 extension _ProviderCommands on ConatusTuiController {
-  /// `/provider`：只读展示 config 里配置的提供商（增删改走 config.toml）。
+  /// `/provider [add]`：展示 config 配置的提供商；`add` 打开新增表单。
+  ///
+  /// 新增会写回 config.toml；第一个 provider 同时设为 `default_model`。
   Future<void> _handleProvider(String arg) async {
     final ProviderRegistry? registry = _app.providers;
     if (registry == null) {
       transcript.add(TuiRole.system, '提供商管理未装配：config.toml 未配置 [providers]。');
+      return;
+    }
+    if (arg.trim() == 'add') {
+      await _addProvider(registry);
       return;
     }
     providerPrompt.show(providerItems(registry));
@@ -74,7 +80,7 @@ extension _ProviderCommands on ConatusTuiController {
         await _applyLlm(registry, registry.currentName ?? '', model: arg));
   }
 
-  /// 浮层列表项（只读：仅展示 config 配置的提供商）。
+  /// 浮层列表项（末尾为新增入口）。
   List<TuiProviderItem> providerItems(ProviderRegistry registry) =>
       <TuiProviderItem>[
         for (final ProviderProfile profile in registry.profiles)
@@ -83,7 +89,75 @@ extension _ProviderCommands on ConatusTuiController {
             baseUrl: profile.baseUrl,
             current: profile.name == registry.currentName,
           ),
+        const TuiProviderItem(name: '', baseUrl: '', current: false, isAdd: true),
       ];
+
+  /// 面板 Enter：选中新增入口时打开表单。
+  Future<void> _confirmProviderItem() async {
+    final ProviderRegistry? registry = _app.providers;
+    final TuiProviderItem? item = providerPrompt.selected;
+    if (registry == null || item == null || !item.isAdd) {
+      return;
+    }
+    providerPrompt.close();
+    await _addProvider(registry);
+  }
+
+  /// 新增 provider：填表 → 写回 config.toml → 更新内存注册表并切换 LLM。
+  ///
+  /// 第一个 provider 同时设为 `default_model`（后续新增不改它）。
+  Future<void> _addProvider(ProviderRegistry registry) async {
+    final Map<String, String>? values = await formPrompt.ask(TuiFormRequest(
+      title: 'Add provider',
+      hint: '写回 config.toml；第一个 provider 同时设为 default_model。',
+      fields: <TuiFormField>[
+        TuiFormField(label: 'name', placeholder: 'ark'),
+        TuiFormField(label: 'base_url', placeholder: 'https://…/v1'),
+        TuiFormField(label: 'api_key', obscure: true),
+        TuiFormField(label: 'type', placeholder: 'openai（或 kimi）'),
+        TuiFormField(label: 'model', placeholder: 'doubao-seed-…'),
+      ],
+    ));
+    if (values == null) {
+      transcript.add(TuiRole.system, '已取消新增。');
+      return;
+    }
+    final String name = (values['name'] ?? '').trim();
+    final String baseUrl = (values['base_url'] ?? '').trim();
+    final String apiKey = (values['api_key'] ?? '').trim();
+    final String type = (values['type'] ?? '').trim();
+    final String model = (values['model'] ?? '').trim();
+    if (name.isEmpty || baseUrl.isEmpty || model.isEmpty) {
+      transcript.add(TuiRole.system, 'name / base_url / model 不能为空。');
+      return;
+    }
+    final ProviderType resolvedType =
+        type == 'kimi' ? ProviderType.kimi : ProviderType.openai;
+    final String? path = _app.get<String>('configPath');
+    if (path != null) {
+      appendProviderToFile(
+        path,
+        name: name,
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+        type: resolvedType.name,
+        defaultModel: registry.profiles.isEmpty ? '$name/$model' : null,
+      );
+    }
+    registry.add(ProviderProfile(
+      name: name,
+      baseUrl: baseUrl,
+      apiKey: apiKey,
+      apiStyle: resolvedType == ProviderType.kimi
+          ? LlmApiStyle.responses
+          : LlmApiStyle.chat,
+      models: <String>[model],
+    ));
+    providerPrompt.refresh(providerItems(registry));
+    transcript.add(TuiRole.system, '已添加提供商 $name（写入 config.toml）');
+    transcript.add(
+        TuiRole.system, await _applyLlm(registry, name, model: model));
+  }
 
   /// 按 provider（可指定模型）替换 LLM 服务并重绑；返回提示文本。
   Future<String> _applyLlm(

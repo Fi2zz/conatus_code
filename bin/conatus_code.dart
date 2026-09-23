@@ -52,6 +52,7 @@ Future<void> main(List<String> args) async {
   }
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
     baseDir: '$workdir$sep${config.agent.projectDir}',
+    configPath: resolveConfigPath(explicit: options.configPath),
     providers: config.providers,
     provider: provider,
     model: model,

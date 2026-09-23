@@ -337,7 +337,7 @@ class _AgentTuiState extends State<AgentTui> {
     } else if (event.logicalKey == LogicalKey.arrowDown) {
       prompt.move(1);
     } else if (event.logicalKey == LogicalKey.enter) {
-      prompt.close();
+      unawaited(_controller.confirmProviderItem());
     } else if (event.logicalKey == LogicalKey.escape) {
       prompt.close();
     } else {

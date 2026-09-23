@@ -20,6 +20,8 @@ import 'package:conatus_tts/conatus_tts.dart';
 
 import '../../providers.dart';
 import '../autonomous/autonomous_assembly.dart';
+import '../config/config_schema.dart';
+import '../config/config_writer.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
@@ -241,10 +243,16 @@ class ConatusTuiController implements TuiUserPromptHost {
     );
   }
 
-  /// 绑定初始会话。
+  /// 绑定初始会话；未配置 provider 时自动打开引导面板。
   Future<void> start() async {
     await _bind(_sessionId);
     _refresh();
+    if (_app.get<bool>('providerSetupNeeded') ?? false) {
+      final ProviderRegistry? registry = _app.providers;
+      if (registry != null) {
+        providerPrompt.show(providerItems(registry));
+      }
+    }
   }
 
   /// 释放当前会话绑定（幂等）。
@@ -508,6 +516,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/model [名字]` 与 `/provider` 的实现见 part 文件
   /// `tui_controller_provider.dart`。
+
+  /// provider 浮层 Enter：选中新增入口时打开表单（根组件按键调用）。
+  Future<void> confirmProviderItem() => _confirmProviderItem();
 
   /// Plan 面板 Enter：切换 Plan Mode 并刷新面板（根组件按键调用）。
   Future<void> confirmPlanPanel() => _confirmPlanPanel();

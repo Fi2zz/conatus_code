@@ -87,12 +87,13 @@ class ConatusTuiRuntime {
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 15 个），调用方是进程级
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 16 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
     String? memoryFile,
     String? baseDir,
+    String? configPath,
     bool webTools = true,
     bool skills = true,
     List<ProviderConfig>? providers,
@@ -215,12 +216,17 @@ class ConatusTuiRuntime {
     final CostTrackerImpl costTracker = CostTrackerImpl();
     app.provide('costTracker', costTracker);
     final TurnBudget resolvedBudget = turnBudget ?? const TurnBudget();
-    if (llm == null && fromRegistry == null) {
-      throw StateError(
-          '未装配 LLM：请在 config.toml 配置 [providers.xxx] 与 [llm] default_model。');
+    if (configPath != null) {
+      app.provide('configPath', configPath);
     }
-    final FallbackLlm resolvedLlm =
-        llm ?? FallbackLlm(<LlmProvider>[fromRegistry!]);
+    if (llm == null && fromRegistry == null) {
+      // 无配置：注入占位 provider，TUI 照常启动并引导添加（不报错退出）。
+      app.provide('providerSetupNeeded', true);
+    }
+    final FallbackLlm resolvedLlm = llm ??
+        (fromRegistry != null
+            ? FallbackLlm(<LlmProvider>[fromRegistry])
+            : FallbackLlm(<LlmProvider>[_UnconfiguredProvider()]));
     Disposer llmDisposer = provideBudgetedLlm(
       app,
       llm: resolvedLlm,
@@ -351,4 +357,33 @@ class ConatusTuiRuntime {
     if (credentials.get('DEEPSEEK_API_KEY') != null) return 'deepseek-flash';
     return '未配置（设置 ARK_API_KEY / DEEPSEEK_API_KEY）';
   }
+}
+
+/// 未配置任何 provider 时的占位：任何调用都提示去配置。
+class _UnconfiguredProvider implements LlmProvider {
+  @override
+  String get name => 'unconfigured';
+
+  @override
+  Future<LlmResult> chat(
+    List<LlmMessage> messages, {
+    Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
+  }) async =>
+      LlmResult(
+        content: '尚未配置模型提供商：用 /provider 添加，或编辑 ~/.nava/config.toml。',
+        provider: name,
+        model: 'none',
+      );
+
+  @override
+  Stream<LlmStreamEvent> chatStream(
+    List<LlmMessage> messages, {
+    Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
+  }) =>
+      const Stream<LlmStreamEvent>.empty();
+
+  @override
+  void close() {}
 }
