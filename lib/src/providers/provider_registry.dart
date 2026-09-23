@@ -55,6 +55,18 @@ class ProviderRegistry {
     _profiles.add(profile);
   }
 
+  /// 生成不冲突的提供商名：base 已存在时追加 `-2` / `-3` 后缀。
+  String uniqueName(String base) {
+    if (byName(base) == null) {
+      return base;
+    }
+    int suffix = 2;
+    while (byName('$base-$suffix') != null) {
+      suffix++;
+    }
+    return '$base-$suffix';
+  }
+
   /// 按名构造 OpenAI 兼容提供商；无此 provider 或没有模型名时返回 `null`。
   ///
   /// Key 解析顺序：配置内 `apiKey` → 注入的 [Credentials]。

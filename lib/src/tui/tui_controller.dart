@@ -20,7 +20,6 @@ import 'package:conatus_tts/conatus_tts.dart';
 
 import '../../providers.dart';
 import '../autonomous/autonomous_assembly.dart';
-import '../config/config_schema.dart';
 import '../config/config_writer.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';

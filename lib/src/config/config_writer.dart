@@ -123,3 +123,20 @@ String _tomlKey(String name) {
 /// TOML 基本字符串转义（`\` 与 `"`）。
 String _tomlString(String value) =>
     value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+
+/// 从 base_url 推导 provider 名：取 host 的主域名段（倒数第二段）。
+///
+/// `https://api.deepseek.com/v1` → `deepseek`；`https://api.kimi.com/coding/v1`
+/// → `kimi`；解析失败或 host 为空 → `custom`。
+String deriveProviderName(String baseUrl) {
+  final Uri? uri = Uri.tryParse(baseUrl);
+  final String host = uri?.host ?? '';
+  if (host.isEmpty) {
+    return 'custom';
+  }
+  final List<String> parts = host.split('.');
+  if (parts.length >= 2) {
+    return parts[parts.length - 2];
+  }
+  return parts.first.isEmpty ? 'custom' : parts.first;
+}

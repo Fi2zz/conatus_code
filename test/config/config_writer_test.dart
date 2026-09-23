@@ -74,6 +74,22 @@ void main() {
     });
   });
 
+  group('deriveProviderName', () {
+    test('标准 api 域名取 host 倒数第二段', () {
+      expect(deriveProviderName('https://api.deepseek.com/v1'), 'deepseek');
+      expect(deriveProviderName('https://api.kimi.com/coding/v1'), 'kimi');
+    });
+
+    test('无协议 / 非法 URL 回退 custom', () {
+      expect(deriveProviderName(''), 'custom');
+      expect(deriveProviderName('not a url'), 'custom');
+    });
+
+    test('单段 host 直接用 host', () {
+      expect(deriveProviderName('http://localhost:11434/v1'), 'localhost');
+    });
+  });
+
   test('writeConfigFile 写入并创建父目录', () {
     final Directory dir = Directory.systemTemp.createTempSync('nava-writer-');
     addTearDown(() => dir.deleteSync(recursive: true));

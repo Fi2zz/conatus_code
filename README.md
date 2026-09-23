@@ -103,9 +103,9 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 default_model = "provider/model"` 同时定当前提供商与默认模型。
 
 - `/provider`：展示注册表；`/provider add` 或面板里 `[ Add New Platform ]`
-  新增（表单填 name / base_url / api_key / type / model，写回 config.toml；
-  **第一个** provider 会同时设为 `default_model`）；删除与切换默认仍直接编辑
-  config.toml
+  新增（表单只填 **base_url / model**，`name` 可选留空自动从 base_url 推导、
+  `type` 固定 `openai`，写回 config.toml；**第一个** provider 会同时设为
+  `default_model`）；删除与切换默认仍直接编辑 config.toml
 - `/model <名字>`：切换当前提供商的模型
 - 未配置任何 provider 时启动进入引导：TUI 照常启动并自动弹出 provider 面板，
   模型调用会提示先用 `/provider` 添加或编辑 config.toml——**没有缺省回退链**

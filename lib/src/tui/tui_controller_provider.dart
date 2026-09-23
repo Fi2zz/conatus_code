@@ -103,54 +103,47 @@ extension _ProviderCommands on ConatusTuiController {
     await _addProvider(registry);
   }
 
-  /// 新增 provider：填表 → 写回 config.toml → 更新内存注册表并切换 LLM。
+  /// 新增 provider：填 base_url / model（name 可选、type 固定 openai）。
   ///
-  /// 第一个 provider 同时设为 `default_model`（后续新增不改它）。
+  /// 写回 config.toml；第一个 provider 同时设为 `default_model`（后续不改它）。
   Future<void> _addProvider(ProviderRegistry registry) async {
     final Map<String, String>? values = await formPrompt.ask(TuiFormRequest(
       title: 'Add provider',
       hint: '写回 config.toml；第一个 provider 同时设为 default_model。',
       fields: <TuiFormField>[
-        TuiFormField(label: 'name', placeholder: 'ark'),
-        TuiFormField(label: 'base_url', placeholder: 'https://…/v1'),
-        TuiFormField(label: 'api_key', obscure: true),
-        TuiFormField(label: 'type', placeholder: 'openai（或 kimi）'),
-        TuiFormField(label: 'model', placeholder: 'doubao-seed-…'),
+        TuiFormField(label: 'base_url', placeholder: 'https://api.deepseek.com'),
+        TuiFormField(label: 'model', placeholder: 'deepseek-chat'),
+        TuiFormField(label: 'name (可选)', placeholder: '留空自动从 base_url 推导'),
       ],
     ));
     if (values == null) {
       transcript.add(TuiRole.system, '已取消新增。');
       return;
     }
-    final String name = (values['name'] ?? '').trim();
     final String baseUrl = (values['base_url'] ?? '').trim();
-    final String apiKey = (values['api_key'] ?? '').trim();
-    final String type = (values['type'] ?? '').trim();
     final String model = (values['model'] ?? '').trim();
-    if (name.isEmpty || baseUrl.isEmpty || model.isEmpty) {
-      transcript.add(TuiRole.system, 'name / base_url / model 不能为空。');
+    if (baseUrl.isEmpty || model.isEmpty) {
+      transcript.add(TuiRole.system, 'base_url / model 不能为空。');
       return;
     }
-    final ProviderType resolvedType =
-        type == 'kimi' ? ProviderType.kimi : ProviderType.openai;
+    final String typedName = (values['name (可选)'] ?? '').trim();
+    final String name = typedName.isEmpty
+        ? registry.uniqueName(deriveProviderName(baseUrl))
+        : registry.uniqueName(typedName);
     final String? path = _app.get<String>('configPath');
     if (path != null) {
       appendProviderToFile(
         path,
         name: name,
         baseUrl: baseUrl,
-        apiKey: apiKey,
-        type: resolvedType.name,
+        apiKey: '',
+        type: 'openai',
         defaultModel: registry.profiles.isEmpty ? '$name/$model' : null,
       );
     }
     registry.add(ProviderProfile(
       name: name,
       baseUrl: baseUrl,
-      apiKey: apiKey,
-      apiStyle: resolvedType == ProviderType.kimi
-          ? LlmApiStyle.responses
-          : LlmApiStyle.chat,
       models: <String>[model],
     ));
     providerPrompt.refresh(providerItems(registry));

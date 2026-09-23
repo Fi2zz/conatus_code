@@ -53,6 +53,15 @@ void main() {
     );
   });
 
+  test('uniqueName：不存在返回原值，已存在追加 -2 / -3 后缀', () {
+    final ProviderRegistry registry = ProviderRegistry(
+      profiles: <ProviderProfile>[profile('a'), profile('a-2')],
+    );
+
+    expect(registry.uniqueName('b'), 'b');
+    expect(registry.uniqueName('a'), 'a-3');
+  });
+
   test('hasKey：apiKey 非空即 true，否则看凭据服务', () {
     final ProviderRegistry registry = ProviderRegistry(
       profiles: <ProviderProfile>[profile('a')],
