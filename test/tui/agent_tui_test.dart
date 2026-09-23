@@ -191,6 +191,65 @@ void main() {
     }
   });
 
+  test('部分选区后 Cmd+C 复制选中片段（regression）', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      ClipboardManager.clear();
+      controller.transcript
+        ..add(TuiRole.system, 'first line message')
+        ..add(TuiRole.system, 'second line message');
+      controller.onChanged?.call();
+      await tester.pump();
+
+      // 只拖选第二行中段（「line」附近），不是整条消息。
+      final TextMatch match =
+          tester.terminalState.findText('second line message').first;
+      await tester.mouseMove(match.x + 7, match.y, match.x + 11, match.y);
+      await tester.release(match.x + 11, match.y);
+
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyC,
+        modifiers: ModifierKeys(meta: true),
+      ));
+      final String? pasted = ClipboardManager.paste();
+      expect(pasted, isNotNull);
+      expect(pasted!.length, lessThan('second line message'.length));
+      expect('second line message', contains(pasted));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
+  test('macOS 空闲时 Ctrl+C 有选区复制、不触发退出确认', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      ClipboardManager.clear();
+      controller.transcript.add(TuiRole.system, 'partial copy target');
+      controller.onChanged?.call();
+      await tester.pump();
+
+      final TextMatch match =
+          tester.terminalState.findText('partial copy target').first;
+      await tester.mouseMove(match.x, match.y, match.x + 7, match.y);
+      await tester.release(match.x + 7, match.y);
+
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyC,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      expect(ClipboardManager.paste(), 'partial');
+      expect(tester.terminalState, isNot(containsText('再按一次 Ctrl+C 退出')));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('忙时 Esc 打断并提示', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui(provider: _HangingProvider());
