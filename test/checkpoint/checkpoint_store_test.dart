@@ -1,6 +1,7 @@
 /// CheckpointStore（delta 版）：base 全量 + 差量、prune、list、旧格式兼容。
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
@@ -74,11 +75,17 @@ void main() {
     expect(delta.isDelta, isTrue);
     expect(delta.changed, unorderedEquals(<String>['a.txt', 'c.txt']));
     expect(delta.deleted, <String>['b.txt']);
-    // 差量目录只存 changed 文件。
+    // 差量目录只存 changed 文件（gzip 压缩存储）。
     final String deltaDir = '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1${Platform.pathSeparator}1';
-    expect(File('$deltaDir${Platform.pathSeparator}a.txt').existsSync(), isTrue);
-    expect(File('$deltaDir${Platform.pathSeparator}b.txt').existsSync(), isFalse);
+    expect(
+        File('$deltaDir${Platform.pathSeparator}a.txt.gz').existsSync(), isTrue);
+    expect(
+        File('$deltaDir${Platform.pathSeparator}b.txt.gz').existsSync(), isFalse);
+    // 内容不以明文落盘。
+    final List<int> raw =
+        File('$deltaDir${Platform.pathSeparator}a.txt.gz').readAsBytesSync();
+    expect(utf8.decode(raw, allowMalformed: true).contains('v1'), isFalse);
     // list 有效文件数 = base(2) + changed新增(1) - deleted(1) = 2。
     expect(store.list('s1').last.files, 2);
   });
@@ -123,7 +130,7 @@ void main() {
     File(
         '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1${Platform.pathSeparator}0'
-        '${Platform.pathSeparator}manifest.json').deleteSync();
+        '${Platform.pathSeparator}manifest.json.gz').deleteSync();
     expect(
       () => store.manifestOf('s1', 0),
       throwsA(isA<CheckpointException>()),

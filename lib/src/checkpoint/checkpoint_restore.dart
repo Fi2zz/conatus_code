@@ -42,19 +42,11 @@ Future<CheckpointRestore> restoreCheckpoint(
     };
     for (final CheckpointFileEntry entry in base.files) {
       if (deleted.contains(entry.path)) continue;
-      await checkpointCopyInto(
-        '${baseDir.path}${Platform.pathSeparator}${entry.path}',
-        store.root,
-        entry.path,
-      );
+      await checkpointRestoreFromGz(baseDir.path, store.root, entry.path);
       restored++;
     }
     for (final String path in manifest.changed) {
-      await checkpointCopyInto(
-        '${dir.path}${Platform.pathSeparator}$path',
-        store.root,
-        path,
-      );
+      await checkpointRestoreFromGz(dir.path, store.root, path);
       restored++;
     }
     for (final String path in manifest.deleted) {
@@ -67,11 +59,7 @@ Future<CheckpointRestore> restoreCheckpoint(
   } else {
     target = <String>{for (final CheckpointFileEntry entry in manifest.files) entry.path};
     for (final CheckpointFileEntry entry in manifest.files) {
-      await checkpointCopyInto(
-        '${dir.path}${Platform.pathSeparator}${entry.path}',
-        store.root,
-        entry.path,
-      );
+      await checkpointRestoreFromGz(dir.path, store.root, entry.path);
       restored++;
     }
   }

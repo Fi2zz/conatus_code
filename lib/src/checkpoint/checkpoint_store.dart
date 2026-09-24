@@ -70,9 +70,7 @@ class CheckpointStore {
       final String rel = checkpointRelativeTo(entity, root);
       if (checkpointExcluded(rel, projectRel, ignore)) continue;
       final FileStat stat = entity.statSync();
-      final File target = File('${dir.path}${Platform.pathSeparator}$rel');
-      target.parent.createSync(recursive: true);
-      await entity.copy(target.path);
+      await checkpointWriteGz(await entity.readAsBytes(), dir.path, rel);
       entries.add(CheckpointFileEntry(
         path: rel,
         mtimeMs: stat.modified.millisecondsSinceEpoch,
@@ -80,7 +78,7 @@ class CheckpointStore {
         hash: _sha256(entity.path),
       ));
     }
-    _writeManifest(
+    await _writeManifest(
       sessionId,
       dir,
       CheckpointManifest(kind: 'base', turn: 0, lastEventId: lastEventId, files: entries),
@@ -115,9 +113,7 @@ class CheckpointStore {
           !statChanged &&
           (old.hash == null || old.hash != _sha256(entity.path));
       if (statChanged || contentChanged) {
-        final File target = File('${dir.path}${Platform.pathSeparator}$rel');
-        target.parent.createSync(recursive: true);
-        await entity.copy(target.path);
+        await checkpointWriteGz(await entity.readAsBytes(), dir.path, rel);
         changed.add(rel);
       }
     }
@@ -125,7 +121,7 @@ class CheckpointStore {
       for (final String path in baseStats.keys)
         if (!current.contains(path)) path,
     ];
-    _writeManifest(
+    await _writeManifest(
       sessionId,
       dir,
       CheckpointManifest(
@@ -138,19 +134,31 @@ class CheckpointStore {
     );
   }
 
-  void _writeManifest(String sessionId, Directory dir, CheckpointManifest manifest) {
-    File('${dir.path}${Platform.pathSeparator}manifest.json')
-        .writeAsStringSync(jsonEncode(manifest.toJson()));
+  Future<void> _writeManifest(
+    String sessionId,
+    Directory dir,
+    CheckpointManifest manifest,
+  ) async {
+    await checkpointWriteGz(
+      utf8.encode(jsonEncode(manifest.toJson())),
+      dir.path,
+      'manifest.json',
+    );
   }
 
-  /// 读某检查点的清单；缺失抛 [CheckpointException]。
+  /// 读某检查点的清单（gzip；旧明文清单自动回退）；缺失抛异常。
   CheckpointManifest manifestOf(String sessionId, int turn) {
-    final File file = File(
+    final File gz = File(
+        '${directoryOf(sessionId, turn).path}${Platform.pathSeparator}manifest.json.gz');
+    final File plain = File(
         '${directoryOf(sessionId, turn).path}${Platform.pathSeparator}manifest.json');
-    if (!file.existsSync()) {
+    if (!gz.existsSync() && !plain.existsSync()) {
       throw CheckpointException('missing-manifest', '检查点 $turn 缺少清单');
     }
-    final Object? json = jsonDecode(file.readAsStringSync());
+    final List<int> bytes = gz.existsSync()
+        ? gzip.decode(gz.readAsBytesSync())
+        : plain.readAsBytesSync();
+    final Object? json = jsonDecode(utf8.decode(bytes));
     return CheckpointManifest.fromJson(json as Map<String, Object?>);
   }
 
