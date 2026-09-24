@@ -8,6 +8,9 @@ import 'tui_views.dart';
 
 const borderSode = BorderSide(color: Colors.blue);
 
+/// shell 模式下的输入框边框（紫色，与普通模式的蓝色区分）。
+const BorderSide kShellInputBorder = BorderSide(color: Colors.magenta);
+
 /// 输入栏：`> ` 前缀 + 单行输入框（思考中置灰只读，避免丢输入）。
 ///
 /// 附件以占位标记（`[image #N (宽×高)]`）形式留在输入框文本里，随文本提交时
@@ -47,17 +50,21 @@ class TuiInputBar extends StatelessComponent {
     return shellMode ? shellInputPlaceholder() : '输入消息，/help 查看命令';
   }
 
+  /// 输入框边框：shell 模式紫色（一眼区分当前在跑 shell），其余蓝色。
+  BorderSide get _border =>
+      shellMode ? kShellInputBorder : borderSode;
+
   @override
   Component build(BuildContext context) {
     return Container(
       // padding: const EdgeInsets.symmetric(horizontal: 0),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         // color: Color.fromRGB(20, 20, 40),
         border: BoxBorder(
-          top: borderSode,
-          bottom: borderSode,
-          left: borderSode,
-          right: borderSode,
+          top: _border,
+          bottom: _border,
+          left: _border,
+          right: _border,
         ),
         // border: BoxBorder(top: BorderSide(color: Colors.blue)),
       ),

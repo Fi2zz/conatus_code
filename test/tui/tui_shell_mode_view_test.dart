@@ -25,7 +25,7 @@ void main() {
     expect(tester.terminalState, isNot(containsText(shellInputPlaceholder())));
   });
 
-  test('输入栏：shell 模式 `! ` 前缀 + shell 占位', () async {
+  test('输入栏：shell 模式 `! ` 前缀 + shell 占位 + 紫色边框', () async {
     final NoctermTester tester = await NoctermTester.create(
       size: const Size(80, 12),
     );
@@ -43,6 +43,25 @@ void main() {
 
     expect(tester.terminalState, containsText('! '));
     expect(tester.terminalState, containsText(shellInputPlaceholder()));
+    expect(tester.terminalState.getCellAt(0, 0)!.style.color, Colors.magenta);
+  });
+
+  test('输入栏：普通模式边框保持蓝色', () async {
+    final NoctermTester tester = await NoctermTester.create(
+      size: const Size(80, 12),
+    );
+    addTearDown(tester.dispose);
+    await tester.pumpComponent(
+      TuiInputBar(
+        controller: TextEditingController(),
+        focused: true,
+        busy: false,
+        onSubmitted: (_) {},
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.terminalState.getCellAt(0, 0)!.style.color, Colors.blue);
   });
 
   test('状态栏：shell 模式显示 shell 操作提示', () async {
