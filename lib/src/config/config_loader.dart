@@ -55,6 +55,12 @@ keep = 5                    # 每会话保留最近 N 个检查点（0 = 不限�
 # post_tool_use = []
 # stop = []
 
+# lint-on-edit：模型编辑文件后自动跑 linter 并把告警塞回上下文。
+[lint]
+enabled = true
+debounce_seconds = 10         # 去抖窗口（秒），防连续编辑连跑
+# command = "dart analyze"    # 覆盖自动探测（默认按项目类型探测）
+
 [agent]
 # workdir = "/path/to/your/project"
 max_steps = 8

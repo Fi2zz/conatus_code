@@ -318,6 +318,24 @@ class HooksConfig {
   final List<String> stop;
 }
 
+/// lint-on-edit 配置；对应 `[lint]` 表。
+class LintConfig {
+  const LintConfig({
+    this.enabled = true,
+    this.command,
+    this.debounceSeconds = 10,
+  });
+
+  /// 是否在模型编辑文件后自动跑 linter。
+  final bool enabled;
+
+  /// 覆盖探测出的 linter 命令（如 `dart analyze` / `eslint .`）。
+  final String? command;
+
+  /// 去抖窗口（秒）：该窗口内最多跑一次 lint。
+  final int debounceSeconds;
+}
+
 /// 后台任务行为；对应 `[background]` 表（解析保留，供未来执行器消费）。
 class BackgroundConfig {
   const BackgroundConfig({
@@ -366,6 +384,7 @@ class ConatusCodeConfig {
     this.mcp = const McpConfig(),
     this.checkpoint = const CheckpointConfig(),
     this.hooks = const HooksConfig(),
+    this.lint = const LintConfig(),
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
     this.defaultPlanMode = false,
@@ -404,6 +423,9 @@ class ConatusCodeConfig {
 
   /// `[hooks]` 表。
   final HooksConfig hooks;
+
+  /// `[lint]` 表。
+  final LintConfig lint;
 
   /// `[background]` 表。
   final BackgroundConfig background;

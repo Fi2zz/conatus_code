@@ -56,6 +56,7 @@ export 'src/config/config_schema.dart'
         CheckpointConfig,
         ConatusCodeConfig,
         HooksConfig,
+        LintConfig,
         LlmConfig,
         LoopControlConfig,
         McpConfig,

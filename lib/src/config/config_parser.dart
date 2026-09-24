@@ -23,6 +23,7 @@ class ConfigParser extends ConfigValues {
         mcp: _readMcp(),
         checkpoint: _readCheckpoint(),
         hooks: _readHooks(),
+        lint: _readLint(),
         background: _readBackground(),
         loopControl: _readLoopControl(),
         defaultPlanMode: readBool(raw, 'default_plan_mode', false),
@@ -285,6 +286,15 @@ class ConfigParser extends ConfigValues {
       preToolUse: readStringList(table, 'pre_tool_use'),
       postToolUse: readStringList(table, 'post_tool_use'),
       stop: readStringList(table, 'stop'),
+    );
+  }
+
+  LintConfig _readLint() {
+    final Map<String, dynamic> table = readTable('lint');
+    return LintConfig(
+      enabled: readBool(table, 'enabled', true),
+      command: readString(table, 'command'),
+      debounceSeconds: readNonNegativeInt(table, 'debounce_seconds', 10),
     );
   }
 
