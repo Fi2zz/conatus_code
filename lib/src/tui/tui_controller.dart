@@ -29,6 +29,7 @@ import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
 import '../config/config_writer.dart';
 import '../diagnose/doctor.dart';
+import '../hooks/hooks.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
@@ -77,6 +78,9 @@ const String kBackgroundUsage =
 
 /// 消息队列容量上限（busy 时排队追问）。
 const int kMessageQueueCap = 20;
+
+/// `!` shell 命令的默认超时（毫秒）。
+const int kShellBangTimeoutMs = 60000;
 
 /// `/compact` 的手动压缩保留条数：小于自动预算，强制折叠较早历史。
 const int kManualCompactKeepRecent = 20;
@@ -345,6 +349,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (line.isEmpty) {
       return;
     }
+    if (line.startsWith('!')) {
+      // `!命令` 直接执行 shell，不经模型（busy 时拒绝）。
+      await _runShellBang(line);
+      return;
+    }
     if (line.startsWith('/')) {
       final String rest = line.replaceFirst(RegExp('^/+'), '');
       final int space = rest.indexOf(' ');
@@ -357,6 +366,77 @@ class ConatusTuiController implements TuiUserPromptHost {
       await expandAtRefs(line, fs: _app.get<FileSystem>('fs')),
       attachments: attachments,
     );
+  }
+
+  /// 上一条 `!` 命令（`!!` 重跑用）。
+  String? _lastBangCommand;
+
+  /// `!<命令>`：直接执行 shell 命令（不经模型）；`!!` 重跑上一条。
+  Future<void> _runShellBang(String line) async {
+    if (busy) {
+      transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
+      _refresh();
+      return;
+    }
+    final String command = _bangCommand(line);
+    if (command.isEmpty) {
+      _refresh();
+      return;
+    }
+    _lastBangCommand = command;
+    await _runShellForUser(command);
+  }
+
+  /// 解析 `!` 行：返回要执行的命令（空串 = 已提示用法，不执行）。
+  String _bangCommand(String line) {
+    final String raw = line.substring(1).trim();
+    if (raw.isEmpty) {
+      transcript.add(TuiRole.system,
+          '用法：!<命令> 直接执行（如 !git status）；!! 重跑上一条。');
+      return '';
+    }
+    if (raw != '!') return raw;
+    final String? last = _lastBangCommand;
+    if (last == null) {
+      transcript.add(TuiRole.system, '没有可重跑的上一条命令。');
+      return '';
+    }
+    return last;
+  }
+
+  /// 执行用户直发的 shell 命令并上屏（走 `'shell'` 缝，沙箱照常）。
+  Future<void> _runShellForUser(String command) async {
+    final ShellExecutor? shell = _app.get<ShellExecutor>('shell');
+    if (shell == null) {
+      transcript.add(TuiRole.system, 'shell 不可用。');
+      return;
+    }
+    transcript.add(TuiRole.system, '\$ $command');
+    final ShellRunResult result;
+    try {
+      result = await shell.run(shell.resolve(ShellExecRequest(
+        command: command,
+        timeoutMs: kShellBangTimeoutMs,
+      )));
+    } catch (error) {
+      transcript.add(TuiRole.system, '命令执行失败：$error');
+      return;
+    }
+    transcript.add(TuiRole.system, _bangOutput(result));
+  }
+
+  /// 把执行结果映射为展示文本。
+  String _bangOutput(ShellRunResult result) {
+    if (result.timedOut) return '命令超时（${kShellBangTimeoutMs ~/ 1000}s）。';
+    final int? code = result.exitCode;
+    if (code == 0) {
+      final String out = result.stdout.text;
+      return out.isEmpty ? '（无输出）' : out;
+    }
+    final String out = result.stdout.text;
+    final String err = result.stderr.text;
+    final String body = out.isEmpty ? err : (err.isEmpty ? out : '$out\n$err');
+    return '命令失败（exit $code）：${body.isEmpty ? '（无输出）' : body}';
   }
 
   /// 打断在飞轮次（Esc / barge-in）：立即提示，盘上记录保留；排队消息一并清空。
@@ -1494,6 +1574,14 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (_queue.isNotEmpty && !busy) {
       final (String, List<TuiAttachment>) next = _queue.removeAt(0);
       unawaited(submit(next.$1, attachments: next.$2));
+    }
+    // Stop hook：轮次收口（失败只提示）。
+    final Hooks? hooks = _app.get<Hooks>('hooks');
+    if (hooks != null) {
+      final String? hookError = await hooks.onStop();
+      if (hookError != null) {
+        transcript.add(TuiRole.system, 'Stop hook 失败：$hookError');
+      }
     }
   }
 
