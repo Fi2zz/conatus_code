@@ -69,6 +69,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '让模型扫描仓库生成 AGENTS.md（已存在则更新）',
   ),
   TuiCommand(name: 'compact', description: '手动压缩当前会话（折叠早期历史）'),
+  TuiCommand(
+    name: 'rewind',
+    description: '回滚工作区到 N 轮前（[N] 缺省 1；list 查看可用检查点）',
+    argHint: '[N|list]',
+  ),
   TuiCommand(name: 'cost', description: '展示今日估算成本与 token 用量'),
   TuiCommand(
     name: 'cron',

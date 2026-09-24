@@ -245,6 +245,29 @@ void main() {
 
     await runtime.dispose();
   });
+
+  test('装配 checkpointManager：传 checkpoint 配置后可用', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String sep = Platform.pathSeparator;
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      workdir: dir.path,
+      checkpoint: const CheckpointConfig(keep: 3),
+    );
+
+    final CheckpointManager? manager =
+        runtime.app.get<CheckpointManager>('checkpointManager');
+    expect(manager, isNotNull);
+    expect(manager!.enabled, isTrue);
+
+    await runtime.dispose();
+  });
 }
 
 /// 记录模型实际收到的消息。

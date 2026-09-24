@@ -24,6 +24,8 @@ import 'package:conatus_tts/conatus_tts.dart';
 import '../../providers.dart';
 import '../autonomous/autonomous_assembly.dart';
 import '../budget/cost_tracker.dart';
+import '../checkpoint/checkpoint_manager.dart';
+import '../checkpoint/checkpoint_types.dart';
 import '../config/config_writer.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
@@ -503,6 +505,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleInit();
       case 'compact':
         await _handleCompact();
+      case 'rewind':
+        await _handleRewind(arg);
       case 'cost':
         _showCost();
       case 'cron':
@@ -659,6 +663,58 @@ class ConatusTuiController implements TuiUserPromptHost {
       '（输入 ${tracker.promptTokens} / 输出 ${tracker.completionTokens} token，'
       '粗略护栏口径，非计费）',
     );
+  }
+
+  /// `/rewind [N]`：回滚 N 轮（缺省 1）的工作区文件状态；`/rewind list` 列出
+  /// 本会话可用检查点。只回滚文件、不动会话与对话（v1 语义）。
+  Future<void> _handleRewind(String arg) async {
+    final CheckpointManager? checkpoint =
+        _app.get<CheckpointManager>('checkpointManager');
+    if (checkpoint == null || !checkpoint.enabled) {
+      transcript.add(
+        TuiRole.system,
+        '检查点不可用：未装配或 [checkpoint] enabled = false。',
+      );
+      return;
+    }
+    if (busy) {
+      transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
+      return;
+    }
+    final String command = arg.trim();
+    if (command == 'list') {
+      _showCheckpoints(checkpoint);
+      return;
+    }
+    final int steps = int.tryParse(command) ?? 1;
+    try {
+      final CheckpointRewindResult? result = await checkpoint.rewind(steps);
+      if (result == null) {
+        transcript.add(TuiRole.system, '没有可回滚的检查点。');
+        return;
+      }
+      transcript.add(
+        TuiRole.system,
+        '已回滚工作区到第 ${result.turn} 轮（恢复 ${result.restore.restored}、'
+        '删除 ${result.restore.deleted} 个文件）。会话与对话未改动，'
+        '可让模型按当前文件状态继续或重做。',
+      );
+    } catch (error) {
+      transcript.add(TuiRole.system, '回滚失败：$error');
+    }
+  }
+
+  void _showCheckpoints(CheckpointManager checkpoint) {
+    final List<CheckpointInfo> infos = checkpoint.list();
+    if (infos.isEmpty) {
+      transcript.add(TuiRole.system, '没有可回滚的检查点。');
+      return;
+    }
+    final StringBuffer buffer = StringBuffer('本会话检查点（${infos.length}）：');
+    for (final CheckpointInfo info in infos) {
+      buffer.write('\n  turn ${info.turn}：${info.files} 个文件');
+    }
+    transcript.add(TuiRole.system, buffer.toString());
   }
 
   /// `/goal [子命令]`：管理当前会话的长期目标（不经模型，直接调 Goal 服务）。
@@ -1185,6 +1241,15 @@ class ConatusTuiController implements TuiUserPromptHost {
     _agent = ctx.agentLoop;
     _planMode = ctx.planMode;
     _goal = ctx.goal;
+    // 检查点：绑定会话即写 turn 0 初始快照（供回滚到「全部轮次之前」）。
+    final CheckpointManager? checkpoint =
+        _app.get<CheckpointManager>('checkpointManager');
+    if (checkpoint != null) {
+      final String? error = await checkpoint.reset(id);
+      if (error != null) {
+        transcript.add(TuiRole.system, error);
+      }
+    }
     // 权限模式按会话恢复：每个会话折叠自己的 permission/mode 后缀，
     // 同时清空审批门的「总是允许」清单（它也是会话级状态）。
     _gate?.resetAlwaysAllowed();
@@ -1222,6 +1287,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     _approvalGate = null;
     _teamSub?.dispose();
     _teamSub = null;
+    _app.get<CheckpointManager>('checkpointManager')?.detach();
     _sessionCtx?.dispose();
     _sessionCtx = null;
     _agent = null;
@@ -1244,6 +1310,15 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     // 轮次结束即空闲：让到期的提醒立刻交付，而不必等到下一次定时唤醒。
     _sessionCtx?.get<ScheduleRuntime>('scheduleRuntime')?.requestDrive();
+    // 检查点：收口后快照本轮工作区（失败只提示不打断）。
+    final CheckpointManager? checkpoint =
+        _app.get<CheckpointManager>('checkpointManager');
+    if (checkpoint != null) {
+      final String? error = await checkpoint.recordTurn();
+      if (error != null) {
+        transcript.add(TuiRole.system, error);
+      }
+    }
   }
 
   /// 调度交付：空闲时把提醒当作一轮用户输入投递，返回是否成功入队。

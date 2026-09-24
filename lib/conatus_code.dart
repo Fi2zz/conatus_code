@@ -12,12 +12,15 @@ export 'src/budget/budgeted_llm.dart'
 export 'src/budget/cost_tracker.dart'
     show CostTrackerImpl, kInputRatePerMillion, kOutputRatePerMillion;
 export 'src/budget/turn_budget.dart' show TurnBudget;
+export 'src/checkpoint/checkpoint_manager.dart' show CheckpointManager;
 export 'src/checkpoint/checkpoint_store.dart' show CheckpointStore;
 export 'src/checkpoint/checkpoint_types.dart'
     show
         CheckpointException,
+        CheckpointInfo,
         CheckpointManifest,
-        CheckpointRestore;
+        CheckpointRestore,
+        CheckpointRewindResult;
 export 'src/config/config_credentials.dart' show ConfigCredentials;
 export 'src/config/config_loader.dart' show ConfigException, loadConfig;
 export 'src/config/config_path.dart'

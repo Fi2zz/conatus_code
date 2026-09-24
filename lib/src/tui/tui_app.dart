@@ -20,6 +20,8 @@ import '../../providers.dart';
 import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
+import '../checkpoint/checkpoint_manager.dart';
+import '../checkpoint/checkpoint_store.dart';
 import '../config/config_schema.dart';
 import '../mcp/mcp_assembly.dart';
 import '../tools/code_tools.dart';
@@ -115,6 +117,7 @@ class ConatusTuiRuntime {
     List<McpServerSpec>? mcpServers,
     bool interactive = true,
     String? workdir,
+    CheckpointConfig? checkpoint,
   }) async {
     final Context app = Context.root(name: 'conatus');
     final String resolvedBaseDir =
@@ -303,6 +306,22 @@ class ConatusTuiRuntime {
     final String? projectContext = await loadProjectContext(resolvedWorkdir);
     if (projectContext != null) {
       prompt.section(PromptSection(name: 'project', text: () => projectContext));
+    }
+    // 检查点：每轮收口后快照工作区（见 checkpoint_manager.dart）。数据目录
+    // 取 baseDir（= workdir/projectDir），快照/恢复走 dart:io 直连。
+    if (checkpoint != null) {
+      app.provide(
+        'checkpointManager',
+        CheckpointManager(
+          store: CheckpointStore(
+            root: resolvedWorkdir,
+            projectDir: Directory(resolvedBaseDir).absolute.path,
+            keep: checkpoint.keep,
+            ignore: checkpoint.ignore,
+          ),
+          config: checkpoint,
+        ),
+      );
     }
     provideTimePrompt(app);
     provideMemory(

@@ -53,3 +53,25 @@ class CheckpointRestore {
   /// 删除的（当前有、检查点没有的）文件数。
   final int deleted;
 }
+
+/// 一个可用检查点的摘要（`/rewind list` 展示用）。
+class CheckpointInfo {
+  const CheckpointInfo({required this.turn, required this.files});
+
+  /// 轮次。
+  final int turn;
+
+  /// 该检查点快照的文件数。
+  final int files;
+}
+
+/// 一次回滚的结果：目标轮次 + 恢复计数。
+class CheckpointRewindResult {
+  const CheckpointRewindResult({required this.turn, required this.restore});
+
+  /// 实际回滚到的轮次。
+  final int turn;
+
+  /// 恢复计数。
+  final CheckpointRestore restore;
+}
