@@ -60,10 +60,12 @@ void main() {
     final (CheckpointStore store, String root, String projectDir) = _setup();
     _writeFixedStat(root, 'a.txt', 'AAAA');
     await store.snapshot('s1', 0);
-    // 用旧格式明文清单（files 为字符串路径、无 hash）覆盖 gz 清单。
-    final Directory dir = store.directoryOf('s1', 0);
-    File('${dir.path}${Platform.pathSeparator}manifest.json.gz').deleteSync();
-    File('${dir.path}${Platform.pathSeparator}manifest.json')
+    // 用旧格式明文清单（files 为字符串路径、无 hash）替换新归档。
+    store.archiveFile('s1', 0).deleteSync();
+    final String legacy = '$projectDir${Platform.pathSeparator}checkpoints'
+        '${Platform.pathSeparator}s1${Platform.pathSeparator}0';
+    Directory(legacy).createSync(recursive: true);
+    File('$legacy${Platform.pathSeparator}manifest.json')
         .writeAsStringSync('{"turn":0,"files":["a.txt"]}');
 
     _writeFixedStat(root, 'a.txt', 'BBBB');

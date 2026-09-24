@@ -1,10 +1,11 @@
-/// 工作区快照存储（delta 版）：turn 0 全量 base + 各轮相对 base 的差量。
+/// 工作区快照存储：每个检查点 = 单个 gzip 归档文件。
 ///
-/// 检查点目录：`<projectDir>/checkpoints/<sessionId>/<turn>/`，各含
-/// `manifest.json`（base：全量文件 + mtime/size；delta：changed/deleted）。
-/// base（turn 0）永不 prune——它是回滚正确性的锚；prune 只裁差量，保留最近
-/// `keep - 1` 个（`keep` 即回滚点数，`<=0` 不限）。恢复见
-/// `checkpoint_restore.dart`。
+/// 布局：`<projectDir>/checkpoints/<sessionId>/<turn>.gz`（**一个文件，不保留
+/// 目录结构**；内容压缩存储，非明文）。turn 0 全量 base + 各轮相对 base 差量
+/// （base 只存变化/新增文件 + 清单里的 deleted）。base（turn 0）永不 prune，
+/// prune 只裁差量、保留最近 `keep - 1` 个。旧版目录树检查点（`<turn>/`）读时
+/// 兼容。恢复见 `checkpoint_restore.dart`，归档编解码见
+/// `checkpoint_archive.dart`。
 library;
 
 import 'dart:convert';
@@ -12,6 +13,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
+import 'checkpoint_archive.dart';
 import 'checkpoint_paths.dart';
 import 'checkpoint_types.dart';
 
@@ -36,10 +38,18 @@ class CheckpointStore {
   /// 额外忽略的相对路径前缀。
   final List<String> ignore;
 
-  /// 某检查点目录。
-  Directory directoryOf(String sessionId, int turn) => Directory(
+  /// 某检查点的归档文件（新格式）。
+  File archiveFile(String sessionId, int turn) => File(
       '$projectDir${Platform.pathSeparator}checkpoints'
-      '${Platform.pathSeparator}$sessionId${Platform.pathSeparator}$turn');
+      '${Platform.pathSeparator}$sessionId${Platform.pathSeparator}$turn.gz');
+
+  /// 某检查点的旧版目录（格式迁移前的检查点；不存在返回 `null`）。
+  Directory? legacyDir(String sessionId, int turn) {
+    final Directory dir = Directory(
+        '$projectDir${Platform.pathSeparator}checkpoints'
+        '${Platform.pathSeparator}$sessionId${Platform.pathSeparator}$turn');
+    return dir.existsSync() ? dir : null;
+  }
 
   /// 快照当前工作区为 [turn] 轮（turn 0 全量 base，其余相对 base 差量）。
   Future<void> snapshot(
@@ -47,30 +57,32 @@ class CheckpointStore {
     int turn, {
     String? lastEventId,
   }) async {
-    final Directory dir = directoryOf(sessionId, turn);
-    if (dir.existsSync()) dir.deleteSync(recursive: true);
-    dir.createSync(recursive: true);
+    final File target = archiveFile(sessionId, turn);
     if (turn == 0) {
-      await _snapshotBase(sessionId, dir, lastEventId);
+      await _snapshotBase(sessionId, target, lastEventId);
     } else {
-      await _snapshotDelta(sessionId, turn, dir, lastEventId);
+      await _snapshotDelta(sessionId, turn, target, lastEventId);
     }
+    // 清掉同轮的旧版目录（格式迁移）。
+    legacyDir(sessionId, turn)?.deleteSync(recursive: true);
     prune(sessionId);
   }
 
   Future<void> _snapshotBase(
     String sessionId,
-    Directory dir,
+    File target,
     String? lastEventId,
   ) async {
     final List<CheckpointFileEntry> entries = <CheckpointFileEntry>[];
+    final List<CheckpointArchiveEntry> blobs = <CheckpointArchiveEntry>[];
     await for (final FileSystemEntity entity
         in Directory(root).list(recursive: true, followLinks: false)) {
       if (entity is! File) continue;
       final String rel = checkpointRelativeTo(entity, root);
       if (checkpointExcluded(rel, projectRel, ignore)) continue;
       final FileStat stat = entity.statSync();
-      await checkpointWriteGz(await entity.readAsBytes(), dir.path, rel);
+      final List<int> bytes = await entity.readAsBytes();
+      blobs.add((rel, bytes));
       entries.add(CheckpointFileEntry(
         path: rel,
         mtimeMs: stat.modified.millisecondsSinceEpoch,
@@ -78,17 +90,22 @@ class CheckpointStore {
         hash: _sha256(entity.path),
       ));
     }
-    await _writeManifest(
-      sessionId,
-      dir,
-      CheckpointManifest(kind: 'base', turn: 0, lastEventId: lastEventId, files: entries),
+    await writeCheckpointArchive(
+      target,
+      CheckpointManifest(
+        kind: 'base',
+        turn: 0,
+        lastEventId: lastEventId,
+        files: entries,
+      ),
+      blobs,
     );
   }
 
   Future<void> _snapshotDelta(
     String sessionId,
     int turn,
-    Directory dir,
+    File target,
     String? lastEventId,
   ) async {
     final CheckpointManifest base = manifestOf(sessionId, 0);
@@ -97,6 +114,7 @@ class CheckpointStore {
       for (final CheckpointFileEntry entry in base.files) entry.path: entry,
     };
     final List<String> changed = <String>[];
+    final List<CheckpointArchiveEntry> blobs = <CheckpointArchiveEntry>[];
     final Set<String> current = <String>{};
     await for (final FileSystemEntity entity
         in Directory(root).list(recursive: true, followLinks: false)) {
@@ -113,7 +131,7 @@ class CheckpointStore {
           !statChanged &&
           (old.hash == null || old.hash != _sha256(entity.path));
       if (statChanged || contentChanged) {
-        await checkpointWriteGz(await entity.readAsBytes(), dir.path, rel);
+        blobs.add((rel, await entity.readAsBytes()));
         changed.add(rel);
       }
     }
@@ -121,9 +139,8 @@ class CheckpointStore {
       for (final String path in baseStats.keys)
         if (!current.contains(path)) path,
     ];
-    await _writeManifest(
-      sessionId,
-      dir,
+    await writeCheckpointArchive(
+      target,
       CheckpointManifest(
         kind: 'delta',
         turn: turn,
@@ -131,35 +148,31 @@ class CheckpointStore {
         changed: changed,
         deleted: deleted,
       ),
+      blobs,
     );
   }
 
-  Future<void> _writeManifest(
-    String sessionId,
-    Directory dir,
-    CheckpointManifest manifest,
-  ) async {
-    await checkpointWriteGz(
-      utf8.encode(jsonEncode(manifest.toJson())),
-      dir.path,
-      'manifest.json',
-    );
-  }
-
-  /// 读某检查点的清单（gzip；旧明文清单自动回退）；缺失抛异常。
+  /// 读某检查点的清单（新归档头部；旧版目录清单自动回退）；缺失抛异常。
   CheckpointManifest manifestOf(String sessionId, int turn) {
-    final File gz = File(
-        '${directoryOf(sessionId, turn).path}${Platform.pathSeparator}manifest.json.gz');
-    final File plain = File(
-        '${directoryOf(sessionId, turn).path}${Platform.pathSeparator}manifest.json');
-    if (!gz.existsSync() && !plain.existsSync()) {
-      throw CheckpointException('missing-manifest', '检查点 $turn 缺少清单');
+    final File archive = archiveFile(sessionId, turn);
+    if (archive.existsSync()) {
+      return readCheckpointArchive(archive).$1;
     }
-    final List<int> bytes = gz.existsSync()
-        ? gzip.decode(gz.readAsBytesSync())
-        : plain.readAsBytesSync();
-    final Object? json = jsonDecode(utf8.decode(bytes));
-    return CheckpointManifest.fromJson(json as Map<String, Object?>);
+    final Directory? legacy = legacyDir(sessionId, turn);
+    if (legacy != null) {
+      final File gz =
+          File('${legacy.path}${Platform.pathSeparator}manifest.json.gz');
+      final File plain =
+          File('${legacy.path}${Platform.pathSeparator}manifest.json');
+      if (gz.existsSync() || plain.existsSync()) {
+        final List<int> bytes = gz.existsSync()
+            ? gzip.decode(gz.readAsBytesSync())
+            : plain.readAsBytesSync();
+        return CheckpointManifest.fromJson(
+            jsonDecode(utf8.decode(bytes)) as Map<String, Object?>);
+      }
+    }
+    throw CheckpointException('missing-manifest', '检查点 $turn 缺少清单');
   }
 
   /// 现有检查点的摘要（turn 升序 + 有效文件数）。
@@ -172,7 +185,8 @@ class CheckpointStore {
     };
     return <CheckpointInfo>[
       for (final int turn in turns)
-        CheckpointInfo(turn: turn, files: _effectiveCount(basePaths, turn, sessionId)),
+        CheckpointInfo(
+            turn: turn, files: _effectiveCount(basePaths, turn, sessionId)),
     ];
   }
 
@@ -185,15 +199,18 @@ class CheckpointStore {
     return count;
   }
 
-  /// 现有检查点的轮次（升序）。
+  /// 现有检查点的轮次（升序；兼容旧版目录）。
   List<int> turnsOf(String sessionId) {
     final Directory dir = Directory('$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}$sessionId');
     if (!dir.existsSync()) return const <int>[];
     final List<int> turns = <int>[];
     for (final FileSystemEntity entity in dir.listSync()) {
-      if (entity is! Directory) continue;
-      final int? turn = int.tryParse(entity.path.split(Platform.pathSeparator).last);
+      final String name = entity.path.split(Platform.pathSeparator).last;
+      final String stem = name.endsWith('.gz')
+          ? name.substring(0, name.length - '.gz'.length)
+          : name;
+      final int? turn = int.tryParse(stem);
       if (turn != null) turns.add(turn);
     }
     turns.sort();
@@ -207,8 +224,14 @@ class CheckpointStore {
         turnsOf(sessionId).where((int turn) => turn > 0).toList();
     final int excess = deltas.length - (keep - 1);
     for (int index = 0; index < excess; index++) {
-      directoryOf(sessionId, deltas[index]).deleteSync(recursive: true);
+      _deleteTurn(sessionId, deltas[index]);
     }
+  }
+
+  void _deleteTurn(String sessionId, int turn) {
+    final File archive = archiveFile(sessionId, turn);
+    if (archive.existsSync()) archive.deleteSync();
+    legacyDir(sessionId, turn)?.deleteSync(recursive: true);
   }
 
   /// `projectDir` 相对 [root] 的路径（排除按相对路径比较）。

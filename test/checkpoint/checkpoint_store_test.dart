@@ -75,16 +75,17 @@ void main() {
     expect(delta.isDelta, isTrue);
     expect(delta.changed, unorderedEquals(<String>['a.txt', 'c.txt']));
     expect(delta.deleted, <String>['b.txt']);
-    // 差量目录只存 changed 文件（gzip 压缩存储）。
-    final String deltaDir = '$projectDir${Platform.pathSeparator}checkpoints'
-        '${Platform.pathSeparator}s1${Platform.pathSeparator}1';
+    // 每个检查点是单个归档文件（1.gz），内容压缩非明文。
+    final String turnDir = '$projectDir${Platform.pathSeparator}checkpoints'
+        '${Platform.pathSeparator}s1';
+    expect(File('$turnDir${Platform.pathSeparator}1.gz').existsSync(), isTrue);
+    expect(File('$turnDir${Platform.pathSeparator}0.gz').existsSync(), isTrue);
     expect(
-        File('$deltaDir${Platform.pathSeparator}a.txt.gz').existsSync(), isTrue);
-    expect(
-        File('$deltaDir${Platform.pathSeparator}b.txt.gz').existsSync(), isFalse);
-    // 内容不以明文落盘。
+      Directory('$turnDir${Platform.pathSeparator}1').existsSync(),
+      isFalse,
+    );
     final List<int> raw =
-        File('$deltaDir${Platform.pathSeparator}a.txt.gz').readAsBytesSync();
+        File('$turnDir${Platform.pathSeparator}1.gz').readAsBytesSync();
     expect(utf8.decode(raw, allowMalformed: true).contains('v1'), isFalse);
     // list 有效文件数 = base(2) + changed新增(1) - deleted(1) = 2。
     expect(store.list('s1').last.files, 2);
@@ -127,10 +128,7 @@ void main() {
       throwsA(isA<CheckpointException>()),
     );
     await store.snapshot('s1', 0);
-    File(
-        '$projectDir${Platform.pathSeparator}checkpoints'
-        '${Platform.pathSeparator}s1${Platform.pathSeparator}0'
-        '${Platform.pathSeparator}manifest.json.gz').deleteSync();
+    store.archiveFile('s1', 0).deleteSync();
     expect(
       () => store.manifestOf('s1', 0),
       throwsA(isA<CheckpointException>()),
@@ -139,9 +137,10 @@ void main() {
 
   test('旧格式兼容：无 kind 的清单按 base 读（files 为字符串路径）', () {
     final (CheckpointStore store, _, String projectDir) = _setup();
-    final Directory dir = store.directoryOf('s1', 0);
-    dir.createSync(recursive: true);
-    File('${dir.path}${Platform.pathSeparator}manifest.json')
+    final String legacy = '$projectDir${Platform.pathSeparator}checkpoints'
+        '${Platform.pathSeparator}s1${Platform.pathSeparator}0';
+    Directory(legacy).createSync(recursive: true);
+    File('$legacy${Platform.pathSeparator}manifest.json')
         .writeAsStringSync('{"turn":0,"files":["a.txt","b.txt"]}');
 
     final CheckpointManifest manifest = store.manifestOf('s1', 0);
