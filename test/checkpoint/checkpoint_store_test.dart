@@ -1,4 +1,4 @@
-/// CheckpointStore：快照 / 恢复 / prune / 清单 / 排除项（真实临时目录）。
+/// CheckpointStore（delta 版）：base 全量 + 差量、prune、list、旧格式兼容。
 library;
 
 import 'dart:io';
@@ -23,25 +23,18 @@ import 'package:test/test.dart';
   );
 }
 
-/// 在 [root] 下写文件；[content] 为 null 表示删除。
-void _write(String root, String rel, String? content) {
+void _write(String root, String rel, String content) {
   final File file = File('$root${Platform.pathSeparator}$rel');
-  if (content == null) {
-    if (file.existsSync()) file.deleteSync();
-    return;
-  }
   file.parent.createSync(recursive: true);
   file.writeAsStringSync(content);
 }
 
-String _read(String root, String rel) =>
-    File('$root${Platform.pathSeparator}$rel').readAsStringSync();
-
-bool _exists(String root, String rel) =>
-    File('$root${Platform.pathSeparator}$rel').existsSync();
+/// 强制文件的 mtime/size 变化（写不同内容即可触发 delta 复制）。
+void _touch(String root, String rel, String content) =>
+    _write(root, rel, content);
 
 void main() {
-  test('快照复制文件、跳过 .git/.conatus/ignore/符号链接，写 manifest', () async {
+  test('turn 0 全量 base（含 mtime/size），跳过排除项，写 manifest', () async {
     final (CheckpointStore store, String root, String projectDir) = _setup(
       ignore: const <String>['node_modules'],
     );
@@ -50,70 +43,80 @@ void main() {
     _write(root, '.git/config', 'not-snapshotted');
     _write(root, 'node_modules/pkg/index.js', 'skip');
     _write(root, '.conatus/secret.json', 'skip');
-    final Link link = Link('$root${Platform.pathSeparator}link.dart');
-    link.createSync('lib/main.dart');
 
-    await store.snapshot('s1', 1, lastEventId: 'ev-99');
+    await store.snapshot('s1', 0, lastEventId: 'ev-0');
 
-    final List<int> turns = store.list('s1');
-    expect(turns, <int>[1]);
-    final CheckpointManifest manifest = store.manifestOf('s1', 1);
+    final List<CheckpointInfo> infos = store.list('s1');
+    expect(infos.single.turn, 0);
+    expect(infos.single.files, 2);
+    final CheckpointManifest base = store.manifestOf('s1', 0);
+    expect(base.isDelta, isFalse);
+    expect(base.lastEventId, 'ev-0');
     expect(
-      manifest.files,
+      base.files.map((CheckpointFileEntry e) => e.path),
       unorderedEquals(<String>['lib/main.dart', 'README.md']),
     );
-    expect(manifest.lastEventId, 'ev-99');
-    final String cpDir = '$projectDir${Platform.pathSeparator}checkpoints'
-        '${Platform.pathSeparator}s1${Platform.pathSeparator}1';
-    expect(File('$cpDir${Platform.pathSeparator}lib/main.dart').existsSync(), isTrue);
-    expect(
-        File('$cpDir${Platform.pathSeparator}.git/config').existsSync(), isFalse);
-    expect(
-        File('$cpDir${Platform.pathSeparator}node_modules/pkg/index.js')
-            .existsSync(),
-        isFalse);
+    expect(base.files.every((CheckpointFileEntry e) => e.size > 0), isTrue);
   });
 
-  test('恢复：覆盖被改文件、删除新增文件、补回被删文件', () async {
+  test('turn 1 差量：只存变化/新增文件，deleted 记录删除', () async {
     final (CheckpointStore store, String root, String projectDir) = _setup();
-    _write(root, 'a.txt', 'v1');
-    _write(root, 'b.txt', 'b1');
+    _write(root, 'a.txt', 'v0');
+    _write(root, 'b.txt', 'b0');
+    await store.snapshot('s1', 0);
+
+    _touch(root, 'a.txt', 'v1'); // 变化
+    _write(root, 'c.txt', 'new'); // 新增
+    File('$root${Platform.pathSeparator}b.txt').deleteSync(); // 删除
+    await store.snapshot('s1', 1, lastEventId: 'ev-1');
+
+    final CheckpointManifest delta = store.manifestOf('s1', 1);
+    expect(delta.isDelta, isTrue);
+    expect(delta.changed, unorderedEquals(<String>['a.txt', 'c.txt']));
+    expect(delta.deleted, <String>['b.txt']);
+    // 差量目录只存 changed 文件。
+    final String deltaDir = '$projectDir${Platform.pathSeparator}checkpoints'
+        '${Platform.pathSeparator}s1${Platform.pathSeparator}1';
+    expect(File('$deltaDir${Platform.pathSeparator}a.txt').existsSync(), isTrue);
+    expect(File('$deltaDir${Platform.pathSeparator}b.txt').existsSync(), isFalse);
+    // list 有效文件数 = base(2) + changed新增(1) - deleted(1) = 2。
+    expect(store.list('s1').last.files, 2);
+  });
+
+  test('mtime+size 不变的文件不进差量（不重复复制）', () async {
+    final (CheckpointStore store, String root, String projectDir) = _setup();
+    _write(root, 'a.txt', 'same');
+    await store.snapshot('s1', 0);
     await store.snapshot('s1', 1);
 
-    // 模型改乱了：a 被改、b 被删、c 是新增。
-    _write(root, 'a.txt', 'v2-broken');
-    _write(root, 'b.txt', null);
-    _write(root, 'c.txt', 'extra');
-
-    final CheckpointRestore result = await store.restore('s1', 1);
-
-    expect(result.restored, 2); // a.txt 覆盖 + b.txt 补回
-    expect(result.deleted, 1); // c.txt 删除
-    expect(_read(root, 'a.txt'), 'v1');
-    expect(_read(root, 'b.txt'), 'b1');
-    expect(_exists(root, 'c.txt'), isFalse);
+    final CheckpointManifest delta = store.manifestOf('s1', 1);
+    expect(delta.changed, isEmpty);
+    expect(delta.deleted, isEmpty);
   });
 
-  test('prune 保留最近 keep 个；keep<=0 不裁剪', () async {
+  test('prune 保留 base + 最近 keep-1 个差量；keep<=0 不裁剪', () async {
     final (CheckpointStore store, String root, String projectDir) =
-        _setup(keep: 2);
-    for (int turn = 0; turn < 5; turn++) {
-      _write(root, 'f$turn.txt', 'x');
+        _setup(keep: 3);
+    _write(root, 'a.txt', 'v0');
+    await store.snapshot('s1', 0);
+    for (int turn = 1; turn < 5; turn++) {
+      _write(root, 'a.txt', 'v$turn');
       await store.snapshot('s1', turn);
     }
-    expect(store.list('s1'), <int>[3, 4]);
+    expect(store.turnsOf('s1'), <int>[0, 3, 4]);
 
     final (CheckpointStore unlimited, _, _) = _setup(keep: 0);
-    for (int turn = 0; turn < 3; turn++) {
+    await unlimited.snapshot('s2', 0);
+    for (int turn = 1; turn < 4; turn++) {
       await unlimited.snapshot('s2', turn);
     }
-    expect(unlimited.list('s2'), <int>[0, 1, 2]);
+    expect(unlimited.turnsOf('s2'), <int>[0, 1, 2, 3]);
   });
 
   test('缺失检查点 / 缺失清单抛 CheckpointException', () async {
     final (CheckpointStore store, _, String projectDir) = _setup();
     expect(
-      () => store.restore('s1', 9),
+      () => store.manifestOf('s1', 9),
       throwsA(isA<CheckpointException>()),
     );
     await store.snapshot('s1', 0);
@@ -127,31 +130,35 @@ void main() {
     );
   });
 
-  test('空工作区快照：清单为空，恢复计数为 0，lastEventId 缺省为 null', () async {
-    final (CheckpointStore store, String root, String projectDir) = _setup();
-    await store.snapshot('s1', 0);
+  test('旧格式兼容：无 kind 的清单按 base 读（files 为字符串路径）', () {
+    final (CheckpointStore store, _, String projectDir) = _setup();
+    final Directory dir = store.directoryOf('s1', 0);
+    dir.createSync(recursive: true);
+    File('${dir.path}${Platform.pathSeparator}manifest.json')
+        .writeAsStringSync('{"turn":0,"files":["a.txt","b.txt"]}');
+
     final CheckpointManifest manifest = store.manifestOf('s1', 0);
-    expect(manifest.files, isEmpty);
-    expect(manifest.lastEventId, isNull);
-    final CheckpointRestore result = await store.restore('s1', 0);
-    expect(result.restored, 0);
-    expect(result.deleted, 0);
+    expect(manifest.isDelta, isFalse);
+    expect(
+      manifest.files.map((CheckpointFileEntry e) => e.path),
+      unorderedEquals(<String>['a.txt', 'b.txt']),
+    );
   });
 
-  test('恢复不触碰排除项（.git / .conatus）', () async {
+  test('符号链接跳过；空工作区 base 清单为空', () async {
     final (CheckpointStore store, String root, String projectDir) = _setup();
-    _write(root, 'a.txt', 'v1');
-    _write(root, '.git/config', 'git-state');
-    await store.snapshot('s1', 1);
+    _write(root, 'a.txt', 'x');
+    final Link link = Link('$root${Platform.pathSeparator}link.txt');
+    link.createSync('$root${Platform.pathSeparator}a.txt');
 
-    _write(root, 'a.txt', 'v2');
-    _write(root, '.git/config', 'new-git-state');
-    _write(root, '.conatus/new.json', 'new-data');
+    await store.snapshot('s1', 0);
 
-    await store.restore('s1', 1);
+    final CheckpointManifest base = store.manifestOf('s1', 0);
+    expect(base.files.map((CheckpointFileEntry e) => e.path),
+        <String>['a.txt']);
 
-    expect(_read(root, 'a.txt'), 'v1');
-    expect(_read(root, '.git/config'), 'new-git-state'); // 不动
-    expect(_read(root, '.conatus/new.json'), 'new-data'); // 不动
+    final (CheckpointStore emptyStore, _, _) = _setup();
+    await emptyStore.snapshot('s2', 0);
+    expect(emptyStore.manifestOf('s2', 0).files, isEmpty);
   });
 }

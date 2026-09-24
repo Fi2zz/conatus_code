@@ -1,21 +1,19 @@
-/// 工作区文件快照存储：快照 / 恢复 / 保留 / 清单，dart:io 直连。
+/// 工作区快照存储（delta 版）：turn 0 全量 base + 各轮相对 base 的差量。
 ///
-/// 快照与恢复都**不经 `'fs'` 接缝**（fs jail 是模型面的守卫；checkpoint 是应用
-/// 级维护操作，与 recovery/sessions 同一信任域）。每个检查点是
-/// `<projectDir>/checkpoints/<sessionId>/<turn>/` 下的一份完整文件复制 +
-/// `manifest.json`。
-///
-/// 不用硬链接：模型经 `run_command` 原地写文件（`sed -i` 等）会共享 inode、
-/// 把快照内容也改掉——只有原子写（rename）才有写时复制，无法保证。普通复制
-/// 正确性优先。
+/// 检查点目录：`<projectDir>/checkpoints/<sessionId>/<turn>/`，各含
+/// `manifest.json`（base：全量文件 + mtime/size；delta：changed/deleted）。
+/// base（turn 0）永不 prune——它是回滚正确性的锚；prune 只裁差量，保留最近
+/// `keep - 1` 个（`keep` 即回滚点数，`<=0` 不限）。恢复见
+/// `checkpoint_restore.dart`。
 library;
 
 import 'dart:convert';
 import 'dart:io';
 
+import 'checkpoint_paths.dart';
 import 'checkpoint_types.dart';
 
-/// 工作区文件快照存储。
+/// 工作区快照存储。
 class CheckpointStore {
   CheckpointStore({
     required String root,
@@ -24,86 +22,124 @@ class CheckpointStore {
     this.ignore = const <String>[],
   }) : root = Directory(root).absolute.path;
 
-  /// 工作区根（sandbox 根，构造时归一化为绝对路径）。
+  /// 工作区根（构造时归一化为绝对路径）。
   final String root;
 
   /// 项目数据目录（相对 [root]，缺省 `.conatus`）；连同其整树排除在快照外。
   final String projectDir;
 
-  /// 每会话保留的检查点数；`<=0` 不限制。
+  /// 回滚点数（含 base）；`<=0` 不限制。
   final int keep;
 
-  /// 额外忽略的相对路径前缀（如 `node_modules` / `build/`）。
+  /// 额外忽略的相对路径前缀。
   final List<String> ignore;
 
-  Directory _dir(String sessionId, int turn) => Directory(
+  /// 某检查点目录。
+  Directory directoryOf(String sessionId, int turn) => Directory(
       '$projectDir${Platform.pathSeparator}checkpoints'
       '${Platform.pathSeparator}$sessionId${Platform.pathSeparator}$turn');
 
-  /// 快照当前工作区为 [turn] 轮；写完后 prune 保留最近 [keep] 个。
-  ///
-  /// [lastEventId] 是快照时刻该会话的最后一条事件 id（对话回滚的 fork 切点），
-  /// 由调用方（manager）从会话传入。
+  /// 快照当前工作区为 [turn] 轮（turn 0 全量 base，其余相对 base 差量）。
   Future<void> snapshot(
     String sessionId,
     int turn, {
     String? lastEventId,
   }) async {
-    final Directory dir = _dir(sessionId, turn);
+    final Directory dir = directoryOf(sessionId, turn);
     if (dir.existsSync()) dir.deleteSync(recursive: true);
     dir.createSync(recursive: true);
-    final List<String> files = <String>[];
-    await for (final FileSystemEntity entity
-        in Directory(root).list(recursive: true, followLinks: false)) {
-      if (entity is! File) continue;
-      final String rel = _relativeTo(entity, root);
-      if (_excluded(rel)) continue;
-      final File target = File('${dir.path}${Platform.pathSeparator}$rel');
-      target.parent.createSync(recursive: true);
-      await entity.copy(target.path);
-      files.add(rel);
+    if (turn == 0) {
+      await _snapshotBase(sessionId, dir, lastEventId);
+    } else {
+      await _snapshotDelta(sessionId, turn, dir, lastEventId);
     }
-    File('${dir.path}${Platform.pathSeparator}manifest.json')
-        .writeAsStringSync(jsonEncode(
-      CheckpointManifest(turn: turn, files: files, lastEventId: lastEventId)
-          .toJson(),
-    ));
     prune(sessionId);
   }
 
-  /// 把工作区恢复到 [turn] 轮：清单文件覆盖回当前、当前多出的文件删除。
-  Future<CheckpointRestore> restore(String sessionId, int turn) async {
-    final Directory dir = _dir(sessionId, turn);
-    if (!dir.existsSync()) {
-      throw CheckpointException(
-          'missing-checkpoint', '检查点 $turn 不存在（会话 $sessionId）');
-    }
-    final CheckpointManifest manifest = manifestOf(sessionId, turn);
-    final Set<String> tracked = manifest.files.toSet();
-    for (final String rel in manifest.files) {
-      final File src = File('${dir.path}${Platform.pathSeparator}$rel');
-      final File dst = File('$root${Platform.pathSeparator}$rel');
-      dst.parent.createSync(recursive: true);
-      await src.copy(dst.path);
-    }
-    final List<File> extra = <File>[];
+  Future<void> _snapshotBase(
+    String sessionId,
+    Directory dir,
+    String? lastEventId,
+  ) async {
+    final List<CheckpointFileEntry> entries = <CheckpointFileEntry>[];
     await for (final FileSystemEntity entity
         in Directory(root).list(recursive: true, followLinks: false)) {
       if (entity is! File) continue;
-      final String rel = _relativeTo(entity, root);
-      if (_excluded(rel) || tracked.contains(rel)) continue;
-      extra.add(entity);
+      final String rel = checkpointRelativeTo(entity, root);
+      if (checkpointExcluded(rel, projectRel, ignore)) continue;
+      final FileStat stat = entity.statSync();
+      final File target = File('${dir.path}${Platform.pathSeparator}$rel');
+      target.parent.createSync(recursive: true);
+      await entity.copy(target.path);
+      entries.add(CheckpointFileEntry(
+        path: rel,
+        mtimeMs: stat.modified.millisecondsSinceEpoch,
+        size: stat.size,
+      ));
     }
-    for (final File file in extra) {
-      file.deleteSync();
-    }
-    return CheckpointRestore(restored: manifest.files.length, deleted: extra.length);
+    _writeManifest(
+      sessionId,
+      dir,
+      CheckpointManifest(kind: 'base', turn: 0, lastEventId: lastEventId, files: entries),
+    );
   }
 
-  /// 读某检查点的清单；清单缺失抛 [CheckpointException]。
+  Future<void> _snapshotDelta(
+    String sessionId,
+    int turn,
+    Directory dir,
+    String? lastEventId,
+  ) async {
+    final CheckpointManifest base = manifestOf(sessionId, 0);
+    final Map<String, CheckpointFileEntry> baseStats =
+        <String, CheckpointFileEntry>{
+      for (final CheckpointFileEntry entry in base.files) entry.path: entry,
+    };
+    final List<String> changed = <String>[];
+    final Set<String> current = <String>{};
+    await for (final FileSystemEntity entity
+        in Directory(root).list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final String rel = checkpointRelativeTo(entity, root);
+      if (checkpointExcluded(rel, projectRel, ignore)) continue;
+      current.add(rel);
+      final FileStat stat = entity.statSync();
+      final CheckpointFileEntry? old = baseStats[rel];
+      if (old == null ||
+          old.size != stat.size ||
+          old.mtimeMs != stat.modified.millisecondsSinceEpoch) {
+        final File target = File('${dir.path}${Platform.pathSeparator}$rel');
+        target.parent.createSync(recursive: true);
+        await entity.copy(target.path);
+        changed.add(rel);
+      }
+    }
+    final List<String> deleted = <String>[
+      for (final String path in baseStats.keys)
+        if (!current.contains(path)) path,
+    ];
+    _writeManifest(
+      sessionId,
+      dir,
+      CheckpointManifest(
+        kind: 'delta',
+        turn: turn,
+        lastEventId: lastEventId,
+        changed: changed,
+        deleted: deleted,
+      ),
+    );
+  }
+
+  void _writeManifest(String sessionId, Directory dir, CheckpointManifest manifest) {
+    File('${dir.path}${Platform.pathSeparator}manifest.json')
+        .writeAsStringSync(jsonEncode(manifest.toJson()));
+  }
+
+  /// 读某检查点的清单；缺失抛 [CheckpointException]。
   CheckpointManifest manifestOf(String sessionId, int turn) {
     final File file = File(
-        '${_dir(sessionId, turn).path}${Platform.pathSeparator}manifest.json');
+        '${directoryOf(sessionId, turn).path}${Platform.pathSeparator}manifest.json');
     if (!file.existsSync()) {
       throw CheckpointException('missing-manifest', '检查点 $turn 缺少清单');
     }
@@ -111,61 +147,62 @@ class CheckpointStore {
     return CheckpointManifest.fromJson(json as Map<String, Object?>);
   }
 
+  /// 现有检查点的摘要（turn 升序 + 有效文件数）。
+  List<CheckpointInfo> list(String sessionId) {
+    final List<int> turns = turnsOf(sessionId);
+    if (turns.isEmpty) return const <CheckpointInfo>[];
+    final Set<String> basePaths = <String>{
+      for (final CheckpointFileEntry entry in manifestOf(sessionId, 0).files)
+        entry.path,
+    };
+    return <CheckpointInfo>[
+      for (final int turn in turns)
+        CheckpointInfo(turn: turn, files: _effectiveCount(basePaths, turn, sessionId)),
+    ];
+  }
+
+  int _effectiveCount(Set<String> basePaths, int turn, String sessionId) {
+    final CheckpointManifest manifest = manifestOf(sessionId, turn);
+    if (!manifest.isDelta) return manifest.files.length;
+    final Set<String> deleted = manifest.deleted.toSet();
+    int count = basePaths.where((String p) => !deleted.contains(p)).length;
+    count += manifest.changed.where((String p) => !basePaths.contains(p)).length;
+    return count;
+  }
+
   /// 现有检查点的轮次（升序）。
-  List<int> list(String sessionId) {
-    final Directory dir = Directory(
-        '$projectDir${Platform.pathSeparator}checkpoints'
+  List<int> turnsOf(String sessionId) {
+    final Directory dir = Directory('$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}$sessionId');
     if (!dir.existsSync()) return const <int>[];
     final List<int> turns = <int>[];
     for (final FileSystemEntity entity in dir.listSync()) {
       if (entity is! Directory) continue;
-      final String name = entity.path.split(Platform.pathSeparator).last;
-      final int? turn = int.tryParse(name);
+      final int? turn = int.tryParse(entity.path.split(Platform.pathSeparator).last);
       if (turn != null) turns.add(turn);
     }
     turns.sort();
     return turns;
   }
 
-  /// 保留最近 [keep] 个检查点；[keep] 非正时不裁剪。
+  /// 保留 turn 0（base）+ 最近 `keep - 1` 个差量；[keep] 非正不裁剪。
   void prune(String sessionId) {
     if (keep <= 0) return;
-    final List<int> turns = list(sessionId);
-    final int excess = turns.length - keep;
+    final List<int> deltas =
+        turnsOf(sessionId).where((int turn) => turn > 0).toList();
+    final int excess = deltas.length - (keep - 1);
     for (int index = 0; index < excess; index++) {
-      _dir(sessionId, turns[index]).deleteSync(recursive: true);
+      directoryOf(sessionId, deltas[index]).deleteSync(recursive: true);
     }
   }
 
-  bool _excluded(String rel) {
-    if (_under(rel, _projectRel) || _under(rel, '.git')) return true;
-    for (final String prefix in ignore) {
-      if (_under(rel, prefix)) return true;
-    }
-    return false;
-  }
-
-  /// `projectDir` 相对 [root] 的相对路径（排除项按相对路径比较）。
-  String get _projectRel {
+  /// `projectDir` 相对 [root] 的路径（排除按相对路径比较）。
+  String get projectRel {
     final String sep = Platform.pathSeparator;
     final String absRoot = root.endsWith(sep) ? root : '$root$sep';
     if (projectDir.startsWith(absRoot)) {
       return projectDir.substring(absRoot.length);
     }
     return projectDir;
-  }
-
-  bool _under(String rel, String prefix) {
-    final String p = prefix.replaceAll(RegExp(r'[/\\]+$'), '');
-    return rel == p || rel.startsWith('$p${Platform.pathSeparator}');
-  }
-
-  static String _relativeTo(FileSystemEntity entity, String root) {
-    final String normalized = root.replaceAll(RegExp(r'[/\\]+$'), '');
-    final List<String> rootSegs =
-        normalized.split(Platform.pathSeparator).where((String s) => s.isNotEmpty).toList();
-    final List<String> entitySegs = entity.uri.pathSegments;
-    return entitySegs.sublist(rootSegs.length).join(Platform.pathSeparator);
   }
 }

@@ -7,6 +7,7 @@
 library;
 
 import '../config/config_schema.dart';
+import 'checkpoint_restore.dart';
 import 'checkpoint_store.dart';
 import 'checkpoint_types.dart';
 
@@ -63,17 +64,11 @@ class CheckpointManager {
     }
   }
 
-  /// 可用检查点摘要（轮次升序）。
+  /// 可用检查点摘要（轮次升序，含有效文件数）。
   List<CheckpointInfo> list() {
     final String? id = _sessionId;
     if (id == null || !enabled) return const <CheckpointInfo>[];
-    return <CheckpointInfo>[
-      for (final int turn in _store.list(id))
-        CheckpointInfo(
-          turn: turn,
-          files: _store.manifestOf(id, turn).files.length,
-        ),
-    ];
+    return _store.list(id);
   }
 
   /// 回滚 [steps] 轮（缺省 1）：目标 = 当前轮次 - steps，钳制到最早检查点。
@@ -82,14 +77,17 @@ class CheckpointManager {
   Future<CheckpointRewindResult?> rewind(int steps) async {
     final String? id = _sessionId;
     if (id == null || !enabled) return null;
-    final List<int> turns = _store.list(id);
-    if (turns.isEmpty) return null;
+    final List<CheckpointInfo> infos = _store.list(id);
+    if (infos.isEmpty) return null;
+    final List<int> turns = <int>[
+      for (final CheckpointInfo info in infos) info.turn,
+    ];
     final int back = steps < 1 ? 1 : steps;
     final int target = turns.length > back
         ? turns[turns.length - 1 - back]
         : turns.first;
     final CheckpointManifest manifest = _store.manifestOf(id, target);
-    final CheckpointRestore restore = await _store.restore(id, target);
+    final CheckpointRestore restore = await restoreCheckpoint(_store, id, target);
     return CheckpointRewindResult(
       turn: target,
       restore: restore,
