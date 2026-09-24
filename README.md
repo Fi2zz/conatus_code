@@ -121,8 +121,9 @@ keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不�
 
 每轮收口后对工作区文件做快照：**turn 0 全量 base + 各轮相对 base 的差量**
 （只复制变化/新增文件，删除记入清单），存到 `<项目数据目录>/checkpoints/
-<会话>/<turn>/`（排除 `.conatus` / `.git` 与 `[checkpoint] ignore` 前缀），
-清单同时记录快照时刻的对话切点事件 id。`/rewind [N]` 把工作区恢复到 N 轮前
+<会话>/<turn>/`——**快照文件与清单均以 gzip 压缩（`.gz`）落盘**，内容不以明文
+显示（排除 `.conatus` / `.git` 与 `[checkpoint] ignore` 前缀）；清单记录
+快照时刻的对话切点事件 id。`/rewind [N]` 把工作区恢复到 N 轮前
 （缺省 1）的文件状态，**并同步把对话回滚到该轮**：从切点事件 `Session.fork`
 出新会话（append-only 不变式，旧会话保留为记录），`/rewind list` 查看本会话
 可用检查点。快照/恢复走应用级 dart:io，不受 fs jail 约束；`/rewind` 是用户

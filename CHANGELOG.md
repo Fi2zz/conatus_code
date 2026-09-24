@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- checkpoint 存储改 **gzip 压缩**：快照文件与清单均以 `.gz` 落盘（`dart:io`
+  内置 GZipCodec，零新依赖），内容不以明文显示；读时自动回退旧明文文件
+  （升级前检查点兼容）。
 - `/commit`：提交流程命令——模型查看暂存 diff、写 Conventional Commits 提交
   信息并经新的 `git_commit` 工具提交（high 风险走审批）。
 - `/doctor`：体检命令——配置 / 提供商 / 沙箱（Layer 1/2）/ 工具表 / MCP /
