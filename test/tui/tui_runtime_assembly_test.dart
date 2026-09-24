@@ -212,6 +212,39 @@ void main() {
 
     await runtime.dispose();
   });
+
+  test('interactive: false 时跳过浮层 / 审批 / ask_user（headless）', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String sep = Platform.pathSeparator;
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      interactive: false,
+    );
+
+    expect(runtime.app.get<TuiPermissionGate>('approval'), isNull);
+    expect(runtime.app.get<TuiChoicePrompt>('tuiChoice'), isNull);
+    expect(runtime.tools.names, isNot(contains(kAskUserToolName)));
+
+    // 高危工具无审批仍可直执（headless 无人值守，沙箱是安全底线）。
+    runtime.app.effect(() => runtime.tools.fn(
+          'danger',
+          description: '高危',
+          riskLevel: ToolRisk.high,
+          handler: (ToolContext ctx) async => ToolResult.success('danger'),
+        ));
+    expect(
+      (await runtime.tools.call(const ToolCall(name: 'danger'))).isError,
+      isFalse,
+    );
+
+    await runtime.dispose();
+  });
 }
 
 /// 记录模型实际收到的消息。

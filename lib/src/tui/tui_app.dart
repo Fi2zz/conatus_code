@@ -89,6 +89,8 @@ class ConatusTuiRuntime {
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
+  /// [interactive] 为 `false` 时跳过人机交互件（浮层 / 审批服务 / `ask_user`
+  /// 工具），供 headless 单轮执行使用。
   // REASON: 装配入口的参数聚合是既定形态（本参数已 16 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
@@ -110,6 +112,7 @@ class ConatusTuiRuntime {
     ShellExecutor? shell,
     Credentials? credentials,
     List<McpServerSpec>? mcpServers,
+    bool interactive = true,
   }) async {
     final Context app = Context.root(name: 'conatus');
     final String resolvedBaseDir =
@@ -148,25 +151,29 @@ class ConatusTuiRuntime {
     // run_command / run_tests / apply_patch）。同样跟随上面的 fs / shell 接缝。
     provideCodeTools(app);
 
-    // ── 交互：选项浮层 + 工具审批 ────────────────────────────────
+    // ── 交互：选项浮层 + 工具审批（headless 不装）────────────────
     // 浮层状态挂在根上下文：控制器构造时接上重绘回调，审批与 `ask_user`
     // 共用同一条提问通道。审批中间件不在这里装——它随权限模式在控制器里
     // 挂载 / 卸载（见 ConatusTuiController._syncPermissionMode）。
-    final TuiChoicePrompt choice = TuiChoicePrompt();
-    app.provide('tuiChoice', choice);
-    provideApproval(
-      app,
-      approval: TuiPermissionGate(
-        choice: choice,
-        fs: app.get<FileSystem>('fs'),
-      ),
-      // 拦截阈值随权限模式变化，由控制器按需挂载 / 卸载
-      // （见 ConatusTuiController._syncPermissionMode），这里只提供服务。
-      instrument: false,
-    );
-    app.effect(() => app.tools.register(AskUserTool(
-          host: () => app.get<TuiUserPromptHost>('tuiController'),
-        )));
+    // `interactive: false`（headless）跳过全部人机交互件：无浮层、无审批
+    // 服务、无 ask_user 工具——高危工具直接执行（沙箱仍是安全底线）。
+    if (interactive) {
+      final TuiChoicePrompt choice = TuiChoicePrompt();
+      app.provide('tuiChoice', choice);
+      provideApproval(
+        app,
+        approval: TuiPermissionGate(
+          choice: choice,
+          fs: app.get<FileSystem>('fs'),
+        ),
+        // 拦截阈值随权限模式变化，由控制器按需挂载 / 卸载
+        // （见 ConatusTuiController._syncPermissionMode），这里只提供服务。
+        instrument: false,
+      );
+      app.effect(() => app.tools.register(AskUserTool(
+            host: () => app.get<TuiUserPromptHost>('tuiController'),
+          )));
+    }
 
     // ── 凭据（先于联网工具：搜索源要经凭据服务解析 Key）──────────
     // Key 统一经凭据服务：provider、注册表与搜索源都不直接读环境变量，换
