@@ -625,6 +625,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleInit();
       case 'commit':
         await _handleCommit();
+      case 'review':
+        await _handleReview();
       case 'compact':
         await _handleCompact();
       case 'rewind':
@@ -976,6 +978,15 @@ class ConatusTuiController implements TuiUserPromptHost {
       '基于改动写一条 Conventional Commits 提交信息（scope + 中文描述），'
       '然后用 git_commit 工具提交。'
       '若没有已暂存的改动，向用户说明并给出建议（如先 git add 暂存）。',
+    );
+  }
+
+  /// `/review`：审查当前未提交改动（提交/提 PR 前自检，只审不改）。
+  Future<void> _handleReview() async {
+    await submit(
+      '审查当前未提交改动：用 git_diff 查看未暂存与暂存的全部差异，'
+      '从命名、边界条件、安全隐患、性能四个方面给出结构化发现清单；'
+      '**只审不改**，不要直接修改代码。若没有未提交改动，直接说明。',
     );
   }
 

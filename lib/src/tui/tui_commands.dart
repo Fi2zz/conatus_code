@@ -72,6 +72,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     name: 'commit',
     description: '提交流程：模型看暂存 diff、写 Conventional Commits 信息并 git_commit 提交',
   ),
+  TuiCommand(
+    name: 'review',
+    description: '审查当前未提交改动（命名/边界/安全/性能，只审不改）',
+  ),
   TuiCommand(name: 'compact', description: '手动压缩当前会话（折叠早期历史）'),
   TuiCommand(
     name: 'rewind',
