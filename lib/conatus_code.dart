@@ -55,6 +55,8 @@ export 'src/diff/diff_types.dart' show DiffFile, DiffHunk, DiffOp, DiffOpKind;
 export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
 export 'src/diff/unified_diff.dart'
     show buildUnifiedDiff, kMaxDiffLines, splitLines;
+export 'src/mcp/mcp_assembly.dart'
+    show attachMcpServers, toMcpServerConfig, toMcpTransport;
 export 'src/sandbox/command_policy.dart'
     show
         CommandDecision,

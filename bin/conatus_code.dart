@@ -67,6 +67,7 @@ Future<void> main(List<String> args) async {
     credentials: ConfigCredentials(config),
     fs: layers.fs,
     shell: layers.shell,
+    mcpServers: config.mcp.servers,
   );
 
   final ConatusTuiController controller = runtime.createController(

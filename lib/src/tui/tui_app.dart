@@ -21,6 +21,7 @@ import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
 import '../config/config_schema.dart';
+import '../mcp/mcp_assembly.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
 import 'system_notifier.dart';
@@ -108,6 +109,7 @@ class ConatusTuiRuntime {
     FileSystem? fs,
     ShellExecutor? shell,
     Credentials? credentials,
+    List<McpServerSpec>? mcpServers,
   }) async {
     final Context app = Context.root(name: 'conatus');
     final String resolvedBaseDir =
@@ -176,6 +178,14 @@ class ConatusTuiRuntime {
       provideSearch(app, credentials: resolvedCredentials);
       provideWebTools(app, credentials: resolvedCredentials);
     }
+
+    // ── MCP server（config.toml [mcp.servers.*]）─────────────────
+    // 逐台挂载、单台失败跳过；工具经 server__tool 前缀进注册表，高危走审批。
+    await attachMcpServers(
+      app,
+      mcpServers ?? const <McpServerSpec>[],
+      credentials: resolvedCredentials,
+    );
 
     // ── 模型 / 自省 / 子 Agent ─────────────────────────────────
     // `[models."provider/model"]`（kimi 格式）按 provider 名展开成模型 id 清单，
