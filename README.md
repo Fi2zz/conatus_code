@@ -5,14 +5,13 @@
 ## 是什么
 
 基于 [conatus](https://github.com/Fi2zz/conatus) 构建的终端编码智能体。
-复用 conatus 的 Agent Loop、工具系统、意图路由、技能沉淀，
+复用 conatus 的 Agent Loop、工具系统、技能沉淀，
 专注 coding 场景。
 
 ## 特性
 
 - 🖥️ 终端交互（基于 conatus_tui）
 - 🔍 文件读写与搜索（read_file / write_file / edit_file / rg / glob）
-- ⚡ 意图路由（高频命令零模型调用）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
 - 🔒 审批与沙箱（高危操作走审批；默认 Seatbelt 进程沙箱 + 文件 jail）
