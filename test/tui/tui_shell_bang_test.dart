@@ -119,6 +119,19 @@ void main() {
     expect(controller.transcript.messages.last.text, contains('没有可重跑'));
   });
 
+  test('执行后立刻触发重绘（结果不等下一次事件才上屏）', () async {
+    final (ConatusTuiController controller, Context app, _) =
+        await _build(_run(stdout: 'ok'));
+    addTearDown(app.dispose);
+    int refreshes = 0;
+    controller.onChanged = () => refreshes++;
+
+    await controller.handleLine('!echo hi');
+
+    // 命令回显 + 结果各刷新一次。
+    expect(refreshes, greaterThanOrEqualTo(2));
+  });
+
   test('busy 时拒绝', () async {
     final (ConatusTuiController controller, Context app, _) =
         await _build(_run());

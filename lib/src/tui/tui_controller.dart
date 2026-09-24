@@ -385,6 +385,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     _lastBangCommand = command;
     await _runShellForUser(command);
+    // Transcript.add 不会通知重绘；执行完必须显式刷新，否则结果要等下一次
+    // 无关事件（按键等）才上屏，看起来像命令很慢。
+    _refresh();
   }
 
   /// 解析 `!` 行：返回要执行的命令（空串 = 已提示用法，不执行）。
@@ -412,6 +415,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     transcript.add(TuiRole.system, '\$ $command');
+    _refresh(); // 命令回显先上屏，长命令执行期间也有反馈。
     final ShellRunResult result;
     try {
       result = await shell.run(shell.resolve(ShellExecRequest(

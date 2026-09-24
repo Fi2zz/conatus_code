@@ -8,6 +8,8 @@
   重跑上一条；busy 时拒绝。
 - shell 模式对齐 OpenCode：空提示符打 `!` 进入（输入框 `!` 前缀 + shell 占位 +
   状态栏 `[Enter] 执行 | [Esc] 退出`），Esc 不执行退出，执行完自动退出回对话模式。
+- 修复 `!` 命令结果不上屏：`Transcript.add` 不触发重绘，执行后显式刷新，
+  不再等下一次按键才看到输出（沙箱执行本身约 30ms）。
 - `/review`：审查当前未提交改动（命名/边界/安全/性能，只审不改），与
   `/commit` 组成「写完 → 自查 → 提交」闭环。
 - lint-on-edit：模型编辑文件（write_file/edit_file/apply_patch）后自动跑
