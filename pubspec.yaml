@@ -51,6 +51,7 @@ dependencies:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_team}
   conatus_tts:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: master, path: packages/conatus_tts}
+  crypto: ^3.0.0
   dart_io_sandbox: ^1.2.3
   file: ^7.0.0
   glob: ^2.2.0

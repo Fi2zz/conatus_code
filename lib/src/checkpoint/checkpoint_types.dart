@@ -15,15 +15,16 @@ class CheckpointException implements Exception {
   String toString() => 'CheckpointException($code): $message';
 }
 
-/// base 清单里的一个文件条目：路径 + 变化检测用的 mtime/size。
+/// base 清单里的一个文件条目：路径 + 变化检测用的 mtime/size + 内容哈希。
 class CheckpointFileEntry {
   const CheckpointFileEntry({
     required this.path,
     required this.mtimeMs,
     required this.size,
+    this.hash,
   });
 
-  /// 反序列化；兼容旧格式的纯字符串路径（mtime/size 记 0）。
+  /// 反序列化；兼容旧格式的纯字符串路径（mtime/size/hash 记缺省）。
   factory CheckpointFileEntry.fromJson(Object? raw) {
     if (raw is String) {
       return CheckpointFileEntry(path: raw, mtimeMs: 0, size: 0);
@@ -34,6 +35,7 @@ class CheckpointFileEntry {
       path: '${json['path'] ?? ''}',
       mtimeMs: json['mtimeMs'] as int? ?? 0,
       size: json['size'] as int? ?? 0,
+      hash: json['hash'] as String?,
     );
   }
 
@@ -46,10 +48,14 @@ class CheckpointFileEntry {
   /// 快照时刻的字节数。
   final int size;
 
+  /// 快照时刻的内容 SHA-256（十六进制）；旧条目为 `null`（按变化处理）。
+  final String? hash;
+
   Map<String, Object?> toJson() => <String, Object?>{
         'path': path,
         'mtimeMs': mtimeMs,
         'size': size,
+        if (hash != null) 'hash': hash,
       };
 }
 

@@ -10,6 +10,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+
 import 'checkpoint_paths.dart';
 import 'checkpoint_types.dart';
 
@@ -75,6 +77,7 @@ class CheckpointStore {
         path: rel,
         mtimeMs: stat.modified.millisecondsSinceEpoch,
         size: stat.size,
+        hash: _sha256(entity.path),
       ));
     }
     _writeManifest(
@@ -105,9 +108,13 @@ class CheckpointStore {
       current.add(rel);
       final FileStat stat = entity.statSync();
       final CheckpointFileEntry? old = baseStats[rel];
-      if (old == null ||
+      final bool statChanged = old == null ||
           old.size != stat.size ||
-          old.mtimeMs != stat.modified.millisecondsSinceEpoch) {
+          old.mtimeMs != stat.modified.millisecondsSinceEpoch;
+      final bool contentChanged = old != null &&
+          !statChanged &&
+          (old.hash == null || old.hash != _sha256(entity.path));
+      if (statChanged || contentChanged) {
         final File target = File('${dir.path}${Platform.pathSeparator}$rel');
         target.parent.createSync(recursive: true);
         await entity.copy(target.path);
@@ -206,3 +213,7 @@ class CheckpointStore {
     return projectDir;
   }
 }
+
+/// 文件内容 SHA-256（十六进制小写）。
+String _sha256(String path) =>
+    sha256.convert(File(path).readAsBytesSync()).toString();
