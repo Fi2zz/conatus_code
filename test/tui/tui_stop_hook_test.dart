@@ -69,7 +69,7 @@ void main() {
     provideTools(app);
     provideLlm(app, llm: FallbackLlm(<LlmProvider>[_StubProvider()]));
     final SessionStore sessions = provideSessions(app);
-    provideHooks(app, config: HooksConfig(stop: <String>['false']));
+    provideHooks(app, config: const HooksConfig(stop: <String>['false']));
     final ConatusTuiController controller = ConatusTuiController(
       app: app,
       sessions: sessions,
