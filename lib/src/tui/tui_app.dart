@@ -25,6 +25,7 @@ import '../budget/turn_budget.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_store.dart';
 import '../config/config_schema.dart';
+import '../hooks/hooks.dart';
 import '../mcp/mcp_assembly.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
@@ -121,6 +122,7 @@ class ConatusTuiRuntime {
     String? workdir,
     CheckpointConfig? checkpoint,
     BackgroundConfig? background,
+    HooksConfig? hooks,
   }) async {
     final Context app = Context.root(name: 'conatus');
     final String resolvedBaseDir =
@@ -290,6 +292,11 @@ class ConatusTuiRuntime {
     );
     app.provide('backgroundTasks', backgroundTasks);
     provideBackgroundTools(app, service: backgroundTasks);
+
+    // ── Hooks：Pre/Post 挂工具中间件，Stop 由控制器 _afterTurn 触发 ──
+    if (hooks != null) {
+      provideHooks(app, config: hooks);
+    }
 
     // ── 会话持久化（JSONL）+ 会话仓库 ────────────────────────────
     provideSessionPersistence(

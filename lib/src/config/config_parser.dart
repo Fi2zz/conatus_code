@@ -22,6 +22,7 @@ class ConfigParser extends ConfigValues {
         services: _readServices(),
         mcp: _readMcp(),
         checkpoint: _readCheckpoint(),
+        hooks: _readHooks(),
         background: _readBackground(),
         loopControl: _readLoopControl(),
         defaultPlanMode: readBool(raw, 'default_plan_mode', false),
@@ -275,6 +276,15 @@ class ConfigParser extends ConfigValues {
       enabled: readBool(table, 'enabled', true),
       keep: readNonNegativeInt(table, 'keep', 5),
       ignore: readStringList(table, 'ignore'),
+    );
+  }
+
+  HooksConfig _readHooks() {
+    final Map<String, dynamic> table = readTable('hooks');
+    return HooksConfig(
+      preToolUse: readStringList(table, 'pre_tool_use'),
+      postToolUse: readStringList(table, 'post_tool_use'),
+      stop: readStringList(table, 'stop'),
     );
   }
 

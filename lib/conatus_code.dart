@@ -55,6 +55,7 @@ export 'src/config/config_schema.dart'
         BudgetConfig,
         CheckpointConfig,
         ConatusCodeConfig,
+        HooksConfig,
         LlmConfig,
         LoopControlConfig,
         McpConfig,
@@ -84,6 +85,8 @@ export 'src/diff/unified_diff.dart'
     show buildUnifiedDiff, kMaxDiffLines, splitLines;
 export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
+export 'src/hooks/hooks.dart'
+    show HookResult, Hooks, provideHooks, runHooks;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
 export 'src/sandbox/command_policy.dart'

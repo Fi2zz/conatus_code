@@ -49,6 +49,12 @@ enabled = true
 keep = 5                    # 每会话保留最近 N 个检查点（0 = 不限）
 # ignore = ["node_modules", "build/"]   # 额外忽略的相对路径前缀
 
+# Hooks：工具执行前/后与轮次收口的用户命令（经 /bin/sh -c 直连运行）。
+# [hooks]
+# pre_tool_use = ["echo 将在工具前运行 > /tmp/nava-hook.log"]
+# post_tool_use = []
+# stop = []
+
 [agent]
 # workdir = "/path/to/your/project"
 max_steps = 8

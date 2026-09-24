@@ -300,6 +300,24 @@ class CheckpointConfig {
   final List<String> ignore;
 }
 
+/// Hooks 配置；对应 `[hooks]` 表（事件 → 命令列表）。
+class HooksConfig {
+  const HooksConfig({
+    this.preToolUse = const <String>[],
+    this.postToolUse = const <String>[],
+    this.stop = const <String>[],
+  });
+
+  /// 工具执行前；任一非零退出即拒绝该工具。
+  final List<String> preToolUse;
+
+  /// 工具执行后；失败只追加提示。
+  final List<String> postToolUse;
+
+  /// 轮次收口；失败只提示。
+  final List<String> stop;
+}
+
 /// 后台任务行为；对应 `[background]` 表（解析保留，供未来执行器消费）。
 class BackgroundConfig {
   const BackgroundConfig({
@@ -347,6 +365,7 @@ class ConatusCodeConfig {
     this.services = const <ServiceConfig>[],
     this.mcp = const McpConfig(),
     this.checkpoint = const CheckpointConfig(),
+    this.hooks = const HooksConfig(),
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
     this.defaultPlanMode = false,
@@ -382,6 +401,9 @@ class ConatusCodeConfig {
 
   /// `[checkpoint]` 表。
   final CheckpointConfig checkpoint;
+
+  /// `[hooks]` 表。
+  final HooksConfig hooks;
 
   /// `[background]` 表。
   final BackgroundConfig background;
