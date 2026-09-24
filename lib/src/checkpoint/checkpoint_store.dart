@@ -1,11 +1,11 @@
-/// 工作区快照存储：每个检查点 = 单个 gzip 归档文件。
+/// 工作区快照存储：每个检查点 = 单个不可读名的 gzip 归档文件。
 ///
-/// 布局：`<projectDir>/checkpoints/<sessionId>/<turn>.gz`（**一个文件，不保留
-/// 目录结构**；内容压缩存储，非明文）。turn 0 全量 base + 各轮相对 base 差量
-/// （base 只存变化/新增文件 + 清单里的 deleted）。base（turn 0）永不 prune，
-/// prune 只裁差量、保留最近 `keep - 1` 个。旧版目录树检查点（`<turn>/`）读时
-/// 兼容。恢复见 `checkpoint_restore.dart`，归档编解码见
-/// `checkpoint_archive.dart`。
+/// 布局：`<projectDir>/checkpoints/<sessionId>/<sha256前16位>.gz`（文件名是
+/// 确定性哈希，**不可读、不暴露轮次**；轮次只记录在归档头部与会话级 `index`
+/// 里）+ `index`（gzip 小索引：turn → 有效文件数，`list`/`prune` 只读它）。
+/// turn 0 全量 base + 各轮相对 base 差量；base 永不 prune，prune 只裁差量、
+/// 保留最近 `keep - 1` 个。旧版目录树检查点（`<turn>/` 可读名）读时兼容，
+/// 索引缺失时按旧格式重建。恢复见 `checkpoint_restore.dart`。
 library;
 
 import 'dart:convert';
@@ -38,16 +38,24 @@ class CheckpointStore {
   /// 额外忽略的相对路径前缀。
   final List<String> ignore;
 
-  /// 某检查点的归档文件（新格式）。
-  File archiveFile(String sessionId, int turn) => File(
+  /// 某会话的检查点目录。
+  Directory sessionDir(String sessionId) => Directory(
       '$projectDir${Platform.pathSeparator}checkpoints'
-      '${Platform.pathSeparator}$sessionId${Platform.pathSeparator}$turn.gz');
+      '${Platform.pathSeparator}$sessionId');
 
-  /// 某检查点的旧版目录（格式迁移前的检查点；不存在返回 `null`）。
+  /// 某检查点的归档文件（不可读哈希名）。
+  File archiveFile(String sessionId, int turn) =>
+      File('${sessionDir(sessionId).path}${Platform.pathSeparator}'
+          '${checkpointArchiveName(sessionId, turn)}');
+
+  /// 会话检查点索引文件。
+  File indexFile(String sessionId) =>
+      File('${sessionDir(sessionId).path}${Platform.pathSeparator}index');
+
+  /// 某检查点的旧版目录（格式迁移前；不存在返回 `null`）。
   Directory? legacyDir(String sessionId, int turn) {
-    final Directory dir = Directory(
-        '$projectDir${Platform.pathSeparator}checkpoints'
-        '${Platform.pathSeparator}$sessionId${Platform.pathSeparator}$turn');
+    final Directory dir = Directory('${sessionDir(sessionId).path}'
+        '${Platform.pathSeparator}$turn');
     return dir.existsSync() ? dir : null;
   }
 
@@ -58,17 +66,19 @@ class CheckpointStore {
     String? lastEventId,
   }) async {
     final File target = archiveFile(sessionId, turn);
+    final CheckpointInfo? files;
     if (turn == 0) {
-      await _snapshotBase(sessionId, target, lastEventId);
+      files = await _snapshotBase(sessionId, target, lastEventId);
     } else {
-      await _snapshotDelta(sessionId, turn, target, lastEventId);
+      files = await _snapshotDelta(sessionId, turn, target, lastEventId);
     }
     // 清掉同轮的旧版目录（格式迁移）。
     legacyDir(sessionId, turn)?.deleteSync(recursive: true);
+    _upsertIndex(sessionId, files);
     prune(sessionId);
   }
 
-  Future<void> _snapshotBase(
+  Future<CheckpointInfo> _snapshotBase(
     String sessionId,
     File target,
     String? lastEventId,
@@ -81,8 +91,7 @@ class CheckpointStore {
       final String rel = checkpointRelativeTo(entity, root);
       if (checkpointExcluded(rel, projectRel, ignore)) continue;
       final FileStat stat = entity.statSync();
-      final List<int> bytes = await entity.readAsBytes();
-      blobs.add((rel, bytes));
+      blobs.add((rel, await entity.readAsBytes()));
       entries.add(CheckpointFileEntry(
         path: rel,
         mtimeMs: stat.modified.millisecondsSinceEpoch,
@@ -100,9 +109,10 @@ class CheckpointStore {
       ),
       blobs,
     );
+    return CheckpointInfo(turn: 0, files: entries.length);
   }
 
-  Future<void> _snapshotDelta(
+  Future<CheckpointInfo> _snapshotDelta(
     String sessionId,
     int turn,
     File target,
@@ -150,6 +160,11 @@ class CheckpointStore {
       ),
       blobs,
     );
+    final Set<String> basePaths = baseStats.keys.toSet();
+    final Set<String> deletedSet = deleted.toSet();
+    final int files = basePaths.where((String p) => !deletedSet.contains(p)).length +
+        changed.where((String p) => !basePaths.contains(p)).length;
+    return CheckpointInfo(turn: turn, files: files);
   }
 
   /// 读某检查点的清单（新归档头部；旧版目录清单自动回退）；缺失抛异常。
@@ -175,57 +190,79 @@ class CheckpointStore {
     throw CheckpointException('missing-manifest', '检查点 $turn 缺少清单');
   }
 
-  /// 现有检查点的摘要（turn 升序 + 有效文件数）。
+  /// 现有检查点的摘要（turn 升序 + 有效文件数；索引缺失时按目录重建）。
   List<CheckpointInfo> list(String sessionId) {
-    final List<int> turns = turnsOf(sessionId);
-    if (turns.isEmpty) return const <CheckpointInfo>[];
-    final Set<String> basePaths = <String>{
-      for (final CheckpointFileEntry entry in manifestOf(sessionId, 0).files)
-        entry.path,
-    };
-    return <CheckpointInfo>[
-      for (final int turn in turns)
-        CheckpointInfo(
-            turn: turn, files: _effectiveCount(basePaths, turn, sessionId)),
-    ];
+    final List<CheckpointInfo>? cached = readCheckpointIndex(indexFile(sessionId));
+    if (cached != null) return cached;
+    return _rebuildIndex(sessionId);
   }
 
-  int _effectiveCount(Set<String> basePaths, int turn, String sessionId) {
-    final CheckpointManifest manifest = manifestOf(sessionId, turn);
-    if (!manifest.isDelta) return manifest.files.length;
-    final Set<String> deleted = manifest.deleted.toSet();
-    int count = basePaths.where((String p) => !deleted.contains(p)).length;
-    count += manifest.changed.where((String p) => !basePaths.contains(p)).length;
-    return count;
-  }
-
-  /// 现有检查点的轮次（升序；兼容旧版目录）。
-  List<int> turnsOf(String sessionId) {
-    final Directory dir = Directory('$projectDir${Platform.pathSeparator}checkpoints'
-        '${Platform.pathSeparator}$sessionId');
-    if (!dir.existsSync()) return const <int>[];
-    final List<int> turns = <int>[];
-    for (final FileSystemEntity entity in dir.listSync()) {
-      final String name = entity.path.split(Platform.pathSeparator).last;
-      final String stem = name.endsWith('.gz')
-          ? name.substring(0, name.length - '.gz'.length)
-          : name;
-      final int? turn = int.tryParse(stem);
-      if (turn != null) turns.add(turn);
-    }
-    turns.sort();
-    return turns;
-  }
+  /// 现有检查点的轮次（升序）。
+  List<int> turnsOf(String sessionId) => <int>[
+        for (final CheckpointInfo info in list(sessionId)) info.turn,
+      ];
 
   /// 保留 turn 0（base）+ 最近 `keep - 1` 个差量；[keep] 非正不裁剪。
   void prune(String sessionId) {
     if (keep <= 0) return;
-    final List<int> deltas =
-        turnsOf(sessionId).where((int turn) => turn > 0).toList();
+    final List<CheckpointInfo> infos = list(sessionId);
+    final List<CheckpointInfo> deltas =
+        infos.where((CheckpointInfo i) => i.turn > 0).toList();
     final int excess = deltas.length - (keep - 1);
+    if (excess <= 0) return;
     for (int index = 0; index < excess; index++) {
-      _deleteTurn(sessionId, deltas[index]);
+      _deleteTurn(sessionId, deltas[index].turn);
     }
+    writeCheckpointIndex(
+      indexFile(sessionId),
+      <CheckpointInfo>[
+        ...infos.where((CheckpointInfo i) => i.turn == 0),
+        ...deltas.sublist(excess),
+      ],
+    );
+  }
+
+  void _upsertIndex(String sessionId, CheckpointInfo info) {
+    final List<CheckpointInfo> infos = <CheckpointInfo>[
+      ...list(sessionId).where((CheckpointInfo i) => i.turn != info.turn),
+      info,
+    ]..sort((CheckpointInfo a, CheckpointInfo b) => a.turn.compareTo(b.turn));
+    writeCheckpointIndex(indexFile(sessionId), infos);
+  }
+
+  /// 索引缺失时重建：旧版可读目录 + 现有哈希归档头部。
+  List<CheckpointInfo> _rebuildIndex(String sessionId) {
+    final Directory dir = sessionDir(sessionId);
+    if (!dir.existsSync()) return const <CheckpointInfo>[];
+    final List<CheckpointInfo> infos = <CheckpointInfo>[];
+    for (final FileSystemEntity entity in dir.listSync()) {
+      final String name = entity.path.split(Platform.pathSeparator).last;
+      if (name == 'index') continue;
+      if (entity is Directory) {
+        final int? turn = int.tryParse(name);
+        if (turn == null) continue;
+        final CheckpointManifest manifest = manifestOf(sessionId, turn);
+        infos.add(CheckpointInfo(turn: turn, files: _countFor(sessionId, manifest)));
+      } else if (entity is File && name.endsWith('.gz')) {
+        final (CheckpointManifest manifest, _) = readCheckpointArchive(entity);
+        infos.add(CheckpointInfo(
+            turn: manifest.turn, files: _countFor(sessionId, manifest)));
+      }
+    }
+    infos.sort((CheckpointInfo a, CheckpointInfo b) => a.turn.compareTo(b.turn));
+    writeCheckpointIndex(indexFile(sessionId), infos);
+    return infos;
+  }
+
+  int _countFor(String sessionId, CheckpointManifest manifest) {
+    if (!manifest.isDelta) return manifest.files.length;
+    final Set<String> basePaths = <String>{
+      for (final CheckpointFileEntry entry in manifestOf(sessionId, 0).files)
+        entry.path,
+    };
+    final Set<String> deleted = manifest.deleted.toSet();
+    return basePaths.where((String p) => !deleted.contains(p)).length +
+        manifest.changed.where((String p) => !basePaths.contains(p)).length;
   }
 
   void _deleteTurn(String sessionId, int turn) {

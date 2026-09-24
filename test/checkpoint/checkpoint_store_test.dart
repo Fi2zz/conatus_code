@@ -75,17 +75,18 @@ void main() {
     expect(delta.isDelta, isTrue);
     expect(delta.changed, unorderedEquals(<String>['a.txt', 'c.txt']));
     expect(delta.deleted, <String>['b.txt']);
-    // 每个检查点是单个归档文件（1.gz），内容压缩非明文。
+    // 归档文件名不可读（哈希名），无 `<轮次>` 可读目录/文件，内容非明文。
     final String turnDir = '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1';
-    expect(File('$turnDir${Platform.pathSeparator}1.gz').existsSync(), isTrue);
-    expect(File('$turnDir${Platform.pathSeparator}0.gz').existsSync(), isTrue);
-    expect(
-      Directory('$turnDir${Platform.pathSeparator}1').existsSync(),
-      isFalse,
-    );
-    final List<int> raw =
-        File('$turnDir${Platform.pathSeparator}1.gz').readAsBytesSync();
+    expect(store.archiveFile('s1', 0).existsSync(), isTrue);
+    expect(store.archiveFile('s1', 1).existsSync(), isTrue);
+    final List<String> names = Directory(turnDir)
+        .listSync()
+        .map((FileSystemEntity e) => e.path.split(Platform.pathSeparator).last)
+        .toList();
+    expect(names.any((String n) => n == '0' || n == '1' || n == '0.gz' || n == '1.gz'), isFalse);
+    expect(names, contains('index'));
+    final List<int> raw = store.archiveFile('s1', 1).readAsBytesSync();
     expect(utf8.decode(raw, allowMalformed: true).contains('v1'), isFalse);
     // list 有效文件数 = base(2) + changed新增(1) - deleted(1) = 2。
     expect(store.list('s1').last.files, 2);
