@@ -149,6 +149,27 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 打断会**清空队列**并提示条数；切换会话同样清空。cron/提醒的投递不受影响
 （busy 时仍由调度器重试）。
 
+## `/commit` 与 `/doctor`
+
+- `/commit`：让模型查看 `git_diff --staged` 的暂存差异、写 Conventional
+  Commits 提交信息，并经 `git_commit` 工具提交（high 风险走审批）。
+- `/doctor`：体检——配置 / 提供商 / 沙箱（Layer 1/2）/ 工具表 / MCP / rg
+  逐项 ✓/✗ + 修复提示，自查用。
+
+## Hooks（`[hooks]`）
+
+config.toml `[hooks]` 表：`pre_tool_use`（任一非零退出即拒绝该工具）、
+`post_tool_use`（失败追加提示）、`stop`（轮次收口，失败只提示）。hook 命令
+经 `/bin/sh -c` 直连运行（**不走** `'shell'` 沙箱缝）；注入环境变量
+`NAVA_HOOK_EVENT` / `NAVA_HOOK_TOOL` / `NAVA_HOOK_ARGS_JSON`。
+
+```toml
+[hooks]
+pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
+# post_tool_use = []
+# stop = []
+```
+
 ## MCP（`/mcp`）
 
 `[mcp.servers.<名字>]` 表声明 MCP server，启动时逐台挂载、**单台连接失败提示并

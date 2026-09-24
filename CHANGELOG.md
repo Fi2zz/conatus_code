@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+- `/commit`：提交流程命令——模型查看暂存 diff、写 Conventional Commits 提交
+  信息并经新的 `git_commit` 工具提交（high 风险走审批）。
+- `/doctor`：体检命令——配置 / 提供商 / 沙箱（Layer 1/2）/ 工具表 / MCP /
+  rg 逐项 ✓/✗ + 修复提示。
+- Hooks：config.toml `[hooks]` 表（pre_tool_use / post_tool_use / stop），
+  事件命令经 `/bin/sh -c` 直连运行（不走沙箱缝）；Pre 非零退出拒绝工具、
+  Post/Stop 失败只提示；注入 `NAVA_HOOK_EVENT/TOOL/ARGS_JSON` 环境变量。
+- delta 哈希级变化检测：checkpoint base 条目记录 SHA-256，mtime+size 相同时
+  读内容哈希比对（修「内容变但 stat 不变」漏检）；旧清单保守按变化处理。
 - 后台任务执行器：`run_command_background` 在沙箱中后台启动命令（返回 `bg-<n>`），
   `list_background_tasks` / `background_output` / `background_kill` 管理；`/background`
   用户命令入口；并发上限读 `[background] max_running_tasks`（复用 `ShellExecutor.start`
