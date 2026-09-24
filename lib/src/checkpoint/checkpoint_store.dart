@@ -243,7 +243,8 @@ class CheckpointStore {
         if (turn == null) continue;
         final CheckpointManifest manifest = manifestOf(sessionId, turn);
         infos.add(CheckpointInfo(turn: turn, files: _countFor(sessionId, manifest)));
-      } else if (entity is File && name.endsWith('.gz')) {
+      } else if (entity is File) {
+        // 无扩展名的哈希归档：读头部拿轮次。
         final (CheckpointManifest manifest, _) = readCheckpointArchive(entity);
         infos.add(CheckpointInfo(
             turn: manifest.turn, files: _countFor(sessionId, manifest)));

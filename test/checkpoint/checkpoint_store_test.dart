@@ -84,7 +84,12 @@ void main() {
         .listSync()
         .map((FileSystemEntity e) => e.path.split(Platform.pathSeparator).last)
         .toList();
-    expect(names.any((String n) => n == '0' || n == '1' || n == '0.gz' || n == '1.gz'), isFalse);
+    // 无可读轮次名、无扩展名（看不出是 gzip）。
+    expect(
+      names.any((String n) => n == '0' || n == '1' || n == '0.gz' || n == '1.gz'),
+      isFalse,
+    );
+    expect(names.any((String n) => n.endsWith('.gz')), isFalse);
     expect(names, contains('index'));
     final List<int> raw = store.archiveFile('s1', 1).readAsBytesSync();
     expect(utf8.decode(raw, allowMalformed: true).contains('v1'), isFalse);

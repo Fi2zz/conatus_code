@@ -19,14 +19,12 @@ import 'checkpoint_types.dart';
 /// 一个归档条目（写路径）。
 typedef CheckpointArchiveEntry = (String path, List<int> bytes);
 
-/// 检查点归档的**不可读文件名**（`<sha256前16位>.gz`，确定性、跨会话不同）。
-String checkpointArchiveName(String sessionId, int turn) {
-  final String hash = sha256
-      .convert(utf8.encode('$sessionId:$turn'))
-      .toString()
-      .substring(0, 16);
-  return '$hash.gz';
-}
+/// 检查点归档的**不可读文件名**（`sha256("<会话>:<轮次>")` 前 16 位，**无扩展名**，
+/// 看不出是 gzip 压缩、也不暴露轮次时间线；确定性、跨会话不同）。
+String checkpointArchiveName(String sessionId, int turn) => sha256
+    .convert(utf8.encode('$sessionId:$turn'))
+    .toString()
+    .substring(0, 16);
 
 /// 写一个检查点归档文件（覆盖）。
 Future<void> writeCheckpointArchive(
