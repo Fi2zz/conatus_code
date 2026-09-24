@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+- 检查点 / 回滚（`/rewind`）：每轮收口后对工作区文件做快照（含绑定时的 turn 0
+  初始态），存 `<项目数据目录>/checkpoints/<会话>/<turn>/`（排除 `.conatus` /
+  `.git` / `[checkpoint] ignore` 前缀，保留最近 `keep` 个）。`/rewind [N]` 把
+  工作区恢复到 N 轮前（缺省 1）的文件状态，`/rewind list` 查看可用检查点；
+  **只回滚文件、不改会话与对话**。新增 `[checkpoint]` 配置表
+  （enabled / keep / ignore）。
 - Headless 非交互模式：`nava -p "<任务>"` 单轮执行、跑完即退出，支持
   `--output-format text|json` 与 `--session` 恢复（CI/脚本可用）；headless 不装
   审批浮层与 `ask_user`（高危工具直执，沙箱兜底）；配置错误退出码为 2、轮次

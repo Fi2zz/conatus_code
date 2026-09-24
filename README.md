@@ -98,6 +98,11 @@ max_output_bytes = 64000
 max_turn_seconds = 600        # 单轮墙钟上限（秒）；0 = 不限
 max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 
+[checkpoint]
+enabled = true                # 每轮收口后对工作区做文件快照（/rewind 回滚）
+keep = 5                      # 每会话保留最近 N 个检查点（0 = 不限）
+# ignore = ["node_modules", "build/"]   # 额外忽略的相对路径前缀
+
 # MCP server：工具经 `server__tool` 前缀接入，高危按审批模式询问。
 # [mcp.servers.filesystem]
 # type = "stdio"              # stdio 用 command；http / sse 用 url
@@ -108,6 +113,19 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 # url = "https://mcp.example.com/mcp"
 # headers = { Authorization = "Bearer ${REMOTE_TOKEN}" }
 ```
+
+## 检查点与回滚（`/rewind`）
+
+每轮收口后对工作区文件做一份快照（含会话绑定的 turn 0 初始态），存到
+`<项目数据目录>/checkpoints/<会话>/<turn>/`（排除 `.conatus` / `.git` 与
+`[checkpoint] ignore` 前缀）。`/rewind [N]` 把工作区恢复到 N 轮前
+（缺省 1）的文件状态——**只回滚文件，不改会话与对话**；`/rewind list`
+查看本会话可用检查点。快照/恢复走应用级 dart:io，不受 fs jail 约束
+（fs jail 是模型面守卫）；`/rewind` 是用户命令，不挂审批。
+
+- 快照时机：会话绑定（turn 0）+ 每轮收口后；保留最近 `keep` 个（缺省 5）。
+- 恢复语义：目标检查点的文件覆盖当前、当前多出的文件删除（rsync 式）。
+- 关闭：`[checkpoint] enabled = false`（/rewind 提示不可用）。
 
 ## MCP（`/mcp`）
 
