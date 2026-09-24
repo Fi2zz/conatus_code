@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- MCP（Model Context Protocol）接入：config.toml `[mcp.servers.<名字>]` 表声明
+  server（stdio / http / sse），启动时逐台挂载、单台连接失败提示并跳过；工具以
+  `server__tool` 前缀进工具表，风险映射走既有审批链；`env` / `headers` 支持
+  `${KEY}` 凭据占位符（解析结果不写日志）。新增 `/mcp` 命令查看已接入 server。
 - 对话流展示模型**思考过程**：Kimi 等模型的 `reasoning_content` 经流式接口
   捕获，在每步正文/工具调用前以「· 思考：…」独立成行渲染（屏上 `TuiRole.thinking`）；
   底层 LLM 调用由非流式改为**流式**端点（`chat()` 内部走 `chatStream` 累积，

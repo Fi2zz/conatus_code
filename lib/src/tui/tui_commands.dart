@@ -40,6 +40,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   TuiCommand(name: 'sessions', description: '打开会话选择面板（↑↓ 选择，Enter 切换）'),
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(
+    name: 'mcp',
+    description: '列出已接入的 MCP server（就绪状态 / 工具数）',
+  ),
+  TuiCommand(
     name: 'model',
     description: '打开模型选择浮层（搜索过滤，Enter 切换）',
   ),

@@ -14,6 +14,7 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
+import 'package:conatus_mcp/conatus_mcp.dart';
 import 'package:conatus_schedule/conatus_schedule.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 import 'package:conatus_team/conatus_team.dart';
@@ -481,6 +482,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         }
       case 'tools':
         _showTools();
+      case 'mcp':
+        _showMcp();
       case 'model':
         await _handleModel(arg);
       case 'provider':
@@ -552,6 +555,26 @@ class ConatusTuiController implements TuiUserPromptHost {
       TuiRole.system,
       '已注册工具（${tools.names.length}）：${tools.names.join('、')}',
     );
+  }
+
+  /// `/mcp`：列出已接入的 MCP server 与各自工具数（不经模型，只读）。
+  void _showMcp() {
+    final McpRegistry? registry = _app.get<McpRegistry>('mcp');
+    if (registry == null || registry.servers.isEmpty) {
+      transcript.add(
+        TuiRole.system,
+        '未配置 MCP server（config.toml [mcp.servers.*]）。',
+      );
+      return;
+    }
+    final StringBuffer buffer =
+        StringBuffer('已接入 MCP server（${registry.servers.length}）：');
+    for (final String name in registry.servers) {
+      final McpClient? client = registry.clientOf(name);
+      final String state = client == null || !client.ready ? '未就绪' : '就绪';
+      buffer.write('\n  $name［$state］工具 ${registry.toolsOf(name).length} 个');
+    }
+    transcript.add(TuiRole.system, buffer.toString());
   }
 
   /// `/model [名字]` 与 `/provider` 的实现见 part 文件

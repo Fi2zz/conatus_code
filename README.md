@@ -98,7 +98,29 @@ max_output_bytes = 64000
 [budget]
 max_turn_seconds = 600        # 单轮墙钟上限（秒）；0 = 不限
 max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
+
+# MCP server：工具经 `server__tool` 前缀接入，高危按审批模式询问。
+# [mcp.servers.filesystem]
+# type = "stdio"              # stdio 用 command；http / sse 用 url
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+# [mcp.servers.remote]
+# type = "http"
+# url = "https://mcp.example.com/mcp"
+# headers = { Authorization = "Bearer ${REMOTE_TOKEN}" }
 ```
+
+## MCP（`/mcp`）
+
+`[mcp.servers.<名字>]` 表声明 MCP server，启动时逐台挂载、**单台连接失败提示并
+跳过**（不阻塞启动）。工具以 `server__tool` 前缀进工具表（`/tools` 可见），
+风险映射后按当前权限模式走审批；`/mcp` 查看已接入的 server（就绪状态 / 工具数）。
+
+- `type`：`stdio`（本地子进程，`command` + `args`）/ `http` / `sse`（远程端点 `url`）。
+- `env` / `headers` 支持 `${KEY}` 占位符，经凭据服务（`[credentials]` / 环境变量）
+  解析；**解析结果不得写进日志**。
+- **安全边界**：MCP server 是用户在配置里显式声明的受信端，其 stdio 子进程
+  **不走** Layer 2 OS 沙箱（沙箱管的是模型临时写出的命令，二者风险面不同）。
 
 ## 模型提供商（`/provider` / `/model`）
 

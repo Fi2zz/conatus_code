@@ -62,3 +62,39 @@ void autoRespond(
     transport.emit(McpMessage(id: id, result: result));
   };
 }
+
+/// 按 server 名造假 server：握手 + tools/list 自动应答。
+class FakeMcpServers {
+  final Map<String, FakeMcpTransport> transports = <String, FakeMcpTransport>{};
+  final Map<String, McpServerConfig> configs = <String, McpServerConfig>{};
+
+  FakeMcpTransport build(McpServerConfig config) {
+    configs[config.name] = config;
+    final FakeMcpTransport transport = FakeMcpTransport();
+    transports[config.name] = transport;
+    autoRespond(transport, (String method, Map<String, Object?>? params) {
+      if (method == 'initialize') {
+        return <String, Object?>{
+          'protocolVersion': kMcpProtocolVersion,
+          'serverInfo': <String, Object?>{'name': config.name},
+        };
+      }
+      if (method == 'tools/list') {
+        return <String, Object?>{
+          'tools': <Object?>[
+            <String, Object?>{
+              'name': 'read_file',
+              'description': '${config.name} 的 read_file',
+            },
+          ],
+        };
+      }
+      return <String, Object?>{
+        'content': <Object?>[
+          <String, Object?>{'type': 'text', 'text': '${config.name}:ok'},
+        ],
+      };
+    });
+    return transport;
+  }
+}
