@@ -28,6 +28,12 @@ class CostTrackerImpl implements CostTracker {
       _promptTokens / 1000000 * kInputRatePerMillion +
       _completionTokens / 1000000 * kOutputRatePerMillion;
 
+  /// 累计输入 token 数（护栏口径，展示用）。
+  int get promptTokens => _promptTokens;
+
+  /// 累计输出 token 数（护栏口径，展示用）。
+  int get completionTokens => _completionTokens;
+
   static int _intOf(Map<String, dynamic> usage, String key) {
     final Object? value = usage[key];
     return value is num ? value.toInt() : 0;

@@ -34,7 +34,8 @@ export 'src/tui/tui_choice_view.dart';
 export 'src/tui/tui_chrome.dart';
 export 'src/tui/tui_command_menu_view.dart';
 export 'src/tui/tui_commands.dart';
-export 'src/tui/tui_controller.dart' show ConatusTuiController;
+export 'src/tui/tui_controller.dart'
+    show ConatusTuiController, kManualCompactKeepRecent;
 export 'src/tui/tui_copy.dart';
 export 'src/tui/tui_form.dart';
 export 'src/tui/tui_form_view.dart';

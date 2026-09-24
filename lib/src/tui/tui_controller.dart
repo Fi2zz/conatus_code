@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
+import 'package:conatus_compaction/conatus_compaction.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -22,6 +23,7 @@ import 'package:conatus_tts/conatus_tts.dart';
 
 import '../../providers.dart';
 import '../autonomous/autonomous_assembly.dart';
+import '../budget/cost_tracker.dart';
 import '../config/config_writer.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
@@ -64,6 +66,9 @@ const String kTeamUsage =
 
 /// `/task` 用法提示。
 const String kTaskUsage = '用法：/task [claim <任务 id>|release <任务 id>]';
+
+/// `/compact` 的手动压缩保留条数：小于自动预算，强制折叠较早历史。
+const int kManualCompactKeepRecent = 20;
 
 /// TUI 会话控制器。
 class ConatusTuiController implements TuiUserPromptHost {
@@ -496,6 +501,10 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleGoal(arg);
       case 'init':
         await _handleInit();
+      case 'compact':
+        await _handleCompact();
+      case 'cost':
+        _showCost();
       case 'cron':
         await _handleCron(arg);
       case 'team':
@@ -606,6 +615,50 @@ class ConatusTuiController implements TuiUserPromptHost {
         : '计划经 exit_plan_mode 提交后即获批执行（未配置审批端口）。';
     transcript.add(
         TuiRole.system, '已进入 Plan Mode：有副作用的工具被拦截，模型先规划再执行。$reviewNote');
+  }
+
+  /// `/compact`：手动压缩当前会话，把早期历史折叠成滚动摘要。
+  ///
+  /// 复用 Agent Loop 同款 LLM 汇总器（`summarizeEvents`），`keepRecent` 取
+  /// [kManualCompactKeepRecent]（20 条）强制折叠；历史太短返回 `null` 不报错。
+  Future<void> _handleCompact() async {
+    final CompactionEngine? compactor = _app.get<CompactionEngine>('compaction');
+    final Session? session = _session;
+    final LlmProvider? llm = _app.get<LlmProvider>('llm');
+    if (compactor == null || session == null || llm == null) {
+      transcript.add(TuiRole.system, '压缩不可用：会话尚未就绪或未装配压缩服务。');
+      return;
+    }
+    try {
+      final CompactionResult? result = await compactor.compactIfNeeded(
+        session,
+        (List<SessionEvent> events, String previous) =>
+            summarizeEvents(llm, events, previous),
+        keepRecent: kManualCompactKeepRecent,
+      );
+      if (result == null) {
+        transcript.add(TuiRole.system, '历史太短，无需压缩。');
+        return;
+      }
+      transcript.add(TuiRole.system, '已压缩 ${result.compacted} 条早期事件。');
+    } catch (error) {
+      transcript.add(TuiRole.system, '压缩失败：$error');
+    }
+  }
+
+  /// `/cost`：展示今日估算成本与 token 用量（护栏口径，非计费）。
+  void _showCost() {
+    final CostTracker? tracker = _app.get<CostTracker>('costTracker');
+    if (tracker is! CostTrackerImpl) {
+      transcript.add(TuiRole.system, '成本追踪不可用。');
+      return;
+    }
+    transcript.add(
+      TuiRole.system,
+      '今日估算成本：\$${tracker.todayCost.toStringAsFixed(4)}'
+      '（输入 ${tracker.promptTokens} / 输出 ${tracker.completionTokens} token，'
+      '粗略护栏口径，非计费）',
+    );
   }
 
   /// `/goal [子命令]`：管理当前会话的长期目标（不经模型，直接调 Goal 服务）。
