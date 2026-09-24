@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+- Headless 非交互模式：`nava -p "<任务>"` 单轮执行、跑完即退出，支持
+  `--output-format text|json` 与 `--session` 恢复（CI/脚本可用）；headless 不装
+  审批浮层与 `ask_user`（高危工具直执，沙箱兜底）；配置错误退出码为 2、轮次
+  失败为 1。
+- 项目上下文：启动加载工作目录根的 `AGENTS.md` / `NAVA.md` 注入 system prompt
+  （单文件超 16 KB 截断）；新增 `/init` 让模型扫描仓库生成 / 更新 AGENTS.md。
+- 小命令批：`/compact` 手动压缩（折叠 20 条之后的早期历史）、`/cost` 展示今日
+  估算成本与 token 用量、`--version` 打印编译期注入的版本号、`--continue` 恢复
+  最近一次会话（`--session` 优先）。
 - MCP（Model Context Protocol）接入：config.toml `[mcp.servers.<名字>]` 表声明
   server（stdio / http / sse），启动时逐台挂载、单台连接失败提示并跳过；工具以
   `server__tool` 前缀进工具表，风险映射走既有审批链；`env` / `headers` 支持

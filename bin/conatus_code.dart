@@ -27,6 +27,17 @@ Future<void> main(List<String> args) async {
   final String workdir = config.agent.workdir ?? Directory.current.path;
   final String sep = Platform.pathSeparator;
 
+  // `--continue`：恢复最近一次会话（`--session` 优先；无历史则新建并提示）。
+  String? initialSession = options.session;
+  if (initialSession == null && options.continueRequested) {
+    final String sessionDir =
+        '$workdir$sep${config.agent.projectDir}${sep}sessions';
+    initialSession = findRecentSessionId(sessionDir);
+    if (initialSession == null) {
+      stderr.writeln('没有历史会话，已新建。');
+    }
+  }
+
   // 分层沙箱装配：
   // - Layer 1（fs_jail）：应用层文件 jail，纯应用层防误操作，任何平台可用；
   // - Layer 2（enabled）：OS 级沙箱，后端不可用时 fail-closed —— 注入拒斥
@@ -84,7 +95,7 @@ Future<void> main(List<String> args) async {
       final HeadlessResult result = await runHeadless(
         runtime,
         prompt: options.print!,
-        sessionId: options.session,
+        sessionId: initialSession,
       );
       stdout.writeln(renderHeadless(
         result,
@@ -102,7 +113,7 @@ Future<void> main(List<String> args) async {
   }
 
   final ConatusTuiController controller = runtime.createController(
-    initialSession: options.session,
+    initialSession: initialSession,
     planning: true,
     initialPermissionMode: toTuiPermissionMode(config.approval.mode),
     onExit: shutdownApp,
