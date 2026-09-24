@@ -73,8 +73,8 @@ class _AgentTuiState extends State<AgentTui> {
     super.initState();
     _controller.onChanged = _refresh;
     _controller.onOpenTeamView = () => setState(() {
-          _view = ViewMode.team;
-        });
+      _view = ViewMode.team;
+    });
     _input.addListener(_onInputChanged);
     _spin = Timer.periodic(const Duration(milliseconds: 120), (_) {
       if (_controller.busy && mounted) {
@@ -143,8 +143,7 @@ class _AgentTuiState extends State<AgentTui> {
     final AttachmentRefs refs = extractAttachmentRefs(raw);
     final List<TuiAttachment> attachments = <TuiAttachment>[
       for (final int index in refs.indices)
-        if (index >= 1 && index <= _attachments.length)
-          _attachments[index - 1],
+        if (index >= 1 && index <= _attachments.length) _attachments[index - 1],
     ];
     _attachments.clear();
     final String text = refs.text;
@@ -198,7 +197,9 @@ class _AgentTuiState extends State<AgentTui> {
       final StringBuffer buffer = StringBuffer(_input.text);
       for (final TuiAttachment attachment in accepted) {
         _attachments.add(attachment);
-        buffer.write('${attachmentPlaceholder(attachment, _attachments.length)} ');
+        buffer.write(
+          '${attachmentPlaceholder(attachment, _attachments.length)} ',
+        );
       }
       _input.text = buffer.toString();
     });
@@ -682,10 +683,6 @@ class _AgentTuiState extends State<AgentTui> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
-          TuiHeader(
-            name: _controller.name,
-            sessionId: _controller.sessionId,
-          ),
           Expanded(
             child: _view == ViewMode.chat
                 ? _body()
@@ -786,7 +783,6 @@ class _AgentTuiState extends State<AgentTui> {
     }
     final child = Scrollbar(
       controller: _scroll,
-      thumbVisibility: true,
       child: ListView.builder(
         controller: _scroll,
         padding: const EdgeInsets.all(1),

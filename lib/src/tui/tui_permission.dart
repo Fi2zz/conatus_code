@@ -26,24 +26,24 @@ enum TuiPermissionMode {
 
   /// 审批阈值；[neverAsk] 为 `null`（不装审批中间件）。
   ToolRisk? get threshold => switch (this) {
-        TuiPermissionMode.alwaysAsk => ToolRisk.medium,
-        TuiPermissionMode.askWhenNeeded => ToolRisk.high,
-        TuiPermissionMode.neverAsk => null,
-      };
+    TuiPermissionMode.alwaysAsk => ToolRisk.medium,
+    TuiPermissionMode.askWhenNeeded => ToolRisk.high,
+    TuiPermissionMode.neverAsk => null,
+  };
 
   /// 选项名。
   String get label => switch (this) {
-        TuiPermissionMode.alwaysAsk => '始终询问',
-        TuiPermissionMode.askWhenNeeded => '按需询问',
-        TuiPermissionMode.neverAsk => '从不询问',
-      };
+    TuiPermissionMode.alwaysAsk => 'Always Ask',
+    TuiPermissionMode.askWhenNeeded => 'Ask When Needed',
+    TuiPermissionMode.neverAsk => 'Never Ask',
+  };
 
   /// 选项说明。
   String get description => switch (this) {
-        TuiPermissionMode.alwaysAsk => '只读操作自动放行，其余都要你先批准。',
-        TuiPermissionMode.askWhenNeeded => '常规改动与命令自动执行，高危操作仍会询问。',
-        TuiPermissionMode.neverAsk => '不打断你：所有操作自动执行并自行决定。',
-      };
+    TuiPermissionMode.alwaysAsk => '只读操作自动放行，其余都要你先批准。',
+    TuiPermissionMode.askWhenNeeded => '常规改动与命令自动执行，高危操作仍会询问。',
+    TuiPermissionMode.neverAsk => '不打断你：所有操作自动执行并自行决定。',
+  };
 }
 
 /// 解析模式标识；无法识别返回 `null`。

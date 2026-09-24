@@ -2,52 +2,10 @@
 library;
 
 import 'dart:io';
-
 import 'package:nocterm/nocterm.dart';
-
 import 'tui_views.dart';
 
-/// 顶栏：应用名 / 当前会话。模型与上下文信息在底部状态栏展示。
-class TuiHeader extends StatelessComponent {
-  const TuiHeader({
-    super.key,
-    required this.name,
-    required this.sessionId,
-  });
-
-  /// 应用 / 场景名。
-  final String name;
-
-  /// 当前会话 id。
-  final String sessionId;
-
-  @override
-  Component build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: const Color.fromRGB(0, 40, 80),
-        border: BoxBorder.all(color: Colors.cyan),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Component>[
-          Text(
-            'Conatus TUI · $name',
-            style: const TextStyle(
-              color: Colors.brightWhite,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            '会话：$sessionId',
-            style: const TextStyle(color: Colors.yellow),
-          ),
-        ],
-      ),
-    );
-  }
-}
+const borderSode = BorderSide(color: Colors.blue);
 
 /// 输入栏：`> ` 前缀 + 单行输入框（思考中置灰只读，避免丢输入）。
 ///
@@ -81,10 +39,16 @@ class TuiInputBar extends StatelessComponent {
   @override
   Component build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 1),
+      // padding: const EdgeInsets.symmetric(horizontal: 0),
       decoration: const BoxDecoration(
-        color: Color.fromRGB(20, 20, 40),
-        border: BoxBorder(top: BorderSide(color: Colors.blue)),
+        // color: Color.fromRGB(20, 20, 40),
+        border: BoxBorder(
+          top: borderSode,
+          bottom: borderSode,
+          left: borderSode,
+          right: borderSode,
+        ),
+        // border: BoxBorder(top: BorderSide(color: Colors.blue)),
       ),
       child: Row(
         children: <Component>[
@@ -179,10 +143,10 @@ class TuiStatusBar extends StatelessComponent {
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: const BoxDecoration(
-        color: Color.fromRGB(0, 20, 40),
-        border: BoxBorder(top: BorderSide(color: Colors.cyan)),
-      ),
+      // decoration: const BoxDecoration(
+      //   color: Color.fromRGB(0, 20, 40),
+      //   border: BoxBorder(top: BorderSide(color: Colors.cyan)),
+      // ),
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           final String left = _leftText();
@@ -190,19 +154,21 @@ class TuiStatusBar extends StatelessComponent {
           final int width = constraints.maxWidth.toInt();
           final int leftWidth = _displayWidth(left);
           // 窄终端先舍右段（环境信息），保住左段与中间操作提示。
-          final bool showRight =
-              leftWidth + _displayWidth(right) + 12 <= width;
-          final int spare = width - leftWidth - (showRight ? _displayWidth(right) : 0);
+          final bool showRight = leftWidth + _displayWidth(right) + 12 <= width;
+          final int spare =
+              width - leftWidth - (showRight ? _displayWidth(right) : 0);
           final bool showHint = spare >= 12;
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Component>[
               Text(
-                left,
+                permissionLabel,
                 maxLines: 1,
                 softWrap: false,
                 style: const TextStyle(color: Colors.brightYellow),
               ),
+              const Spacer(),
+
               Expanded(
                 child: showHint
                     ? Text(
@@ -230,8 +196,10 @@ class TuiStatusBar extends StatelessComponent {
 
   /// 左段：权限模式 + 模型标签。
   String _leftText() {
-    final String model = '模型：$modelLabel';
-    return permissionLabel.isEmpty ? model : '权限：$permissionLabel · $model';
+    final String model = modelLabel;
+    return permissionLabel.isEmpty
+        ? model
+        : '$permissionLabel   $model $location';
   }
 
   /// 右段：目录 + 分支 + 上下文用量。

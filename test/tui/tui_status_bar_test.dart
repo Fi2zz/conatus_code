@@ -38,22 +38,27 @@ void main() {
   });
 
   test('状态栏三段：权限+模型 / 提示 / 位置+上下文', () async {
-    final NoctermTester tester =
-        await NoctermTester.create(size: const Size(140, 24));
+    final NoctermTester tester = await NoctermTester.create(
+      size: const Size(140, 24),
+    );
     addTearDown(tester.dispose);
-    await tester.pumpComponent(const TuiStatusBar(
-      pickerOpen: false,
-      busy: false,
-      tick: 0,
-      modelLabel: 'doubao-seed-x',
-      permissionLabel: 'ask_when_needed',
-      location: '~/REPO/conatus master',
-      contextText: 'ctx 299k/1M (30%)',
-    ));
+    await tester.pumpComponent(
+      const TuiStatusBar(
+        pickerOpen: false,
+        busy: false,
+        tick: 0,
+        modelLabel: 'doubao-seed-x',
+        permissionLabel: 'ask_when_needed',
+        location: '~/REPO/conatus master',
+        contextText: 'ctx 299k/1M (30%)',
+      ),
+    );
     await tester.pump();
 
-    expect(tester.terminalState,
-        containsText('权限：ask_when_needed · 模型：doubao-seed-x'));
+    expect(
+      tester.terminalState,
+      containsText('权限：ask_when_needed · 模型：doubao-seed-x'),
+    );
     expect(tester.terminalState, containsText('~/REPO/conatus master'));
     expect(tester.terminalState, containsText('ctx 299k/1M (30%)'));
     expect(tester.terminalState, containsText('回车发送'));
@@ -62,30 +67,18 @@ void main() {
   test('状态栏缺省：无权限/位置/上下文时不显示对应段', () async {
     final NoctermTester tester = await NoctermTester.create();
     addTearDown(tester.dispose);
-    await tester.pumpComponent(const TuiStatusBar(
-      pickerOpen: false,
-      busy: false,
-      tick: 0,
-      modelLabel: 'mock',
-    ));
+    await tester.pumpComponent(
+      const TuiStatusBar(
+        pickerOpen: false,
+        busy: false,
+        tick: 0,
+        modelLabel: 'mock',
+      ),
+    );
     await tester.pump();
 
     expect(tester.terminalState, containsText('模型：mock'));
     expect(tester.terminalState, isNot(containsText('权限：')));
     expect(tester.terminalState, isNot(containsText('ctx ')));
-  });
-
-  test('顶栏只展示应用名与会话，不再展示模型', () async {
-    final NoctermTester tester = await NoctermTester.create();
-    addTearDown(tester.dispose);
-    await tester.pumpComponent(const TuiHeader(
-      name: '测试',
-      sessionId: 'session_x',
-    ));
-    await tester.pump();
-
-    expect(tester.terminalState, containsText('Conatus TUI · 测试'));
-    expect(tester.terminalState, containsText('会话：session_x'));
-    expect(tester.terminalState, isNot(containsText('模型：')));
   });
 }

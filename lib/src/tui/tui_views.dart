@@ -24,6 +24,7 @@ String tuiSpinner(int tick) => tuiSpinFrames[tick % tuiSpinFrames.length];
 
 /// 动态省略号（纯 ASCII，兼容不显示盲文点的终端）。
 String tuiDots(int tick) => '.' * (tick % 4);
+const String tuiDot = '.';
 
 /// 相对时间描述（用于会话面板）。
 String timeAgo(DateTime? time) {
@@ -77,10 +78,7 @@ class MessageView extends StatelessComponent {
   /// 一条顶格消息（用户 / 助手正文，无「你：/助手：」气泡前缀，
   /// 与 kimi-code 的记录风格一致）。
   Component _line(Component body) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 2),
-      child: body,
-    );
+    return Padding(padding: const EdgeInsets.only(left: 2), child: body);
   }
 
   Component _indent(String text, Color color) {
