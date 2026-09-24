@@ -35,6 +35,7 @@ import 'tui_plan_view.dart';
 import 'tui_provider.dart';
 import 'tui_provider_view.dart';
 import 'tui_session_picker_view.dart';
+import 'tui_shell_mode.dart';
 import 'tui_status_info.dart';
 import 'tui_views.dart';
 
@@ -57,6 +58,7 @@ class _AgentTuiState extends State<AgentTui> {
     commands: () => _controller.commands,
   );
   late final AtRefMenu _atMenu = AtRefMenu(cwd: () => Directory.current.path);
+  final TuiShellMode _shell = TuiShellMode();
   Timer? _spin;
   Timer? _exitTimer;
   int _tick = 0;
@@ -110,6 +112,16 @@ class _AgentTuiState extends State<AgentTui> {
 
   /// 输入变化：同步 `/` 菜单与 `@` 文件补全并重绘。
   void _onInputChanged() {
+    if (_enterShellMode()) {
+      return;
+    }
+    if (_shell.active) {
+      // shell 模式里 `/` 与 `@` 交给 shell 解释，不弹补全面板。
+      _menu.close();
+      _atMenu.close();
+      _refresh();
+      return;
+    }
     _menu.syncInput(_input.text);
     final int cursor = _input.selection.baseOffset;
     _atMenu.syncInput(
@@ -117,6 +129,20 @@ class _AgentTuiState extends State<AgentTui> {
       cursor: cursor < 0 ? _input.text.length : cursor,
     );
     _refresh();
+  }
+
+  /// 输入以 `!` 开头 → 进入 shell 模式并剥掉 `!` 前缀（回显在输入框前缀上）；
+  /// 未进入返回 false。
+  bool _enterShellMode() {
+    if (_controller.busy || !_shell.consumeBang(_input.text)) {
+      return false;
+    }
+    _menu.close();
+    _atMenu.close();
+    _input.text = _input.text.substring(1);
+    _input.selection = const TextSelection.collapsed(offset: 0);
+    _refresh();
+    return true;
   }
 
   void _refresh() {
@@ -138,6 +164,9 @@ class _AgentTuiState extends State<AgentTui> {
     if (raw.trim().isEmpty && _attachments.isEmpty) {
       return;
     }
+    if (_submitShell(raw)) {
+      return;
+    }
     _input.clear();
     // 占位标记映射回附件：文本里未出现的占位对应的附件（悬空）随清空丢弃。
     final AttachmentRefs refs = extractAttachmentRefs(raw);
@@ -154,6 +183,39 @@ class _AgentTuiState extends State<AgentTui> {
     }
     unawaited(_controller.handleLine(text, attachments: attachments));
     setState(() {});
+  }
+
+  /// shell 模式提交：交回 `!<命令>` 交给控制器执行，执行后自动退出模式；
+  /// 不在 shell 模式返回 false。
+  bool _submitShell(String raw) {
+    if (!_shell.active) {
+      return false;
+    }
+    final String command = _shell.submit(raw);
+    _input.clear();
+    if (command.isNotEmpty) {
+      unawaited(_controller.handleLine(command));
+    }
+    _refresh();
+    return true;
+  }
+
+  /// shell 模式按键：Esc 退出（不执行）、空输入时 Backspace 退出。
+  bool _onShellKey(KeyboardEvent event) {
+    if (!_shell.active) {
+      return false;
+    }
+    final bool exited = event.logicalKey == LogicalKey.escape ||
+        (_input.text.isEmpty && event.logicalKey == LogicalKey.backspace);
+    if (!exited) {
+      return false;
+    }
+    _shell.exit();
+    _input.clear();
+    _menu.close();
+    _atMenu.close();
+    _refresh();
+    return true;
   }
 
   /// Ctrl+V 粘贴分派：剪贴板有文本时先按文件路径识别（终端拖放 / 复制路径），
@@ -238,6 +300,9 @@ class _AgentTuiState extends State<AgentTui> {
   /// Ctrl+T 视图切换、Ctrl+C/Alt+C 复制/打断/退出，Ctrl+V 粘贴（路径/图片），
   /// 均先于文本域消费。
   bool _onInputKey(KeyboardEvent event) {
+    if (_onShellKey(event)) {
+      return true;
+    }
     if (event.matches(LogicalKey.keyT, ctrl: true)) {
       _controller.togglePlanExpanded();
       return true;
@@ -733,6 +798,7 @@ class _AgentTuiState extends State<AgentTui> {
           TeamStatusBar(snapshot: _controller.teamSnapshot),
           TuiInputBar(
             controller: _input,
+            shellMode: _shell.active,
             focused:
                 !_controller.picker.open &&
                 !_controller.choice.open &&
@@ -744,6 +810,7 @@ class _AgentTuiState extends State<AgentTui> {
             onKeyEvent: _onInputKey,
           ),
           TuiStatusBar(
+            shellMode: _shell.active,
             pickerOpen: _controller.picker.open,
             busy: _controller.busy,
             tick: _tick,

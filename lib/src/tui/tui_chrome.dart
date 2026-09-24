@@ -3,6 +3,7 @@ library;
 
 import 'dart:io';
 import 'package:nocterm/nocterm.dart';
+import 'tui_shell_mode.dart';
 import 'tui_views.dart';
 
 const borderSode = BorderSide(color: Colors.blue);
@@ -18,8 +19,12 @@ class TuiInputBar extends StatelessComponent {
     required this.focused,
     required this.busy,
     required this.onSubmitted,
+    this.shellMode = false,
     this.onKeyEvent,
   });
+
+  /// shell 模式：前缀换成 `! `，占位提示改为 shell 提示。
+  final bool shellMode;
 
   /// 文本控制器。
   final TextEditingController controller;
@@ -35,6 +40,12 @@ class TuiInputBar extends StatelessComponent {
 
   /// 文本框按键拦截（返回 true 吞掉）：`/` 菜单打开时用于 ↑↓/Enter/Esc/Tab。
   final bool Function(KeyboardEvent event)? onKeyEvent;
+
+  /// 占位提示：思考中 / shell 模式 / 普通输入。
+  String _placeholder() {
+    if (busy) return '思考中…';
+    return shellMode ? shellInputPlaceholder() : '输入消息，/help 查看命令';
+  }
 
   @override
   Component build(BuildContext context) {
@@ -52,7 +63,12 @@ class TuiInputBar extends StatelessComponent {
       ),
       child: Row(
         children: <Component>[
-          const Text('> ', style: TextStyle(color: Colors.green)),
+          Text(
+            shellMode ? '! ' : '> ',
+            style: TextStyle(
+              color: shellMode ? Colors.brightYellow : Colors.green,
+            ),
+          ),
           Expanded(
             child: TextField(
               key: ValueKey<bool>(busy),
@@ -60,7 +76,7 @@ class TuiInputBar extends StatelessComponent {
               focused: focused,
               readOnly: busy,
               style: const TextStyle(color: Colors.white),
-              placeholder: busy ? '思考中…' : '输入消息，/help 查看命令',
+              placeholder: _placeholder(),
               onSubmitted: onSubmitted,
               onKeyEvent: onKeyEvent,
             ),
@@ -79,6 +95,7 @@ class TuiStatusBar extends StatelessComponent {
     required this.busy,
     required this.tick,
     required this.modelLabel,
+    this.shellMode = false,
     this.location = '',
     this.contextText = '',
     this.menuOpen = false,
@@ -99,6 +116,9 @@ class TuiStatusBar extends StatelessComponent {
 
   /// 当前模型标签（左段）。
   final String modelLabel;
+
+  /// shell 模式：提示 shell 操作键。
+  final bool shellMode;
 
   /// 工作目录 + git 分支（右段）；空则不显示。
   final String location;
@@ -124,7 +144,9 @@ class TuiStatusBar extends StatelessComponent {
   @override
   Component build(BuildContext context) {
     final String hint;
-    if (exitPending) {
+    if (shellMode) {
+      hint = shellStatusHint();
+    } else if (exitPending) {
       hint = '再按一次 Ctrl+C 退出';
     } else if (choiceOpen) {
       hint = '[↑↓] 选择 | [Enter] 确认 | [Esc] 取消';

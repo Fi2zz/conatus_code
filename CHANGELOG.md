@@ -6,6 +6,8 @@
 
 - `!` 快捷 shell 模式：输入 `!<命令>` 直接执行不经模型（走沙箱缝）；`!!`
   重跑上一条；busy 时拒绝。
+- shell 模式对齐 OpenCode：空提示符打 `!` 进入（输入框 `!` 前缀 + shell 占位 +
+  状态栏 `[Enter] 执行 | [Esc] 退出`），Esc 不执行退出，执行完自动退出回对话模式。
 - `/review`：审查当前未提交改动（命名/边界/安全/性能，只审不改），与
   `/commit` 组成「写完 → 自查 → 提交」闭环。
 - lint-on-edit：模型编辑文件（write_file/edit_file/apply_patch）后自动跑

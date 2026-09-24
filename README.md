@@ -164,6 +164,10 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 
 - `!<命令>`：直接执行 shell 命令（**不进模型、不烧 token**），走沙箱缝；
   `!!` 重跑上一条。
+- **shell 模式**（与 OpenCode 一致）：在**空提示符**打 `!` 进入 shell 模式——
+  输入框前缀变 `!`（黄）、占位提示「输入 shell 命令，Esc 退出」、状态栏提示
+  `[Enter] 执行 | [Esc] 退出`；`Esc` 不执行直接退出；执行完自动退出回对话模式
+  （一次性）。shell 模式里 `/` 与 `@` 交给 shell 解释，不弹补全面板。
 - lint-on-edit：模型编辑文件后自动跑 linter（`[lint]` 可配置：
   `enabled` / `command` 覆盖 / `debounce_seconds`），告警追加进工具结果
   当场闭环；按项目类型自动探测（pubspec→`dart analyze`、package.json→

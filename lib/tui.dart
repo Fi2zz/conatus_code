@@ -63,6 +63,8 @@ export 'src/tui/tui_provider.dart';
 export 'src/tui/tui_provider_view.dart';
 export 'src/tui/tui_session_picker.dart';
 export 'src/tui/tui_session_picker_view.dart';
+export 'src/tui/tui_shell_mode.dart'
+    show TuiShellMode, shellInputPlaceholder, shellStatusHint;
 export 'src/tui/tui_skill_command.dart';
 export 'src/tui/tui_status_info.dart';
 export 'src/tui/tui_views.dart';
