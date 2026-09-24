@@ -26,6 +26,8 @@ class TuiOptions {
     this.session,
     this.configPath,
     this.helpRequested = false,
+    this.print,
+    this.outputFormat = 'text',
   });
 
   /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
@@ -39,12 +41,21 @@ class TuiOptions {
   /// 解析本身不打印也不退出，由调用方决定怎么处理。
   final bool helpRequested;
 
+  /// `-p` / `--print` 的任务文本；非空时进入 headless 单轮执行（不启动 TUI）。
+  final String? print;
+
+  /// headless 输出格式：`text`（缺省）或 `json`；非法值回落 `text`。
+  final String outputFormat;
+
   /// 用法文案。
   static const String usage =
       '用法：nava '
       '[--session <id>] [--config <路径>]\n'
+      '       nava -p <任务文本> [--output-format text|json] [--session <id>]\n'
       '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
-      '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n';
+      '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n'
+      '  -p, --print <任务>  headless 单轮执行：跑完即退出，不启动 TUI\n'
+      '  --output-format   headless 输出格式：text / json（缺省 text）\n';
 
   /// 解析命令行参数。
   ///
@@ -56,6 +67,8 @@ class TuiOptions {
     String? session;
     String? configPath;
     bool helpRequested = false;
+    String? print;
+    String outputFormat = 'text';
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
@@ -71,12 +84,25 @@ class TuiOptions {
         }
       } else if (arg == '--config' && index + 1 < args.length) {
         configPath = args[++index];
+      } else if (arg == '--print' || arg == '-p') {
+        final bool hasValue =
+            index + 1 < args.length && !args[index + 1].startsWith('-');
+        if (hasValue) {
+          print = args[++index];
+        }
+      } else if (arg == '--output-format' && index + 1 < args.length) {
+        final String candidate = args[++index];
+        if (candidate == 'json') {
+          outputFormat = 'json';
+        }
       }
     }
     return TuiOptions(
       session: session,
       configPath: configPath,
       helpRequested: helpRequested,
+      print: print,
+      outputFormat: outputFormat,
     );
   }
 }
