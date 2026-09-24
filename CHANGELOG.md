@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+- `!` 快捷 shell 模式：输入 `!<命令>` 直接执行不经模型（走沙箱缝）；`!!`
+  重跑上一条；busy 时拒绝。
+- `/review`：审查当前未提交改动（命名/边界/安全/性能，只审不改），与
+  `/commit` 组成「写完 → 自查 → 提交」闭环。
+- lint-on-edit：模型编辑文件（write_file/edit_file/apply_patch）后自动跑
+  linter 并把告警塞回工具结果当场闭环；`[lint]` 配置（enabled/command 覆盖/
+  debounce_seconds），按项目类型探测（dart analyze / eslint / go vet / cargo check）。
 - checkpoint 存储改为**单文件压缩归档 + 不可读文件名**：每个检查点是一个无扩展名
   文件（文件名 = `sha256("<会话>:<轮次>")` 前 16 位哈希，**不可读、无 `.gz` 扩展
   名、不暴露轮次时间线**；轮次只记录在归档头与会话级 gzip `index` 里，`list`/

@@ -155,8 +155,19 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 
 - `/commit`：让模型查看 `git_diff --staged` 的暂存差异、写 Conventional
   Commits 提交信息，并经 `git_commit` 工具提交（high 风险走审批）。
+- `/review`：审查当前未提交改动（命名/边界/安全/性能，**只审不改**），
+  提交/提 PR 前自检。
 - `/doctor`：体检——配置 / 提供商 / 沙箱（Layer 1/2）/ 工具表 / MCP / rg
   逐项 ✓/✗ + 修复提示，自查用。
+
+## `!` 快捷 shell 与 lint-on-edit
+
+- `!<命令>`：直接执行 shell 命令（**不进模型、不烧 token**），走沙箱缝；
+  `!!` 重跑上一条。
+- lint-on-edit：模型编辑文件后自动跑 linter（`[lint]` 可配置：
+  `enabled` / `command` 覆盖 / `debounce_seconds`），告警追加进工具结果
+  当场闭环；按项目类型自动探测（pubspec→`dart analyze`、package.json→
+  `eslint .`、go.mod→`go vet ./...`、Cargo.toml→`cargo check`）。
 
 ## Hooks（`[hooks]`）
 
