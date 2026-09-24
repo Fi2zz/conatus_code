@@ -9,6 +9,9 @@ class FakeShellExecutor implements ShellExecutor {
   /// 最后一次传入 [resolve] 的请求。
   ShellExecRequest? lastRequest;
 
+  /// `run` 被调用次数（去抖等断言用）。
+  int calls = 0;
+
   @override
   ShellExecSpec resolve(ShellExecRequest request) {
     lastRequest = request;
@@ -23,7 +26,10 @@ class FakeShellExecutor implements ShellExecutor {
   }
 
   @override
-  Future<ShellRunResult> run(ShellExecSpec spec) async => result!;
+  Future<ShellRunResult> run(ShellExecSpec spec) async {
+    calls++;
+    return result!;
+  }
 
   @override
   Future<ShellProcess> start(ShellExecSpec spec) =>

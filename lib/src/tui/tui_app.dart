@@ -26,6 +26,7 @@ import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_store.dart';
 import '../config/config_schema.dart';
 import '../hooks/hooks.dart';
+import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
@@ -123,11 +124,13 @@ class ConatusTuiRuntime {
     CheckpointConfig? checkpoint,
     BackgroundConfig? background,
     HooksConfig? hooks,
+    LintConfig? lint,
   }) async {
     final Context app = Context.root(name: 'conatus');
     final String resolvedBaseDir =
         baseDir ?? '${Directory.current.path}${Platform.pathSeparator}.conatus';
     final String sep = Platform.pathSeparator;
+    final String resolvedWorkdir = workdir ?? Directory.current.path;
 
     // ── 工具：时间 / 回显 / 文件读取 / 联网（可选）──────────────
     provideTools(app, timeout: const Duration(seconds: 30));
@@ -297,7 +300,10 @@ class ConatusTuiRuntime {
     if (hooks != null) {
       provideHooks(app, config: hooks);
     }
-
+    // ── lint-on-edit：模型编辑后自动跑 linter 并闭环 ──
+    if (lint != null) {
+      provideLinter(app, config: lint, workdir: resolvedWorkdir);
+    }
     // ── 会话持久化（JSONL）+ 会话仓库 ────────────────────────────
     provideSessionPersistence(
       app,
@@ -320,7 +326,6 @@ class ConatusTuiRuntime {
     ));
     // 项目上下文：AGENTS.md / NAVA.md（见 project_context.dart）。注入为
     // `'workdir'` 服务供 `/init` 等命令定位仓库根。
-    final String resolvedWorkdir = workdir ?? Directory.current.path;
     app.provide('workdir', resolvedWorkdir);
     final String? projectContext = await loadProjectContext(resolvedWorkdir);
     if (projectContext != null) {

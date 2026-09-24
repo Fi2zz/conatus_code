@@ -88,6 +88,7 @@ Future<void> main(List<String> args) async {
     checkpoint: config.checkpoint,
     background: config.background,
     hooks: config.hooks,
+    lint: config.lint,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。

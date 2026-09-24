@@ -88,6 +88,8 @@ export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
 export 'src/hooks/hooks.dart'
     show HookResult, Hooks, provideHooks, runHooks;
+export 'src/lint/linter.dart'
+    show LinterService, provideLinter, kLintFeedbackChars, kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
 export 'src/sandbox/command_policy.dart'
