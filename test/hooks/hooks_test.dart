@@ -36,7 +36,7 @@ void main() {
     final Directory dir = Directory.systemTemp.createTempSync('nava-hooks');
     addTearDown(() => dir.deleteSync(recursive: true));
     final String out = '${dir.path}${Platform.pathSeparator}out.txt';
-    final Hooks hooks = Hooks(config: const HooksConfig(preToolUse: <String>[
+    final Hooks hooks = Hooks(config: HooksConfig(preToolUse: <String>[
       'printf "%s|%s|%s" "\$NAVA_HOOK_EVENT" "\$NAVA_HOOK_TOOL" '
           '"\$NAVA_HOOK_ARGS_JSON" > $out',
     ]));
@@ -105,7 +105,8 @@ void main() {
     final Hooks none = Hooks(config: const HooksConfig());
     expect(await none.onStop(), isNull);
 
-    final Hooks failing = Hooks(config: HooksConfig(stop: <String>['false']));
+    final Hooks failing =
+        Hooks(config: const HooksConfig(stop: <String>['false']));
     expect(await failing.onStop(), isNotNull);
   });
 }
