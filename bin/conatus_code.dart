@@ -17,7 +17,7 @@ Future<void> main(List<String> args) async {
     config = loadConfig(path: options.configPath);
   } on ConfigException catch (error) {
     stderr.writeln('配置错误：${error.message}');
-    exit(1);
+    exit(2);
   }
 
   final String workdir = config.agent.workdir ?? Directory.current.path;
@@ -68,7 +68,33 @@ Future<void> main(List<String> args) async {
     fs: layers.fs,
     shell: layers.shell,
     mcpServers: config.mcp.servers,
+    interactive: options.print == null,
   );
+
+  // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。
+  // 异常（模型调用失败等）映射为退出码 1；配置错误已是 2。
+  if (options.print != null) {
+    int code = 1;
+    try {
+      final HeadlessResult result = await runHeadless(
+        runtime,
+        prompt: options.print!,
+        sessionId: options.session,
+      );
+      stdout.writeln(renderHeadless(
+        result,
+        options.outputFormat == 'json'
+            ? HeadlessFormat.json
+            : HeadlessFormat.text,
+      ));
+      code = result.exitCode;
+    } catch (error) {
+      stderr.writeln('headless 执行失败：$error');
+    } finally {
+      await runtime.dispose();
+    }
+    exit(code);
+  }
 
   final ConatusTuiController controller = runtime.createController(
     initialSession: options.session,
