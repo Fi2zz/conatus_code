@@ -20,6 +20,7 @@ class ConfigParser extends ConfigValues {
         credentials: _readCredentials(),
         thinking: _readThinking(),
         services: _readServices(),
+        mcp: _readMcp(),
         background: _readBackground(),
         loopControl: _readLoopControl(),
         defaultPlanMode: readBool(raw, 'default_plan_mode', false),
@@ -207,6 +208,64 @@ class ConfigParser extends ConfigValues {
       apiKey: readString(table, 'api_key') ?? '',
       oauthKey: oauthKey,
     );
+  }
+
+  McpConfig _readMcp() {
+    final Map<String, dynamic> table = readTable('mcp');
+    final Object? servers = table['servers'];
+    if (servers == null) return const McpConfig();
+    if (servers is! Map) {
+      throw ConfigException('$source：mcp.servers 必须是表。');
+    }
+    return McpConfig(servers: <McpServerSpec>[
+      for (final MapEntry<String, dynamic> entry
+          in servers.cast<String, dynamic>().entries)
+        _readMcpServer(entry.key, entry.value),
+    ]);
+  }
+
+  McpServerSpec _readMcpServer(String name, Object? raw) {
+    if (raw is! Map) {
+      throw ConfigException('$source：mcp.servers.$name 必须是表。');
+    }
+    final Map<String, dynamic> table = raw.cast<String, dynamic>();
+    final McpServerType type = _mcpServerType(table, name);
+    final String? command = readString(table, 'command');
+    final String? url = readString(table, 'url');
+    _validateMcpEndpoint(name, type, command, url);
+    return McpServerSpec(
+      name: name,
+      type: type,
+      command: command,
+      args: readStringList(table, 'args'),
+      env: readStringMap(table, 'env', 'mcp.servers.$name.env'),
+      url: url,
+      headers: readStringMap(table, 'headers', 'mcp.servers.$name.headers'),
+    );
+  }
+
+  McpServerType _mcpServerType(Map<String, dynamic> table, String name) {
+    final String? value = readString(table, 'type');
+    if (value == null) return McpServerType.stdio;
+    return switch (value) {
+      'stdio' => McpServerType.stdio,
+      'http' => McpServerType.http,
+      'sse' => McpServerType.sse,
+      _ => throw ConfigException(
+          '$source：mcp.servers.$name.type 取值 "$value" 不合法。'),
+    };
+  }
+
+  void _validateMcpEndpoint(
+      String name, McpServerType type, String? command, String? url) {
+    if (type == McpServerType.stdio && command == null) {
+      throw ConfigException(
+          '$source：mcp.servers.$name.command 不能为空（stdio 必填）。');
+    }
+    if (type != McpServerType.stdio && url == null) {
+      throw ConfigException(
+          '$source：mcp.servers.$name.url 不能为空（http/sse 必填）。');
+    }
   }
 
   BackgroundConfig _readBackground() {

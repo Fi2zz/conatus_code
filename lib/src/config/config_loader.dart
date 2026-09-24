@@ -32,6 +32,17 @@ const String kDefaultConfigToml = '''
 # BRAVE_API_KEY = "..."
 # FIRECRAWL_API_KEY = "fc-..."
 
+# MCP server：工具经 server__tool 前缀接入，高危按审批模式询问。
+# env / headers 支持 \${KEY} 占位符（经凭据服务解析）。
+# [mcp.servers.filesystem]
+# type = "stdio"           # stdio 用 command；http / sse 用 url
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+# [mcp.servers.remote]
+# type = "http"
+# url = "https://mcp.example.com/mcp"
+# headers = { Authorization = "Bearer \${REMOTE_TOKEN}" }
+
 [agent]
 # workdir = "/path/to/your/project"
 max_steps = 8

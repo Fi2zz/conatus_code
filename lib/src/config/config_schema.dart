@@ -225,6 +225,63 @@ class ServiceConfig {
   final String? oauthKey;
 }
 
+/// MCP server 传输类型；对应 `[mcp.servers.<name>].type`。
+enum McpServerType {
+  /// 本地子进程（`command` + `args`）。
+  stdio,
+
+  /// 远程 HTTP 端点（`url`）。
+  http,
+
+  /// 远程 SSE 端点（`url`）。
+  sse,
+}
+
+/// 一台 MCP server 的声明；对应 `[mcp.servers.<name>]` 表。
+///
+/// [env] 与 [headers] 的值支持 `${KEY}` 凭据占位符，**解析期原样保留**，
+/// 装配期经凭据服务替换（替换结果不得写进日志）。
+class McpServerSpec {
+  const McpServerSpec({
+    required this.name,
+    required this.type,
+    this.command,
+    this.args = const <String>[],
+    this.env = const <String, String>{},
+    this.url,
+    this.headers = const <String, String>{},
+  });
+
+  /// server 名（`[mcp.servers.<name>]` 的键），兼作工具名前缀（`server__tool`）。
+  final String name;
+
+  /// 传输类型。
+  final McpServerType type;
+
+  /// `stdio` 的可执行文件；其他类型为 `null`。
+  final String? command;
+
+  /// `stdio` 的命令行参数。
+  final List<String> args;
+
+  /// `stdio` 注入子进程的环境变量。
+  final Map<String, String> env;
+
+  /// `http` / `sse` 的端点地址；`stdio` 为 `null`。
+  final String? url;
+
+  /// `http` / `sse` 的附加请求头（如 `Authorization`）。
+  final Map<String, String> headers;
+}
+
+/// MCP 配置；对应 `[mcp]` 表。
+class McpConfig {
+  const McpConfig({this.servers = const <McpServerSpec>[]});
+
+  /// `[mcp.servers.<name>]` 表，保持 TOML 书写顺序。
+  final List<McpServerSpec> servers;
+}
+
 /// 后台任务行为；对应 `[background]` 表（解析保留，供未来执行器消费）。
 class BackgroundConfig {
   const BackgroundConfig({
@@ -270,6 +327,7 @@ class ConatusCodeConfig {
     this.credentials = const <String, String>{},
     this.thinking = const ThinkingConfig(),
     this.services = const <ServiceConfig>[],
+    this.mcp = const McpConfig(),
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
     this.defaultPlanMode = false,
@@ -299,6 +357,9 @@ class ConatusCodeConfig {
 
   /// `[services.<名字>]` 表。
   final List<ServiceConfig> services;
+
+  /// `[mcp]` 表。
+  final McpConfig mcp;
 
   /// `[background]` 表。
   final BackgroundConfig background;

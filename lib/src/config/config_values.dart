@@ -102,4 +102,19 @@ class ConfigValues {
     if (item is String) return item;
     throw ConfigException('$source：$key 的元素必须是字符串。');
   }
+
+  /// 取字符串键值表；缺失返回空表，值非字符串即抛错。
+  ///
+  /// [path] 只用于出错信息（[key] 是查找键，二者在嵌套表里不同名）。
+  Map<String, String> readStringMap(
+      Map<String, dynamic> table, String key, String path) {
+    final Object? value = table[key];
+    if (value == null) return const <String, String>{};
+    if (value is! Map) throw ConfigException('$source：$path 必须是表。');
+    return <String, String>{
+      for (final MapEntry<String, dynamic> entry
+          in value.cast<String, dynamic>().entries)
+        entry.key: readListItem(path, entry.value),
+    };
+  }
 }
