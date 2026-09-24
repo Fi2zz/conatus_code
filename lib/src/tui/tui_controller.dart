@@ -542,6 +542,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleGoal(arg);
       case 'init':
         await _handleInit();
+      case 'commit':
+        await _handleCommit();
       case 'compact':
         await _handleCompact();
       case 'rewind':
@@ -865,6 +867,17 @@ class ConatusTuiController implements TuiUserPromptHost {
     } on GoalException catch (e) {
       transcript.add(TuiRole.system, '目标操作失败：${e.message}');
     }
+  }
+
+  /// `/commit`：提交流程——模型查看暂存 diff、写 Conventional Commits 提交
+  /// 信息并经 `git_commit` 工具提交（high 风险走审批）。
+  Future<void> _handleCommit() async {
+    await submit(
+      '执行提交流程：先用 git_diff --staged 查看已暂存的改动；'
+      '基于改动写一条 Conventional Commits 提交信息（scope + 中文描述），'
+      '然后用 git_commit 工具提交。'
+      '若没有已暂存的改动，向用户说明并给出建议（如先 git add 暂存）。',
+    );
   }
 
   /// `/init`：让模型扫描仓库并生成 / 更新 AGENTS.md。

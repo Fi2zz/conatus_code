@@ -68,6 +68,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     name: 'init',
     description: '让模型扫描仓库生成 AGENTS.md（已存在则更新）',
   ),
+  TuiCommand(
+    name: 'commit',
+    description: '提交流程：模型看暂存 diff、写 Conventional Commits 信息并 git_commit 提交',
+  ),
   TuiCommand(name: 'compact', description: '手动压缩当前会话（折叠早期历史）'),
   TuiCommand(
     name: 'rewind',
