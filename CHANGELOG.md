@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+- 后台任务执行器：`run_command_background` 在沙箱中后台启动命令（返回 `bg-<n>`），
+  `list_background_tasks` / `background_output` / `background_kill` 管理；`/background`
+  用户命令入口；并发上限读 `[background] max_running_tasks`（复用 `ShellExecutor.start`
+  能力缝）。任务随进程退出而结束。
+- 消息队列：busy 时输入自动排队（上限 20 条），收口后依次投递；`Esc` 打断与切会话
+  清空队列；cron/提醒投递不受影响。
+- checkpoint delta 快照：turn 0 全量 base + 各轮相对 base 的差量（只复制变化/新增，
+  删除记入清单，mtime+size 变化检测）；恢复为 base 铺底 + 差量覆盖/删除；base 永不
+  prune（回滚锚），保留 base + 最近 `keep-1` 个差量。旧格式清单兼容读。
 - `/rewind` 对话回滚（checkpoint v2）：检查点清单记录对话切点事件 id，
   `/rewind [N]` 在恢复工作区文件的同时把对话回滚到该轮——从切点
   `Session.fork` 出新会话（旧会话保留为记录），切点为空（全新会话的

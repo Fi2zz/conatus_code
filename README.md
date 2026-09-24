@@ -100,8 +100,11 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 
 [checkpoint]
 enabled = true                # 每轮收口后对工作区做文件快照（/rewind 回滚）
-keep = 5                      # 每会话保留最近 N 个检查点（0 = 不限）
+keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不限）
 # ignore = ["node_modules", "build/"]   # 额外忽略的相对路径前缀
+
+[background]
+# max_running_tasks = 4       # 后台任务并发上限（0 = 不限）
 
 # MCP server：工具经 `server__tool` 前缀接入，高危按审批模式询问。
 # [mcp.servers.filesystem]
@@ -116,18 +119,35 @@ keep = 5                      # 每会话保留最近 N 个检查点（0 = 不�
 
 ## 检查点与回滚（`/rewind`）
 
-每轮收口后对工作区文件做一份快照（含会话绑定的 turn 0 初始态），存到
-`<项目数据目录>/checkpoints/<会话>/<turn>/`（排除 `.conatus` / `.git` 与
-`[checkpoint] ignore` 前缀），清单同时记录快照时刻的对话切点事件 id。
-`/rewind [N]` 把工作区恢复到 N 轮前（缺省 1）的文件状态，**并同步把对话
-回滚到该轮**：从切点事件 `Session.fork` 出新会话（append-only 不变式，旧会话
-保留为记录），`/rewind list` 查看本会话可用检查点。快照/恢复走应用级
-dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
+每轮收口后对工作区文件做快照：**turn 0 全量 base + 各轮相对 base 的差量**
+（只复制变化/新增文件，删除记入清单），存到 `<项目数据目录>/checkpoints/
+<会话>/<turn>/`（排除 `.conatus` / `.git` 与 `[checkpoint] ignore` 前缀），
+清单同时记录快照时刻的对话切点事件 id。`/rewind [N]` 把工作区恢复到 N 轮前
+（缺省 1）的文件状态，**并同步把对话回滚到该轮**：从切点事件 `Session.fork`
+出新会话（append-only 不变式，旧会话保留为记录），`/rewind list` 查看本会话
+可用检查点。快照/恢复走应用级 dart:io，不受 fs jail 约束；`/rewind` 是用户
+命令，不挂审批。
 
-- 快照时机：会话绑定（turn 0）+ 每轮收口后；保留最近 `keep` 个（缺省 5）。
-- 恢复语义：目标检查点的文件覆盖当前、当前多出的文件删除（rsync 式）。
+- 快照时机：会话绑定（turn 0）+ 每轮收口后；保留 base + 最近 `keep-1` 个差量。
+- 恢复语义：base 铺底 + 差量覆盖/删除 + 删当前多余（rsync 式）。
+- 变化检测：相对 base 的 mtime+size 比对（保留 mtime+size 的修改会漏检）。
 - 对话切点：`lastEventId` 为 null（全新会话的 turn 0）时切到全新空会话。
 - 关闭：`[checkpoint] enabled = false`（/rewind 提示不可用）。
+
+## 后台任务（`/background`）
+
+`run_command_background` 在沙箱中后台启动命令（不阻塞对话），返回 `bg-<n>`；
+`list_background_tasks` / `background_output` / `background_kill` 管理之。
+`/background [list|output <id>|kill <id>]` 是用户侧入口。任务走 `'shell'` 缝的
+`start()`，照常受沙箱 CommandPolicy 裁决；并发上限读 `[background]
+max_running_tasks`（缺省 4）；任务随进程退出而结束（`keep_alive_on_exit`
+未实现）。
+
+## 消息队列
+
+busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口后依次投递；`Esc`
+打断会**清空队列**并提示条数；切换会话同样清空。cron/提醒的投递不受影响
+（busy 时仍由调度器重试）。
 
 ## MCP（`/mcp`）
 
