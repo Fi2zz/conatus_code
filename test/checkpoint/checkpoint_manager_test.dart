@@ -40,28 +40,30 @@ void main() {
     expect(manager.list().single.turn, 0);
 
     _write(root, 'a.txt', 'v1');
-    expect(await manager.recordTurn(), isNull);
+    expect(await manager.recordTurn(lastEventId: 'ev-1'), isNull);
     expect(manager.turn, 1);
     expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1]);
   });
 
-  test('rewind 回滚到目标轮；超出钳制到最早', () async {
+  test('rewind 回滚到目标轮；返回切点事件 id；超出钳制到最早', () async {
     final (CheckpointManager manager, String root, _) = _manager();
     _write(root, 'a.txt', 'v0');
-    await manager.reset('s1');
+    await manager.reset('s1', lastEventId: 'ev-0');
     _write(root, 'a.txt', 'v1');
-    await manager.recordTurn(); // turn 1
+    await manager.recordTurn(lastEventId: 'ev-1'); // turn 1
     _write(root, 'a.txt', 'v2');
-    await manager.recordTurn(); // turn 2
+    await manager.recordTurn(lastEventId: 'ev-2'); // turn 2
 
     final CheckpointRewindResult? back1 = await manager.rewind(1);
     expect(back1, isNotNull);
     expect(back1!.turn, 1);
+    expect(back1.lastEventId, 'ev-1');
     expect(
         File('$root${Platform.pathSeparator}a.txt').readAsStringSync(), 'v1');
 
     final CheckpointRewindResult? backFar = await manager.rewind(99);
     expect(backFar!.turn, 0);
+    expect(backFar.lastEventId, 'ev-0');
     expect(
         File('$root${Platform.pathSeparator}a.txt').readAsStringSync(), 'v0');
   });

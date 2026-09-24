@@ -53,7 +53,7 @@ void main() {
     final Link link = Link('$root${Platform.pathSeparator}link.dart');
     link.createSync('lib/main.dart');
 
-    await store.snapshot('s1', 1);
+    await store.snapshot('s1', 1, lastEventId: 'ev-99');
 
     final List<int> turns = store.list('s1');
     expect(turns, <int>[1]);
@@ -62,6 +62,7 @@ void main() {
       manifest.files,
       unorderedEquals(<String>['lib/main.dart', 'README.md']),
     );
+    expect(manifest.lastEventId, 'ev-99');
     final String cpDir = '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1${Platform.pathSeparator}1';
     expect(File('$cpDir${Platform.pathSeparator}lib/main.dart').existsSync(), isTrue);
@@ -126,11 +127,12 @@ void main() {
     );
   });
 
-  test('空工作区快照：清单为空，恢复计数为 0', () async {
+  test('空工作区快照：清单为空，恢复计数为 0，lastEventId 缺省为 null', () async {
     final (CheckpointStore store, String root, String projectDir) = _setup();
     await store.snapshot('s1', 0);
     final CheckpointManifest manifest = store.manifestOf('s1', 0);
     expect(manifest.files, isEmpty);
+    expect(manifest.lastEventId, isNull);
     final CheckpointRestore result = await store.restore('s1', 0);
     expect(result.restored, 0);
     expect(result.deleted, 0);

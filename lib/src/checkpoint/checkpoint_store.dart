@@ -41,7 +41,14 @@ class CheckpointStore {
       '${Platform.pathSeparator}$sessionId${Platform.pathSeparator}$turn');
 
   /// 快照当前工作区为 [turn] 轮；写完后 prune 保留最近 [keep] 个。
-  Future<void> snapshot(String sessionId, int turn) async {
+  ///
+  /// [lastEventId] 是快照时刻该会话的最后一条事件 id（对话回滚的 fork 切点），
+  /// 由调用方（manager）从会话传入。
+  Future<void> snapshot(
+    String sessionId,
+    int turn, {
+    String? lastEventId,
+  }) async {
     final Directory dir = _dir(sessionId, turn);
     if (dir.existsSync()) dir.deleteSync(recursive: true);
     dir.createSync(recursive: true);
@@ -58,7 +65,8 @@ class CheckpointStore {
     }
     File('${dir.path}${Platform.pathSeparator}manifest.json')
         .writeAsStringSync(jsonEncode(
-      CheckpointManifest(turn: turn, files: files).toJson(),
+      CheckpointManifest(turn: turn, files: files, lastEventId: lastEventId)
+          .toJson(),
     ));
     prune(sessionId);
   }

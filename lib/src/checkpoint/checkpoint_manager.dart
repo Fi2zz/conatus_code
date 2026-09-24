@@ -31,12 +31,12 @@ class CheckpointManager {
   bool get enabled => _config.enabled;
 
   /// 绑定会话：轮次归 0 并写初始快照（turn 0）。失败返回错误说明。
-  Future<String?> reset(String sessionId) async {
+  Future<String?> reset(String sessionId, {String? lastEventId}) async {
     _sessionId = sessionId;
     _turn = 0;
     if (!enabled) return null;
     try {
-      await _store.snapshot(sessionId, 0);
+      await _store.snapshot(sessionId, 0, lastEventId: lastEventId);
       return null;
     } catch (error) {
       return '检查点初始快照失败：$error';
@@ -50,13 +50,13 @@ class CheckpointManager {
   }
 
   /// 每轮收口后调用：轮次 +1 并快照。失败返回错误说明（不抛出）。
-  Future<String?> recordTurn() async {
+  Future<String?> recordTurn({String? lastEventId}) async {
     _turn++;
     if (!enabled) return null;
     final String? id = _sessionId;
     if (id == null) return null;
     try {
-      await _store.snapshot(id, _turn);
+      await _store.snapshot(id, _turn, lastEventId: lastEventId);
       return null;
     } catch (error) {
       return '检查点保存失败：$error';
@@ -88,7 +88,12 @@ class CheckpointManager {
     final int target = turns.length > back
         ? turns[turns.length - 1 - back]
         : turns.first;
+    final CheckpointManifest manifest = _store.manifestOf(id, target);
     final CheckpointRestore restore = await _store.restore(id, target);
-    return CheckpointRewindResult(turn: target, restore: restore);
+    return CheckpointRewindResult(
+      turn: target,
+      restore: restore,
+      lastEventId: manifest.lastEventId,
+    );
   }
 }

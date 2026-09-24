@@ -665,8 +665,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     );
   }
 
-  /// `/rewind [N]`：回滚 N 轮（缺省 1）的工作区文件状态；`/rewind list` 列出
-  /// 本会话可用检查点。只回滚文件、不动会话与对话（v1 语义）。
+  /// `/rewind [N]`：回滚 N 轮（缺省 1）——工作区文件 + 对话都回到该轮之前。
+  /// `/rewind list` 列出本会话可用检查点。对话回滚用 `Session.fork`（append-only
+  /// 不变式，非破坏派生）+ `SessionStore.adopt` 注册，再切到 fork 会话。
   Future<void> _handleRewind(String arg) async {
     final CheckpointManager? checkpoint =
         _app.get<CheckpointManager>('checkpointManager');
@@ -687,21 +688,55 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     final int steps = int.tryParse(command) ?? 1;
+    final Session? session = _session;
     try {
       final CheckpointRewindResult? result = await checkpoint.rewind(steps);
       if (result == null) {
         transcript.add(TuiRole.system, '没有可回滚的检查点。');
         return;
       }
-      transcript.add(
-        TuiRole.system,
-        '已回滚工作区到第 ${result.turn} 轮（恢复 ${result.restore.restored}、'
-        '删除 ${result.restore.deleted} 个文件）。会话与对话未改动，'
-        '可让模型按当前文件状态继续或重做。',
-      );
+      final String counts = '恢复 ${result.restore.restored}、'
+          '删除 ${result.restore.deleted} 个文件';
+      if (session == null) {
+        transcript.add(
+          TuiRole.system,
+          '已回滚工作区到第 ${result.turn} 轮（$counts）。',
+        );
+        return;
+      }
+      await _switchToRewind(result, session, counts);
     } catch (error) {
       transcript.add(TuiRole.system, '回滚失败：$error');
     }
+  }
+
+  /// 对话回滚：从目标检查点的切点事件 fork 新会话（`lastEventId` 为 null 时
+  /// 是空会话的 turn 0，直接建全新空会话），adopt 进仓库后切过去。
+  ///
+  /// 旧会话保留为记录（append-only 不变式）；切会话时 `_bind` 会为新会话写
+  /// turn 0 快照，捕捉回滚后的文件状态。
+  Future<void> _switchToRewind(
+    CheckpointRewindResult result,
+    Session session,
+    String counts,
+  ) async {
+    final String? cut = result.lastEventId;
+    final String forkId;
+    if (cut == null) {
+      forkId = _sessions.create().id;
+    } else {
+      final Session fork = session.fork(
+        fromEventId: cut,
+        id: 'session_${newUuidV4()}',
+      );
+      _sessions.adopt(fork);
+      forkId = fork.id;
+    }
+    await switchSession(
+      forkId,
+      announce: '已回滚到第 ${result.turn} 轮（$counts，对话已回到该轮），'
+          '新会话 $forkId。',
+    );
   }
 
   void _showCheckpoints(CheckpointManager checkpoint) {
@@ -1245,7 +1280,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     final CheckpointManager? checkpoint =
         _app.get<CheckpointManager>('checkpointManager');
     if (checkpoint != null) {
-      final String? error = await checkpoint.reset(id);
+      final String? error = await checkpoint.reset(
+        id,
+        lastEventId: session.lastEventId,
+      );
       if (error != null) {
         transcript.add(TuiRole.system, error);
       }
@@ -1314,7 +1352,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     final CheckpointManager? checkpoint =
         _app.get<CheckpointManager>('checkpointManager');
     if (checkpoint != null) {
-      final String? error = await checkpoint.recordTurn();
+      final String? error = await checkpoint.recordTurn(
+        lastEventId: _session?.lastEventId,
+      );
       if (error != null) {
         transcript.add(TuiRole.system, error);
       }
