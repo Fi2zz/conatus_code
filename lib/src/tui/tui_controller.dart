@@ -28,6 +28,7 @@ import '../budget/cost_tracker.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
 import '../config/config_writer.dart';
+import '../diagnose/doctor.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
@@ -550,6 +551,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleRewind(arg);
       case 'background':
         await _handleBackground(arg);
+      case 'doctor':
+        _showDoctor();
       case 'cost':
         _showCost();
       case 'cron':
@@ -849,6 +852,22 @@ class ConatusTuiController implements TuiUserPromptHost {
       buffer.write('\n  ${task.id} [${task.status.name}] ${task.command}'
           '（${task.elapsedMs}ms，输出 ${task.outputBytes}B）');
     }
+    transcript.add(TuiRole.system, buffer.toString());
+  }
+
+  /// `/doctor`：聚合体检（不经模型，只读）。
+  void _showDoctor() {
+    final List<DoctorCheck> checks = doctorChecks(_app);
+    final StringBuffer buffer = StringBuffer('nava 体检：');
+    int failed = 0;
+    for (final DoctorCheck check in checks) {
+      final String mark = check.ok ? '✓' : (check.warning ? '⚠' : '✗');
+      if (!check.ok && !check.warning) failed++;
+      buffer
+        ..write('\n  $mark ${check.name}')
+        ..write(check.hint == null ? '' : ' — ${check.hint}');
+    }
+    buffer.write('\n${failed == 0 ? '未发现阻塞项。' : '发现 $failed 个需处理项（见上）。'}');
     transcript.add(TuiRole.system, buffer.toString());
   }
 

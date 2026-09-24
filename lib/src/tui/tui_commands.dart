@@ -83,6 +83,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '后台任务（list / output <id> / kill <id>）',
     argHint: '<子命令>',
   ),
+  TuiCommand(
+    name: 'doctor',
+    description: '体检：配置 / 提供商 / 沙箱 / 工具 / rg',
+  ),
   TuiCommand(name: 'cost', description: '展示今日估算成本与 token 用量'),
   TuiCommand(
     name: 'cron',

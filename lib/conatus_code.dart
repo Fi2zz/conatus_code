@@ -76,6 +76,7 @@ export 'src/config/config_writer.dart'
         deriveProviderName,
         upsertDefaultModel,
         writeConfigFile;
+export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;
 export 'src/diff/diff_parse.dart' show parseUnifiedDiff;
 export 'src/diff/diff_types.dart' show DiffFile, DiffHunk, DiffOp, DiffOpKind;
 export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
