@@ -69,6 +69,7 @@ Future<void> main(List<String> args) async {
     shell: layers.shell,
     mcpServers: config.mcp.servers,
     interactive: options.print == null,
+    workdir: workdir,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。

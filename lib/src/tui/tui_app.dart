@@ -24,6 +24,7 @@ import '../config/config_schema.dart';
 import '../mcp/mcp_assembly.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
+import 'project_context.dart';
 import 'system_notifier.dart';
 import 'tui_choice.dart';
 import 'tui_controller.dart';
@@ -113,6 +114,7 @@ class ConatusTuiRuntime {
     Credentials? credentials,
     List<McpServerSpec>? mcpServers,
     bool interactive = true,
+    String? workdir,
   }) async {
     final Context app = Context.root(name: 'conatus');
     final String resolvedBaseDir =
@@ -294,6 +296,14 @@ class ConatusTuiRuntime {
       text: () => '编码任务先规划后执行：复杂任务先用 plan_write 制定执行计划，'
           '执行中每完成一步用 update_plan 标记进度；工具失败时反思原因并重试或调整方案。',
     ));
+    // 项目上下文：AGENTS.md / NAVA.md（见 project_context.dart）。注入为
+    // `'workdir'` 服务供 `/init` 等命令定位仓库根。
+    final String resolvedWorkdir = workdir ?? Directory.current.path;
+    app.provide('workdir', resolvedWorkdir);
+    final String? projectContext = await loadProjectContext(resolvedWorkdir);
+    if (projectContext != null) {
+      prompt.section(PromptSection(name: 'project', text: () => projectContext));
+    }
     provideTimePrompt(app);
     provideMemory(
       app,

@@ -89,3 +89,5 @@ export 'src/tools/run_command.dart' show RunCommandTool;
 export 'src/tools/run_tests.dart' show RunTestsTool;
 export 'src/tools/update_plan.dart'
     show UpdatePlanTool, provideUpdatePlanTool;
+export 'src/tui/project_context.dart'
+    show kProjectContextMaxChars, loadProjectContext;
