@@ -65,6 +65,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     argHint: '<子命令>',
   ),
   TuiCommand(
+    name: 'init',
+    description: '让模型扫描仓库生成 AGENTS.md（已存在则更新）',
+  ),
+  TuiCommand(
     name: 'cron',
     description: '管理定时任务（list / add / remove / enable / disable / history）',
     argHint: '<子命令>',

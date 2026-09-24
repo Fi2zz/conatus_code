@@ -494,6 +494,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         _openPlanPanel();
       case 'goal':
         await _handleGoal(arg);
+      case 'init':
+        await _handleInit();
       case 'cron':
         await _handleCron(arg);
       case 'team':
@@ -621,6 +623,24 @@ class ConatusTuiController implements TuiUserPromptHost {
     } on GoalException catch (e) {
       transcript.add(TuiRole.system, '目标操作失败：${e.message}');
     }
+  }
+
+  /// `/init`：让模型扫描仓库并生成 / 更新 AGENTS.md。
+  ///
+  /// 不直接写文件：提交固定提示词走正常轮次，由模型经 write_file 落盘
+  /// （沙箱限定工作区、审批照常）。
+  Future<void> _handleInit() async {
+    final String? workdir = _app.get<String>('workdir');
+    final bool exists = workdir != null &&
+        File('$workdir${Platform.pathSeparator}AGENTS.md').existsSync();
+    if (exists) {
+      transcript.add(TuiRole.system, 'AGENTS.md 已存在，将让模型先读取再更新。');
+    }
+    await submit(
+      '扫描当前仓库（工作目录）的结构与关键文件，生成 AGENTS.md：'
+      '项目概述、构建与测试命令、代码风格约定、边界与注意事项。'
+      '${exists ? '文件已存在：先读取再改写，保留仍有用的内容。' : '文件不存在：用 write_file 创建到仓库根。'}',
+    );
   }
 
   Future<void> _runGoalSub(GoalService goal, String sub, String rest) async {
