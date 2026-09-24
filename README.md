@@ -118,13 +118,15 @@ keep = 5                      # 每会话保留最近 N 个检查点（0 = 不�
 
 每轮收口后对工作区文件做一份快照（含会话绑定的 turn 0 初始态），存到
 `<项目数据目录>/checkpoints/<会话>/<turn>/`（排除 `.conatus` / `.git` 与
-`[checkpoint] ignore` 前缀）。`/rewind [N]` 把工作区恢复到 N 轮前
-（缺省 1）的文件状态——**只回滚文件，不改会话与对话**；`/rewind list`
-查看本会话可用检查点。快照/恢复走应用级 dart:io，不受 fs jail 约束
-（fs jail 是模型面守卫）；`/rewind` 是用户命令，不挂审批。
+`[checkpoint] ignore` 前缀），清单同时记录快照时刻的对话切点事件 id。
+`/rewind [N]` 把工作区恢复到 N 轮前（缺省 1）的文件状态，**并同步把对话
+回滚到该轮**：从切点事件 `Session.fork` 出新会话（append-only 不变式，旧会话
+保留为记录），`/rewind list` 查看本会话可用检查点。快照/恢复走应用级
+dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 
 - 快照时机：会话绑定（turn 0）+ 每轮收口后；保留最近 `keep` 个（缺省 5）。
 - 恢复语义：目标检查点的文件覆盖当前、当前多出的文件删除（rsync 式）。
+- 对话切点：`lastEventId` 为 null（全新会话的 turn 0）时切到全新空会话。
 - 关闭：`[checkpoint] enabled = false`（/rewind 提示不可用）。
 
 ## MCP（`/mcp`）

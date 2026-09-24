@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- `/rewind` 对话回滚（checkpoint v2）：检查点清单记录对话切点事件 id，
+  `/rewind [N]` 在恢复工作区文件的同时把对话回滚到该轮——从切点
+  `Session.fork` 出新会话（旧会话保留为记录），切点为空（全新会话的
+  turn 0）时切到全新空会话。框架层 `SessionStore.adopt` 支持注册外部
+  fork 会话并整体落盘继承种子（重开不丢历史）。
 - 检查点 / 回滚（`/rewind`）：每轮收口后对工作区文件做快照（含绑定时的 turn 0
   初始态），存 `<项目数据目录>/checkpoints/<会话>/<turn>/`（排除 `.conatus` /
   `.git` / `[checkpoint] ignore` 前缀，保留最近 `keep` 个）。`/rewind [N]` 把
