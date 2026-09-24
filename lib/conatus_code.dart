@@ -7,6 +7,12 @@ library;
 
 export 'src/assembly/permission_mode.dart' show toTuiPermissionMode;
 export 'src/autonomous/autonomous_assembly.dart' show provideAutonomous;
+export 'src/background/background_tasks.dart'
+    show
+        BackgroundException,
+        BackgroundTask,
+        BackgroundTaskService,
+        BackgroundTaskView;
 export 'src/budget/budgeted_llm.dart'
     show BudgetedLlmProvider, kBudgetExhaustedReply, provideBudgetedLlm;
 export 'src/budget/cost_tracker.dart'
