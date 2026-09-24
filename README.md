@@ -32,6 +32,16 @@ dart run bin/conatus_code.dart
 
 ## 打包成可执行文件
 
+包根提供了 Makefile 入口（推荐）：
+
+```bash
+make            # 编译产出 dist/nava（等价 make build）
+make install    # 编译并软链 ~/bin/nava（已在 PATH）
+make clean      # 删除 dist/
+```
+
+也可以直接调脚本：
+
 ```bash
 bash tool/build_binary.sh
 ```
@@ -49,7 +59,7 @@ export PATH="$PWD/dist:$PATH"
 
 之后直接 `nava` 启动，`nava --help` 看用法。脚本默认写到
 `<包根>/dist/nava`；第一个参数可覆盖输出路径，例如把产物写到
-`/tmp/nava`。
+`/tmp/nava`。用 Makefile 时等价写法是 `make build OUTPUT=/tmp/nava`。
 
 注意：OS 沙箱后端（launcher）仍在运行时从 pub 缓存定位，换机器或清理 pub 缓存后
 沙箱会 fail-closed（命令执行被禁用，文件 jail 保留），这与源码运行时的行为一致。
