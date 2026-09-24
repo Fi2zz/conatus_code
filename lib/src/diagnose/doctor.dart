@@ -75,12 +75,19 @@ DoctorCheck _providerCheck(Context app) {
 
 DoctorCheck _mcpCheck(Context app) {
   final McpRegistry? mcp = app.get<McpRegistry>('mcp');
-  final bool ok = mcp != null && mcp.servers.isNotEmpty;
-  return DoctorCheck(
+  if (mcp != null && mcp.servers.isNotEmpty) {
+    return DoctorCheck(
+      name: 'MCP server',
+      ok: true,
+      warning: true,
+      hint: '${mcp.servers.length} 个',
+    );
+  }
+  return const DoctorCheck(
     name: 'MCP server',
-    ok: ok,
-    warning: true, // 未配置不算故障
-    hint: ok ? '${mcp!.servers.length} 个' : '未配置（config.toml [mcp.servers.*]）',
+    ok: false,
+    warning: true,
+    hint: '未配置（config.toml [mcp.servers.*]）',
   );
 }
 
