@@ -23,6 +23,7 @@ import 'package:conatus_tts/conatus_tts.dart';
 
 import '../../providers.dart';
 import '../autonomous/autonomous_assembly.dart';
+import '../background/background_tasks.dart';
 import '../budget/cost_tracker.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
@@ -68,6 +69,10 @@ const String kTeamUsage =
 
 /// `/task` 用法提示。
 const String kTaskUsage = '用法：/task [claim <任务 id>|release <任务 id>]';
+
+/// `/background` 用法提示。
+const String kBackgroundUsage =
+    '用法：/background [list|output <任务 id>|kill <任务 id>]';
 
 /// `/compact` 的手动压缩保留条数：小于自动预算，强制折叠较早历史。
 const int kManualCompactKeepRecent = 20;
@@ -507,6 +512,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleCompact();
       case 'rewind':
         await _handleRewind(arg);
+      case 'background':
+        await _handleBackground(arg);
       case 'cost':
         _showCost();
       case 'cron':
@@ -748,6 +755,63 @@ class ConatusTuiController implements TuiUserPromptHost {
     final StringBuffer buffer = StringBuffer('本会话检查点（${infos.length}）：');
     for (final CheckpointInfo info in infos) {
       buffer.write('\n  turn ${info.turn}：${info.files} 个文件');
+    }
+    transcript.add(TuiRole.system, buffer.toString());
+  }
+
+  /// `/background [list|output <id>|kill <id>]`：后台任务管理（不经模型）。
+  Future<void> _handleBackground(String arg) async {
+    final BackgroundTaskService? service =
+        _app.get<BackgroundTaskService>('backgroundTasks');
+    if (service == null) {
+      transcript.add(TuiRole.system, '后台任务不可用：未装配。');
+      return;
+    }
+    final int space = arg.indexOf(' ');
+    final String sub = space < 0 ? arg.trim() : arg.substring(0, space).trim();
+    final String rest = space < 0 ? '' : arg.substring(space + 1).trim();
+    try {
+      switch (sub) {
+        case '' || 'list':
+          _showBackgroundTasks(service);
+        case 'output':
+          if (rest.isEmpty) {
+            transcript.add(TuiRole.system, kBackgroundUsage);
+            return;
+          }
+          final String output = service.output(rest);
+          transcript.add(
+            TuiRole.system,
+            '后台任务 $rest 输出：${output.isEmpty ? '（尚无输出）' : output}',
+          );
+        case 'kill':
+          if (rest.isEmpty) {
+            transcript.add(TuiRole.system, kBackgroundUsage);
+            return;
+          }
+          final bool killed = service.kill(rest);
+          transcript.add(
+            TuiRole.system,
+            killed ? '已终止后台任务 $rest。' : '后台任务 $rest 已结束。',
+          );
+        default:
+          transcript.add(TuiRole.system, kBackgroundUsage);
+      }
+    } on BackgroundException catch (error) {
+      transcript.add(TuiRole.system, '后台任务操作失败：${error.message}');
+    }
+  }
+
+  void _showBackgroundTasks(BackgroundTaskService service) {
+    final List<BackgroundTaskView> tasks = service.list();
+    if (tasks.isEmpty) {
+      transcript.add(TuiRole.system, '当前没有后台任务。');
+      return;
+    }
+    final StringBuffer buffer = StringBuffer('后台任务（${tasks.length}）：');
+    for (final BackgroundTaskView task in tasks) {
+      buffer.write('\n  ${task.id} [${task.status.name}] ${task.command}'
+          '（${task.elapsedMs}ms，输出 ${task.outputBytes}B）');
     }
     transcript.add(TuiRole.system, buffer.toString());
   }

@@ -86,6 +86,7 @@ Future<void> main(List<String> args) async {
     interactive: options.print == null,
     workdir: workdir,
     checkpoint: config.checkpoint,
+    background: config.background,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。

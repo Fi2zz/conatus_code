@@ -74,6 +74,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '回滚工作区到 N 轮前（[N] 缺省 1；list 查看可用检查点）',
     argHint: '[N|list]',
   ),
+  TuiCommand(
+    name: 'background',
+    description: '后台任务（list / output <id> / kill <id>）',
+    argHint: '<子命令>',
+  ),
   TuiCommand(name: 'cost', description: '展示今日估算成本与 token 用量'),
   TuiCommand(
     name: 'cron',

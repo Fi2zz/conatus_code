@@ -17,6 +17,8 @@ import 'package:conatus_skill/conatus_skill.dart';
 
 import '../../fs_tools.dart';
 import '../../providers.dart';
+import '../background/background_tasks.dart';
+import '../background/background_tools.dart';
 import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
@@ -118,6 +120,7 @@ class ConatusTuiRuntime {
     bool interactive = true,
     String? workdir,
     CheckpointConfig? checkpoint,
+    BackgroundConfig? background,
   }) async {
     final Context app = Context.root(name: 'conatus');
     final String resolvedBaseDir =
@@ -278,6 +281,15 @@ class ConatusTuiRuntime {
       app,
       defaultTools: <String>['get_time', 'echo', 'read_file'],
     );
+
+    // ── 后台任务：消费 [background] 配置与 'shell' 的 start() 能力缝 ──
+    // 服务跨会话存活；命令照常过沙箱（CommandPolicy + seatbelt）。
+    final BackgroundTaskService backgroundTasks = BackgroundTaskService(
+      shell: app.require<ShellExecutor>('shell'),
+      maxRunningTasks: background?.maxRunningTasks ?? 4,
+    );
+    app.provide('backgroundTasks', backgroundTasks);
+    provideBackgroundTools(app, service: backgroundTasks);
 
     // ── 会话持久化（JSONL）+ 会话仓库 ────────────────────────────
     provideSessionPersistence(
