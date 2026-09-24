@@ -21,6 +21,7 @@ class ConfigParser extends ConfigValues {
         thinking: _readThinking(),
         services: _readServices(),
         mcp: _readMcp(),
+        checkpoint: _readCheckpoint(),
         background: _readBackground(),
         loopControl: _readLoopControl(),
         defaultPlanMode: readBool(raw, 'default_plan_mode', false),
@@ -266,6 +267,15 @@ class ConfigParser extends ConfigValues {
       throw ConfigException(
           '$source：mcp.servers.$name.url 不能为空（http/sse 必填）。');
     }
+  }
+
+  CheckpointConfig _readCheckpoint() {
+    final Map<String, dynamic> table = readTable('checkpoint');
+    return CheckpointConfig(
+      enabled: readBool(table, 'enabled', true),
+      keep: readNonNegativeInt(table, 'keep', 5),
+      ignore: readStringList(table, 'ignore'),
+    );
   }
 
   BackgroundConfig _readBackground() {

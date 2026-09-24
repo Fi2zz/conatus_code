@@ -282,6 +282,24 @@ class McpConfig {
   final List<McpServerSpec> servers;
 }
 
+/// 检查点配置；对应 `[checkpoint]` 表（工作区每轮快照与回滚）。
+class CheckpointConfig {
+  const CheckpointConfig({
+    this.enabled = true,
+    this.keep = 5,
+    this.ignore = const <String>[],
+  });
+
+  /// 是否每轮快照工作区；`false` 时 `/rewind` 不可用。
+  final bool enabled;
+
+  /// 每会话保留最近 N 个检查点（含 turn 0）；`0` 表示不限制。
+  final int keep;
+
+  /// 额外忽略的相对路径前缀（如 `node_modules` / `build/`）。
+  final List<String> ignore;
+}
+
 /// 后台任务行为；对应 `[background]` 表（解析保留，供未来执行器消费）。
 class BackgroundConfig {
   const BackgroundConfig({
@@ -328,6 +346,7 @@ class ConatusCodeConfig {
     this.thinking = const ThinkingConfig(),
     this.services = const <ServiceConfig>[],
     this.mcp = const McpConfig(),
+    this.checkpoint = const CheckpointConfig(),
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
     this.defaultPlanMode = false,
@@ -360,6 +379,9 @@ class ConatusCodeConfig {
 
   /// `[mcp]` 表。
   final McpConfig mcp;
+
+  /// `[checkpoint]` 表。
+  final CheckpointConfig checkpoint;
 
   /// `[background]` 表。
   final BackgroundConfig background;

@@ -43,6 +43,12 @@ const String kDefaultConfigToml = '''
 # url = "https://mcp.example.com/mcp"
 # headers = { Authorization = "Bearer \${REMOTE_TOKEN}" }
 
+# 检查点：每轮收口后对工作区文件做快照，/rewind 一键回滚。
+[checkpoint]
+enabled = true
+keep = 5                    # 每会话保留最近 N 个检查点（0 = 不限）
+# ignore = ["node_modules", "build/"]   # 额外忽略的相对路径前缀
+
 [agent]
 # workdir = "/path/to/your/project"
 max_steps = 8

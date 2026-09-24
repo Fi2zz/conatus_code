@@ -34,6 +34,7 @@ export 'src/config/config_schema.dart'
         ApprovalMode,
         BackgroundConfig,
         BudgetConfig,
+        CheckpointConfig,
         ConatusCodeConfig,
         LlmConfig,
         LoopControlConfig,
