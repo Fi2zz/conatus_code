@@ -74,6 +74,9 @@ const String kTaskUsage = '用法：/task [claim <任务 id>|release <任务 id>
 const String kBackgroundUsage =
     '用法：/background [list|output <任务 id>|kill <任务 id>]';
 
+/// 消息队列容量上限（busy 时排队追问）。
+const int kMessageQueueCap = 20;
+
 /// `/compact` 的手动压缩保留条数：小于自动预算，强制折叠较早历史。
 const int kManualCompactKeepRecent = 20;
 
@@ -231,6 +234,13 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 是否有在途轮次。
   bool busy = false;
 
+  /// 排队中的用户输入（busy 时入队，收口后依次投递；上限 [kMessageQueueCap]）。
+  final List<(String, List<TuiAttachment>)> _queue =
+      <(String, List<TuiAttachment>)>[];
+
+  /// 排队消息条数。
+  int get queuedCount => _queue.length;
+
   /// 会话是否已绑定就绪。
   bool ready = false;
 
@@ -348,7 +358,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     );
   }
 
-  /// 打断在飞轮次（Esc / barge-in）：立即提示，盘上记录保留。
+  /// 打断在飞轮次（Esc / barge-in）：立即提示，盘上记录保留；排队消息一并清空。
   ///
   /// 空闲时（无在飞轮次）也给出提示，打断按键始终有反馈。
   void interrupt() {
@@ -359,7 +369,13 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     cancel.cancel();
-    transcript.add(TuiRole.system, '正在打断…');
+    final int queued = _queue.length;
+    if (queued > 0) {
+      _queue.clear();
+      transcript.add(TuiRole.system, '正在打断…已清空 $queued 条排队消息。');
+    } else {
+      transcript.add(TuiRole.system, '正在打断…');
+    }
     _refresh();
   }
 
@@ -369,7 +385,25 @@ class ConatusTuiController implements TuiUserPromptHost {
     List<TuiAttachment> attachments = const <TuiAttachment>[],
   }) async {
     if (busy) {
-      transcript.add(TuiRole.system, '正在回复，请稍候（Esc 可打断）。');
+      // busy 时排队追问（上限 [kMessageQueueCap]）；未绑定会话不排队。
+      if (_agent == null) {
+        transcript.add(TuiRole.system, '正在回复，请稍候（Esc 可打断）。');
+        _refresh();
+        return;
+      }
+      if (_queue.length >= kMessageQueueCap) {
+        transcript.add(
+          TuiRole.system,
+          '排队已满（$kMessageQueueCap 条），请稍后再试。',
+        );
+        _refresh();
+        return;
+      }
+      _queue.add((text, attachments));
+      transcript.add(
+        TuiRole.system,
+        '已排队（第 ${_queue.length} 条），当前轮结束后依次处理（Esc 打断时清空）。',
+      );
       _refresh();
       return;
     }
@@ -1390,6 +1424,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     _teamSub?.dispose();
     _teamSub = null;
     _app.get<CheckpointManager>('checkpointManager')?.detach();
+    _queue.clear();
     _sessionCtx?.dispose();
     _sessionCtx = null;
     _agent = null;
@@ -1422,6 +1457,11 @@ class ConatusTuiController implements TuiUserPromptHost {
       if (error != null) {
         transcript.add(TuiRole.system, error);
       }
+    }
+    // 消息队列：收口后投递下一条排队输入（一次一条，依次衔接）。
+    if (_queue.isNotEmpty && !busy) {
+      final (String, List<TuiAttachment>) next = _queue.removeAt(0);
+      unawaited(submit(next.$1, attachments: next.$2));
     }
   }
 
