@@ -32,6 +32,7 @@ List<Tool> provideCodeTools(
     registered.addAll(<Tool>[
       GitStatusTool(shell: resolvedShell),
       GitDiffTool(shell: resolvedShell),
+      GitCommitTool(shell: resolvedShell),
       RunCommandTool(shell: resolvedShell),
       RunTestsTool(shell: resolvedShell),
     ]);

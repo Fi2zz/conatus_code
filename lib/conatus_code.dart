@@ -109,7 +109,8 @@ export 'src/sandbox/seatbelt_profile.dart'
         seatbeltMachAllowlist;
 export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
-export 'src/tools/git_tools.dart' show GitDiffTool, GitRun, GitStatusTool, runGit;
+export 'src/tools/git_tools.dart'
+    show GitCommitTool, GitDiffTool, GitRun, GitStatusTool, runGit;
 export 'src/tools/list_files.dart' show ListFilesTool;
 export 'src/tools/run_command.dart' show RunCommandTool;
 export 'src/tools/run_tests.dart' show RunTestsTool;

@@ -84,6 +84,7 @@ class GitStatusTool extends Tool {
 }
 
 /// 查看未提交差异（`git diff`）。只读。
+/// 查看未提交差异（`git diff`）。只读。
 class GitDiffTool extends Tool {
   const GitDiffTool({
     required ShellExecutor shell,
@@ -131,9 +132,58 @@ class GitDiffTool extends Tool {
     if (ctx.optional<bool>('staged') ?? false) parts.add('--staged');
     if (ctx.has('context')) parts.addAll(<String>['-U', '${ctx.integer('context')}']);
     parts.add('--');
-    if (ctx.has('path')) parts.add(_quote(ctx.str('path')));
+    if (ctx.has('path')) parts.add(_gitQuote(ctx.str('path')));
     return parts.join(' ');
   }
+}
 
-  String _quote(String value) => "'${value.replaceAll("'", "'\\''")}'";
+/// shell 单引号转义（`'` → `'\''`），用于把用户输入拼进 git 参数。
+String _gitQuote(String value) => "'${value.replaceAll("'", "'\\''")}'";
+
+/// 提交已暂存的改动（`git commit`）。写操作：high 风险走审批。
+class GitCommitTool extends Tool {
+  const GitCommitTool({
+    required ShellExecutor shell,
+    this.timeout = const Duration(seconds: 30),
+  }) : _shell = shell;
+
+  final ShellExecutor _shell;
+
+  @override
+  final Duration? timeout;
+
+  @override
+  String get name => 'git_commit';
+
+  @override
+  String get description =>
+      '提交已暂存的改动（git commit）；提交信息用 Conventional Commits 格式（scope + 中文描述）。';
+
+  @override
+  ToolRisk get riskLevel => ToolRisk.high;
+
+  @override
+  List<ParamSpec> get params => <ParamSpec>[
+        ParamSpec.string(
+          'message',
+          required: true,
+          description: '提交信息（如 feat(code): 新增 /commit 命令）',
+        ),
+        ParamSpec.string('body', description: '补充正文（可选）'),
+      ];
+
+  @override
+  Future<ToolResult> call(ToolContext ctx) async {
+    final String message = ctx.str('message');
+    final String? body = ctx.string('body');
+    final StringBuffer args = StringBuffer('commit -m ${_gitQuote(message)}');
+    if (body != null) {
+      args.write(' -m ${_gitQuote(body)}');
+    }
+    final GitRun run = await runGit(_shell, args.toString(), timeout!);
+    final ToolResult? failure = run.failure;
+    if (failure != null) return failure;
+    final String text = run.text.trimRight();
+    return ToolResult.success(text.isEmpty ? '已提交。' : text);
+  }
 }
