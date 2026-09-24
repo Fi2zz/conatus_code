@@ -28,6 +28,7 @@ class TuiOptions {
     this.helpRequested = false,
     this.print,
     this.outputFormat = 'text',
+    this.versionRequested = false,
   });
 
   /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
@@ -47,6 +48,9 @@ class TuiOptions {
   /// headless 输出格式：`text`（缺省）或 `json`；非法值回落 `text`。
   final String outputFormat;
 
+  /// 命令行里是否出现了 `--version`；打印版本后退出。
+  final bool versionRequested;
+
   /// 用法文案。
   static const String usage =
       '用法：nava '
@@ -55,7 +59,8 @@ class TuiOptions {
       '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
       '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n'
       '  -p, --print <任务>  headless 单轮执行：跑完即退出，不启动 TUI\n'
-      '  --output-format   headless 输出格式：text / json（缺省 text）\n';
+      '  --output-format   headless 输出格式：text / json（缺省 text）\n'
+      '  --version         打印版本号后退出\n';
 
   /// 解析命令行参数。
   ///
@@ -69,10 +74,13 @@ class TuiOptions {
     bool helpRequested = false;
     String? print;
     String outputFormat = 'text';
+    bool versionRequested = false;
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
         helpRequested = true;
+      } else if (arg == '--version') {
+        versionRequested = true;
       } else if (arg == '--session') {
         final bool hasValue =
             index + 1 < args.length && !args[index + 1].startsWith('-');
@@ -103,6 +111,7 @@ class TuiOptions {
       helpRequested: helpRequested,
       print: print,
       outputFormat: outputFormat,
+      versionRequested: versionRequested,
     );
   }
 }

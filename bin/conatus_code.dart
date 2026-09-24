@@ -11,6 +11,10 @@ Future<void> main(List<String> args) async {
     stdout.write(TuiOptions.usage);
     return;
   }
+  if (options.versionRequested) {
+    stdout.writeln('nava $navaVersion');
+    return;
+  }
 
   final ConatusCodeConfig config;
   try {

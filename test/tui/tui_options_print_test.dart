@@ -72,4 +72,14 @@ void main() {
     expect(TuiOptions.usage, contains('-p, --print'));
     expect(TuiOptions.usage, contains('--output-format'));
   });
+
+  group('--version', () {
+    test('出现时置 versionRequested', () {
+      expect(TuiOptions.parse(const <String>['--version']).versionRequested, isTrue);
+    });
+
+    test('缺省为 false', () {
+      expect(TuiOptions.parse(const <String>[]).versionRequested, isFalse);
+    });
+  });
 }

@@ -91,3 +91,4 @@ export 'src/tools/update_plan.dart'
     show UpdatePlanTool, provideUpdatePlanTool;
 export 'src/tui/project_context.dart'
     show kProjectContextMaxChars, loadProjectContext;
+export 'src/version.dart' show navaVersion;

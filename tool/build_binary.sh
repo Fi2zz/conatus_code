@@ -14,7 +14,9 @@ package_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output="${1:-$package_root/dist/nava}"
 
 mkdir -p "$(dirname "$output")"
-dart compile exe "$package_root/bin/conatus_code.dart" -o "$output"
+version="$(grep '^version:' "$package_root/pubspec.yaml" | awk '{print $2}')"
+dart compile exe "$package_root/bin/conatus_code.dart" \
+  -DNAVA_VERSION="$version" -o "$output"
 chmod +x "$output"
 
 echo "产物：${output}（$(du -h "$output" | awk '{print $1}')）"
