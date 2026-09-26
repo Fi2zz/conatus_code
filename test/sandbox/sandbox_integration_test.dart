@@ -65,11 +65,12 @@ void main() {
     }
   });
 
-  /// 取集成 shell；后端不可用时跳过当前测试（markTestSkipped 抛异常）。
+  /// 取集成 shell；后端不可用时跳过当前测试（markTestSkipped 在当前 test 版本
+  /// 下只标记不终止，必须显式终止，否则后面的空断言会以错误形式报出）。
   SandboxedShellExecutor requireShell(SandboxedShellExecutor? executor) {
     if (executor == null) {
       markTestSkipped('沙箱后端不可用，跳过集成测试');
-      return executor!;
+      throw StateError('unreachable：markTestSkipped 未终止执行');
     }
     return executor;
   }
