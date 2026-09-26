@@ -44,13 +44,20 @@ Future<CheckpointRestore> _restoreArchive(
       ...basePaths.where((String p) => !deleted.contains(p)),
       ...manifest.changed,
     };
+    // 两遍式第一遍：先校验本次恢复要动的全部路径，任一越界则一个文件都不动。
+    ensurePathsRestorable(store.root, <String>[
+      for (final MapEntry<String, List<int>> e in baseEntries.entries)
+        if (!deleted.contains(e.key)) e.key,
+      for (final (String path, _) in entries) path,
+      ...manifest.deleted,
+    ]);
     for (final MapEntry<String, List<int>> entry in baseEntries.entries) {
       if (deleted.contains(entry.key)) continue;
-      await _writeEntry(store.root, entry.key, entry.value);
+      await checkpointWriteBytes(store.root, entry.key, entry.value);
       restored++;
     }
     for (final (String path, List<int> bytes) in entries) {
-      await _writeEntry(store.root, path, bytes);
+      await checkpointWriteBytes(store.root, path, bytes);
       restored++;
     }
     for (final String path in manifest.deleted) {
@@ -62,8 +69,12 @@ Future<CheckpointRestore> _restoreArchive(
     }
   } else {
     target = <String>{for (final CheckpointFileEntry entry in manifest.files) entry.path};
+    ensurePathsRestorable(store.root, <String>[
+      for (final (String path, _) in entries) path,
+      ...manifest.deleted,
+    ]);
     for (final (String path, List<int> bytes) in entries) {
-      await _writeEntry(store.root, path, bytes);
+      await checkpointWriteBytes(store.root, path, bytes);
       restored++;
     }
   }
@@ -125,6 +136,12 @@ Future<CheckpointRestore> _restoreLegacy(
       ...basePaths.where((String p) => !deleted.contains(p)),
       ...manifest.changed,
     };
+    ensurePathsRestorable(store.root, <String>[
+      for (final CheckpointFileEntry entry in base.files)
+        if (!deleted.contains(entry.path)) entry.path,
+      ...manifest.changed,
+      ...manifest.deleted,
+    ]);
     if (baseDir != null) {
       for (final CheckpointFileEntry entry in base.files) {
         if (deleted.contains(entry.path)) continue;
@@ -147,6 +164,10 @@ Future<CheckpointRestore> _restoreLegacy(
     target = <String>{
       for (final CheckpointFileEntry entry in manifest.files) entry.path
     };
+    ensurePathsRestorable(store.root, <String>[
+      for (final CheckpointFileEntry entry in manifest.files) entry.path,
+      ...manifest.deleted,
+    ]);
     for (final CheckpointFileEntry entry in manifest.files) {
       await checkpointRestoreFromGz(dir.path, store.root, entry.path);
       restored++;
@@ -154,12 +175,6 @@ Future<CheckpointRestore> _restoreLegacy(
   }
   final int extras = await _deleteExtras(store, target);
   return CheckpointRestore(restored: restored, deleted: removed + extras);
-}
-
-Future<void> _writeEntry(String root, String rel, List<int> bytes) async {
-  final File dst = File('$root${Platform.pathSeparator}$rel');
-  dst.parent.createSync(recursive: true);
-  await dst.writeAsBytes(bytes, flush: true);
 }
 
 /// 删除当前工作区中「不在目标状态、且未被排除」的文件；返回删除数。
@@ -174,6 +189,8 @@ Future<int> _deleteExtras(CheckpointStore store, Set<String> target) async {
     extras.add(entity);
   }
   for (final File file in extras) {
+    // 防御性：extras 本体不是链接（list 用 followLinks:false），父链仍可能是。
+    ensureRestorable(store.root, checkpointRelativeTo(file, store.root));
     file.deleteSync();
   }
   return extras.length;
