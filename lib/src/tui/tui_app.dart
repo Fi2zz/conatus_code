@@ -94,11 +94,13 @@ class ConatusTuiRuntime {
   /// [fs] / [shell] / [credentials] 是能力接缝的注入点：缺省用本地实现
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
+  /// [shellInteractive] 是用户直发命令（`!` shell 模式）的交互缝，缺省本地直执
+  /// 不经命令白名单；模型发起的命令仍走 [shell]（沙箱照常）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
   /// [interactive] 为 `false` 时跳过人机交互件（浮层 / 审批服务 / `ask_user`
   /// 工具），供 headless 单轮执行使用。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 16 个），调用方是进程级
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 17 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
@@ -117,6 +119,7 @@ class ConatusTuiRuntime {
     String? modelLabel,
     FileSystem? fs,
     ShellExecutor? shell,
+    ShellExecutor? shellInteractive,
     Credentials? credentials,
     List<McpServerSpec>? mcpServers,
     bool interactive = true,
@@ -158,6 +161,10 @@ class ConatusTuiRuntime {
     // 'shell' 既是 rg 的必需依赖（fs 工具回落到 ctx.get('shell')），也是命令执行
     // 的唯一接缝：注入受限实现后 rg / run_command / run_tests / run_code 一并跟随。
     provideShellLocal(app, executor: shell);
+    // 'shellInteractive'：用户直发命令（`!` shell 模式）的交互缝——本地直执、
+    // 不过模型命令白名单（对齐 OpenCode）；模型命令仍走上面的 'shell' 沙箱缝。
+    app.provide(
+        'shellInteractive', shellInteractive ?? LocalShellExecutor());
     provideFsTools(app);
     provideToolResultEviction(app);
     // conatus_code 自己的工具：list_files / git_status / git_diff（M3 起再加

@@ -407,9 +407,12 @@ class ConatusTuiController implements TuiUserPromptHost {
     return last;
   }
 
-  /// 执行用户直发的 shell 命令并上屏（走 `'shell'` 缝，沙箱照常）。
+  /// 执行用户直发的 shell 命令并上屏：走 `'shellInteractive'` 交互缝（缺省本地
+  /// 直执，对齐 OpenCode）；模型工具仍走 `'shell'` 沙箱缝，不受影响。
   Future<void> _runShellForUser(String command) async {
-    final ShellExecutor? shell = _app.get<ShellExecutor>('shell');
+    final ShellExecutor? shell =
+        _app.get<ShellExecutor>('shellInteractive') ??
+            _app.get<ShellExecutor>('shell');
     if (shell == null) {
       transcript.add(TuiRole.system, 'shell 不可用。');
       return;

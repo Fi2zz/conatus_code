@@ -90,6 +90,27 @@ void main() {
     );
   });
 
+  test("'shellInteractive' 存在时 bang 走交互缝（'shell' 沙箱缝零调用）", () async {
+    final (ConatusTuiController controller, Context app, FakeShellExecutor shell) =
+        await _build(_run(stdout: 'sandbox-out'));
+    addTearDown(app.dispose);
+    final FakeShellExecutor interactive =
+        FakeShellExecutor(_run(stdout: 'local-out'));
+    app.provide('shellInteractive', interactive);
+
+    await controller.handleLine('!which kimi');
+
+    expect(interactive.lastRequest!.command, 'which kimi');
+    expect(interactive.calls, 1);
+    // 沙箱缝完全未被触碰：交互命令不过模型命令白名单。
+    expect(shell.calls, 0);
+    expect(
+      controller.transcript.messages
+          .any((TuiMessage m) => m.text == 'local-out'),
+      isTrue,
+    );
+  });
+
   test('!! 重跑上一条；无历史提示', () async {
     final (ConatusTuiController controller, Context app, FakeShellExecutor shell) =
         await _build(_run(stdout: 'ok'));
