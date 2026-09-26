@@ -558,7 +558,7 @@ void main() {
     expect(controller.permissionMode, TuiPermissionMode.neverAsk);
     expect(
       controller.transcript.messages.last.text,
-      contains('权限模式已切换为「从不询问」'),
+      contains('权限模式已切换为「Never Ask」'),
     );
     final SessionEvent last = sessions.get('s1')!.ownEvents.last;
     expect(last.type, kPermissionModeEvent);
@@ -858,7 +858,7 @@ void main() {
 
     // 缺省 Ask When Needed（阈值 high）：medium 工具放行。
     expect(controller.permissionMode, TuiPermissionMode.askWhenNeeded);
-    expect(controller.permissionLabel, '按需询问');
+    expect(controller.permissionLabel, 'Ask When Needed');
     expect(
       (await app.tools.call(const ToolCall(name: 'risky'))).isError,
       isFalse,
@@ -867,7 +867,7 @@ void main() {
     controller.applyPermissionMode(TuiPermissionMode.alwaysAsk);
     expect(
       controller.transcript.messages.last.text,
-      contains('权限模式已切换为「始终询问」'),
+      contains('权限模式已切换为「Always Ask」'),
     );
 
     // Always Ask（阈值 medium）：medium 工具被拦，浮层等待选择。

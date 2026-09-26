@@ -190,11 +190,21 @@ class TuiStatusBar extends StatelessComponent {
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Component>[
-              Text(
-                permissionLabel,
-                maxLines: 1,
-                softWrap: false,
-                style: const TextStyle(color: Colors.brightYellow),
+              Row(
+                children: <Component>[
+                  if (permissionLabel.isNotEmpty)
+                    Text(
+                      permissionLabel,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: const TextStyle(color: Colors.brightYellow),
+                    ),
+                  Text(
+                    permissionLabel.isEmpty ? modelLabel : '   $modelLabel',
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
+                ],
               ),
               const Spacer(),
 
@@ -225,10 +235,9 @@ class TuiStatusBar extends StatelessComponent {
 
   /// 左段：权限模式 + 模型标签。
   String _leftText() {
-    final String model = modelLabel;
     return permissionLabel.isEmpty
-        ? model
-        : '$permissionLabel   $model $location';
+        ? modelLabel
+        : '$permissionLabel   $modelLabel';
   }
 
   /// 右段：目录 + 分支 + 上下文用量。

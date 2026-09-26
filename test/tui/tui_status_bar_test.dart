@@ -57,7 +57,7 @@ void main() {
 
     expect(
       tester.terminalState,
-      containsText('权限：ask_when_needed · 模型：doubao-seed-x'),
+      containsText('ask_when_needed   doubao-seed-x'),
     );
     expect(tester.terminalState, containsText('~/REPO/conatus master'));
     expect(tester.terminalState, containsText('ctx 299k/1M (30%)'));
@@ -77,7 +77,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(tester.terminalState, containsText('模型：mock'));
+    expect(tester.terminalState, containsText('mock'));
     expect(tester.terminalState, isNot(containsText('权限：')));
     expect(tester.terminalState, isNot(containsText('ctx ')));
   });

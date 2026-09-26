@@ -61,7 +61,7 @@ class _HangingProvider implements LlmProvider {
 }
 
 void main() {
-  test('AgentTui 渲染顶栏与空态提示', () async {
+  test('AgentTui 渲染空态提示与状态栏', () async {
     final Context app = Context.root();
     provideTools(app);
     provideLlm(app, llm: FallbackLlm(<LlmProvider>[_NoopProvider()]));
@@ -82,9 +82,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(tester.terminalState, containsText('Conatus TUI'));
-      expect(tester.terminalState, containsText('会话：smoke'));
       expect(tester.terminalState, containsText('输入文字开始对话'));
+      expect(tester.terminalState, containsText('Ask When Needed'));
+      expect(tester.terminalState, containsText('mock'));
     } finally {
       tester.dispose();
       app.dispose();

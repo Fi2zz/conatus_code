@@ -110,12 +110,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(tester.terminalState, containsText('权限：按需询问'));
+      expect(tester.terminalState, containsText('Ask When Needed'));
 
       controller.applyPermissionMode(TuiPermissionMode.alwaysAsk);
       await tester.pump();
 
-      expect(tester.terminalState, containsText('权限：始终询问'));
+      expect(tester.terminalState, containsText('Always Ask'));
     } finally {
       tester.dispose();
       app.dispose();
