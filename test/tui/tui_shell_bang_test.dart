@@ -183,4 +183,17 @@ void main() {
     await timedOut.handleLine('!sleep 999');
     expect(timedOut.transcript.messages.last.text, contains('超时'));
   });
+
+  test('命令未找到（exit 127）错误行原样直出，不加命令失败包装', () async {
+    final (ConatusTuiController controller, Context app, _) = await _build(
+        _run(exitCode: 127, stderr: 'bash: fork: command not found'));
+    addTearDown(app.dispose);
+
+    await controller.handleLine('!fork');
+
+    expect(
+      controller.transcript.messages.last.text,
+      'bash: fork: command not found',
+    );
+  });
 }

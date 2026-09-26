@@ -443,6 +443,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     final String out = result.stdout.text;
     final String err = result.stderr.text;
     final String body = out.isEmpty ? err : (err.isEmpty ? out : '$out\n$err');
+    // 127 是 shell「命令未找到」的约定退出码：错误行原样直出，不加
+    // 「命令失败（exit 127）」包装，观感与终端直出一致。
+    if (code == 127 && body.isNotEmpty) return body;
     return '命令失败（exit $code）：${body.isEmpty ? '（无输出）' : body}';
   }
 
