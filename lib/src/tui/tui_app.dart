@@ -28,6 +28,7 @@ import '../config/config_schema.dart';
 import '../hooks/hooks.dart';
 import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
+import '../sandbox/sandboxed_shell.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
 import 'project_context.dart';
@@ -137,22 +138,27 @@ class ConatusTuiRuntime {
 
     // ── 工具：时间 / 回显 / 文件读取 / 联网（可选）──────────────
     provideTools(app, timeout: const Duration(seconds: 30));
-    app.effect(() => app.tools.fn(
-          'get_time',
-          description: '返回当前本地时间（RFC 3339，带时区偏移）',
-          handler: (ToolContext ctx) async {
-            final DateTime now = DateTime.now();
-            return ToolResult.success('${now.toIso8601String()}'
-                '${formatClockOffset(now.timeZoneOffset)}');
-          },
-        ));
-    app.effect(() => app.tools.fn(
-          'echo',
-          description: '回显输入文本',
-          params: <ParamSpec>[ParamSpec.string('text', required: true)],
-          handler: (ToolContext ctx) async =>
-              ToolResult.success(ctx.str('text')),
-        ));
+    app.effect(
+      () => app.tools.fn(
+        'get_time',
+        description: '返回当前本地时间（RFC 3339，带时区偏移）',
+        handler: (ToolContext ctx) async {
+          final DateTime now = DateTime.now();
+          return ToolResult.success(
+            '${now.toIso8601String()}'
+            '${formatClockOffset(now.timeZoneOffset)}',
+          );
+        },
+      ),
+    );
+    app.effect(
+      () => app.tools.fn(
+        'echo',
+        description: '回显输入文本',
+        params: <ParamSpec>[ParamSpec.string('text', required: true)],
+        handler: (ToolContext ctx) async => ToolResult.success(ctx.str('text')),
+      ),
+    );
 
     provideTelemetry(app);
     instrumentTools(app);
@@ -163,8 +169,7 @@ class ConatusTuiRuntime {
     provideShellLocal(app, executor: shell);
     // 'shellInteractive'：用户直发命令（`!` shell 模式）的交互缝——本地直执、
     // 不过模型命令白名单（对齐 OpenCode）；模型命令仍走上面的 'shell' 沙箱缝。
-    app.provide(
-        'shellInteractive', shellInteractive ?? LocalShellExecutor());
+    app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
     provideFsTools(app);
     provideToolResultEviction(app);
     // conatus_code 自己的工具：list_files / git_status / git_diff（M3 起再加
@@ -180,26 +185,58 @@ class ConatusTuiRuntime {
     if (interactive) {
       final TuiChoicePrompt choice = TuiChoicePrompt();
       app.provide('tuiChoice', choice);
+      final TuiPermissionGate gate = TuiPermissionGate(
+        choice: choice,
+        fs: app.get<FileSystem>('fs'),
+      );
       provideApproval(
         app,
-        approval: TuiPermissionGate(
-          choice: choice,
-          fs: app.get<FileSystem>('fs'),
-        ),
+        approval: gate,
         // 拦截阈值随权限模式变化，由控制器按需挂载 / 卸载
         // （见 ConatusTuiController._syncPermissionMode），这里只提供服务。
         instrument: false,
       );
-      app.effect(() => app.tools.register(AskUserTool(
-            host: () => app.get<TuiUserPromptHost>('tuiController'),
-          )));
+      // 沙箱 REVIEW → 同一选项浮层征询人工复核；headless 不接线（按拒绝，
+      // fail-closed）。NeverAsk 视同放行，与其余审批语义一致。
+      final ShellExecutor? sandboxedShell = shell;
+      if (sandboxedShell is SandboxedShellExecutor) {
+        sandboxedShell.reviewPrompter = (String command, String reason) async {
+          if (gate.mode == TuiPermissionMode.neverAsk) return true;
+          final String? picked = await choice.ask(
+            TuiChoiceRequest(
+              title: '命令需人工复核',
+              choices: <TuiChoice>[
+                TuiChoice(
+                  id: 'sandbox-review-allow',
+                  label: '允许执行',
+                  description: '$command\n复核理由：$reason',
+                ),
+                const TuiChoice(
+                  id: 'sandbox-review-deny',
+                  label: '拒绝',
+                  description: '不执行，把拒绝结果回给模型。',
+                ),
+              ],
+            ),
+            timeout: kTuiDecisionTimeout,
+          );
+          return picked == 'sandbox-review-allow';
+        };
+      }
+      app.effect(
+        () => app.tools.register(
+          AskUserTool(host: () => app.get<TuiUserPromptHost>('tuiController')),
+        ),
+      );
     }
 
     // ── 凭据（先于联网工具：搜索源要经凭据服务解析 Key）──────────
     // Key 统一经凭据服务：provider、注册表与搜索源都不直接读环境变量，换
     // config.toml / File / Vault 等来源时只改这一处注入。缺省 EnvCredentials。
-    final Credentials resolvedCredentials =
-        provideCredentials(app, credentials: credentials);
+    final Credentials resolvedCredentials = provideCredentials(
+      app,
+      credentials: credentials,
+    );
 
     if (webTools) {
       provideSearch(app, credentials: resolvedCredentials);
@@ -219,7 +256,9 @@ class ConatusTuiRuntime {
     // 供 `/model` 浮层候选与 registry 默认模型使用；没有该表时清单为空。
     final Map<String, List<String>> modelsByProvider = <String, List<String>>{};
     for (final ModelConfig config in models ?? const <ModelConfig>[]) {
-      modelsByProvider.putIfAbsent(config.provider, () => <String>[]).add(config.model);
+      modelsByProvider
+          .putIfAbsent(config.provider, () => <String>[])
+          .add(config.model);
     }
     ProviderRegistry? registry;
     if (providers != null) {
@@ -269,7 +308,8 @@ class ConatusTuiRuntime {
       // 无配置：注入占位 provider，TUI 照常启动并引导添加（不报错退出）。
       app.provide('providerSetupNeeded', true);
     }
-    final FallbackLlm resolvedLlm = llm ??
+    final FallbackLlm resolvedLlm =
+        llm ??
         (fromRegistry != null
             ? FallbackLlm(<LlmProvider>[fromRegistry])
             : FallbackLlm(<LlmProvider>[_UnconfiguredProvider()]));
@@ -288,6 +328,7 @@ class ConatusTuiRuntime {
         costTracker: costTracker,
       );
     }
+
     provideReflection(app);
     provideSpawnAgent(
       app,
@@ -322,21 +363,28 @@ class ConatusTuiRuntime {
 
     // ── system prompt / 记忆 / 压缩 / 技能 ──────────────────────
     final SystemPrompt prompt = provideSystemPrompt(app);
-    prompt.section(PromptSection(
-      name: 'persona',
-      text: () => '你是"助手"，一位耐心、务实的助手。需要实时信息或操作时调用工具；否则直接简洁回答。',
-    ));
-    prompt.section(PromptSection(
-      name: 'coding',
-      text: () => '编码任务先规划后执行：复杂任务先用 plan_write 制定执行计划，'
-          '执行中每完成一步用 update_plan 标记进度；工具失败时反思原因并重试或调整方案。',
-    ));
+    prompt.section(
+      PromptSection(
+        name: 'persona',
+        text: () => '你是"助手"，一位耐心、务实的助手。需要实时信息或操作时调用工具；否则直接简洁回答。',
+      ),
+    );
+    prompt.section(
+      PromptSection(
+        name: 'coding',
+        text: () =>
+            '编码任务先规划后执行：复杂任务先用 plan_write 制定执行计划，'
+            '执行中每完成一步用 update_plan 标记进度；工具失败时反思原因并重试或调整方案。',
+      ),
+    );
     // 项目上下文：AGENTS.md / NAVA.md（见 project_context.dart）。注入为
     // `'workdir'` 服务供 `/init` 等命令定位仓库根。
     app.provide('workdir', resolvedWorkdir);
     final String? projectContext = await loadProjectContext(resolvedWorkdir);
     if (projectContext != null) {
-      prompt.section(PromptSection(name: 'project', text: () => projectContext));
+      prompt.section(
+        PromptSection(name: 'project', text: () => projectContext),
+      );
     }
     // 检查点：每轮收口后快照工作区（见 checkpoint_manager.dart）。数据目录
     // 取 baseDir（= workdir/projectDir），快照/恢复走 dart:io 直连。
@@ -388,8 +436,9 @@ class ConatusTuiRuntime {
     provideCronRuntime(
       app,
       deliver: (String recordId, String framing, CronTask task) async {
-        final ConatusTuiController? controller =
-            app.get<ConatusTuiController>('tuiController');
+        final ConatusTuiController? controller = app.get<ConatusTuiController>(
+          'tuiController',
+        );
         if (controller == null) return false;
         return controller.deliverCron(recordId, framing);
       },
@@ -400,7 +449,8 @@ class ConatusTuiRuntime {
       app: app,
       sessions: sessions,
       tools: app.tools,
-      modelLabel: modelLabel ?? model ?? _modelLabel(registry, resolvedCredentials),
+      modelLabel:
+          modelLabel ?? model ?? _modelLabel(registry, resolvedCredentials),
       providers: registry,
       maxSteps: maxSteps,
       switchLlm: switchLlm,
@@ -439,7 +489,10 @@ class ConatusTuiRuntime {
     app.dispose();
   }
 
-  static String _modelLabel(ProviderRegistry? registry, Credentials credentials) {
+  static String _modelLabel(
+    ProviderRegistry? registry,
+    Credentials credentials,
+  ) {
     final String? model = registry?.current?.defaultModel;
     if (model != null) return model;
     if (credentials.get('ARK_API_KEY') != null) return 'doubao-seed-1-8-251228';
@@ -458,20 +511,18 @@ class _UnconfiguredProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) async =>
-      LlmResult(
-        content: '尚未配置模型提供商：用 /provider 添加，或编辑 ~/.nava/config.toml。',
-        provider: name,
-        model: 'none',
-      );
+  }) async => LlmResult(
+    content: '尚未配置模型提供商：用 /provider 添加，或编辑 ~/.nava/config.toml。',
+    provider: name,
+    model: 'none',
+  );
 
   @override
   Stream<LlmStreamEvent> chatStream(
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}

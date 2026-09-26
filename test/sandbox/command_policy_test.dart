@@ -19,8 +19,26 @@ void main() {
   });
 
   test('多命令（&&）→ review', () {
-    expect(policy.decide('echo hi && git status').decision,
-        CommandDecision.review);
+    expect(
+      policy.decide('echo hi && git status').decision,
+      CommandDecision.review,
+    );
+  });
+
+  test('复核形状 + 白名单外可执行 → deny（确定性违规优先于复核）', () {
+    final CommandVerdict verdict = policy.decide('unknownbin && echo hi');
+    expect(verdict.decision, CommandDecision.deny);
+    expect(verdict.reason, contains('白名单'));
+  });
+
+  test('复核形状 + 越界路径 → deny（路径违规同样优先于复核）', () {
+    final CommandVerdict verdict = policy.decide('cat /etc/passwd && echo hi');
+    expect(verdict.decision, CommandDecision.deny);
+    expect(verdict.reason, contains('越界'));
+  });
+
+  test('复核形状 + 白名单/路径全过 → review', () {
+    expect(policy.decide('echo a && echo b').decision, CommandDecision.review);
   });
 
   test('命令替换 → review', () {
@@ -52,8 +70,10 @@ void main() {
     });
 
     test('用户项与缺省集合并（扩展语义）', () {
-      final Set<String> set =
-          resolveAllowedExecutables(<String>['npx', 'kubectl']);
+      final Set<String> set = resolveAllowedExecutables(<String>[
+        'npx',
+        'kubectl',
+      ]);
       expect(set, containsAll(<String>['dart', 'git', 'npx', 'kubectl']));
     });
 
@@ -65,8 +85,9 @@ void main() {
 
   group('resolveReadAllowedPaths', () {
     test('用户路径并入缺省只读集', () {
-      final Set<String> set =
-          resolveReadAllowedPaths(<String>['~/cc-sb-writable']);
+      final Set<String> set = resolveReadAllowedPaths(<String>[
+        '~/cc-sb-writable',
+      ]);
       expect(set, contains('~/.pub-cache'));
       expect(set, contains('~/cc-sb-writable'));
     });

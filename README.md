@@ -264,7 +264,8 @@ final LlmProvider? llm = registry.buildLlm('ark', model: 'doubao-seed-1-8-251228
   **不依赖 OS 后端**，任何平台可用。
 - **Layer 2 · OS 级沙箱**（`enabled`，默认开启，仅 macOS）：
   `CommandPolicy` 裁决命令形状（管道 / 重定向放行；`&&`、`;`、`$()` 触发
-  review，当前按拒绝处理），再由 `SandboxedShellExecutor` 直调系统
+  review，TUI 内经人工复核裁决、headless 按拒绝），再由
+  `SandboxedShellExecutor` 直调系统
   `/usr/bin/sandbox-exec` + 自建的 Seatbelt profile 执行：deny-default 基线、
   可写根经 `-D` 参数注入（工作区、/tmp 真实路径、常用 HOME 缓存、`writable_paths`），
   `/dev/null` 按字符设备放行，mach-lookup 收敛为系统服务白名单，最小环境变量、
@@ -284,8 +285,10 @@ jail 继续生效。Layer 1 与 Layer 2 可独立关闭；`preset = "danger_full
   默认拒绝，读不限面（与 Codex / Claude Code 同姿态）；对抗决心攻击者不是其目标。
 - mach-lookup 白名单是维护点：个别工具若因缺服务报错，按报错扩展
   `seatbeltMachAllowlist` 即可（TLS 所需的 trustd/ocspd 已内置）。
-- 审批判定 `REVIEW` 目前按拒绝处理（不启动进程），"REVIEW → 人工审批"
-  未接线。
+- CommandPolicy 的 REVIEW 已接线人工复核：TUI 内经选项浮层征询（NeverAsk
+  视同放行），批准后在 seatbelt 内照常执行；headless 无浮层，REVIEW 仍按
+  拒绝处理（fail-closed）。白名单/路径越界这类确定性违规不受复核豁免，
+  优先按 deny 拒绝。
 - Layer 2 仅支持 macOS：其他平台命令执行会禁用，请显式设
   `[sandbox] enabled = false`。
 

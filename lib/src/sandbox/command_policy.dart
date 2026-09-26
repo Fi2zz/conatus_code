@@ -27,7 +27,8 @@ class CommandPolicy {
   }) : _allowedExecutables = allowedExecutables ?? _defaultExecutables,
        _readAllowed = _buildReadAllowed(readAllowedPaths),
        _shield =
-           shieldImpl ?? shield.CommandShield(defaultSyntax: shield.CommandSyntax.bash);
+           shieldImpl ??
+           shield.CommandShield(defaultSyntax: shield.CommandSyntax.bash);
 
   /// 沙箱根（规范化）。
   final String root;
@@ -47,12 +48,17 @@ class CommandPolicy {
   }
 
   /// 裁决命令；deny/review 附理由。
+  ///
+  /// shield 判 review 时仍做 invocation 白名单/路径检查：确定性违规直接
+  /// deny，人工复核只豁免「命令形状」这一类顾虑。
   CommandVerdict decide(String command) {
     final shield.CommandResult result = _shield.validate(command);
     if (result.decision == shield.CommandDecision.deny) {
       return CommandVerdict(CommandDecision.deny, _findingText(result));
     }
     if (result.decision == shield.CommandDecision.review) {
+      final CommandVerdict invocation = _checkInvocations(command);
+      if (invocation.decision != CommandDecision.allow) return invocation;
       return CommandVerdict(CommandDecision.review, _findingText(result));
     }
     return _checkInvocations(command);
@@ -61,11 +67,14 @@ class CommandPolicy {
   /// 逐个 invocation 查可执行白名单与越界路径。
   CommandVerdict _checkInvocations(String command) {
     final shield.ParseResult parsed = shield.ParserFactory.forSyntax(
-        shield.CommandSyntax.bash).parse(command);
+      shield.CommandSyntax.bash,
+    ).parse(command);
     for (final shield.CommandInvocation inv in parsed.invocations) {
       if (!_allowedExecutables.contains(inv.executable)) {
         return CommandVerdict(
-            CommandDecision.deny, '可执行文件不在白名单：${inv.executable}');
+          CommandDecision.deny,
+          '可执行文件不在白名单：${inv.executable}',
+        );
       }
       final CommandVerdict pathVerdict = _checkPaths(inv);
       if (pathVerdict.decision != CommandDecision.allow) return pathVerdict;
@@ -111,13 +120,16 @@ class CommandPolicy {
 
   String _findingText(shield.CommandResult result) {
     if (result.findings.isEmpty) return '命令被策略拦截';
-    return result.findings.map((shield.SecurityFinding f) => f.message).join('；');
+    return result.findings
+        .map((shield.SecurityFinding f) => f.message)
+        .join('；');
   }
 }
 
 /// 路径是否在 [parent] 之内（含自身）。
 bool _within(String path, String parent) =>
-    path == parent || path.startsWith('$parent/');String _normalize(String path) => Uri.file(path).normalizePath().toFilePath();
+    path == parent || path.startsWith('$parent/');
+String _normalize(String path) => Uri.file(path).normalizePath().toFilePath();
 
 String _normalizeWithHome(String path) {
   if (!path.startsWith('~/')) return _normalize(path);
@@ -148,24 +160,55 @@ Set<String> resolveAllowedExecutables(Iterable<String> userProvided) =>
     };
 
 /// 合并缺省只读放行路径与用户扩展项（`writable_paths` 经此进入命令路径裁决）。
-Set<String> resolveReadAllowedPaths(Iterable<String> userProvided) =>
-    <String>{
-      ..._defaultReadPaths,
-      for (final String path in userProvided)
-        if (path.isNotEmpty) path,
-    };
+Set<String> resolveReadAllowedPaths(Iterable<String> userProvided) => <String>{
+  ..._defaultReadPaths,
+  for (final String path in userProvided)
+    if (path.isNotEmpty) path,
+};
 
 /// 缺省可执行白名单：coding 常用命令集合。
 const Set<String> _defaultExecutables = <String>{
-  'dart', 'flutter', 'git', 'rg', 'ls', 'cat', 'sed', 'grep',
-  'mkdir', 'mv', 'cp', 'rm', 'touch', 'echo', 'pwd', 'find',
-  'head', 'tail', 'sort', 'uniq', 'wc', 'sh', 'bash', 'python3', 'node',
+  'dart',
+  'flutter',
+  'git',
+  'rg',
+  'ls',
+  'cat',
+  'sed',
+  'grep',
+  'mkdir',
+  'mv',
+  'cp',
+  'rm',
+  'touch',
+  'echo',
+  'pwd',
+  'find',
+  'head',
+  'tail',
+  'sort',
+  'uniq',
+  'wc',
+  'sh',
+  'bash',
+  'python3',
+  'node',
 };
 
 /// 缺省只读放行路径：系统与工具缓存目录、tmp 真实路径、设备文件（`~`
 /// 构造时展开）。与 Seatbelt 可写面保持一致，避免策略层先于 OS 层误拒。
 const Set<String> _defaultReadPaths = <String>{
-  '~/.pub-cache', '~/.dart_tool', '~/.m2', '~/.gradle',
-  '/tmp', '/private/tmp', '/var/tmp', '/private/var/folders',
-  '/dev/null', '/dev/zero', '/dev/stdout', '/dev/stderr', '/dev/tty',
+  '~/.pub-cache',
+  '~/.dart_tool',
+  '~/.m2',
+  '~/.gradle',
+  '/tmp',
+  '/private/tmp',
+  '/var/tmp',
+  '/private/var/folders',
+  '/dev/null',
+  '/dev/zero',
+  '/dev/stdout',
+  '/dev/stderr',
+  '/dev/tty',
 };

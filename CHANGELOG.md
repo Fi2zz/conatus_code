@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+- 沙箱 REVIEW 接线人工复核：TUI 内经选项浮层征询（展示命令与复核理由，
+  NeverAsk 视同放行），批准后命令在 seatbelt 内照常执行；人工拒绝/超时/
+  回调故障均按拒绝（fail-closed）。headless 无浮层，REVIEW 维持拒绝。
+  `CommandPolicy` 复核形状时仍查可执行白名单与越界路径——确定性违规
+  优先 deny，人工复核只豁免命令形状顾虑。`SandboxedShellExecutor` 新增
+  运行期可接线的 `reviewPrompter`（`SandboxReviewPrompter`）。
+
 - 修复 `!` shell 模式误用模型命令策略：用户直发命令此前走 `'shell'` 沙箱缝，
   被可执行白名单（`which` 等日常命令不在列）与路径越界裁决（`cat ~/.zshrc`
   等）整批拒绝，"系统命令全部无法用"。现改走 `'shellInteractive'` 交互缝

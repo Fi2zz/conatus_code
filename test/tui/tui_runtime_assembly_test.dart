@@ -36,8 +36,10 @@ void main() {
 
     final ProviderRegistry? registry = runtime.providers;
     expect(registry, isNotNull);
-    expect(registry!.current?.models,
-        <String>['deepseek-chat', 'deepseek-reasoner']);
+    expect(registry!.current?.models, <String>[
+      'deepseek-chat',
+      'deepseek-reasoner',
+    ]);
 
     await runtime.dispose();
   });
@@ -55,15 +57,17 @@ void main() {
       llm: FallbackLlm(const <LlmProvider>[]),
     );
 
-    final SystemPrompt prompt =
-        runtime.app.require<SystemPrompt>('systemPrompt');
+    final SystemPrompt prompt = runtime.app.require<SystemPrompt>(
+      'systemPrompt',
+    );
     final String anchor = prompt.renderContexts(prompt.assemble());
 
     expect(anchor, startsWith('[当前时间]'));
     expect(anchor, contains('${DateTime.now().year}-'));
 
-    final ToolResult result =
-        await runtime.tools.call(const ToolCall(name: 'get_time'));
+    final ToolResult result = await runtime.tools.call(
+      const ToolCall(name: 'get_time'),
+    );
 
     expect(
       result.content,
@@ -86,8 +90,9 @@ void main() {
       skills: false,
       llm: FallbackLlm(<LlmProvider>[provider]),
     );
-    final ConatusTuiController controller =
-        runtime.createController(onExit: () {});
+    final ConatusTuiController controller = runtime.createController(
+      onExit: () {},
+    );
 
     await controller.start();
     await controller.handleLine('今天几号？');
@@ -112,8 +117,9 @@ void main() {
       skills: false,
       llm: FallbackLlm(<LlmProvider>[provider]),
     );
-    final ConatusTuiController controller =
-        runtime.createController(onExit: () {});
+    final ConatusTuiController controller = runtime.createController(
+      onExit: () {},
+    );
 
     await controller.start();
 
@@ -141,11 +147,14 @@ void main() {
     expect(history.single.excerpt, '好的');
     // 任务提示经 framing 注入：找到含 [cron] 标记的那次模型调用。
     expect(
-      provider.calls.any((List<LlmMessage> messages) => messages.any(
+      provider.calls.any(
+        (List<LlmMessage> messages) => messages.any(
           (LlmMessage m) =>
               m.content.contains('[cron]') &&
               m.content.contains('<task>') &&
-              m.content.contains('报时'))),
+              m.content.contains('报时'),
+        ),
+      ),
       isTrue,
     );
 
@@ -166,47 +175,60 @@ void main() {
       skills: false,
       llm: FallbackLlm(const <LlmProvider>[]),
     );
-    final ConatusTuiController controller =
-        runtime.createController(onExit: () {});
+    final ConatusTuiController controller = runtime.createController(
+      onExit: () {},
+    );
 
     expect(runtime.tools.names, contains(kAskUserToolName));
     expect(runtime.app.get<TuiPermissionGate>('approval'), isNotNull);
     expect(
-      identical(runtime.app.get<TuiChoicePrompt>('tuiChoice'), controller.choice),
+      identical(
+        runtime.app.get<TuiChoicePrompt>('tuiChoice'),
+        controller.choice,
+      ),
       isTrue,
     );
 
     // 缺省按需询问：medium 工具放行，high 工具走浮层。
-    runtime.app.effect(() => runtime.tools.fn(
-          'mid',
-          description: '有副作用',
-          riskLevel: ToolRisk.medium,
-          handler: (ToolContext ctx) async => ToolResult.success('mid'),
-        ));
-    runtime.app.effect(() => runtime.tools.fn(
-          'danger',
-          description: '高危',
-          riskLevel: ToolRisk.high,
-          handler: (ToolContext ctx) async => ToolResult.success('danger'),
-        ));
+    runtime.app.effect(
+      () => runtime.tools.fn(
+        'mid',
+        description: '有副作用',
+        riskLevel: ToolRisk.medium,
+        handler: (ToolContext ctx) async => ToolResult.success('mid'),
+      ),
+    );
+    runtime.app.effect(
+      () => runtime.tools.fn(
+        'danger',
+        description: '高危',
+        riskLevel: ToolRisk.high,
+        handler: (ToolContext ctx) async => ToolResult.success('danger'),
+      ),
+    );
 
-    expect((await runtime.tools.call(const ToolCall(name: 'mid'))).isError,
-        isFalse);
+    expect(
+      (await runtime.tools.call(const ToolCall(name: 'mid'))).isError,
+      isFalse,
+    );
 
-    final Future<ToolResult> blocked =
-        runtime.tools.call(const ToolCall(name: 'danger'));
+    final Future<ToolResult> blocked = runtime.tools.call(
+      const ToolCall(name: 'danger'),
+    );
     expect(controller.choice.open, isTrue);
     controller.choice.confirm(); // 「允许一次」
     expect((await blocked).isError, isFalse);
 
     // ask_user 经同一浮层提问，选中项作为工具结果回传。
-    final Future<ToolResult> asked = runtime.tools.call(const ToolCall(
-      name: kAskUserToolName,
-      arguments: <String, Object?>{
-        'question': '选哪个？',
-        'options': <String>['甲', '乙'],
-      },
-    ));
+    final Future<ToolResult> asked = runtime.tools.call(
+      const ToolCall(
+        name: kAskUserToolName,
+        arguments: <String, Object?>{
+          'question': '选哪个？',
+          'options': <String>['甲', '乙'],
+        },
+      ),
+    );
     controller.choice.confirm();
     expect((await asked).content, contains('甲'));
 
@@ -232,12 +254,14 @@ void main() {
     expect(runtime.tools.names, isNot(contains(kAskUserToolName)));
 
     // 高危工具无审批仍可直执（headless 无人值守，沙箱是安全底线）。
-    runtime.app.effect(() => runtime.tools.fn(
-          'danger',
-          description: '高危',
-          riskLevel: ToolRisk.high,
-          handler: (ToolContext ctx) async => ToolResult.success('danger'),
-        ));
+    runtime.app.effect(
+      () => runtime.tools.fn(
+        'danger',
+        description: '高危',
+        riskLevel: ToolRisk.high,
+        handler: (ToolContext ctx) async => ToolResult.success('danger'),
+      ),
+    );
     expect(
       (await runtime.tools.call(const ToolCall(name: 'danger'))).isError,
       isFalse,
@@ -261,12 +285,55 @@ void main() {
       checkpoint: const CheckpointConfig(keep: 3),
     );
 
-    final CheckpointManager? manager =
-        runtime.app.get<CheckpointManager>('checkpointManager');
+    final CheckpointManager? manager = runtime.app.get<CheckpointManager>(
+      'checkpointManager',
+    );
     expect(manager, isNotNull);
     expect(manager!.enabled, isTrue);
 
     await runtime.dispose();
+  });
+
+  test('REVIEW 复核接线：交互模式挂 prompter，headless 不挂（fail-closed）', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String sep = Platform.pathSeparator;
+    SandboxedShellOptions sandboxOptions(String root) => SandboxedShellOptions(
+      backend: const SandboxBackend(sandboxExecPath: '/bin/false'),
+      root: root,
+      commandPolicy: CommandPolicy(root: root),
+    );
+
+    final SandboxedShellExecutor interactiveShell = SandboxedShellExecutor(
+      options: sandboxOptions(dir.path),
+    );
+    final ConatusTuiRuntime interactiveRt = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      shell: interactiveShell,
+    );
+    expect(interactiveShell.reviewPrompter, isNotNull);
+    await interactiveRt.dispose();
+
+    final SandboxedShellExecutor headlessShell = SandboxedShellExecutor(
+      options: sandboxOptions(dir.path),
+    );
+    final ConatusTuiRuntime headlessRt = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      shell: headlessShell,
+      interactive: false,
+    );
+    expect(headlessShell.reviewPrompter, isNull);
+    await headlessRt.dispose();
   });
 }
 
@@ -292,8 +359,7 @@ class _CaptureProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}

@@ -19,7 +19,13 @@ import 'seatbelt_profile.dart';
 /// 沙箱化的 [ShellExecutor]：经 sandbox-exec 执行，命令先经策略裁决。
 class SandboxedShellExecutor implements ShellExecutor {
   SandboxedShellExecutor({required SandboxedShellOptions options})
-      : _options = options;
+    : _options = options;
+
+  /// REVIEW 裁决的人工复核回调：展示命令与理由，返回是否放行。
+  ///
+  /// 由 TUI 装配期挂上（选项浮层征询）；未接线时 REVIEW 按拒绝处理
+  /// （fail-closed，headless 即此形态）。回调抛错同样按拒绝处理。
+  SandboxReviewPrompter? reviewPrompter;
 
   final SandboxedShellOptions _options;
 
@@ -28,11 +34,14 @@ class SandboxedShellExecutor implements ShellExecutor {
 
   @override
   ShellExecSpec resolve(ShellExecRequest request) {
-    final int timeout =
-        math.min(request.timeoutMs ?? _defaultTimeoutMs, _options.maxTimeoutMs);
+    final int timeout = math.min(
+      request.timeoutMs ?? _defaultTimeoutMs,
+      _options.maxTimeoutMs,
+    );
     final int stdoutMax = math.min(
-        request.stdoutMaxBytes ?? _options.maxOutputBytes,
-        _options.maxOutputBytes);
+      request.stdoutMaxBytes ?? _options.maxOutputBytes,
+      _options.maxOutputBytes,
+    );
     return ShellExecSpec(
       command: request.command,
       workdir: request.workdir == null
@@ -49,18 +58,36 @@ class SandboxedShellExecutor implements ShellExecutor {
   @override
   Future<ShellRunResult> run(ShellExecSpec spec) async {
     final CommandVerdict verdict = _options.commandPolicy.decide(spec.command);
-    if (verdict.decision != CommandDecision.allow) {
+    if (verdict.decision == CommandDecision.deny) {
       return rejected('命令被拒绝：${verdict.reason}', spec);
+    }
+    if (verdict.decision == CommandDecision.review) {
+      final SandboxReviewPrompter? prompter = reviewPrompter;
+      if (prompter == null) {
+        return rejected('命令被拒绝：${verdict.reason}', spec);
+      }
+      final bool approved = await _promptSafely(
+        prompter,
+        spec.command,
+        verdict.reason,
+      );
+      if (!approved) {
+        return rejected('命令未获人工复核通过：${verdict.reason}', spec);
+      }
     }
     if (!withinRoot(spec.workdir, _options.root)) {
       return rejected('工作目录越界：${spec.workdir}', spec);
     }
     final Process process = await _spawn(spec);
     closeStdin(process, spec.stdin);
-    final Future<CollectedOutput> stdout =
-        collectOutput(process.stdout, spec.stdoutMaxBytes);
-    final Future<CollectedOutput> stderr =
-        collectOutput(process.stderr, _options.maxOutputBytes);
+    final Future<CollectedOutput> stdout = collectOutput(
+      process.stdout,
+      spec.stdoutMaxBytes,
+    );
+    final Future<CollectedOutput> stderr = collectOutput(
+      process.stderr,
+      _options.maxOutputBytes,
+    );
     bool timedOut = false;
     final Timer timer = Timer(Duration(milliseconds: spec.timeoutMs), () {
       timedOut = true;
@@ -82,8 +109,20 @@ class SandboxedShellExecutor implements ShellExecutor {
   @override
   Future<ShellProcess> start(ShellExecSpec spec) async {
     final CommandVerdict verdict = _options.commandPolicy.decide(spec.command);
-    if (verdict.decision != CommandDecision.allow) {
+    if (verdict.decision == CommandDecision.deny) {
       return RejectedShellProcess(verdict.reason);
+    }
+    if (verdict.decision == CommandDecision.review) {
+      final SandboxReviewPrompter? prompter = reviewPrompter;
+      if (prompter == null) return RejectedShellProcess(verdict.reason);
+      final bool approved = await _promptSafely(
+        prompter,
+        spec.command,
+        verdict.reason,
+      );
+      if (!approved) {
+        return RejectedShellProcess('未获人工复核通过：${verdict.reason}');
+      }
     }
     if (!withinRoot(spec.workdir, _options.root)) {
       return RejectedShellProcess('工作目录越界：${spec.workdir}');
@@ -91,6 +130,19 @@ class SandboxedShellExecutor implements ShellExecutor {
     final Process process = await _spawn(spec);
     closeStdin(process, spec.stdin);
     return SandboxedShellProcess(process, _options.maxOutputBytes);
+  }
+
+  /// 人工复核（回调抛错按拒绝，fail-closed）。
+  Future<bool> _promptSafely(
+    SandboxReviewPrompter prompter,
+    String command,
+    String reason,
+  ) async {
+    try {
+      return await prompter(command, reason);
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<Process> _spawn(ShellExecSpec spec) {
@@ -145,3 +197,7 @@ class SandboxedShellExecutor implements ShellExecutor {
   Map<String, String> _minimalEnv() =>
       _options.minimalEnv ?? defaultMinimalEnv();
 }
+
+/// REVIEW 裁决的人工复核回调：命令与理由进，是否放行进。
+typedef SandboxReviewPrompter =
+    Future<bool> Function(String command, String reason);

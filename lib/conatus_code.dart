@@ -86,8 +86,7 @@ export 'src/diff/unified_diff.dart'
     show buildUnifiedDiff, kMaxDiffLines, splitLines;
 export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
-export 'src/hooks/hooks.dart'
-    show HookResult, Hooks, provideHooks, runHooks;
+export 'src/hooks/hooks.dart' show HookResult, Hooks, provideHooks, runHooks;
 export 'src/lint/linter.dart'
     show LinterService, provideLinter, kLintFeedbackChars, kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
@@ -106,7 +105,8 @@ export 'src/sandbox/sandbox_assembly.dart'
     show SandboxLayers, resolveSandboxLayers;
 export 'src/sandbox/sandbox_probe.dart'
     show SandboxBackend, SandboxException, probeSandboxBackend;
-export 'src/sandbox/sandboxed_shell.dart' show SandboxedShellExecutor;
+export 'src/sandbox/sandboxed_shell.dart'
+    show SandboxedShellExecutor, SandboxReviewPrompter;
 export 'src/sandbox/sandboxed_shell_options.dart' show SandboxedShellOptions;
 export 'src/sandbox/seatbelt_profile.dart'
     show
@@ -121,8 +121,7 @@ export 'src/tools/git_tools.dart'
 export 'src/tools/list_files.dart' show ListFilesTool;
 export 'src/tools/run_command.dart' show RunCommandTool;
 export 'src/tools/run_tests.dart' show RunTestsTool;
-export 'src/tools/update_plan.dart'
-    show UpdatePlanTool, provideUpdatePlanTool;
+export 'src/tools/update_plan.dart' show UpdatePlanTool, provideUpdatePlanTool;
 export 'src/tui/project_context.dart'
     show kProjectContextMaxChars, loadProjectContext;
 export 'src/tui/recent_session.dart' show findRecentSessionId;
