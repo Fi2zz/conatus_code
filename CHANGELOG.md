@@ -9,6 +9,8 @@
   标签统一为英文（Always Ask / Ask When Needed / Never Ask），相关测试同步对齐。
 - 修复沙箱集成测试守卫：`markTestSkipped` 在当前 test 版本下只标记不终止，
   无沙箱环境会以空断言报错而非跳过；标记后显式抛 `StateError` 终止。
+- `config.toml` 创建与每次写入后 `chmod 600`（Windows 跳过），避免明文
+  API Key 被同机其他用户读取。
 - `!` 快捷 shell 模式：输入 `!<命令>` 直接执行不经模型（走沙箱缝）；`!!`
   重跑上一条；busy 时拒绝。
 - shell 模式对齐 OpenCode：空提示符打 `!` 进入（输入框 `!` 前缀 + shell 占位 +

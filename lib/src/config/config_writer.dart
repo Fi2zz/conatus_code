@@ -120,11 +120,15 @@ String appendModelSection(
   return buffer.toString();
 }
 
-/// 写入文件（父目录自动创建）。
+/// 写入文件（父目录自动创建）；写入后收紧权限为 600（Windows 跳过），
+/// 避免明文 API Key 被同机其他用户读取。
 void writeConfigFile(String path, String content) {
   final File file = File(path);
   file.parent.createSync(recursive: true);
   file.writeAsStringSync(content);
+  if (!Platform.isWindows) {
+    Process.runSync('chmod', <String>['600', path]);
+  }
 }
 
 /// 读 [path] → 追加 provider 段（[models] 非空时逐个写模型段）→ 设置
