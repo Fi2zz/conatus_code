@@ -336,13 +336,16 @@ class ConatusTuiRuntime {
     );
 
     // ── 后台任务：消费 [background] 配置与 'shell' 的 start() 能力缝 ──
-    // 服务跨会话存活；命令照常过沙箱（CommandPolicy + seatbelt）。
+    // 服务跨会话存活；命令照常过沙箱（CommandPolicy + seatbelt）。退出时
+    // 按 keep_alive_on_exit 终止（缺省）或保活脱离。
     final BackgroundTaskService backgroundTasks = BackgroundTaskService(
       shell: app.require<ShellExecutor>('shell'),
       maxRunningTasks: background?.maxRunningTasks ?? 4,
+      keepAliveOnExit: background?.keepAliveOnExit ?? false,
     );
     app.provide('backgroundTasks', backgroundTasks);
     provideBackgroundTools(app, service: backgroundTasks);
+    app.onDispose(backgroundTasks.shutdown);
 
     // ── Hooks：Pre/Post 挂工具中间件，Stop 由控制器 _afterTurn 触发 ──
     if (hooks != null) {

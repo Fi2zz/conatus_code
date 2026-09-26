@@ -10,6 +10,10 @@
   `CommandPolicy` 复核形状时仍查可执行白名单与越界路径——确定性违规
   优先 deny，人工复核只豁免命令形状顾虑。`SandboxedShellExecutor` 新增
   运行期可接线的 `reviewPrompter`（`SandboxReviewPrompter`）。
+- `[background] keep_alive_on_exit` 生效：缺省 `false` 时 nava 退出即终止
+  所有在跑后台任务（`BackgroundTaskService.shutdown` 随根上下文 dispose
+  调用，TUI 与 headless 同路径）；置 `true` 退出不杀、任务保活脱离——
+  脱离后不受 `/background` 管理，输出管道随进程退出关闭。
 
 - 修复 `!` shell 模式误用模型命令策略：用户直发命令此前走 `'shell'` 沙箱缝，
   被可执行白名单（`which` 等日常命令不在列）与路径越界裁决（`cat ~/.zshrc`

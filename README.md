@@ -104,6 +104,7 @@ keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不�
 # ignore = ["node_modules", "build/"]   # 额外忽略的相对路径前缀
 
 [background]
+# keep_alive_on_exit = false  # true = 退出时不杀后台任务（脱离 /background 管理）
 # max_running_tasks = 4       # 后台任务并发上限（0 = 不限）
 
 # MCP server：工具经 `server__tool` 前缀接入，高危按审批模式询问。
@@ -142,8 +143,10 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 `list_background_tasks` / `background_output` / `background_kill` 管理之。
 `/background [list|output <id>|kill <id>]` 是用户侧入口。任务走 `'shell'` 缝的
 `start()`，照常受沙箱 CommandPolicy 裁决；并发上限读 `[background]
-max_running_tasks`（缺省 4）；任务随进程退出而结束（`keep_alive_on_exit`
-未实现）。
+max_running_tasks`（缺省 4）。缺省 `keep_alive_on_exit = false`：nava 退出时
+终止所有在跑任务；置 `true` 则退出时不杀、任务保活脱离——**脱离后不再受
+`/background` 管理**（list/output/kill 找不到它），且输出管道随进程退出关闭，
+子进程继续大量写输出可能被 SIGPIPE 杀死。
 
 ## 消息队列
 

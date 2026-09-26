@@ -1,8 +1,10 @@
 /// 后台任务执行器：复用 `'shell'` 能力缝的 [ShellExecutor.start]。
 ///
 /// 任务跨会话存活（根上下文服务 `'backgroundTasks'`）；沙箱内启动的后台进程
-/// 照常受 CommandPolicy 形状裁决与 seatbelt 隔离。任务随 nava 进程退出而结束
-/// （`keep_alive_on_exit` 本期不实现）。输出在服务内累计，`output` 读全量。
+/// 照常受 CommandPolicy 形状裁决与 seatbelt 隔离。进程退出时按
+/// [BackgroundTaskService.keepAliveOnExit] 决定终止（缺省）或保活脱离
+/// （保活的任务脱离 `/background` 管理，输出管道随进程退出关闭）。
+/// 输出在服务内累计，`output` 读全量。
 library;
 
 import 'dart:async';
@@ -44,7 +46,11 @@ class BackgroundTaskView {
 
 /// 在途后台任务：持有进程句柄与累计输出。
 class BackgroundTask {
-  BackgroundTask({required this.id, required this.command, required this.process});
+  BackgroundTask({
+    required this.id,
+    required this.command,
+    required this.process,
+  });
 
   final String id;
   final String command;
@@ -59,13 +65,13 @@ class BackgroundTask {
   }
 
   BackgroundTaskView view() => BackgroundTaskView(
-        id: id,
-        command: command,
-        status: process.status,
-        exitCode: process.exitCode,
-        elapsedMs: DateTime.now().difference(startedAt).inMilliseconds,
-        outputBytes: output.length,
-      );
+    id: id,
+    command: command,
+    status: process.status,
+    exitCode: process.exitCode,
+    elapsedMs: DateTime.now().difference(startedAt).inMilliseconds,
+    outputBytes: output.length,
+  );
 }
 
 /// 后台任务执行器。
@@ -74,6 +80,7 @@ class BackgroundTaskService {
     required ShellExecutor shell,
     this.maxRunningTasks = 4,
     this.maxRecords = 20,
+    this.keepAliveOnExit = false,
   }) : _shell = shell;
 
   final ShellExecutor _shell;
@@ -83,6 +90,9 @@ class BackgroundTaskService {
 
   /// 记录保留上限（含已完成/被杀）。
   final int maxRecords;
+
+  /// 进程退出时是否保活后台任务；缺省 `false` = 退出即终止。
+  final bool keepAliveOnExit;
 
   final Map<String, BackgroundTask> _tasks = <String, BackgroundTask>{};
   final List<String> _order = <String>[];
@@ -98,11 +108,16 @@ class BackgroundTaskService {
       ShellExecRequest(command: command, workdir: cwd),
     );
     final ShellProcess process = await _shell.start(spec);
-    if (process.status != ShellProcessStatus.running && process.exitCode == null) {
+    if (process.status != ShellProcessStatus.running &&
+        process.exitCode == null) {
       throw BackgroundException('rejected', _rejectionReason(process));
     }
     final String id = 'bg-${++_seq}';
-    final BackgroundTask task = BackgroundTask(id: id, command: command, process: process);
+    final BackgroundTask task = BackgroundTask(
+      id: id,
+      command: command,
+      process: process,
+    );
     _tasks[id] = task;
     _order.add(id);
     unawaited(process.done.then((_) => _pruneRecords()));
@@ -111,8 +126,8 @@ class BackgroundTaskService {
 
   /// 全部任务（含历史记录，按启动顺序）。
   List<BackgroundTaskView> list() => <BackgroundTaskView>[
-        for (final String id in _order) _tasks[id]!.view(),
-      ];
+    for (final String id in _order) _tasks[id]!.view(),
+  ];
 
   /// 某任务的累计输出（先吸收增量）；id 不存在抛 [BackgroundException.notFound]。
   String output(String id) {
@@ -133,10 +148,23 @@ class BackgroundTaskService {
     return task.process.kill();
   }
 
+  /// 进程退出前收口：[keepAliveOnExit] 为 false 时终止所有在跑任务，为 true
+  /// 时保活脱离（句柄随进程消失，任务不再受 `/background` 管理）。幂等。
+  void shutdown() {
+    if (keepAliveOnExit) return;
+    for (final BackgroundTask task in _tasks.values) {
+      if (task.process.status == ShellProcessStatus.running) {
+        task.process.kill();
+      }
+    }
+  }
+
   void _enforceLimit() {
     if (maxRunningTasks <= 0) return;
     final int running = _tasks.values
-        .where((BackgroundTask t) => t.process.status == ShellProcessStatus.running)
+        .where(
+          (BackgroundTask t) => t.process.status == ShellProcessStatus.running,
+        )
         .length;
     if (running >= maxRunningTasks) {
       throw BackgroundException('limit', '已达后台任务上限（$maxRunningTasks）');
@@ -149,8 +177,7 @@ class BackgroundTaskService {
   }
 
   void _pruneRecords() {
-    while (_order.length > maxRecords &&
-        !_isRunning(_order.first)) {
+    while (_order.length > maxRecords && !_isRunning(_order.first)) {
       _tasks.remove(_order.removeAt(0));
     }
   }
