@@ -101,6 +101,32 @@ void main() {
     expect(ran.content, contains('[PostToolUse]'));
   });
 
+  test('工具失败时 post hook 提示附加但失败语义保留', () async {
+    final Context app = Context.root();
+    provideTools(app);
+    final Hooks hooks = Hooks(config: const HooksConfig(
+      postToolUse: <String>['false'],
+    ));
+    hooks.mount(app.tools);
+    app.effect(() => app.tools.fn(
+          'fail_tool',
+          description: '失败',
+          params: <ParamSpec>[],
+          handler: (ToolContext ctx) async => ToolResult.failure(
+            '失败正文',
+            error: const ToolError('BOOM', 'tool exploded'),
+          ),
+        ));
+    addTearDown(app.dispose);
+
+    final ToolResult result =
+        await app.tools.call(const ToolCall(name: 'fail_tool'));
+    expect(result.isError, isTrue);
+    expect(result.error?.code, 'BOOM');
+    expect(result.content, contains('失败正文'));
+    expect(result.content, contains('[PostToolUse]'));
+  });
+
   test('onStop 失败返回提示；无配置返回 null', () async {
     final Hooks none = Hooks(config: const HooksConfig());
     expect(await none.onStop(), isNull);

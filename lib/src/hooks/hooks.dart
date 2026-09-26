@@ -123,10 +123,13 @@ class Hooks {
       final ToolResult result = await next();
       final String? note = await postToolUse(call);
       if (note == null) return result;
-      return ToolResult.success(
-        '${result.content}\n\n[PostToolUse] $note',
-        value: result.value,
-      );
+      final String content = '${result.content}\n\n[PostToolUse] $note';
+      if (result.isError) {
+        // 失败语义不丢：提示照附加，但 isError/error 必须保留——
+        // 否则 Agent Loop 会基于错误的成功信号继续推进。
+        return ToolResult.failure(content, error: result.error);
+      }
+      return ToolResult.success(content, value: result.value);
     });
   }
 }
