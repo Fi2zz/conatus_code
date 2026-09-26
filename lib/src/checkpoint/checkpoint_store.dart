@@ -43,6 +43,13 @@ class CheckpointStore {
       '$projectDir${Platform.pathSeparator}checkpoints'
       '${Platform.pathSeparator}$sessionId');
 
+  /// 清空某会话的全部检查点（重绑即新时间线：旧 base/差量一并移除，
+  /// 避免「新 base + 旧 delta」合成从未存在过的混合状态）。
+  Future<void> clearSession(String sessionId) async {
+    final Directory dir = sessionDir(sessionId);
+    if (dir.existsSync()) await dir.delete(recursive: true);
+  }
+
   /// 某检查点的归档文件（不可读哈希名）。
   File archiveFile(String sessionId, int turn) =>
       File('${sessionDir(sessionId).path}${Platform.pathSeparator}'

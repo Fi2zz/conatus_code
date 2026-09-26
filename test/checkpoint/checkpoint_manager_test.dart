@@ -91,6 +91,27 @@ void main() {
     expect(manager.list(), isEmpty);
   });
 
+  test('重绑会话清空旧时间线，不会合成混合状态', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+    await manager.reset('s1');
+    _write(root, 'a.txt', 'v1');
+    await manager.recordTurn(); // turn 1 delta
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1]);
+
+    // 模拟 /sessions 切回：工作区已是新状态，重绑应清掉旧差量。
+    _write(root, 'a.txt', 'v2');
+    await manager.reset('s1');
+    expect(manager.turn, 0);
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0]);
+
+    // rewind 只能回到新 base（v2），不存在与旧 delta 合成的混合状态。
+    final CheckpointRewindResult? back = await manager.rewind(1);
+    expect(back!.turn, 0);
+    expect(
+        File('$root${Platform.pathSeparator}a.txt').readAsStringSync(), 'v2');
+  });
+
   test('detach 后不再关联会话', () async {
     final (CheckpointManager manager, _, _) = _manager();
     await manager.reset('s1');

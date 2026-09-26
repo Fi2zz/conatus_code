@@ -32,11 +32,17 @@ class CheckpointManager {
   bool get enabled => _config.enabled;
 
   /// 绑定会话：轮次归 0 并写初始快照（turn 0）。失败返回错误说明。
+  ///
+  /// 重绑即新时间线：会话已有检查点时先清空（旧 base/差量一并移除），
+  /// 避免旧差量叠在新 base 上合成从未存在过的混合状态。
   Future<String?> reset(String sessionId, {String? lastEventId}) async {
     _sessionId = sessionId;
     _turn = 0;
     if (!enabled) return null;
     try {
+      if (_store.list(sessionId).isNotEmpty) {
+        await _store.clearSession(sessionId);
+      }
       await _store.snapshot(sessionId, 0, lastEventId: lastEventId);
       return null;
     } catch (error) {
