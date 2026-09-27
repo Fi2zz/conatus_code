@@ -101,7 +101,8 @@ max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
 [checkpoint]
 enabled = true                # 每轮收口后对工作区做文件快照（/rewind 回滚）
 keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不限）
-# ignore = ["node_modules", "build/"]   # 额外忽略的相对路径前缀
+# ignore = ["app/build"]      # 额外忽略的相对路径前缀（内置已排 .git / .conatus /
+                              # build / .dart_tool / node_modules 等可再生目录）
 
 [background]
 # keep_alive_on_exit = false  # true = 退出时不杀后台任务（脱离 /background 管理）
@@ -132,6 +133,9 @@ keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不�
 dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 
 - 快照时机：会话绑定（turn 0）+ 每轮收口后；保留 base + 最近 `keep-1` 个差量。
+- 排除：内置 `.git` / `.conatus` / `build` / `.dart_tool` / `node_modules`
+  （顶层前缀），外加 `[checkpoint] ignore` 用户配置；读写全程流式
+  （清单头单独读、条目按 chunk 过 gzip），大工作区快照内存 ≈ 最大单文件。
 - 恢复语义：base 铺底 + 差量覆盖/删除 + 删当前多余（rsync 式）。
 - 变化检测：相对 base 的 mtime+size + SHA-256 哈希（stat 相同也兜底）。
 - 对话切点：`lastEventId` 为 null（全新会话的 turn 0）时切到全新空会话。

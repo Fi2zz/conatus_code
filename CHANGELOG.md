@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+- 修复大工作区新会话卡在「正在加载会话…」：检查点归档层曾把整包文件内容
+  全量读进内存（base 快照 660MB 工作区 ≈ 2GB RSS、数十秒）。现归档读写
+  全程流式——新增 `CheckpointArchiveWriter`（清单头先行、条目按 chunk 过
+  gzip）、`readCheckpointManifest`（只读头部、不再整包解压）、
+  `readCheckpointEntries`（逐条产出）；base/差量快照两遍式流式落盘，
+  `/rewind` 恢复按条目写盘，内存 ≈ 最大单文件。排除面内置 `.git` /
+  `.conatus` / `build` / `.dart_tool` / `node_modules` 顶层前缀
+  （`kCheckpointDefaultIgnores`），与 `[checkpoint] ignore` 取并集。
+
 - 沙箱 REVIEW 接线人工复核：TUI 内经选项浮层征询（展示命令与复核理由，
   NeverAsk 视同放行），批准后命令在 seatbelt 内照常执行；人工拒绝/超时/
   回调故障均按拒绝（fail-closed）。headless 无浮层，REVIEW 维持拒绝。

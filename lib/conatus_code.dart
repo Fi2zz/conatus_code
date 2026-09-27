@@ -26,6 +26,15 @@ export 'src/budget/budgeted_llm.dart'
 export 'src/budget/cost_tracker.dart'
     show CostTrackerImpl, kInputRatePerMillion, kOutputRatePerMillion;
 export 'src/budget/turn_budget.dart' show TurnBudget;
+export 'src/checkpoint/checkpoint_archive.dart'
+    show
+        CheckpointArchiveEntry,
+        CheckpointArchiveWriter,
+        checkpointArchiveName,
+        readCheckpointArchive,
+        readCheckpointEntries,
+        readCheckpointManifest,
+        writeCheckpointArchive;
 export 'src/checkpoint/checkpoint_manager.dart' show CheckpointManager;
 export 'src/checkpoint/checkpoint_restore.dart' show restoreCheckpoint;
 export 'src/checkpoint/checkpoint_store.dart' show CheckpointStore;

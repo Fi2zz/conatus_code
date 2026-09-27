@@ -25,14 +25,26 @@ List<String> checkpointPathSegments(String path) {
       .toList();
 }
 
-/// 相对路径是否命中排除：`projectDir` 整树、`.git` 整树、[ignore] 前缀。
+/// 内置排除的相对路径前缀（顶层匹配）：版本库 / 可再生构建产物 / 应用数据
+/// 目录。与 [ignore]（用户配置）取并集——无论配置如何这些都不进快照。
+const List<String> kCheckpointDefaultIgnores = <String>[
+  '.git',
+  '.conatus',
+  'build',
+  '.dart_tool',
+  'node_modules',
+];
+
+/// 相对路径是否命中排除：[kCheckpointDefaultIgnores]、`projectDir` 整树、
+/// [ignore] 前缀。
 ///
 /// [projectDir] 必须是相对 [root] 的路径（调用方算好再传，见 store 的
 /// `projectRel`）；绝对路径会永远匹配不上相对路径。
 bool checkpointExcluded(String rel, String projectDir, List<String> ignore) {
-  if (_under(rel, projectDir) || _under(rel, '.git')) {
-    return true;
+  for (final String prefix in kCheckpointDefaultIgnores) {
+    if (_under(rel, prefix)) return true;
   }
+  if (_under(rel, projectDir)) return true;
   for (final String prefix in ignore) {
     if (_under(rel, prefix)) return true;
   }
@@ -75,7 +87,10 @@ Future<File> checkpointRestoreFromGz(
 /// 写入目标是符号链接时先删链接本体（不穿透）再写——恢复两遍式校验与执行
 /// 之间的 TOCTOU 窗口兜底。
 Future<void> checkpointWriteBytes(
-    String root, String rel, List<int> bytes) async {
+  String root,
+  String rel,
+  List<int> bytes,
+) async {
   final File dst = File('$root${Platform.pathSeparator}$rel');
   if (FileSystemEntity.typeSync(dst.path, followLinks: false) ==
       FileSystemEntityType.link) {
@@ -96,7 +111,8 @@ void ensureRestorable(String root, String rel) {
   final Directory parent = File(target).parent;
   if (!parent.existsSync()) return; // 父目录将由 createSync 新建，无链接可穿
   final String canonicalParent = parent.resolveSymbolicLinksSync();
-  final bool inside = canonicalParent == canonicalRoot ||
+  final bool inside =
+      canonicalParent == canonicalRoot ||
       canonicalParent.startsWith('$canonicalRoot${Platform.pathSeparator}');
   if (!inside) {
     throw CheckpointException('restore-escape', '恢复路径越出工作区：$rel');
@@ -109,4 +125,3 @@ void ensurePathsRestorable(String root, Iterable<String> rels) {
     ensureRestorable(root, rel);
   }
 }
-

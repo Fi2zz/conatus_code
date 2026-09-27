@@ -13,9 +13,11 @@ import 'checkpoint_types.dart';
 
 /// 每会话检查点管理器。
 class CheckpointManager {
-  CheckpointManager({required CheckpointStore store, required CheckpointConfig config})
-      : _store = store,
-        _config = config;
+  CheckpointManager({
+    required CheckpointStore store,
+    required CheckpointConfig config,
+  }) : _store = store,
+       _config = config;
 
   final CheckpointStore _store;
   final CheckpointConfig _config;
@@ -92,8 +94,12 @@ class CheckpointManager {
     final int target = turns.length > back
         ? turns[turns.length - 1 - back]
         : turns.first;
-    final CheckpointManifest manifest = _store.manifestOf(id, target);
-    final CheckpointRestore restore = await restoreCheckpoint(_store, id, target);
+    final CheckpointManifest manifest = await _store.loadManifest(id, target);
+    final CheckpointRestore restore = await restoreCheckpoint(
+      _store,
+      id,
+      target,
+    );
     return CheckpointRewindResult(
       turn: target,
       restore: restore,
