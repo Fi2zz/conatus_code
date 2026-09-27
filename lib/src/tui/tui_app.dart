@@ -390,7 +390,8 @@ class ConatusTuiRuntime {
       );
     }
     // 检查点：每轮收口后快照工作区（见 checkpoint_manager.dart）。数据目录
-    // 取 baseDir（= workdir/projectDir），快照/恢复走 dart:io 直连。
+    // 取 baseDir（缺省 ~/.nava/projects/<编码工作区>，不在工作区内），快照/
+    // 恢复走 dart:io 直连。
     if (checkpoint != null) {
       app.provide(
         'checkpointManager',

@@ -79,6 +79,9 @@ type = "openai"
 [agent]
 max_steps = 8                 # 单轮最大模型步数
 workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
+# project_dir = ".conatus"    # 项目数据目录（会话/记忆/检查点）；缺省不放工作区，
+                              # 落 ~/.nava/projects/<编码工作区路径>；显式设置才
+                              # 相对工作目录（旧行为，工作区会出现该目录）
 
 [approval]
 mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
@@ -123,7 +126,8 @@ keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不�
 
 每轮收口后对工作区文件做快照：**turn 0 全量 base + 各轮相对 base 的差量**
 （只打包变化/新增文件，删除记入清单），**每个检查点压缩成单个无扩展名归档
-文件**（`<项目数据目录>/checkpoints/<会话>/<sha256 哈希名>`——**文件名不可读、
+文件**（`<项目数据目录>/checkpoints/<会话>/<sha256 哈希名>`**——项目数据目录
+缺省是 `~/.nava/projects/<编码工作区路径>`（不在工作区建目录），**文件名不可读、
 无 `.gz` 扩展名、不暴露轮次时间线**，轮次只记录在归档头与会话级 gzip `index`
 里；内容非明文、不保留目录结构；`dart:io` 内置 GZipCodec 自定义容器格式，零新
 依赖；旧版目录树检查点读时兼容、索引缺失自动重建）。清单记录快照时刻的对话

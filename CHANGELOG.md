@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- 项目数据目录移出工作区：缺省落 `~/.nava/projects/<编码后的规范工作区路径>`
+  （新 `resolveProjectDataDir`，`NAVA_HOME` 优先），不再在每个项目里建
+  `.conatus`；显式 `[agent] project_dir` 才保持相对工作区的旧语义。
+  `AgentConfig.projectDir` 缺省由 `'.conatus'` 改为未设置（null）。旧工作区
+  `.conatus` 里的历史会话不再自动发现（数据保留不删）。
 - 修复大工作区新会话卡在「正在加载会话…」：检查点归档层曾把整包文件内容
   全量读进内存（base 快照 660MB 工作区 ≈ 2GB RSS、数十秒）。现归档读写
   全程流式——新增 `CheckpointArchiveWriter`（清单头先行、条目按 chunk 过

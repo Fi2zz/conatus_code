@@ -16,8 +16,9 @@ Directory _tempDir() {
 
 /// 把 [content] 写进临时目录的 `config.toml`，返回该文件路径。
 String _writeConfig(String content) {
-  final File file =
-      File('${_tempDir().path}${Platform.pathSeparator}$kConfigFileName');
+  final File file = File(
+    '${_tempDir().path}${Platform.pathSeparator}$kConfigFileName',
+  );
   file.writeAsStringSync(content);
   return file.path;
 }
@@ -30,9 +31,13 @@ ConatusCodeConfig loadConfigFromToml(String toml) =>
 void _expectConfigError(String fragment, void Function() body) {
   expect(
     body,
-    throwsA(isA<ConfigException>().having(
-        (ConfigException error) => error.message, 'message',
-        contains(fragment))),
+    throwsA(
+      isA<ConfigException>().having(
+        (ConfigException error) => error.message,
+        'message',
+        contains(fragment),
+      ),
+    ),
   );
 }
 
@@ -46,10 +51,12 @@ void main() {
   group('resolveConfigDir', () {
     test('NAVA_HOME 优先于 HOME', () {
       expect(
-        resolveConfigDir(env: <String, String>{
-          kConfigHomeEnv: '/tmp/custom',
-          'HOME': '/tmp/home',
-        }),
+        resolveConfigDir(
+          env: <String, String>{
+            kConfigHomeEnv: '/tmp/custom',
+            'HOME': '/tmp/home',
+          },
+        ),
         '/tmp/custom',
       );
     });
@@ -63,10 +70,9 @@ void main() {
         expected,
       );
       expect(
-        resolveConfigDir(env: <String, String>{
-          kConfigHomeEnv: '   ',
-          'HOME': '/tmp/home',
-        }),
+        resolveConfigDir(
+          env: <String, String>{kConfigHomeEnv: '   ', 'HOME': '/tmp/home'},
+        ),
         expected,
       );
     });
@@ -77,7 +83,10 @@ void main() {
       final String sep = Platform.pathSeparator;
       final Map<String, String> env = <String, String>{'HOME': '/tmp/home'};
 
-      expect(resolveConfigPath(explicit: '/tmp/a.toml', env: env), '/tmp/a.toml');
+      expect(
+        resolveConfigPath(explicit: '/tmp/a.toml', env: env),
+        '/tmp/a.toml',
+      );
       expect(
         resolveConfigPath(env: env),
         '/tmp/home$sep$kConfigDirName$sep$kConfigFileName',
@@ -96,19 +105,22 @@ void main() {
       expect(config.providers, isEmpty);
       expect(config.agent.maxSteps, 8);
       expect(config.agent.workdir, isNull);
-      expect(config.agent.projectDir, '.conatus');
+      expect(config.agent.projectDir, isNull);
       expect(config.approval.mode, ApprovalMode.askWhenNeeded);
       expect(config.sandbox.enabled, isTrue);
       expect(config.sandbox.preset, SandboxPreset.workspaceWrite);
       expect(config.sandbox.allowNetwork, isFalse);
-      expect(
-          config.sandbox.networkAllowlist, <String>['git fetch', 'git pull']);
+      expect(config.sandbox.networkAllowlist, <String>[
+        'git fetch',
+        'git pull',
+      ]);
       expect(config.sandbox.allowedExecutables, isEmpty);
       expect(config.credentials, isEmpty);
     });
 
     test('合法 TOML → 逐字段映射', () {
-      final ConatusCodeConfig config = loadConfig(path: _writeConfig('''
+      final ConatusCodeConfig config = loadConfig(
+        path: _writeConfig('''
 [llm]
 default_model = "ark/doubao-seed"
 
@@ -128,7 +140,8 @@ allowed_executables = ["git", "dart"]
 
 [credentials]
 ARK_API_KEY = "from-file"
-'''));
+'''),
+      );
 
       expect(config.llm.defaultModel, 'ark/doubao-seed');
       expect(config.agent.maxSteps, 12);
@@ -173,16 +186,22 @@ ARK_API_KEY = "from-file"
   group('ConfigCredentials', () {
     test('base 优先，配置文件兜底；keys 取并集；update 只读', () async {
       final ConatusCodeConfig config = loadConfig(
-        path: _writeConfig('[credentials]\n'
-            'SHARED = "file-value"\n'
-            'ONLY_FILE = "file-only"\n'),
+        path: _writeConfig(
+          '[credentials]\n'
+          'SHARED = "file-value"\n'
+          'ONLY_FILE = "file-only"\n',
+        ),
       );
-      final Credentials base = InMemoryCredentials(initial: <String, String>{
-        'SHARED': 'base-value',
-        'ONLY_BASE': 'base-only',
-      });
-      final ConfigCredentials credentials =
-          ConfigCredentials(config, base: base);
+      final Credentials base = InMemoryCredentials(
+        initial: <String, String>{
+          'SHARED': 'base-value',
+          'ONLY_BASE': 'base-only',
+        },
+      );
+      final ConfigCredentials credentials = ConfigCredentials(
+        config,
+        base: base,
+      );
       addTearDown(credentials.close);
 
       expect(credentials.get('SHARED')?.value, 'base-value');
@@ -196,8 +215,13 @@ ARK_API_KEY = "from-file"
 
       await expectLater(
         credentials.update('K', 'V'),
-        throwsA(isA<CredentialsException>().having(
-            (CredentialsException error) => error.code, 'code', 'read-only')),
+        throwsA(
+          isA<CredentialsException>().having(
+            (CredentialsException error) => error.code,
+            'code',
+            'read-only',
+          ),
+        ),
       );
     });
   });
@@ -232,7 +256,10 @@ default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"
     expect(kimi.apiKey, '');
     expect(kimi.type, ProviderType.kimi);
     expect(kimi.oauthKey, 'oauth/kimi-code');
-    expect(config.llm.defaultModel, 'arkcli-agent-plan/doubao-seed-2-0-lite-260215');
+    expect(
+      config.llm.defaultModel,
+      'arkcli-agent-plan/doubao-seed-2-0-lite-260215',
+    );
   });
 
   test('default_model 格式非法抛 ConfigException', () {

@@ -10,27 +10,27 @@ class ConfigParser extends ConfigValues {
 
   /// 解析整份配置。
   ConatusCodeConfig parse() => ConatusCodeConfig(
-        llm: _readLlm(),
-        providers: _readProviders(),
-        models: _readModels(),
-        agent: _readAgent(),
-        approval: _readApproval(),
-        sandbox: _readSandbox(),
-        budget: _readBudget(),
-        credentials: _readCredentials(),
-        thinking: _readThinking(),
-        services: _readServices(),
-        mcp: _readMcp(),
-        checkpoint: _readCheckpoint(),
-        hooks: _readHooks(),
-        lint: _readLint(),
-        background: _readBackground(),
-        loopControl: _readLoopControl(),
-        defaultPlanMode: readBool(raw, 'default_plan_mode', false),
-        extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
-        mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
-        telemetry: readBool(raw, 'telemetry', false),
-      );
+    llm: _readLlm(),
+    providers: _readProviders(),
+    models: _readModels(),
+    agent: _readAgent(),
+    approval: _readApproval(),
+    sandbox: _readSandbox(),
+    budget: _readBudget(),
+    credentials: _readCredentials(),
+    thinking: _readThinking(),
+    services: _readServices(),
+    mcp: _readMcp(),
+    checkpoint: _readCheckpoint(),
+    hooks: _readHooks(),
+    lint: _readLint(),
+    background: _readBackground(),
+    loopControl: _readLoopControl(),
+    defaultPlanMode: readBool(raw, 'default_plan_mode', false),
+    extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
+    mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
+    telemetry: readBool(raw, 'telemetry', false),
+  );
 
   /// 顶层 `default_model`（kimi 风格）优先，回退 `[llm] default_model`。
   LlmConfig _readLlm() {
@@ -80,7 +80,9 @@ class ConfigParser extends ConfigValues {
     return switch (value) {
       'openai' => ProviderType.openai,
       'kimi' => ProviderType.kimi,
-      _ => throw ConfigException('$source：providers.$name.type 取值 "$value" 不合法。'),
+      _ => throw ConfigException(
+        '$source：providers.$name.type 取值 "$value" 不合法。',
+      ),
     };
   }
 
@@ -102,14 +104,14 @@ class ConfigParser extends ConfigValues {
     return AgentConfig(
       maxSteps: readPositiveInt(table, 'max_steps', 8),
       workdir: readString(table, 'workdir'),
-      projectDir: readString(table, 'project_dir') ?? '.conatus',
+      projectDir: readString(table, 'project_dir'),
     );
   }
 
   ApprovalConfig _readApproval() {
     final Map<String, dynamic> table = readTable('approval');
-    final String? mode = readString(raw, 'default_permission_mode') ??
-        readString(table, 'mode');
+    final String? mode =
+        readString(raw, 'default_permission_mode') ?? readString(table, 'mode');
     return ApprovalConfig(mode: _approvalMode(mode));
   }
 
@@ -158,10 +160,12 @@ class ConfigParser extends ConfigValues {
     }
     final Map<String, dynamic> table = raw.cast<String, dynamic>();
     final int slash = qualifiedName.indexOf('/');
-    final String defaultProvider =
-        slash > 0 ? qualifiedName.substring(0, slash) : '';
-    final String defaultModel =
-        slash > 0 ? qualifiedName.substring(slash + 1) : qualifiedName;
+    final String defaultProvider = slash > 0
+        ? qualifiedName.substring(0, slash)
+        : '';
+    final String defaultModel = slash > 0
+        ? qualifiedName.substring(slash + 1)
+        : qualifiedName;
     return ModelConfig(
       provider: readString(table, 'provider') ?? defaultProvider,
       model: readString(table, 'model') ?? defaultModel,
@@ -220,11 +224,13 @@ class ConfigParser extends ConfigValues {
     if (servers is! Map) {
       throw ConfigException('$source：mcp.servers 必须是表。');
     }
-    return McpConfig(servers: <McpServerSpec>[
-      for (final MapEntry<String, dynamic> entry
-          in servers.cast<String, dynamic>().entries)
-        _readMcpServer(entry.key, entry.value),
-    ]);
+    return McpConfig(
+      servers: <McpServerSpec>[
+        for (final MapEntry<String, dynamic> entry
+            in servers.cast<String, dynamic>().entries)
+          _readMcpServer(entry.key, entry.value),
+      ],
+    );
   }
 
   McpServerSpec _readMcpServer(String name, Object? raw) {
@@ -255,19 +261,24 @@ class ConfigParser extends ConfigValues {
       'http' => McpServerType.http,
       'sse' => McpServerType.sse,
       _ => throw ConfigException(
-          '$source：mcp.servers.$name.type 取值 "$value" 不合法。'),
+        '$source：mcp.servers.$name.type 取值 "$value" 不合法。',
+      ),
     };
   }
 
   void _validateMcpEndpoint(
-      String name, McpServerType type, String? command, String? url) {
+    String name,
+    McpServerType type,
+    String? command,
+    String? url,
+  ) {
     if (type == McpServerType.stdio && command == null) {
       throw ConfigException(
-          '$source：mcp.servers.$name.command 不能为空（stdio 必填）。');
+        '$source：mcp.servers.$name.command 不能为空（stdio 必填）。',
+      );
     }
     if (type != McpServerType.stdio && url == null) {
-      throw ConfigException(
-          '$source：mcp.servers.$name.url 不能为空（http/sse 必填）。');
+      throw ConfigException('$source：mcp.servers.$name.url 不能为空（http/sse 必填）。');
     }
   }
 
@@ -309,10 +320,17 @@ class ConfigParser extends ConfigValues {
   LoopControlConfig _readLoopControl() {
     final Map<String, dynamic> table = readTable('loop_control');
     return LoopControlConfig(
-      compactionTriggerRatio:
-          readDouble(table, 'compaction_trigger_ratio', 0.85),
+      compactionTriggerRatio: readDouble(
+        table,
+        'compaction_trigger_ratio',
+        0.85,
+      ),
       maxStepsPerTurn: readPositiveInt(table, 'max_steps_per_turn', 200),
-      reservedContextSize: readPositiveInt(table, 'reserved_context_size', 50000),
+      reservedContextSize: readPositiveInt(
+        table,
+        'reserved_context_size',
+        50000,
+      ),
     );
   }
 
@@ -320,11 +338,15 @@ class ConfigParser extends ConfigValues {
     if (value == null) return ApprovalMode.askWhenNeeded;
     return switch (value) {
       'always_ask' || 'alwaysAsk' => ApprovalMode.alwaysAsk,
-      'ask_when_needed' || 'askWhenNeeded' || 'default' ||
-          'acceptEdits' || 'plan' =>
-        ApprovalMode.askWhenNeeded,
-      'never_ask' || 'neverAsk' || 'yolo' || 'bypassPermissions' =>
-        ApprovalMode.neverAsk,
+      'ask_when_needed' ||
+      'askWhenNeeded' ||
+      'default' ||
+      'acceptEdits' ||
+      'plan' => ApprovalMode.askWhenNeeded,
+      'never_ask' ||
+      'neverAsk' ||
+      'yolo' ||
+      'bypassPermissions' => ApprovalMode.neverAsk,
       _ => throw ConfigException('$source：permission 模式 "$value" 不合法。'),
     };
   }

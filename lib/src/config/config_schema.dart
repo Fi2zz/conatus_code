@@ -47,11 +47,7 @@ class ProviderConfig {
 
 /// Agent Loop 行为。
 class AgentConfig {
-  const AgentConfig({
-    this.maxSteps = 8,
-    this.workdir,
-    this.projectDir = '.conatus',
-  });
+  const AgentConfig({this.maxSteps = 8, this.workdir, this.projectDir});
 
   /// 单轮最大步数。
   final int maxSteps;
@@ -59,8 +55,10 @@ class AgentConfig {
   /// 工作目录（沙箱根）；`null` 表示当前工作目录。
   final String? workdir;
 
-  /// 项目级状态目录名（会话 / 记忆 / 技能），相对工作目录。
-  final String projectDir;
+  /// 项目数据目录（`[agent] project_dir`）；`null`（缺省）= 用户配置目录下
+  /// 按工作区路径分目录（见 [resolveProjectDataDir]），不在工作区建目录；
+  /// 显式设置时相对 [workdir] 解析（旧语义）。
+  final String? projectDir;
 }
 
 /// 审批模式，对应 TUI 的三档权限。

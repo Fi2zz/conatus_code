@@ -27,11 +27,17 @@ Future<void> main(List<String> args) async {
   final String workdir = config.agent.workdir ?? Directory.current.path;
   final String sep = Platform.pathSeparator;
 
+  // 项目数据目录：缺省在 ~/.nava/projects/<编码工作区路径>（不污染工作区）；
+  // 显式 [agent] project_dir 时才相对工作区。
+  final String projectDataDir = resolveProjectDataDir(
+    workdir: workdir,
+    projectDir: config.agent.projectDir,
+  );
+
   // `--continue`：恢复最近一次会话（`--session` 优先；无历史则新建并提示）。
   String? initialSession = options.session;
   if (initialSession == null && options.continueRequested) {
-    final String sessionDir =
-        '$workdir$sep${config.agent.projectDir}${sep}sessions';
+    final String sessionDir = '$projectDataDir${sep}sessions';
     initialSession = findRecentSessionId(sessionDir);
     if (initialSession == null) {
       stderr.writeln('没有历史会话，已新建。');
@@ -66,7 +72,7 @@ Future<void> main(List<String> args) async {
     model = defaultModel.substring(slash + 1);
   }
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
-    baseDir: '$workdir$sep${config.agent.projectDir}',
+    baseDir: projectDataDir,
     configPath: resolveConfigPath(explicit: options.configPath),
     providers: config.providers,
     models: config.models,
@@ -101,12 +107,14 @@ Future<void> main(List<String> args) async {
         prompt: options.print!,
         sessionId: initialSession,
       );
-      stdout.writeln(renderHeadless(
-        result,
-        options.outputFormat == 'json'
-            ? HeadlessFormat.json
-            : HeadlessFormat.text,
-      ));
+      stdout.writeln(
+        renderHeadless(
+          result,
+          options.outputFormat == 'json'
+              ? HeadlessFormat.json
+              : HeadlessFormat.text,
+        ),
+      );
       code = result.exitCode;
     } catch (error) {
       stderr.writeln('headless 执行失败：$error');
