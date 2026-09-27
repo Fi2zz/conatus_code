@@ -25,6 +25,7 @@ import '../budget/turn_budget.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_store.dart';
 import '../config/config_schema.dart';
+import '../config/project_data_dir.dart';
 import '../hooks/hooks.dart';
 import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
@@ -79,7 +80,8 @@ class ConatusTuiRuntime {
   /// 装配一个默认运行时。
   ///
   /// [sessionDir] / [memoryFile] / cron 任务与运行历史缺省落在 [baseDir]
-  /// （默认 `<cwd>/.conatus`）下；[webTools] 为 true 时按 `kDefaultSearchOrder`
+  /// （缺省 `$NAVA_HOME/projects/<编码工作区路径>`，即 `~/.nava/...`，不在工作区
+  /// 内）下；[webTools] 为 true 时按 `kDefaultSearchOrder`
   /// 装配搜索源（缺 Key 的自动跳过，见 `conatus_search`）；[skills] 为 true 时
   /// 从 `.conatus/skills` 等目录
   /// 发现技能，注入目录段并注册 `skill` 工具。
@@ -131,10 +133,10 @@ class ConatusTuiRuntime {
     LintConfig? lint,
   }) async {
     final Context app = Context.root(name: 'conatus');
-    final String resolvedBaseDir =
-        baseDir ?? '${Directory.current.path}${Platform.pathSeparator}.conatus';
     final String sep = Platform.pathSeparator;
     final String resolvedWorkdir = workdir ?? Directory.current.path;
+    final String resolvedBaseDir =
+        baseDir ?? resolveProjectDataDir(workdir: resolvedWorkdir);
 
     // ── 工具：时间 / 回显 / 文件读取 / 联网（可选）──────────────
     provideTools(app, timeout: const Duration(seconds: 30));
@@ -423,9 +425,9 @@ class ConatusTuiRuntime {
       await provideSkillFilesystem(app);
     }
 
-    // ── 恢复：数据库（JSON 后端）+ 快照服务 ────────────────────
+    // ── 恢复：数据库（JSON 后端，集中在 baseDir）+ 快照服务 ─────────
     provideDatabase(app, defaultBackend: 'json');
-    provideDatabaseJson(app);
+    provideDatabaseJson(app, dir: '$resolvedBaseDir${sep}database');
     provideRecovery(app);
 
     // ── cron 定时任务：全局任务表 + 运行历史 + 到点交付 ─────────

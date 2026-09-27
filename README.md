@@ -79,7 +79,7 @@ type = "openai"
 [agent]
 max_steps = 8                 # 单轮最大模型步数
 workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
-# project_dir = ".conatus"    # 项目数据目录（会话/记忆/检查点）；缺省不放工作区，
+# project_dir = ".conatus"    # 项目数据目录（会话/记忆/数据库/检查点）；缺省不放工作区，
                               # 落 ~/.nava/projects/<编码工作区路径>；显式设置才
                               # 相对工作目录（旧行为，工作区会出现该目录）
 

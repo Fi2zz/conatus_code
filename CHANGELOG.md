@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- 默认目录全部收敛到用户目录、零 cwd 兜底：`resolveConfigDir` 无 `HOME` 时改用
+  `USERPROFILE`，仍缺失抛 `StateError`（此前静默落当前工作目录）；
+  `ConatusTuiRuntime.create` 的 `baseDir` 缺省由 `<cwd>/.conatus` 改为
+  `resolveProjectDataDir`（与 CLI 入口一致）；TUI 的 database 随之集中到
+  `<项目数据目录>/database`（此前散在 `<cwd>/.conatus/database`）。
 - 项目数据目录移出工作区：缺省落 `~/.nava/projects/<编码后的规范工作区路径>`
   （新 `resolveProjectDataDir`，`NAVA_HOME` 优先），不再在每个项目里建
   `.conatus`；显式 `[agent] project_dir` 才保持相对工作区的旧语义。

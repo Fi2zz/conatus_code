@@ -76,6 +76,15 @@ void main() {
         expected,
       );
     });
+
+    test('无 HOME 时用 USERPROFILE；全部缺失抛 StateError 而非落 cwd', () {
+      final String sep = Platform.pathSeparator;
+      expect(
+        resolveConfigDir(env: <String, String>{'USERPROFILE': r'C:\Users\u'}),
+        'C:\\Users\\u$sep$kConfigDirName',
+      );
+      expect(() => resolveConfigDir(env: <String, String>{}), throwsStateError);
+    });
   });
 
   group('resolveConfigPath', () {
