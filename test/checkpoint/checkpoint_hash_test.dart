@@ -20,7 +20,9 @@ import 'package:test/test.dart';
 }
 
 /// 整秒 mtime（macOS 的 setLastModifiedSync 只到秒级，用整秒可精确还原）。
-final DateTime kWholeSecond = DateTime.fromMillisecondsSinceEpoch(1700000000000);
+final DateTime kWholeSecond = DateTime.fromMillisecondsSinceEpoch(
+  1700000000000,
+);
 
 /// 写 [content] 并把 mtime 固定到 [kWholeSecond]（与 base 完全一致）。
 void _writeFixedStat(String root, String rel, String content) {
@@ -61,16 +63,19 @@ void main() {
   });
 
   test('旧清单（无 hash 条目）→ 保守按变化处理', () async {
-    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) =
+        _setup();
     _writeFixedStat(root, 'a.txt', 'AAAA');
     await store.snapshot('s1', 0);
     // 用旧格式明文清单（files 为字符串路径、无 hash）替换新归档。
     store.archiveFile('s1', 0).deleteSync();
-    final String legacy = '$projectDir${Platform.pathSeparator}checkpoints'
+    final String legacy =
+        '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1${Platform.pathSeparator}0';
     Directory(legacy).createSync(recursive: true);
-    File('$legacy${Platform.pathSeparator}manifest.json')
-        .writeAsStringSync('{"turn":0,"files":["a.txt"]}');
+    File(
+      '$legacy${Platform.pathSeparator}manifest.json',
+    ).writeAsStringSync('{"turn":0,"files":["a.txt"]}');
 
     _writeFixedStat(root, 'a.txt', 'BBBB');
     await store.snapshot('s1', 1);

@@ -18,7 +18,12 @@ import 'package:test/test.dart';
   final String projectDir = '$root${Platform.pathSeparator}.conatus';
   Directory(projectDir).createSync();
   return (
-    ArchiveCheckpointStore(root: root, projectDir: projectDir, keep: keep, ignore: ignore),
+    ArchiveCheckpointStore(
+      root: root,
+      projectDir: projectDir,
+      keep: keep,
+      ignore: ignore,
+    ),
     root,
     projectDir,
   );
@@ -36,9 +41,8 @@ void _touch(String root, String rel, String content) =>
 
 void main() {
   test('turn 0 全量 base（含 mtime/size），跳过排除项，写 manifest', () async {
-    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup(
-      ignore: const <String>['node_modules'],
-    );
+    final (ArchiveCheckpointStore store, String root, String projectDir) =
+        _setup(ignore: const <String>['node_modules']);
     _write(root, 'lib/main.dart', 'void main() {}');
     _write(root, 'README.md', '# hi');
     _write(root, '.git/config', 'not-snapshotted');
@@ -61,7 +65,8 @@ void main() {
   });
 
   test('turn 1 差量：只存变化/新增文件，deleted 记录删除', () async {
-    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) =
+        _setup();
     _write(root, 'a.txt', 'v0');
     _write(root, 'b.txt', 'b0');
     await store.snapshot('s1', 0);
@@ -76,7 +81,8 @@ void main() {
     expect(delta.changed, unorderedEquals(<String>['a.txt', 'c.txt']));
     expect(delta.deleted, <String>['b.txt']);
     // 归档文件名不可读（哈希名），无 `<轮次>` 可读目录/文件，内容非明文。
-    final String turnDir = '$projectDir${Platform.pathSeparator}checkpoints'
+    final String turnDir =
+        '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1';
     expect(store.archiveFile('s1', 0).existsSync(), isTrue);
     expect(store.archiveFile('s1', 1).existsSync(), isTrue);
@@ -86,7 +92,9 @@ void main() {
         .toList();
     // 无可读轮次名、无扩展名（看不出是 gzip）。
     expect(
-      names.any((String n) => n == '0' || n == '1' || n == '0.gz' || n == '1.gz'),
+      names.any(
+        (String n) => n == '0' || n == '1' || n == '0.gz' || n == '1.gz',
+      ),
       isFalse,
     );
     expect(names.any((String n) => n.endsWith('.gz')), isFalse);
@@ -98,7 +106,8 @@ void main() {
   });
 
   test('mtime+size 不变的文件不进差量（不重复复制）', () async {
-    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) =
+        _setup();
     _write(root, 'a.txt', 'same');
     await store.snapshot('s1', 0);
     await store.snapshot('s1', 1);
@@ -143,11 +152,13 @@ void main() {
 
   test('旧格式兼容：无 kind 的清单按 base 读（files 为字符串路径）', () {
     final (ArchiveCheckpointStore store, _, String projectDir) = _setup();
-    final String legacy = '$projectDir${Platform.pathSeparator}checkpoints'
+    final String legacy =
+        '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1${Platform.pathSeparator}0';
     Directory(legacy).createSync(recursive: true);
-    File('$legacy${Platform.pathSeparator}manifest.json')
-        .writeAsStringSync('{"turn":0,"files":["a.txt","b.txt"]}');
+    File(
+      '$legacy${Platform.pathSeparator}manifest.json',
+    ).writeAsStringSync('{"turn":0,"files":["a.txt","b.txt"]}');
 
     final CheckpointManifest manifest = store.manifestOf('s1', 0);
     expect(manifest.isDelta, isFalse);
@@ -158,7 +169,8 @@ void main() {
   });
 
   test('符号链接跳过；空工作区 base 清单为空', () async {
-    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) =
+        _setup();
     _write(root, 'a.txt', 'x');
     final Link link = Link('$root${Platform.pathSeparator}link.txt');
     link.createSync('$root${Platform.pathSeparator}a.txt');
@@ -166,8 +178,9 @@ void main() {
     await store.snapshot('s1', 0);
 
     final CheckpointManifest base = store.manifestOf('s1', 0);
-    expect(base.files.map((CheckpointFileEntry e) => e.path),
-        <String>['a.txt']);
+    expect(base.files.map((CheckpointFileEntry e) => e.path), <String>[
+      'a.txt',
+    ]);
 
     final (ArchiveCheckpointStore emptyStore, _, _) = _setup();
     await emptyStore.snapshot('s2', 0);

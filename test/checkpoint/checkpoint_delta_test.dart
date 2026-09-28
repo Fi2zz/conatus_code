@@ -52,8 +52,7 @@ void main() {
     _write(root, 'a.txt', '乱改');
     _write(root, 'x.txt', '多余');
 
-    final CheckpointRestore result =
-        await store.restore('s1', 0);
+    final CheckpointRestore result = await store.restore('s1', 0);
 
     expect(result.restored, 2); // a.txt + b.txt 铺底
     expect(result.deleted, 2); // c.txt + x.txt 删除（base 后创建的都删）
@@ -72,8 +71,7 @@ void main() {
     File('$root${Platform.pathSeparator}c.txt').deleteSync();
     _write(root, 'x.txt', '多余');
 
-    final CheckpointRestore result =
-        await store.restore('s1', 1);
+    final CheckpointRestore result = await store.restore('s1', 1);
 
     expect(result.restored, 3); // base a + changed a,c
     expect(result.deleted, 2); // b（目标态删除）+ x（多余）
@@ -87,8 +85,7 @@ void main() {
     final (ArchiveCheckpointStore store, String root, _) = _setup();
     await _scenario(root, store);
 
-    final CheckpointRestore result =
-        await store.restore('s1', 2);
+    final CheckpointRestore result = await store.restore('s1', 2);
 
     expect(_read(root, 'a.txt'), 'a2');
     expect(_exists(root, 'b.txt'), isFalse);
@@ -97,7 +94,8 @@ void main() {
   });
 
   test('恢复不触碰排除项（.conatus / .git）', () async {
-    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) =
+        _setup();
     _write(root, 'a.txt', 'v0');
     _write(root, '.git/config', 'git-state');
     await store.snapshot('s1', 0);

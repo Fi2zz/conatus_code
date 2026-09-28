@@ -25,28 +25,49 @@ List<String> checkpointPathSegments(String path) {
       .toList();
 }
 
-/// 内置排除的相对路径前缀（顶层匹配）：版本库 / 可再生构建产物 / 应用数据
-/// 目录。与 [ignore]（用户配置）取并集——无论配置如何这些都不进快照。
+/// 内置排除的相对路径前缀（**顶层匹配**）：可再生构建产物 / 应用数据目录。
+/// 与 [ignore]（用户配置）取并集——无论配置如何这些都不进快照。
 const List<String> kCheckpointDefaultIgnores = <String>[
-  '.git',
-  '.conatus',
   'build',
   '.dart_tool',
   'node_modules',
 ];
 
-/// 相对路径是否命中排除：[kCheckpointDefaultIgnores]、`projectDir` 整树、
-/// [ignore] 前缀。
+/// 版本库元数据目录名。**任意层级都排除**（不是顶层匹配）。
+const String kCheckpointVcsDir = '.git';
+
+/// 相对路径是否命中排除：[kCheckpointDefaultIgnores]（顶层）、[projectDir]
+/// 整树、任意层级的 [kCheckpointVcsDir]、[ignore] 前缀。
 ///
 /// [projectDir] 必须是相对 [root] 的路径（调用方算好再传，见 store 的
 /// `projectRel`）；绝对路径会永远匹配不上相对路径。
+///
+/// 嵌套版本库必须整树排除，两个原因：
+///
+/// 1. **恢复会删它**。rsync 语义下「不在目标态」的文件会被删；快照若漏掉
+///    嵌套仓库，恢复就会把整个子树删掉。
+/// 2. **git 收不了它**。`git add` 显式指定嵌套仓库内的路径会**静默跳过**
+///    （退出码 0、无告警），实测 `git worktree` / vendor 目录必中。因此
+///    归档实现收了它而影子实现收不到，两者语义不一致，恢复时按残缺清单删。
+///
+/// 故嵌套版本库一律不进快照、也不被恢复删除——代价是该子树的改动不可回滚
+/// （它有自己的历史，用户可在其中自行处理）。
 bool checkpointExcluded(String rel, String projectDir, List<String> ignore) {
+  if (_hasSegment(rel, kCheckpointVcsDir)) return true;
   for (final String prefix in kCheckpointDefaultIgnores) {
     if (_under(rel, prefix)) return true;
   }
   if (_under(rel, projectDir)) return true;
   for (final String prefix in ignore) {
     if (_under(rel, prefix)) return true;
+  }
+  return false;
+}
+
+/// 路径的任一段是否等于 [segment]。
+bool _hasSegment(String rel, String segment) {
+  for (final String part in rel.split(Platform.pathSeparator)) {
+    if (part == segment) return true;
   }
   return false;
 }

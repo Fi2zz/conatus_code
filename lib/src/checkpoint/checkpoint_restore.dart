@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'checkpoint_archive.dart';
 import 'checkpoint_paths.dart';
+import 'checkpoint_scan.dart';
 import 'checkpoint_store_archive.dart';
 import 'checkpoint_types.dart';
 
@@ -191,22 +192,24 @@ Future<CheckpointRestore> _restoreLegacy(
 }
 
 /// 删除当前工作区中「不在目标状态、且未被排除」的文件；返回删除数。
+///
+/// 用 [checkpointWalk] 而非裸 `Directory.list`：嵌套版本库整棵跳过（它不在
+/// 快照里，若当成「多余文件」删掉，恢复一次就抹掉一个 worktree）。
 Future<int> _deleteExtras(
   ArchiveCheckpointStore store,
   Set<String> target,
 ) async {
   final List<File> extras = <File>[];
-  await for (final FileSystemEntity entity in Directory(
+  await for (final FileSystemEntity entity in checkpointWalk(
     store.root,
-  ).list(recursive: true, followLinks: false)) {
-    if (entity is! File) continue;
-    final String rel = checkpointRelativeTo(entity, store.root);
-    if (checkpointExcluded(rel, store.projectRel, store.ignore)) continue;
-    if (target.contains(rel)) continue;
-    extras.add(entity);
+    store.projectRel,
+    store.ignore,
+  )) {
+    if (target.contains(checkpointRelativeTo(entity, store.root))) continue;
+    extras.add(entity as File);
   }
   for (final File file in extras) {
-    // 防御性：extras 本体不是链接（list 用 followLinks:false），父链仍可能是。
+    // 防御性：walk 已排除链接，父链仍可能是。
     ensureRestorable(store.root, checkpointRelativeTo(file, store.root));
     file.deleteSync();
   }

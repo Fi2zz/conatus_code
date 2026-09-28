@@ -236,6 +236,43 @@ class GitShadowStore implements CheckpointStore {
         '记录已删除的文件',
       );
     }
+    _verifyStaged(wanted);
+  }
+
+  /// 断言索引确实收到了我们想暂存的每一个路径，否则**报错**。
+  ///
+  /// 绝不静默放过：`git add` 对「显式指定的路径落在嵌套版本库里」会**跳过
+  /// 且退出码 0、无告警**。一旦漏暂存，本轮快照就是残缺的，而恢复的 rsync
+  /// 语义会按残缺清单把那些文件删掉——这是本实现踩过的最严重的一个坑
+  /// （9661 文件的 swiftus 上快照只收 293 个，恢复删掉 9119 个；修掉
+  /// `.gitignore` 之后又在带 `git worktree` 的项目上复现一次）。
+  ///
+  /// 嵌套版本库已由 [checkpointExcluded] 整树排除，故正常路径下这里恒等。
+  /// 它是**兜底断言**：将来冒出新的「git 静默不收」的情形，至少会变成一条
+  /// 可见的检查点错误（编排层转成屏上提示），而不是悄悄损坏回滚能力。
+  void _verifyStaged(List<String> wanted) {
+    if (wanted.isEmpty) return;
+    final GitResult indexed = _gitObjSync(<String>[
+      'ls-files',
+      '-z',
+      '--cached',
+    ]);
+    _expect(indexed, '核对暂存结果');
+    final Set<String> have = <String>{
+      for (final String p in indexed.stdout.split('\u0000'))
+        if (p.isNotEmpty) p,
+    };
+    final List<String> missing = wanted
+        .where((String p) => !have.contains(p))
+        .toList();
+    if (missing.isEmpty) return;
+    final String sample = missing.take(3).join(', ');
+    throw CheckpointException(
+      'stage-incomplete',
+      '暂存不完整：${missing.length} 个文件未被 git 收录（$sample'
+          '${missing.length > 3 ? ' 等' : ''}）。已中止本轮快照，'
+          '以免恢复时按残缺清单误删文件。',
+    );
   }
 
   /// 自己 walk 出来的应入快照路径（与归档实现同一套排除判定）。
@@ -339,19 +376,20 @@ class GitShadowStore implements CheckpointStore {
   /// 删除当前工作区中「不在目标态、且未被排除」的文件；返回删除数。
   ///
   /// 排除项必须跳过：影子 git dir 就在 `projectDir` 下，删掉它等于自毁。
+  /// 嵌套版本库整棵跳过——它本就不在快照里（[checkpointWalk] 剪掉了），
+  /// 这里若不跳过，恢复就会把它当成「目标态没有的多余文件」整棵删掉。
   Future<int> _deleteExtras(Set<String> target) async {
     final List<String> extras = <String>[];
-    await for (final FileSystemEntity entity in Directory(
+    await for (final FileSystemEntity entity in checkpointWalk(
       root,
-    ).list(recursive: true, followLinks: false)) {
-      if (entity is! File) continue;
+      projectRel,
+      ignore,
+    )) {
       final String rel = checkpointRelativeTo(entity, root);
-      if (checkpointExcluded(rel, projectRel, ignore)) continue;
-      if (target.contains(rel)) continue;
-      extras.add(rel);
+      if (!target.contains(rel)) extras.add(rel);
     }
     for (final String rel in extras) {
-      // 防御性：extras 本体不是链接（list 用 followLinks:false），父链仍可能是。
+      // 防御性：walk 已排除链接，父链仍可能是。
       ensureRestorable(root, rel);
       File('$root${Platform.pathSeparator}$rel').deleteSync();
     }
@@ -399,16 +437,8 @@ class GitShadowStore implements CheckpointStore {
 
   /// 同步版（`list`/`prune` 这类同步接口用；会阻塞事件循环，故只用于
   /// 低频路径）。
-  GitResult _gitObjSync(List<String> args) {
-    final GitRunner runner = _git;
-    if (runner is ProcessGitRunner) {
-      return runner.runSync(args, gitDir: gitDir, workTree: root);
-    }
-    throw const CheckpointException(
-      'no-sync-runner',
-      '影子仓库同步路径需要 ProcessGitRunner',
-    );
-  }
+  GitResult _gitObjSync(List<String> args) =>
+      _git.runSync(args, gitDir: gitDir, workTree: root);
 
   /// git 失败转成 [CheckpointException]（编排层转成提示，不打断轮次）。
   void _expect(GitResult result, String what) {

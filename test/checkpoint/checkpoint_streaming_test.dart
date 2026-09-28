@@ -125,8 +125,9 @@ void main() {
       final CheckpointManifest head = await readCheckpointManifest(target);
       expect(head.kind, 'base');
       // 条目流同样不受影响（只对路径做 UTF-8 解码，内容按原字节还原）。
-      final List<CheckpointArchiveEntry> entries =
-          await readCheckpointEntries(target).toList();
+      final List<CheckpointArchiveEntry> entries = await readCheckpointEntries(
+        target,
+      ).toList();
       expect(entries.map((CheckpointArchiveEntry e) => e.$1), <String>[
         'logo.png',
         'blob.bin',
@@ -246,7 +247,10 @@ void main() {
     setUp(() {
       root = _tempDir();
       projectDir = Directory('${root.path}/.conatus')..createSync();
-      store = ArchiveCheckpointStore(root: root.path, projectDir: projectDir.path);
+      store = ArchiveCheckpointStore(
+        root: root.path,
+        projectDir: projectDir.path,
+      );
       addTearDown(() => root.deleteSync(recursive: true));
     });
 

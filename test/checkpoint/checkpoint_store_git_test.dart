@@ -307,6 +307,69 @@ void main() {
     expect(at1, isNot(contains('b.txt')), reason: '删除必须被记录');
   });
 
+  test('嵌套 git 仓库整树排除：既不收也不会被恢复删掉', () async {
+    if (!_gitOk) return;
+    _setUp();
+    // `git worktree` / vendor 目录必中。git add 对落在嵌套仓库里的显式路径
+    // 会**静默跳过**（rc=0、无告警），所以若不整树排除，快照会残缺而恢复
+    // 会把整个子树删掉。
+    final String inner =
+        '$_root${Platform.pathSeparator}.worktrees'
+        '${Platform.pathSeparator}feature';
+    Directory(inner).createSync(recursive: true);
+    Process.runSync('git', <String>['init', '--quiet', inner]);
+    _write('.worktrees/feature/code.dart', 'INNER');
+    _write('top.dart', 'TOP');
+
+    await _store.snapshot('s1', 0);
+    final Set<String> tracked = _lsTree(_commitOf('s1', 0)).toSet();
+    expect(tracked, contains('top.dart'));
+    expect(
+      tracked.any((String p) => p.startsWith('.worktrees/')),
+      isFalse,
+      reason: '嵌套仓库的内部文件不该进快照（git 收不了，收了也不一致）',
+    );
+
+    // 关键：恢复时不能把它当「多余文件」删掉。
+    await _store.restore('s1', 0);
+    expect(
+      File('$inner${Platform.pathSeparator}code.dart').existsSync(),
+      isTrue,
+      reason: '排除项在恢复侧也要跳过，否则会被 rsync 删除',
+    );
+  });
+
+  test('暂存不完整时报错而非静默产出残缺快照', () async {
+    if (!_gitOk) return;
+    _setUp();
+    _write('a.txt', 'v0');
+    _write('b.txt', 'v0');
+    // 让 `ls-files --cached` 少报一个路径 = 精确模拟「git 静默不收」。
+    // 真实世界的原因就是嵌套版本库（`git add` 跳过且 rc=0 无告警）。
+    final GitShadowStore store = GitShadowStore(
+      root: _root,
+      projectDir: _projectDir,
+      git: const _DroppingRunner(ProcessGitRunner(), 'b.txt'),
+    );
+    await expectLater(
+      store.snapshot('s1', 0),
+      throwsA(
+        isA<CheckpointException>()
+            .having(
+              (CheckpointException e) => e.code,
+              'code',
+              'stage-incomplete',
+            )
+            .having(
+              (CheckpointException e) => e.message,
+              'message',
+              contains('b.txt'),
+            ),
+      ),
+      reason: '残缺快照会让恢复按残缺清单删文件，必须当场失败',
+    );
+  });
+
   test('跨会话复用对象：同内容不重存（只多出 tree+commit）', () async {
     if (!_gitOk) return;
     _setUp();
@@ -329,6 +392,49 @@ void main() {
 /// 恢复基线并顺手删掉多余文件后，工作区应只剩基线里的东西。
 Future<CheckpointRestore> _restoreTurn0(GitShadowStore store) =>
     store.restore('s1', 0);
+
+/// 包一层真实执行器，让 `ls-files --cached` 少报某个路径——用来验证
+/// 「暂存不完整」时 store 会报错而不是静默产出残缺快照。
+class _DroppingRunner implements GitRunner {
+  const _DroppingRunner(this.inner, this.drop);
+
+  final GitRunner inner;
+  final String drop;
+
+  @override
+  Future<bool> available() => inner.available();
+
+  @override
+  Future<GitResult> run(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) async {
+    final GitResult r = await inner.run(
+      args,
+      gitDir: gitDir,
+      workTree: workTree,
+    );
+    return _maybeDrop(args, r);
+  }
+
+  @override
+  GitResult runSync(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) =>
+      _maybeDrop(args, inner.runSync(args, gitDir: gitDir, workTree: workTree));
+
+  GitResult _maybeDrop(List<String> args, GitResult r) {
+    if (!args.contains('ls-files')) return r;
+    final List<String> kept = <String>[
+      for (final String p in r.stdout.split('\u0000'))
+        if (p.isNotEmpty && p != drop) p,
+    ];
+    return GitResult(r.exitCode, '${kept.join('\u0000')}\u0000', r.stderr);
+  }
+}
 
 /// 某轮提交树里的文件路径。
 List<String> _lsTree(String sha) {

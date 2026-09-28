@@ -44,6 +44,16 @@ abstract class GitRunner {
     required String workTree,
   });
 
+  /// 同步版（`CheckpointStore.list` / `prune` 这类同步接口用）。
+  ///
+  /// 会阻塞事件循环，故只许用于低频路径（列表展示、裁剪），不得放进快照
+  /// 或恢复的热路径。
+  GitResult runSync(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  });
+
   /// 环境里是否有可用的 git。不可用时调用方应降级，不得抛异常。
   Future<bool> available();
 }
@@ -100,6 +110,7 @@ class ProcessGitRunner implements GitRunner {
 
   /// 同步版（[CheckpointStore.list] 等同步接口用；git 子进程会阻塞事件循环，
   /// 故只在低频路径上用）。
+  @override
   GitResult runSync(
     List<String> args, {
     required String gitDir,
@@ -155,4 +166,11 @@ class UnavailableGitRunner implements GitRunner {
     required String gitDir,
     required String workTree,
   }) async => const GitResult(127, '', 'git 不可用');
+
+  @override
+  GitResult runSync(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) => const GitResult(127, '', 'git 不可用');
 }

@@ -42,8 +42,16 @@ export 'src/checkpoint/checkpoint_hashes.dart'
         readCheckpointHashes,
         writeCheckpointHashes;
 export 'src/checkpoint/checkpoint_manager.dart' show CheckpointManager;
+export 'src/checkpoint/checkpoint_paths.dart'
+    show
+        checkpointExcluded,
+        checkpointRelativeTo,
+        kCheckpointDefaultIgnores,
+        kCheckpointVcsDir;
 export 'src/checkpoint/checkpoint_restore.dart'
     show restoreArchiveCheckpoint;
+export 'src/checkpoint/checkpoint_scan.dart'
+    show checkpointIncluded, checkpointWalk;
 export 'src/checkpoint/checkpoint_store.dart' show CheckpointStore;
 export 'src/checkpoint/checkpoint_store_archive.dart'
     show ArchiveCheckpointStore;

@@ -17,7 +17,11 @@ import 'package:test/test.dart';
   final String projectDir = '$root${Platform.pathSeparator}.conatus';
   Directory(projectDir).createSync();
   final CheckpointManager manager = CheckpointManager(
-    store: ArchiveCheckpointStore(root: root, projectDir: projectDir, keep: keep),
+    store: ArchiveCheckpointStore(
+      root: root,
+      projectDir: projectDir,
+      keep: keep,
+    ),
     config: CheckpointConfig(enabled: enabled, keep: keep),
   );
   return (manager, root, projectDir);
@@ -108,13 +112,17 @@ void main() {
     expect(back1!.turn, 1);
     expect(back1.lastEventId, 'ev-1');
     expect(
-        File('$root${Platform.pathSeparator}a.txt').readAsStringSync(), 'v1');
+      File('$root${Platform.pathSeparator}a.txt').readAsStringSync(),
+      'v1',
+    );
 
     final CheckpointRewindResult? backFar = await manager.rewind(99);
     expect(backFar!.turn, 0);
     expect(backFar.lastEventId, 'ev-0');
     expect(
-        File('$root${Platform.pathSeparator}a.txt').readAsStringSync(), 'v0');
+      File('$root${Platform.pathSeparator}a.txt').readAsStringSync(),
+      'v0',
+    );
   });
 
   test('enabled=false：reset/recordTurn 不写盘，list/rewind 为空', () async {
@@ -158,7 +166,9 @@ void main() {
     final CheckpointRewindResult? back = await manager.rewind(1);
     expect(back!.turn, 0);
     expect(
-        File('$root${Platform.pathSeparator}a.txt').readAsStringSync(), 'v2');
+      File('$root${Platform.pathSeparator}a.txt').readAsStringSync(),
+      'v2',
+    );
   });
 
   test('detach 后不再关联会话', () async {
