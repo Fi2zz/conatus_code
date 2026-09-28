@@ -47,6 +47,7 @@ export 'src/checkpoint/checkpoint_restore.dart'
 export 'src/checkpoint/checkpoint_store.dart' show CheckpointStore;
 export 'src/checkpoint/checkpoint_store_archive.dart'
     show ArchiveCheckpointStore;
+export 'src/checkpoint/checkpoint_store_git.dart' show GitShadowStore;
 export 'src/checkpoint/checkpoint_types.dart'
     show
         CheckpointException,
@@ -55,6 +56,8 @@ export 'src/checkpoint/checkpoint_types.dart'
         CheckpointManifest,
         CheckpointRestore,
         CheckpointRewindResult;
+export 'src/checkpoint/shadow_git_runner.dart'
+    show GitResult, GitRunner, ProcessGitRunner, UnavailableGitRunner;
 export 'src/config/config_credentials.dart' show ConfigCredentials;
 export 'src/config/config_loader.dart' show ConfigException, loadConfig;
 export 'src/config/config_path.dart'

@@ -52,11 +52,11 @@ class CheckpointFileEntry {
   final String? hash;
 
   Map<String, Object?> toJson() => <String, Object?>{
-        'path': path,
-        'mtimeMs': mtimeMs,
-        'size': size,
-        if (hash != null) 'hash': hash,
-      };
+    'path': path,
+    'mtimeMs': mtimeMs,
+    'size': size,
+    if (hash != null) 'hash': hash,
+  };
 }
 
 /// 一个检查点的清单。
@@ -82,7 +82,8 @@ class CheckpointManifest {
       turn: json['turn'] as int? ?? 0,
       lastEventId: json['lastEventId'] as String?,
       files: <CheckpointFileEntry>[
-        for (final Object? item in (json['files'] as List<Object?>?) ?? const <Object?>[])
+        for (final Object? item
+            in (json['files'] as List<Object?>?) ?? const <Object?>[])
           CheckpointFileEntry.fromJson(item),
       ],
       changed: <String>[
@@ -121,17 +122,17 @@ class CheckpointManifest {
 
   /// 序列化。
   Map<String, Object?> toJson() => <String, Object?>{
-        'kind': kind,
-        'turn': turn,
-        if (lastEventId != null) 'lastEventId': lastEventId,
-        if (isDelta)
-          'changed': changed
-        else
-          'files': <Map<String, Object?>>[
-            for (final CheckpointFileEntry entry in files) entry.toJson(),
-          ],
-        if (isDelta && deleted.isNotEmpty) 'deleted': deleted,
-      };
+    'kind': kind,
+    'turn': turn,
+    if (lastEventId != null) 'lastEventId': lastEventId,
+    if (isDelta)
+      'changed': changed
+    else
+      'files': <Map<String, Object?>>[
+        for (final CheckpointFileEntry entry in files) entry.toJson(),
+      ],
+    if (isDelta && deleted.isNotEmpty) 'deleted': deleted,
+  };
 }
 
 /// 一次恢复的结果计数。

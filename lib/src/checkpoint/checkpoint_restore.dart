@@ -191,7 +191,10 @@ Future<CheckpointRestore> _restoreLegacy(
 }
 
 /// 删除当前工作区中「不在目标状态、且未被排除」的文件；返回删除数。
-Future<int> _deleteExtras(ArchiveCheckpointStore store, Set<String> target) async {
+Future<int> _deleteExtras(
+  ArchiveCheckpointStore store,
+  Set<String> target,
+) async {
   final List<File> extras = <File>[];
   await for (final FileSystemEntity entity in Directory(
     store.root,

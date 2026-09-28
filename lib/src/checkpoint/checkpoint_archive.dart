@@ -57,8 +57,9 @@ class CheckpointArchiveWriter {
   final Map<String, String> _hashes = <String, String>{};
 
   /// [collectHashes] 为真时，收集到的 `路径 → sha256`（写入顺序）。
-  Map<String, String> get hashes =>
-      collectHashes ? Map<String, String>.unmodifiable(_hashes) : const <String, String>{};
+  Map<String, String> get hashes => collectHashes
+      ? Map<String, String>.unmodifiable(_hashes)
+      : const <String, String>{};
 
   /// 写入一个内存中已有字节的条目。
   void addBytes(String path, List<int> bytes) {
@@ -80,7 +81,6 @@ class CheckpointArchiveWriter {
     final _HashSink sink = _HashSink(path, _hashes, _controller);
     await sink.absorb(file.openRead());
   }
-
 
   /// 关闭 gzip 管道并落盘；之后不可再写。
   Future<void> close() async {
@@ -179,8 +179,7 @@ Future<CheckpointManifest> readCheckpointManifest(File file) async {
 /// 到行尾即取消订阅，不整包解压。归档损坏/无行尾返回 `null`。
 Future<List<int>?> _readHeadBytes(File file) async {
   final List<int> head = <int>[];
-  await for (final List<int> chunk
-      in file.openRead().transform(gzip.decoder)) {
+  await for (final List<int> chunk in file.openRead().transform(gzip.decoder)) {
     for (int i = 0; i < chunk.length; i++) {
       if (chunk[i] == 0x0a) return head;
       head.add(chunk[i]);

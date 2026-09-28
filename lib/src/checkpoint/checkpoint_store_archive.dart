@@ -20,6 +20,7 @@ import 'checkpoint_archive.dart';
 import 'checkpoint_hashes.dart';
 import 'checkpoint_paths.dart';
 import 'checkpoint_restore.dart';
+import 'checkpoint_scan.dart';
 import 'checkpoint_store.dart';
 import 'checkpoint_types.dart';
 
@@ -81,11 +82,8 @@ class ArchiveCheckpointStore implements CheckpointStore {
   ///
   /// 另提供 [snapshotUnindexed] 供基准测量用（写到临时目录、不动索引）。
   @override
-  Future<void> snapshot(
-    String sessionId,
-    int turn, {
-    String? lastEventId,
-  }) => _snapshot(
+  Future<void> snapshot(String sessionId, int turn, {String? lastEventId}) =>
+      _snapshot(
         archiveFile(sessionId, turn),
         sessionId,
         turn,
@@ -101,8 +99,7 @@ class ArchiveCheckpointStore implements CheckpointStore {
     String sessionId,
     int turn, {
     String? lastEventId,
-  }) =>
-      _snapshot(target, sessionId, turn, lastEventId: lastEventId);
+  }) => _snapshot(target, sessionId, turn, lastEventId: lastEventId);
 
   Future<void> _snapshot(
     File target,
@@ -165,8 +162,9 @@ class ArchiveCheckpointStore implements CheckpointStore {
           for (final CheckpointFileEntry entry in base.files) entry.path: entry,
         };
     // 基线内容哈希在旁挂文件里（旧检查点 / 手删则无 → 退化为纯 stat 比较）。
-    final Map<String, String>? baseHashes =
-        readCheckpointHashes(archiveFile(sessionId, 0));
+    final Map<String, String>? baseHashes = readCheckpointHashes(
+      archiveFile(sessionId, 0),
+    );
     // pass 1：walk 分类（stat 变化直接记 changed；stat 未变的哈希兜底
     // 「mtime+size 同内容变」），得到完整 changed/deleted 才能写清单头。
     final _DeltaScan scan = await _scanDelta(baseStats, baseHashes);
@@ -245,15 +243,7 @@ class ArchiveCheckpointStore implements CheckpointStore {
   }
 
   /// 流式列出工作区内需快照的文件（排除目录树、跟随链接关闭）。
-  Stream<FileSystemEntity> _walk() => Directory(
-    root,
-  ).list(recursive: true, followLinks: false).where(_included);
-
-  bool _included(FileSystemEntity entity) {
-    if (entity is! File) return false;
-    final String rel = checkpointRelativeTo(entity, root);
-    return !checkpointExcluded(rel, projectRel, ignore);
-  }
+  Stream<FileSystemEntity> _walk() => checkpointWalk(root, projectRel, ignore);
 
   /// pass 1 用：全部条目的 stat（不读内容——哈希在 pass 2 顺带产出）。
   Future<List<CheckpointFileEntry>> _scanStats() async {
