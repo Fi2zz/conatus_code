@@ -159,21 +159,34 @@ Future<void> writeCheckpointArchive(
 ///
 /// base 归档可达数百 MB，而 `list()` / 差量快照每轮只要清单——整包解压曾
 /// 让大工作区每轮口吃数秒、内存翻倍。
+///
+/// **按字节找行尾、不把整流过 UTF-8 解码器**：条目内容是任意二进制（含非法
+/// UTF-8 序列），`utf8.decoder` 会在越过清单头、进入条目内容时抛
+/// `FormatException`——即使我们只想读第一行。头是 JSON（必然合法 UTF-8），
+/// 故只在切出头部那一段后解码。
 Future<CheckpointManifest> readCheckpointManifest(File file) async {
-  final Stream<String> lines = file
-      .openRead()
-      .transform(gzip.decoder)
-      .transform(utf8.decoder)
-      .transform(const LineSplitter());
-  final String header;
-  try {
-    header = await lines.first;
-  } on StateError {
+  final List<int>? head = await _readHeadBytes(file);
+  if (head == null) {
     throw const CheckpointException('bad-archive', '检查点归档缺少清单头');
   }
   return CheckpointManifest.fromJson(
-    jsonDecode(header) as Map<String, Object?>,
+    jsonDecode(utf8.decode(head)) as Map<String, Object?>,
   );
+}
+
+/// 流式解压直到第一个 `0x0a`（清单头的行尾），返回不含行尾的字节。
+///
+/// 到行尾即取消订阅，不整包解压。归档损坏/无行尾返回 `null`。
+Future<List<int>?> _readHeadBytes(File file) async {
+  final List<int> head = <int>[];
+  await for (final List<int> chunk
+      in file.openRead().transform(gzip.decoder)) {
+    for (int i = 0; i < chunk.length; i++) {
+      if (chunk[i] == 0x0a) return head;
+      head.add(chunk[i]);
+    }
+  }
+  return null;
 }
 
 /// 流式读出归档的全部条目：逐帧解析、逐条产出，不整包解压。

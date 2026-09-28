@@ -103,6 +103,53 @@ void main() {
     });
   });
 
+  group('二进制内容不影响读头', () {
+    late Directory dir;
+
+    setUp(() {
+      dir = _tempDir();
+      addTearDown(() => dir.deleteSync(recursive: true));
+    });
+
+    test('条目含非法 UTF-8 字节时 readCheckpointManifest 仍能读头', () async {
+      final File target = File('${dir.path}/bin.cp');
+      final CheckpointArchiveWriter writer = CheckpointArchiveWriter(
+        target,
+        _manifest(),
+      );
+      // 0xFF 0xFE 不是合法 UTF-8：图片 / 编译产物 / 压缩包都会命中。
+      writer.addBytes('logo.png', <int>[0x89, 0x50, 0x4e, 0xff, 0xfe, 0x00]);
+      writer.addBytes('blob.bin', List<int>.filled(200, 0xc3)); // 截断多字节序列
+      await writer.close();
+
+      final CheckpointManifest head = await readCheckpointManifest(target);
+      expect(head.kind, 'base');
+      // 条目流同样不受影响（只对路径做 UTF-8 解码，内容按原字节还原）。
+      final List<CheckpointArchiveEntry> entries =
+          await readCheckpointEntries(target).toList();
+      expect(entries.map((CheckpointArchiveEntry e) => e.$1), <String>[
+        'logo.png',
+        'blob.bin',
+      ]);
+      expect(entries[0].$2, <int>[0x89, 0x50, 0x4e, 0xff, 0xfe, 0x00]);
+    });
+
+    test('缺清单头（无换行的损坏归档）报 bad-archive', () async {
+      final File broken = File('${dir.path}/broken.cp')
+        ..writeAsBytesSync(gzip.encode(utf8.encode('{"kind":"base"}')));
+      await expectLater(
+        readCheckpointManifest(broken),
+        throwsA(
+          isA<CheckpointException>().having(
+            (CheckpointException e) => e.code,
+            'code',
+            'bad-archive',
+          ),
+        ),
+      );
+    });
+  });
+
   group('内容哈希旁挂（工作区内容只读一遍）', () {
     late Directory dir;
 

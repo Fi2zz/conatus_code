@@ -14,6 +14,13 @@
   `.conatus`；显式 `[agent] project_dir` 才保持相对工作区的旧语义。
   `AgentConfig.projectDir` 缺省由 `'.conatus'` 改为未设置（null）。旧工作区
   `.conatus` 里的历史会话不再自动发现（数据保留不删）。
+- 修复工作区含二进制文件时每轮快照报「检查点保存失败：FormatException:
+  Invalid UTF-8 byte」：`readCheckpointManifest` 曾把整个解压流过
+  `utf8.decoder` + `LineSplitter` 取首行，清单头之后的条目内容是任意二进制
+  （图片 / 编译产物 / 压缩包），解码器一越过行尾就抛 `FormatException`——
+  尽管我们只想读第一行。现按字节找行尾、只解码切出的头部那一段（头是 JSON，
+  必然合法 UTF-8）。差量快照每轮都要读基线清单，故此问题表现为「每轮都
+  失败」。`readCheckpointEntries` 不受影响（只对路径解码，内容按原字节还原）。
 - 修复大工作区「正在加载会话…」久等（界面被检查点基线挡住）：会话绑定不再
   `await` turn 0 基线快照——`ready` 先置位、历史立即可读，基线在后台起拍。
   首轮（`submit`）与 `/rewind` 前各有一道门闩等基线落定，避免快照飞行中被
