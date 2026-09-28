@@ -53,6 +53,20 @@ void _write(String root, String rel, String content) {
 String _read(String root, String rel) =>
     File('$root${Platform.pathSeparator}$rel').readAsStringSync();
 
+/// 释放根上下文前先等检查点落定。
+///
+/// `/rewind` 收口后会再拍一次快照，而快照是后台流式写的。用例跑完立刻删
+/// 临时目录的话，写入还在飞行中的那几个用例会偶发 `PathNotFoundException`
+/// （package:test 报成「用例已完成之后失败」）。等基线落定再 dispose 即可
+/// 消除这个竞态。
+Future<void> _disposeAfterSettle(
+  Context app,
+  ConatusTuiController controller,
+) async {
+  await controller.checkpointSettled;
+  app.dispose();
+}
+
 /// 装配带 checkpointManager 的控制器。
 ///
 /// [initialSessionId] 非空时预置一个带历史事件的会话并绑定（模拟重开会话）；
@@ -101,7 +115,7 @@ void main() {
         await _build(
       beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
     );
-    addTearDown(app.dispose);
+    addTearDown(() => _disposeAfterSettle(app, controller));
     final String original = controller.sessionId;
     _write(root, 'a.txt', 'v1-broken');
     await controller.handleLine('把 a.txt 改坏一点');
@@ -123,7 +137,7 @@ void main() {
       initialSessionId: seededId,
       beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
     );
-    addTearDown(app.dispose);
+    addTearDown(() => _disposeAfterSettle(app, controller));
     _write(root, 'a.txt', 'v1-broken');
     await controller.handleLine('改坏 a.txt'); // turn 1
 
@@ -159,7 +173,7 @@ void main() {
       modelLabel: 'mock',
       onExit: () {},
     );
-    addTearDown(app.dispose);
+    addTearDown(() => _disposeAfterSettle(app, controller));
     await controller.start();
 
     await controller.handleLine('/rewind list');
@@ -169,7 +183,7 @@ void main() {
 
   test('busy 时 /rewind 拒绝', () async {
     final (ConatusTuiController controller, Context app, _) = await _build();
-    addTearDown(app.dispose);
+    addTearDown(() => _disposeAfterSettle(app, controller));
 
     controller.busy = true;
     await controller.handleLine('/rewind 1');
@@ -180,7 +194,7 @@ void main() {
   test('回滚不动 .conatus 数据目录', () async {
     final (ConatusTuiController controller, Context app, String root) =
         await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
-    addTearDown(app.dispose);
+    addTearDown(() => _disposeAfterSettle(app, controller));
     _write(root, '.conatus/keep.json', 'data');
     _write(root, 'a.txt', 'v1');
     await controller.handleLine('跑一轮');
@@ -211,7 +225,7 @@ void main() {
       modelLabel: 'mock',
       onExit: () {},
     );
-    addTearDown(app.dispose);
+    addTearDown(() => _disposeAfterSettle(app, controller));
     _write(root, 'a.txt', 'v0');
 
     // start() 返回即就绪——不等基线（大工作区上这一步可达数十秒）。
