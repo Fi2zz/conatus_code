@@ -40,8 +40,35 @@ class ConfigParser extends ConfigValues {
     if (defaultModel != null && !_validDefaultModel(defaultModel)) {
       throw ConfigException('$source：default_model 必须是 "provider/model" 形式。');
     }
-    return LlmConfig(defaultModel: defaultModel);
+    return LlmConfig(
+      defaultModel: defaultModel,
+      fallbackModels: _readFallbackModels(table),
+      retry: _readRetry(table),
+    );
   }
+
+  /// `[llm] fallback_models`：主模型失败后按序尝试的 `provider/model` 清单。
+  List<String> _readFallbackModels(Map<String, dynamic> table) {
+    final List<String> entries = <String>[
+      for (final String entry in readStringList(table, 'fallback_models'))
+        if (entry.trim().isNotEmpty) entry.trim(),
+    ];
+    for (final String entry in entries) {
+      if (!_validDefaultModel(entry)) {
+        throw ConfigException(
+          '$source：fallback_models 的 "$entry" 必须是 "provider/model" 形式。',
+        );
+      }
+    }
+    return entries;
+  }
+
+  /// `[llm]` 表里的退避重试参数；缺省即框架侧默认值。
+  RetrySettings _readRetry(Map<String, dynamic> table) => RetrySettings(
+        maxAttempts: readNonNegativeInt(table, 'max_attempts', 4),
+        baseDelayMs: readNonNegativeInt(table, 'retry_base_ms', 500),
+        maxDelayMs: readNonNegativeInt(table, 'retry_max_ms', 30000),
+      );
 
   bool _validDefaultModel(String value) {
     final int slash = value.indexOf('/');

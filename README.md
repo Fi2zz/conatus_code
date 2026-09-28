@@ -65,6 +65,10 @@ ARK_API_KEY = "sk-..."        # 非模型 Key 也放这里（TAVILY_API_KEY 等�
 
 [llm]
 default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"   # provider/model
+# fallback_models = ["deepseek/deepseek-chat"]                    # 回退链（按序）
+# max_attempts = 4            # 单个提供商总尝试次数（含首次）；1 = 关闭重试
+# retry_base_ms = 500         # 首次退避，此后按 2 的幂翻倍
+# retry_max_ms = 30000        # 单次退避上限（Retry-After 也受此约束）
 
 [providers.arkcli-agent-plan]
 api_key = "ark-..."
@@ -226,6 +230,7 @@ default_model = "provider/model"` 同时定当前提供商与默认模型。
   （缓存 24h，失败仅展示配置内模型）；没有候选也照常打开浮层
 - 未配置任何 provider 时启动进入引导：TUI 照常启动并自动弹出 provider 面板，
   模型调用会提示先用 `/provider` 添加或编辑 config.toml——**没有缺省回退链**
+  （回退链需在 config.toml `[llm] fallback_models` 里显式声明）
 
 ```toml
 [providers.my-gateway]
@@ -264,6 +269,42 @@ final LlmProvider? llm = registry.buildLlm('ark', model: 'doubao-seed-1-8-251228
 **Plan 端点只认订阅后生成的专属 Key**：`ark-agent-plan` 用
 `ARK_AGENT_PLAN_API_KEY`、`volcengine-coding-plan` 用 `ARK_CODING_PLAN_API_KEY`，
 普通方舟 Key（`ARK_API_KEY`）对 plan 端点会返回 401。
+
+## LLM 韧性（重试 / 退避 / 回退链）
+
+一次网络抖动不该让整轮失败。链路分两层，各自独立生效：
+
+1. **退避重试**（同一提供商内）——限流（429）、5xx、超时、连接失败按指数退避
+   重试，缺省 4 次 / 500ms 起翻倍 / 单次封顶 30s，带 ±25% 抖动。服务端给了
+   `Retry-After` 就照它等。
+2. **回退链**（换提供商）——上面重试耗尽后，按 `[llm] fallback_models` 换下一
+   个候选。
+
+只对**可重试**的错误重试：401 / 403、缺 API Key、400 这类重试无意义的失败一次
+就上抛，直接进入回退（换一个 Key 正确的提供商才是出路）。
+
+- 装配形状是两层嵌套：`FallbackLlm(RetryingLlm(主), RetryingLlm(备), …)`。
+  先在原提供商上把能救的失败救回来，避免一次抖动就换模型、让回答风格在一次会话
+  里来回跳。
+- **流式重试只在尚未产出任何增量时生效**：已经 yield 出去的文本收不回来，静默
+  重来只会让用户看到重复内容（回退链同理）。
+- 配错的回退项（provider 不存在 / 重复）**跳过而不是整体失败**，并在 `/doctor`
+  的「模型回退链」里列出；配错一条备用模型不该让主模型都用不了。
+- 重试与回退都**实时上屏**（`· ark 触发限流，1.0s 后重试（2/4）`、
+  `· ark 不可用，已切到 deepseek`）——退避可能静默 30 秒，没有提示在用户眼里
+  就是卡死。`/doctor` 另报出候选链与最近一次回退。
+- `/model` 切换主模型时**重建整条链**，回退项仍然跟随——否则一次切模型就顺手
+  关掉了容错。
+
+```toml
+[llm]
+default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"
+fallback_models = ["deepseek/deepseek-chat", "openai/gpt-4o-mini"]
+max_attempts = 4
+```
+
+框架侧（`conatus_llm`）的入口是 `RetryingLlm` / `RetryPolicy` / `LlmErrorKind`
+与 `FallbackLlm`，任何宿主都能单独取用。
 
 ## 沙箱分层与已知边界
 

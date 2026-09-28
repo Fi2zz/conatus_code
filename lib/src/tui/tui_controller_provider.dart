@@ -449,22 +449,36 @@ extension _ProviderCommands on ConatusTuiController {
   }
 
   /// 按 provider（可指定模型）替换 LLM 服务并重绑；返回提示文本。
+  ///
+  /// 换的是**整条链**而不是单个 provider——用户挑中的模型升为主模型，配置里
+  /// 的 `fallback_models` 仍跟在后面。只把新模型接上、把回退丢掉，等于让
+  /// `/model` 顺手关掉了容错。
   Future<String> _applyLlm(
     ProviderRegistry registry,
     String provider, {
     String? model,
   }) async {
     final void Function(FallbackLlm)? swap = switchLlm;
-    final LlmProvider? llm = registry.buildLlm(provider, model: model);
-    if (swap == null || llm == null) {
-      return '无法切换到 $provider：'
-          '${swap == null ? '未注入 LLM 替换钩子' : '没有可用模型'}';
-    }
+    if (swap == null) return '无法切换到 $provider：未注入 LLM 替换钩子';
     final String label =
         model ?? registry.byName(provider)?.defaultModel ?? provider;
-    swap(FallbackLlm(<LlmProvider>[llm]));
+    final LlmChain? chain = buildLlmChain(
+      registry,
+      entries: <String>['$provider/$label', ..._fallbackModels],
+      policy: _retryPolicy,
+      notices: _app.get<LlmNotices>('llmNotices'),
+    );
+    if (chain == null) {
+      return '无法切换到 $provider · $label：没有可用模型。';
+    }
+    _app.provide('llmChain', chain);
+    swap(chain.llm);
     modelLabel = label;
     final bool rebound = await rebind();
-    return '已切换到 $provider · $label${rebound ? '' : '（有在途轮次，稍后生效）'}';
+    final String skipped = chain.skipped.isEmpty
+        ? ''
+        : '（跳过 ${chain.skipped.length} 条无效回退）';
+    return '已切换到 $provider · $label$skipped'
+        '${rebound ? '' : '（有在途轮次，稍后生效）'}';
   }
 }

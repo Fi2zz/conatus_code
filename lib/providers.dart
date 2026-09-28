@@ -9,6 +9,8 @@ library;
 
 export 'src/providers/builtin_providers.dart'
     show DeepSeekProvider, DoubaoProvider;
+export 'src/providers/llm_chain.dart'
+    show LlmChain, LlmNotice, LlmNotices, buildLlmChain;
 export 'src/providers/model_catalog.dart'
     show ModelCapability, ModelSpec, ProviderPreset, kProviderPresets;
 export 'src/providers/models_dev.dart'

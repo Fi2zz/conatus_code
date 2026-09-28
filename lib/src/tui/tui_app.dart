@@ -48,6 +48,8 @@ class ConatusTuiRuntime {
     required this.modelLabel,
     required this.providers,
     required this.maxSteps,
+    required this.fallbackModels,
+    required this.retryPolicy,
     required void Function(FallbackLlm llm) switchLlm,
   }) : _switchLlm = switchLlm;
 
@@ -68,6 +70,12 @@ class ConatusTuiRuntime {
 
   /// Agent Loop 单轮最大步数。
   final int maxSteps;
+
+  /// 配置里的回退链；`/model` 切换主模型后仍跟随（见 `llm_chain.dart`）。
+  final List<String> fallbackModels;
+
+  /// 单个提供商内部的退避重试策略。
+  final RetryPolicy retryPolicy;
 
   final void Function(FallbackLlm llm) _switchLlm;
 
@@ -118,6 +126,8 @@ class ConatusTuiRuntime {
     String? model,
     int maxSteps = 8,
     FallbackLlm? llm,
+    RetryPolicy? retryPolicy,
+    List<String> fallbackModels = const <String>[],
     TurnBudget? turnBudget,
     String? modelLabel,
     FileSystem? fs,
@@ -294,10 +304,25 @@ class ConatusTuiRuntime {
         throw StateError('未知提供商：$provider（config.toml [providers] 里没有）');
       }
     }
-    final LlmProvider? fromRegistry = registry?.buildLlm(
-      provider ?? registry.currentName ?? '',
-      model: model,
-    );
+
+    // LLM 链：主模型 + `[llm] fallback_models`，每个候选各包一层退避重试。
+    // 提示出口挂到上下文，控制器订阅后写进屏上记录（见 LlmNotices）。
+    final LlmNotices notices = LlmNotices();
+    app.provide('llmNotices', notices);
+    app.onDispose(notices.close);
+    final List<String> chainEntries = <String>[
+      if (model != null && model.isNotEmpty) '$provider/$model' else if (provider != null) provider,
+      ...fallbackModels,
+    ];
+    final LlmChain? chain = registry == null
+        ? null
+        : buildLlmChain(
+            registry,
+            entries: chainEntries,
+            policy: retryPolicy ?? const RetryPolicy(),
+            notices: notices,
+          );
+
     // 预算护栏：包装 `'llm'` 服务（每轮墙钟 + 上下文 token 估算），并把首个
     // CostTracker 实现注册到 `'costTracker'`（供未来 autonomous runner 消费）。
     final CostTrackerImpl costTracker = CostTrackerImpl();
@@ -306,15 +331,15 @@ class ConatusTuiRuntime {
     if (configPath != null) {
       app.provide('configPath', configPath);
     }
-    if (llm == null && fromRegistry == null) {
+    if (llm == null && chain == null) {
       // 无配置：注入占位 provider，TUI 照常启动并引导添加（不报错退出）。
       app.provide('providerSetupNeeded', true);
     }
     final FallbackLlm resolvedLlm =
         llm ??
-        (fromRegistry != null
-            ? FallbackLlm(<LlmProvider>[fromRegistry])
-            : FallbackLlm(<LlmProvider>[_UnconfiguredProvider()]));
+        chain?.llm ??
+        FallbackLlm(<LlmProvider>[_UnconfiguredProvider()]);
+    app.provide('llmChain', chain);
     Disposer llmDisposer = provideBudgetedLlm(
       app,
       llm: resolvedLlm,
@@ -458,6 +483,8 @@ class ConatusTuiRuntime {
           modelLabel ?? model ?? _modelLabel(registry, resolvedCredentials),
       providers: registry,
       maxSteps: maxSteps,
+      fallbackModels: fallbackModels,
+      retryPolicy: retryPolicy ?? const RetryPolicy(),
       switchLlm: switchLlm,
     );
   }
@@ -483,6 +510,8 @@ class ConatusTuiRuntime {
       planning: planning,
       onExit: onExit,
       initialPermissionMode: initialPermissionMode,
+      fallbackModels: fallbackModels,
+      retryPolicy: retryPolicy,
     );
     controller.switchLlm = switchLlm;
     return controller;

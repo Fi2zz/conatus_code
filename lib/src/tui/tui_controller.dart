@@ -99,19 +99,45 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.tts,
     this.ttsSink,
     this.initialPermissionMode = TuiPermissionMode.askWhenNeeded,
+    List<String> fallbackModels = const <String>[],
+    RetryPolicy retryPolicy = const RetryPolicy(),
   })  : _app = app,
         _sessions = sessions,
-        _sessionId = initialSession ?? '' {
+        _sessionId = initialSession ?? '',
+        _fallbackModels = fallbackModels,
+        _retryPolicy = retryPolicy {
     picker = TuiSessionPicker(sessions, onChanged: _refresh);
     _app.provide('tuiController', this);
     final TuiPermissionGate? gate = app.get<TuiPermissionGate>('approval');
     _gate = gate;
     choice.onChanged = _refresh;
+    _watchLlmNotices();
     _syncPermissionMode();
+  }
+
+  /// 订阅 LLM 韧性提示并即时上屏。
+  ///
+  /// 退避重试可能静默 30 秒——没有这行提示，用户看到的是一个不动的转圈。
+  void _watchLlmNotices() {
+    final LlmNotices? notices = _app.get<LlmNotices>('llmNotices');
+    if (notices == null) return;
+    _noticeSubscription = notices.stream.listen((LlmNotice notice) {
+      transcript.add(TuiRole.system, notice.text);
+      _refresh();
+    });
   }
 
   final Context _app;
   final SessionStore _sessions;
+
+  /// 配置里的回退链（`[llm] fallback_models`）；`/model` 切换主模型后仍跟随。
+  final List<String> _fallbackModels;
+
+  /// 单个提供商内部的退避重试策略。
+  final RetryPolicy _retryPolicy;
+
+  /// LLM 重试 / 回退的提示订阅；控制器销毁时随 `_unbind` 一并取消。
+  StreamSubscription<LlmNotice>? _noticeSubscription;
 
   /// 选项浮层（`ask_user` 与工具审批共用）。
   ///
@@ -335,7 +361,13 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// 释放当前会话绑定（幂等）。
-  void dispose() => _unbind();
+  void dispose() {
+    _unbind();
+    // 提示订阅跨会话存活（换会话不该丢「正在重试」的可见性），只在控制器
+    // 真正销毁时取消。
+    unawaited(_noticeSubscription?.cancel());
+    _noticeSubscription = null;
+  }
 
   /// 重新绑定当前会话：替换根上下文服务（如 `'llm'`）后调用，让 Agent Loop
   /// 用新服务重建；屏上记录按会话事件重建，历史不丢。

@@ -20,6 +20,13 @@ const String kDefaultConfigToml = '''
 
 # default_model = "deepseek/deepseek-chat"
 
+# 韧性：单个提供商内先退避重试，仍失败再按 fallback_models 换下一个。
+# [llm]
+# fallback_models = ["deepseek/deepseek-chat", "ark/doubao-seed-2-0-lite-260215"]
+# max_attempts = 4            # 总尝试次数（含首次）；1 = 关闭重试
+# retry_base_ms = 500         # 首次退避，此后按 2 的幂翻倍
+# retry_max_ms = 30000        # 单次退避上限（服务端 Retry-After 也受此约束）
+
 # [models."deepseek/deepseek-chat"]
 # capabilities = [ "always_thinking", "tool_use" ]
 # max_context_size = 1000000

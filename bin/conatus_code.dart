@@ -79,6 +79,8 @@ Future<void> main(List<String> args) async {
     provider: provider,
     model: model,
     maxSteps: config.agent.maxSteps,
+    retryPolicy: config.llm.retry.toPolicy(),
+    fallbackModels: config.llm.fallbackModels,
     turnBudget: TurnBudget(
       maxDuration: config.budget.maxTurnSeconds == null
           ? null
@@ -124,6 +126,8 @@ Future<void> main(List<String> args) async {
     exit(code);
   }
 
+  // 回退链与重试策略已在 runtime 上（`/model` 切换主模型时要跟着重建），
+  // `createController` 直接取用，这里不重复传。
   final ConatusTuiController controller = runtime.createController(
     initialSession: initialSession,
     planning: true,

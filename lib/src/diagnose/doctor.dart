@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
+import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
 
 import '../../providers.dart';
@@ -42,6 +43,7 @@ List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
         hint: '未定位到 config.toml（--config 未指定）',
       ),
       _providerCheck(app),
+      _llmChainCheck(app),
       _mcpCheck(app),
       DoctorCheck(
         name: '工具表',
@@ -71,6 +73,41 @@ DoctorCheck _providerCheck(Context app) {
     ok: false,
     hint: '无已配置 provider：/provider add 或编辑 config.toml [providers.*]',
   );
+}
+
+/// LLM 链：候选数与最近一次回退。
+///
+/// 回退是静默发生的——没有这项，用户只会看到回答风格突然变了，却不知道
+/// 主模型已经挂过一次。
+DoctorCheck _llmChainCheck(Context app) {
+  final LlmChain? chain = app.get<LlmChain>('llmChain');
+  if (chain == null) {
+    return const DoctorCheck(
+      name: '模型回退链',
+      ok: false,
+      hint: '未装配（先用 /provider 配置提供商）',
+    );
+  }
+  return DoctorCheck(
+    name: '模型回退链',
+    ok: true,
+    warning: chain.entries.length < 2,
+    hint: _chainHint(chain, app.get<LlmNotices>('llmNotices')),
+  );
+}
+
+String _chainHint(LlmChain chain, LlmNotices? notices) {
+  final StringBuffer buffer =
+      StringBuffer('${chain.entries.length} 个候选：${chain.entries.join(' → ')}');
+  final LlmFallbackEvent? last = notices?.lastFallback;
+  if (last != null) {
+    buffer.write('；最近回退 ${last.fromProvider} → ${last.toProvider}');
+  }
+  if (chain.skipped.isNotEmpty) {
+    buffer.write('；已跳过 ${chain.skipped.length} 条无效回退'
+        '（${chain.skipped.keys.join('、')}）');
+  }
+  return buffer.toString();
 }
 
 DoctorCheck _mcpCheck(Context app) {

@@ -1,13 +1,57 @@
 /// conatus_code 的配置模型，对应 `~/.nava/config.toml`。
 library;
 
+import 'package:conatus_llm/conatus_llm.dart';
+
 /// LLM 选择：`provider/model` 同时定当前提供商与默认模型。
 class LlmConfig {
-  const LlmConfig({this.defaultModel});
+  const LlmConfig({
+    this.defaultModel,
+    this.fallbackModels = const <String>[],
+    this.retry = const RetrySettings(),
+  });
 
   /// `provider/model`（如 `'arkcli-agent-plan/doubao-seed-2-0-lite-260215'`）；
   /// `null` 表示缺省取注册表首个提供商。
   final String? defaultModel;
+
+  /// 回退链；按顺序尝试，主模型失败后接着试这些。空 = 不回退。
+  ///
+  /// 每项同样是 `provider/model`，可与主模型同 provider 不同模型（换模型
+  /// 比换网关更常见的降级手段）。
+  final List<String> fallbackModels;
+
+  /// 单个提供商内部的退避重试参数。
+  final RetrySettings retry;
+}
+
+/// 单个提供商的重试参数；对应 `[llm]` 表的 `max_attempts` 等字段。
+class RetrySettings {
+  const RetrySettings({
+    this.maxAttempts = 4,
+    this.baseDelayMs = 500,
+    this.maxDelayMs = 30000,
+  });
+
+  /// 总尝试次数（含首次）；`1` = 关闭重试。
+  ///
+  /// 只对**可重试**的错误生效（限流 / 5xx / 网络）。401、缺 Key、400 这类
+  /// 重试无意义的失败一次就上抛，随后交给回退链换提供商。
+  final int maxAttempts;
+
+  /// 首次退避时长（毫秒），此后按 2 的幂翻倍。
+  final int baseDelayMs;
+
+  /// 单次退避的硬上限（毫秒）。服务端给了 `Retry-After` 时按它等，但同样受
+  /// 此上限约束——避免被一个写错的 `Retry-After: 3600` 卡住一小时。
+  final int maxDelayMs;
+
+  /// 转成框架侧的策略对象。
+  RetryPolicy toPolicy() => RetryPolicy(
+        maxAttempts: maxAttempts,
+        baseDelay: Duration(milliseconds: baseDelayMs),
+        maxDelay: Duration(milliseconds: maxDelayMs),
+      );
 }
 
 /// provider 类型：决定请求形态（都走 OpenAI 兼容客户端）。

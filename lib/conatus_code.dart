@@ -97,6 +97,7 @@ export 'src/config/config_schema.dart'
         ModelConfig,
         ProviderConfig,
         ProviderType,
+        RetrySettings,
         SandboxPreset,
         SandboxSettings,
         ServiceConfig,
