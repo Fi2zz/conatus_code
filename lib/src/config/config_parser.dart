@@ -288,6 +288,7 @@ class ConfigParser extends ConfigValues {
       enabled: readBool(table, 'enabled', true),
       keep: readNonNegativeInt(table, 'keep', 5),
       ignore: readStringList(table, 'ignore'),
+      backend: CheckpointBackend.parse(readString(table, 'backend')),
     );
   }
 

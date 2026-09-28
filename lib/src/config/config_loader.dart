@@ -48,6 +48,9 @@ const String kDefaultConfigToml = '''
 enabled = true
 keep = 5                    # 每会话保留最近 N 个检查点（0 = 不限）
 # ignore = ["node_modules", "build/"]   # 额外忽略的相对路径前缀
+# backend = "auto"          # auto(默认) 有 git 用影子仓库、无 git 用自研归档
+                            # git / archive 为显式固定，不做自动降级
+                            # 影子仓库更快：开第二个会话不必重拍全量
 
 # Hooks：工具执行前/后与轮次收口的用户命令（经 /bin/sh -c 直连运行）。
 # [hooks]

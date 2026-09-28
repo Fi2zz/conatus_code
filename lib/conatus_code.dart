@@ -35,6 +35,7 @@ export 'src/checkpoint/checkpoint_archive.dart'
         readCheckpointEntries,
         readCheckpointManifest,
         writeCheckpointArchive;
+export 'src/checkpoint/checkpoint_backend.dart' show openCheckpointStore;
 export 'src/checkpoint/checkpoint_hashes.dart'
     show
         checkpointHashesFile,
@@ -78,6 +79,7 @@ export 'src/config/config_path.dart'
         resolveConfigPath;
 export 'src/config/config_schema.dart'
     show
+        CheckpointBackend,
         AgentConfig,
         ApprovalConfig,
         ApprovalMode,

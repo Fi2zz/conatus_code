@@ -280,12 +280,35 @@ class McpConfig {
   final List<McpServerSpec> servers;
 }
 
+/// 检查点存储后端。
+enum CheckpointBackend {
+  /// 有 git 用影子仓库，没有就用自研归档（缺省）。
+  auto,
+
+  /// 强制影子仓库：git 不可用时每轮快照会报错（用户显式选择，不静默降级）。
+  git,
+
+  /// 强制自研 gzip 归档：零外部依赖，任何环境可跑，代价是每会话重付全量代价。
+  archive;
+
+  /// 解析配置值；未知值按 [auto]（容错，不因拼错让检查点整个失效）。
+  static CheckpointBackend parse(String? raw) => switch (raw?.trim()) {
+    'git' => CheckpointBackend.git,
+    'archive' => CheckpointBackend.archive,
+    _ => CheckpointBackend.auto,
+  };
+
+  /// 配置里的字面量（`[checkpoint] backend`）。
+  String get label => name;
+}
+
 /// 检查点配置；对应 `[checkpoint]` 表（工作区每轮快照与回滚）。
 class CheckpointConfig {
   const CheckpointConfig({
     this.enabled = true,
     this.keep = 5,
     this.ignore = const <String>[],
+    this.backend = CheckpointBackend.auto,
   });
 
   /// 是否每轮快照工作区；`false` 时 `/rewind` 不可用。
@@ -296,6 +319,9 @@ class CheckpointConfig {
 
   /// 额外忽略的相对路径前缀（如 `node_modules` / `build/`）。
   final List<String> ignore;
+
+  /// 存储后端（`auto` 缺省）。
+  final CheckpointBackend backend;
 }
 
 /// Hooks 配置；对应 `[hooks]` 表（事件 → 命令列表）。

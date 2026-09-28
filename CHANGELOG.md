@@ -4,6 +4,40 @@
 
 ## [未发布]
 
+- 检查点存储新增「影子 git 仓库」后端，`[checkpoint] backend` 可选
+  `auto`（缺省）/ `git` / `archive`。`auto` 在有 git 时用影子仓库、无 git
+  时退回自研 gzip 归档（零外部依赖，任何环境可跑）；`git` / `archive` 是
+  显式固定，不做自动降级——写死 `git` 而环境无 git 时每轮快照会报错，比
+  悄悄换实现更容易察觉问题。
+- 影子仓库的收益：内容寻址 + zlib + 增量全交给 git。同一工作区
+  （2000 文件 / 125MB 合成数据）实测——开**第二个会话**的 turn 0 从 4.36s
+  降到 239ms（归档实现每次开会话都要重付全量代价），这也是「新会话卡在
+  正在加载会话…」的根因。代价是多文件小文件场景占用更高（39.9MiB vs
+  24MiB，git 按 blob 各自 zlib，跨文件上下文不如单条 gzip 流）。
+  新增 `tool/bench_shadow.dart` 可复测。
+- 影子仓库**不要求工作区本身是 git 仓库**，也不碰用户仓库（实测：影子提交
+  后用户 `git log` 不变、`status` 只多 untracked）。仓库位于项目数据目录下
+  `checkpoints/shadow.git`，随会话数据一起备份。
+- 快照排除面统一由 conatus 自己算（`checkpointWalk`），不再委托 git 的
+  ignore 机制：影子实现曾用 `git add --all`，git 会顺从**工作区的
+  `.gitignore`**，与归档实现的排除面不一致——恢复按 rsync 语义把「不在目标
+  态」的文件删掉，实测在 9661 文件的 swiftus 上快照只收 293 个、恢复删掉
+  其余 9119 个。现改为自行 walk 后把路径显式喂给 `git add -f`，并加
+  `_verifyStaged` 断言：暂存不完整就中止本轮快照并报错，绝不静默产出残缺
+  快照。嵌套 git 仓库（`git worktree` / vendor）整树排除——`git add` 对其
+  内部路径会**静默跳过**（rc=0 无告警）。归档实现同样改用共用遍历，顺带
+  修掉它删除侧的同一个洞。
+- 快照默认排除敏感文件（凭据 / 私钥）：`.env` 及变体、`.pem`/`.key`/`.p12`
+  等后缀、`id_rsa` 一类、`credentials.json`、`secrets.*`、`.netrc` 等；放过
+  `.env.example`/`.sample`/`.template` 与 `.envrc`。理由：快照是明文落盘
+  （gzip 不是加密），影子实现还会把内容写进 git 对象库，删掉检查点后 blob
+  仍留在库里。排除是双向的——也不会在恢复时被当成「多余文件」删掉。
+- 快照排除**全局** gitignore（`core.excludesFile`）忽略的路径：机器级
+  housekeeping（`.DS_Store`、`*~` 等）进快照无价值。**不**排除工作区的
+  `.gitignore`——「不进版本库」不等于「不该备份」，构建产物恰恰是最需要能
+  被回滚的。用 `git check-ignore --verbose` 按「来源」筛选，无需自己解析
+  gitignore 语法。该集合并入 `checkpointExcluded`，采集与删除判定同源。
+
 - 默认目录全部收敛到用户目录、零 cwd 兜底：`resolveConfigDir` 无 `HOME` 时改用
   `USERPROFILE`，仍缺失抛 `StateError`（此前静默落当前工作目录）；
   `ConatusTuiRuntime.create` 的 `baseDir` 缺省由 `<cwd>/.conatus` 改为
