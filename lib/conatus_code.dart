@@ -35,6 +35,12 @@ export 'src/checkpoint/checkpoint_archive.dart'
         readCheckpointEntries,
         readCheckpointManifest,
         writeCheckpointArchive;
+export 'src/checkpoint/checkpoint_hashes.dart'
+    show
+        checkpointHashesFile,
+        deleteCheckpointHashes,
+        readCheckpointHashes,
+        writeCheckpointHashes;
 export 'src/checkpoint/checkpoint_manager.dart' show CheckpointManager;
 export 'src/checkpoint/checkpoint_restore.dart' show restoreCheckpoint;
 export 'src/checkpoint/checkpoint_store.dart' show CheckpointStore;

@@ -34,7 +34,11 @@ void main() {
     final (CheckpointStore store, String root, _) = _setup();
     _writeFixedStat(root, 'a.txt', 'AAAA');
     await store.snapshot('s1', 0);
-    expect(store.manifestOf('s1', 0).files.single.hash, isNotNull);
+    // 哈希在旁挂文件里（清单头只留 stat，避免为算哈希多读一遍内容）。
+    expect(
+      readCheckpointHashes(store.archiveFile('s1', 0))!['a.txt'],
+      isNotNull,
+    );
 
     // 同 size 不同内容，mtime 固定在同一整秒。
     _writeFixedStat(root, 'a.txt', 'BBBB');

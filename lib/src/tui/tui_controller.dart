@@ -221,6 +221,12 @@ class ConatusTuiController implements TuiUserPromptHost {
   GoalService? _goal;
   Disposer? _eventSub;
 
+  /// turn 0 基线快照的落盘门闩：`_bind` 起拍、`submit` 与 `/rewind` 等待。
+  ///
+  /// 非空表示有一轮基线在飞（会话刚绑定）。解除绑定时置 `null`，免得旧门闩
+  /// 拖住下一个会话的首轮。
+  Future<void>? _checkpointBase;
+
   /// 在飞轮次的取消句柄（Esc / 打断）；null = 无在飞轮次。
   AgentCancel? _cancel;
 
@@ -248,6 +254,13 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 会话是否已绑定就绪。
   bool ready = false;
+
+  /// turn 0 基线快照已落盘。
+  ///
+  /// [ready] 只保证会话历史可读；基线是后台起拍的（大工作区可达数十秒）。
+  /// 内部在 [submit] 与 `/rewind` 前自动等待，此 getter 供测试与外部在
+  /// 「就绪但基线未落盘」的窗口里显式同步。
+  Future<void> get checkpointSettled => _checkpointBase ?? Future<void>.value();
 
   /// 当前会话 id。
   String get sessionId => _sessionId;
@@ -517,6 +530,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     _cancel = cancel;
     busy = true;
     _refresh();
+    // 等 turn 0 基线落盘再开跑：快照边写边读工作区，飞行中被工具改动会
+    // 拍出「半旧半新」的 base，之后 /rewind 回到从未存在过的混合状态。
+    // 界面此时已就绪，用户能看到历史并排队，这里只是把首轮延后。
+    await _checkpointBase;
     bool turnOk = true;
     String reply = '';
     try {
@@ -820,6 +837,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
       return;
     }
+    // 基线还在写：此时回滚没有可回滚的锚点，等它落盘（与首轮同一道门闩）。
+    await _checkpointBase;
     final String command = arg.trim();
     if (command == 'list') {
       _showCheckpoints(checkpoint);
@@ -1507,18 +1526,6 @@ class ConatusTuiController implements TuiUserPromptHost {
     _agent = ctx.agentLoop;
     _planMode = ctx.planMode;
     _goal = ctx.goal;
-    // 检查点：绑定会话即写 turn 0 初始快照（供回滚到「全部轮次之前」）。
-    final CheckpointManager? checkpoint =
-        _app.get<CheckpointManager>('checkpointManager');
-    if (checkpoint != null) {
-      final String? error = await checkpoint.reset(
-        id,
-        lastEventId: session.lastEventId,
-      );
-      if (error != null) {
-        transcript.add(TuiRole.system, error);
-      }
-    }
     // 权限模式按会话恢复：每个会话折叠自己的 permission/mode 后缀，
     // 同时清空审批门的「总是允许」清单（它也是会话级状态）。
     _gate?.resetAlwaysAllowed();
@@ -1530,7 +1537,22 @@ class ConatusTuiController implements TuiUserPromptHost {
       _refresh();
     });
     _bindTeam(ctx);
+    // 检查点：绑定会话即写 turn 0 初始快照（供回滚到「全部轮次之前」）。
+    // 后台起拍、不挡就绪——大工作区的全量基线可达数十秒，挡在这里会让整个
+    // 界面卡在「正在加载会话…」（而会话本身只有几 KB）。真正的门闩在
+    // [submit]：第一轮开跑前等基线落定，避免快照飞行中被工具改出撕裂状态。
+    _checkpointBase = _startCheckpoint(id, session.lastEventId);
     ready = true;
+  }
+
+  /// 后台起拍 turn 0 基线；错误说明补进 transcript（基线未就绪时
+  /// `/rewind` 不可用，属降级不属阻塞）。
+  Future<void> _startCheckpoint(String id, String? lastEventId) async {
+    final CheckpointManager? checkpoint =
+        _app.get<CheckpointManager>('checkpointManager');
+    if (checkpoint == null) return;
+    final String? error = await checkpoint.reset(id, lastEventId: lastEventId);
+    if (error != null && ready) transcript.add(TuiRole.system, error);
   }
 
   /// 绑定团队订阅与语音播报（装配了团队服务时生效）。
@@ -1557,6 +1579,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     _teamSub?.dispose();
     _teamSub = null;
     _app.get<CheckpointManager>('checkpointManager')?.detach();
+    // 换掉在飞门闩：基线仍会自己跑完（`detach` 已让它在链上让位），但下个
+    // 会话的首轮不该等它。
+    _checkpointBase = null;
     _queue.clear();
     _sessionCtx?.dispose();
     _sessionCtx = null;

@@ -32,9 +32,15 @@ String checkpointArchiveName(String sessionId, int turn) =>
 /// 流式归档写入器：构造时写清单头（gzip 流内），随后逐条目写入
 /// （[addBytes] 写内存字节；[addFile] 按 chunk 读文件），[close] 收尾落盘。
 /// 输出格式与 [readCheckpointArchive] 完全兼容。
+///
+/// 开了 [collectHashes] 时，[addFile] 在把内容喂给 gzip 的同一遍里顺带算出
+/// 每个文件的 sha256（收在 [hashes]），让「读内容算哈希」不必单独再读一遍。
 class CheckpointArchiveWriter {
-  CheckpointArchiveWriter(File target, CheckpointManifest manifest)
-    : _controller = StreamController<List<int>>() {
+  CheckpointArchiveWriter(
+    File target,
+    CheckpointManifest manifest, {
+    this.collectHashes = false,
+  }) : _controller = StreamController<List<int>>() {
     target.parent.createSync(recursive: true);
     _done = _controller.stream.transform(gzip.encoder).pipe(target.openWrite());
     _controller
@@ -45,17 +51,36 @@ class CheckpointArchiveWriter {
   final StreamController<List<int>> _controller;
   late final Future<dynamic> _done;
 
+  /// 是否顺带收集条目内容的 sha256（见 [hashes]）。
+  final bool collectHashes;
+
+  final Map<String, String> _hashes = <String, String>{};
+
+  /// [collectHashes] 为真时，收集到的 `路径 → sha256`（写入顺序）。
+  Map<String, String> get hashes =>
+      collectHashes ? Map<String, String>.unmodifiable(_hashes) : const <String, String>{};
+
   /// 写入一个内存中已有字节的条目。
   void addBytes(String path, List<int> bytes) {
     _writeFrameHeader(path, bytes.length);
+    if (collectHashes) _hashes[path] = sha256.convert(bytes).toString();
     _controller.add(bytes);
   }
 
   /// 写入一个文件条目：长度前缀取自 [File.lengthSync]，内容按 chunk 流式读入。
+  ///
+  /// 开了 [collectHashes] 时，每个 chunk 同时喂给 sha256 累加器——内容只从
+  /// 磁盘读一遍，内存 O(chunk)。
   Future<void> addFile(String path, File file) async {
     _writeFrameHeader(path, file.lengthSync());
-    await _controller.addStream(file.openRead());
+    if (!collectHashes) {
+      await _controller.addStream(file.openRead());
+      return;
+    }
+    final _HashSink sink = _HashSink(path, _hashes, _controller);
+    await sink.absorb(file.openRead());
   }
+
 
   /// 关闭 gzip 管道并落盘；之后不可再写。
   Future<void> close() async {
@@ -71,6 +96,46 @@ class CheckpointArchiveWriter {
     _controller.add(lens.buffer.asUint8List());
     _controller.add(pathBytes);
   }
+}
+
+/// 边转发 chunk 边算 sha256 的旁路 sink：同一遍读取既喂 gzip 又喂哈希。
+///
+/// 哈希用 `crypto` 的分块接口（[Hash.startChunkedConversion]），内存 O(chunk)
+/// 而非 O(单文件)——`sha256.convert(await file.readAsBytes())` 会把整个文件
+/// 读进内存，正是大文件快照吃内存的原因。
+class _HashSink {
+  /// [collector] 与 [hash] 必须同一对象，故在构造体里建（initializer 阶段
+  /// 还拿不到 `this`）。
+  _HashSink(this.path, this.sink, this.target) {
+    _collector = _DigestCollector();
+    _hash = sha256.startChunkedConversion(_collector);
+  }
+
+  final String path;
+  final Map<String, String> sink;
+  final StreamController<List<int>> target;
+  late final _DigestCollector _collector;
+  late final ByteConversionSink _hash;
+
+  Future<void> absorb(Stream<List<int>> source) async {
+    await for (final List<int> chunk in source) {
+      _hash.add(chunk);
+      target.add(chunk);
+    }
+    _hash.close();
+    sink[path] = _collector.value;
+  }
+}
+
+/// 收下 sha256 的最终摘要（`crypto` 的分块哈希要求一个收集器）。
+class _DigestCollector implements Sink<Digest> {
+  String value = '';
+
+  @override
+  void add(Digest data) => value = data.toString();
+
+  @override
+  void close() {}
 }
 
 /// 写一个检查点归档文件（覆盖）。内存中条目走 [CheckpointArchiveWriter]

@@ -45,6 +45,55 @@ void main() {
     expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1]);
   });
 
+  test('reset 不阻塞调用方：返回前即可读会话与轮次', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+
+    final Future<String?> pending = manager.reset('s1');
+    // 未 await：会话归属与轮次已同步切换（UI 的 /rewind list 立刻可用）。
+    expect(manager.sessionId, 's1');
+    expect(manager.turn, 0);
+    expect(await pending, isNull);
+    // 落盘后才出现基线。
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0]);
+  });
+
+  test('基线与差量串行：recordTurn 不早于 reset 落盘', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+
+    // 连发三轮、全部不 await：链上必须按 base → delta1 → delta2 顺序落盘，
+    // 否则差量会按「基线缺失」分类，合成从未存在过的混合状态。
+    final List<Future<String?>> pending = <Future<String?>>[
+      manager.reset('s1'),
+      manager.recordTurn(),
+      manager.recordTurn(),
+    ];
+    for (final Future<String?> step in pending) {
+      expect(await step, isNull);
+    }
+    expect(manager.turn, 2);
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1, 2]);
+  });
+
+  test('基线在飞时 detach：在途基线放弃，不写盘', () async {
+    final (CheckpointManager manager, String root, String projectDir) =
+        _manager();
+    _write(root, 'a.txt', 'v0');
+
+    final Future<String?> pending = manager.reset('s1');
+    manager.detach();
+    expect(manager.sessionId, isNull);
+    expect(manager.turn, 0);
+    expect(await pending, isNull);
+    // 代数已变：不该留下 turn 0 基线（目录整个都不该被创建）。
+    expect(manager.list(), isEmpty);
+    expect(
+      Directory('$projectDir${Platform.pathSeparator}checkpoints').existsSync(),
+      isFalse,
+    );
+  });
+
   test('rewind 回滚到目标轮；返回切点事件 id；超出钳制到最早', () async {
     final (CheckpointManager manager, String root, _) = _manager();
     _write(root, 'a.txt', 'v0');

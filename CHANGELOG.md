@@ -14,11 +14,25 @@
   `.conatus`；显式 `[agent] project_dir` 才保持相对工作区的旧语义。
   `AgentConfig.projectDir` 缺省由 `'.conatus'` 改为未设置（null）。旧工作区
   `.conatus` 里的历史会话不再自动发现（数据保留不删）。
-- 修复大工作区新会话卡在「正在加载会话…」：检查点归档层曾把整包文件内容
-  全量读进内存（base 快照 660MB 工作区 ≈ 2GB RSS、数十秒）。现归档读写
-  全程流式——新增 `CheckpointArchiveWriter`（清单头先行、条目按 chunk 过
-  gzip）、`readCheckpointManifest`（只读头部、不再整包解压）、
-  `readCheckpointEntries`（逐条产出）；base/差量快照两遍式流式落盘，
+- 修复大工作区「正在加载会话…」久等（界面被检查点基线挡住）：会话绑定不再
+  `await` turn 0 基线快照——`ready` 先置位、历史立即可读，基线在后台起拍。
+  首轮（`submit`）与 `/rewind` 前各有一道门闩等基线落定，避免快照飞行中被
+  工具改动拍出「半旧半新」的 base。`CheckpointManager` 的 `reset` /
+  `recordTurn` / `detach` 改走串行链，差量必晚于基线；`detach` 递增代数让
+  在途基线自行放弃（换会话时不再写盘）。新增
+  `ConatusTuiController.checkpointSettled` 供外部在「就绪但基线未落盘」的
+  窗口显式同步。
+- 基线快照的工作区内容由**读两遍降为读一遍**（894MB 工作区实测 21.3s →
+  19.6s）：旧实现 pass 1 为算 sha256 整文件读入、pass 2 再整文件读一遍写
+  归档。现清单头只留 `path`/`mtime`/`size`（`stat` 即可得，全量 55ms），
+  内容哈希在 pass 2 流式写 gzip 的同一遍里顺带算出（`crypto` 分块接口，
+  内存 O(chunk)），落 `<归档>.hashes` 旁挂文件；差量据此做「mtime+size 未变
+  但内容变」的兜底判定。旁挂缺失/损坏时保守按变化处理（与旧语义一致）。
+  新增 `tool/bench_snapshot.dart` 量基线耗时。
+- 归档层曾把整包文件内容全量读进内存（base 快照 660MB 工作区 ≈ 2GB RSS、
+  数十秒）。现归档读写全程流式——新增 `CheckpointArchiveWriter`（清单头先行、
+  条目按 chunk 过 gzip）、`readCheckpointManifest`（只读头部、不再整包
+  解压）、`readCheckpointEntries`（逐条产出）；base/差量快照两遍式流式落盘，
   `/rewind` 恢复按条目写盘，内存 ≈ 最大单文件。排除面内置 `.git` /
   `.conatus` / `build` / `.dart_tool` / `node_modules` 顶层前缀
   （`kCheckpointDefaultIgnores`），与 `[checkpoint] ignore` 取并集。

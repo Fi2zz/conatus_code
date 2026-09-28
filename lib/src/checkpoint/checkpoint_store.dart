@@ -14,6 +14,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 
 import 'checkpoint_archive.dart';
+import 'checkpoint_hashes.dart';
 import 'checkpoint_paths.dart';
 import 'checkpoint_types.dart';
 
@@ -75,16 +76,41 @@ class CheckpointStore {
     String sessionId,
     int turn, {
     String? lastEventId,
+  }) => _snapshot(
+        archiveFile(sessionId, turn),
+        sessionId,
+        turn,
+        indexTurn: turn,
+        lastEventId: lastEventId,
+      );
+
+  /// 快照到指定归档文件（覆盖），**不**动索引与裁剪。
+  ///
+  /// 供基准测量在临时目录里跑同一份实现；生产路径用 [snapshot]。
+  Future<void> snapshotUnindexed(
+    File target,
+    String sessionId,
+    int turn, {
+    String? lastEventId,
+  }) =>
+      _snapshot(target, sessionId, turn, lastEventId: lastEventId);
+
+  Future<void> _snapshot(
+    File target,
+    String sessionId,
+    int turn, {
+    int? indexTurn,
+    String? lastEventId,
   }) async {
-    final File target = archiveFile(sessionId, turn);
-    final CheckpointInfo? files;
+    final CheckpointInfo files;
     if (turn == 0) {
       files = await _snapshotBase(sessionId, target, lastEventId);
     } else {
       files = await _snapshotDelta(sessionId, turn, target, lastEventId);
     }
+    if (indexTurn == null) return; // 基准路径：不写索引、不裁剪
     // 清掉同轮的旧版目录（格式迁移）。
-    legacyDir(sessionId, turn)?.deleteSync(recursive: true);
+    legacyDir(sessionId, indexTurn)?.deleteSync(recursive: true);
     _upsertIndex(sessionId, files);
     prune(sessionId);
   }
@@ -94,9 +120,12 @@ class CheckpointStore {
     File target,
     String? lastEventId,
   ) async {
-    // 两遍式：pass 1 收集清单（stat + 流式哈希），pass 2 按清单把内容流式
-    // 写进归档——内存 O(chunk)。清单先行是容器格式约束。
-    final List<CheckpointFileEntry> entries = await _scanEntries();
+    // 两遍式，但工作区**内容只读一遍**（旧实现读了两遍：pass 1 为算哈希、
+    // pass 2 为写内容，882MB 就是 1.76GB 的读）：
+    //   pass 1：只 stat，收集 path/mtime/size 写清单头——不需要读内容；
+    //   pass 2：流式写内容，同一遍里顺带算 sha256，落 <归档>.hashes 旁挂文件。
+    // 清单先行是容器格式约束（gzip 不可回填头部），故两遍结构保留。
+    final List<CheckpointFileEntry> entries = await _scanStats();
     final CheckpointArchiveWriter writer = CheckpointArchiveWriter(
       target,
       CheckpointManifest(
@@ -105,11 +134,13 @@ class CheckpointStore {
         lastEventId: lastEventId,
         files: entries,
       ),
+      collectHashes: true,
     );
     await for (final FileSystemEntity entity in _walk()) {
       await writer.addFile(checkpointRelativeTo(entity, root), entity as File);
     }
     await writer.close();
+    writeCheckpointHashes(target, writer.hashes);
     return CheckpointInfo(turn: 0, files: entries.length);
   }
 
@@ -124,27 +155,14 @@ class CheckpointStore {
         <String, CheckpointFileEntry>{
           for (final CheckpointFileEntry entry in base.files) entry.path: entry,
         };
-    // pass 1：walk 分类（stat 变化直接记 changed；stat 未变的流式哈希兜底
+    // 基线内容哈希在旁挂文件里（旧检查点 / 手删则无 → 退化为纯 stat 比较）。
+    final Map<String, String>? baseHashes =
+        readCheckpointHashes(archiveFile(sessionId, 0));
+    // pass 1：walk 分类（stat 变化直接记 changed；stat 未变的哈希兜底
     // 「mtime+size 同内容变」），得到完整 changed/deleted 才能写清单头。
-    final List<String> changed = <String>[];
-    final Set<String> current = <String>{};
-    await for (final FileSystemEntity entity in _walk()) {
-      final String rel = checkpointRelativeTo(entity, root);
-      current.add(rel);
-      final FileStat stat = entity.statSync();
-      final CheckpointFileEntry? old = baseStats[rel];
-      final bool statChanged =
-          old == null ||
-          old.size != stat.size ||
-          old.mtimeMs != stat.modified.millisecondsSinceEpoch;
-      if (statChanged) {
-        changed.add(rel);
-        continue;
-      }
-      final bool contentChanged =
-          old.hash == null || old.hash != await _sha256File(entity as File);
-      if (contentChanged) changed.add(rel);
-    }
+    final _DeltaScan scan = await _scanDelta(baseStats, baseHashes);
+    final List<String> changed = scan.changed;
+    final Set<String> current = scan.current;
     final List<String> deleted = <String>[
       for (final String path in baseStats.keys)
         if (!current.contains(path)) path,
@@ -172,6 +190,51 @@ class CheckpointStore {
     return CheckpointInfo(turn: turn, files: files);
   }
 
+  /// 差量 pass 1：按基线锚点把当前工作区分类为 changed / 全量现存路径。
+  ///
+  /// 读内容的次数取决于 [baseHashes]：stat 变化即判定、无需哈希；只有
+  /// 「mtime+size 未变」的文件才读内容比对哈希。
+  Future<_DeltaScan> _scanDelta(
+    Map<String, CheckpointFileEntry> baseStats,
+    Map<String, String>? baseHashes,
+  ) async {
+    final List<String> changed = <String>[];
+    final Set<String> current = <String>{};
+    await for (final FileSystemEntity entity in _walk()) {
+      final String rel = checkpointRelativeTo(entity, root);
+      current.add(rel);
+      final CheckpointFileEntry? old = baseStats[rel];
+      if (old == null || _statMoved(old, entity.statSync())) {
+        changed.add(rel);
+        continue;
+      }
+      if (await _contentMoved(rel, baseHashes, entity as File)) {
+        changed.add(rel);
+      }
+    }
+    return _DeltaScan(changed: changed, current: current);
+  }
+
+  /// mtime 或大小相对基线锚点有变动。
+  static bool _statMoved(CheckpointFileEntry old, FileStat now) =>
+      old.size != now.size ||
+      old.mtimeMs != now.modified.millisecondsSinceEpoch;
+
+  /// 「stat 未变但内容变了」的兜底判定。
+  ///
+  /// 无基线哈希时（旧检查点 / 旁挂文件缺失或损坏）返回 `true`——保守按变化
+  /// 处理，与旧实现「`hash == null` 即记 changed」一致。多记进差量只是让
+  /// 差量虚胖（回滚仍正确）；漏记则会让 rewind 恢复出陈旧内容。
+  static Future<bool> _contentMoved(
+    String rel,
+    Map<String, String>? baseHashes,
+    File file,
+  ) async {
+    final String? known = baseHashes?[rel];
+    if (known == null) return true;
+    return known != await _sha256File(file);
+  }
+
   /// 流式列出工作区内需快照的文件（排除目录树、跟随链接关闭）。
   Stream<FileSystemEntity> _walk() => Directory(
     root,
@@ -183,8 +246,8 @@ class CheckpointStore {
     return !checkpointExcluded(rel, projectRel, ignore);
   }
 
-  /// pass 1 用：全部条目的 stat + 流式 SHA-256。
-  Future<List<CheckpointFileEntry>> _scanEntries() async {
+  /// pass 1 用：全部条目的 stat（不读内容——哈希在 pass 2 顺带产出）。
+  Future<List<CheckpointFileEntry>> _scanStats() async {
     final List<CheckpointFileEntry> entries = <CheckpointFileEntry>[];
     await for (final FileSystemEntity entity in _walk()) {
       final FileStat stat = entity.statSync();
@@ -193,7 +256,6 @@ class CheckpointStore {
           path: checkpointRelativeTo(entity, root),
           mtimeMs: stat.modified.millisecondsSinceEpoch,
           size: stat.size,
-          hash: await _sha256File(entity as File),
         ),
       );
     }
@@ -285,7 +347,8 @@ class CheckpointStore {
     final List<CheckpointInfo> infos = <CheckpointInfo>[];
     for (final FileSystemEntity entity in dir.listSync()) {
       final String name = entity.path.split(Platform.pathSeparator).last;
-      if (name == 'index') continue;
+      // 索引本身与哈希旁挂文件都不是归档（旁挂是纯 gzip JSON，无归档头）。
+      if (name == 'index' || name.endsWith(kCheckpointHashesSuffix)) continue;
       if (entity is Directory) {
         final int? turn = int.tryParse(name);
         if (turn == null) continue;
@@ -325,6 +388,7 @@ class CheckpointStore {
   void _deleteTurn(String sessionId, int turn) {
     final File archive = archiveFile(sessionId, turn);
     if (archive.existsSync()) archive.deleteSync();
+    deleteCheckpointHashes(archive); // 旁挂哈希随归档一起清
     legacyDir(sessionId, turn)?.deleteSync(recursive: true);
   }
 
@@ -337,6 +401,17 @@ class CheckpointStore {
     }
     return projectDir;
   }
+}
+
+/// 差量 pass 1 的分类结果。
+class _DeltaScan {
+  const _DeltaScan({required this.changed, required this.current});
+
+  /// 相对基线新增或修改的路径。
+  final List<String> changed;
+
+  /// 当前工作区的全部路径（用于算 deleted）。
+  final Set<String> current;
 }
 
 /// 单文件 SHA-256（内存 ≈ 该文件自身；调用方逐文件调用，不累积）。

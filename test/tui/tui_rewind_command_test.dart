@@ -88,6 +88,10 @@ Future<(ConatusTuiController, Context, String)> _build({
   );
   beforeStart?.call(root);
   await controller.start();
+  // turn 0 基线是后台起拍的（`ready` 不等它）。这些用例随后手工改工作区来
+  // 模拟「第一轮把文件改坏」，须先等基线落盘——否则改写可能落在基线之前，
+  // 被当成 turn 0 的初始状态。真实交互由 [ConatusTuiController.submit] 自动等待。
+  await controller.checkpointSettled;
   return (controller, app, root);
 }
 
@@ -184,6 +188,43 @@ void main() {
     await controller.handleLine('/rewind 1');
 
     expect(_read(root, '.conatus/keep.json'), 'data');
+    expect(_read(root, 'a.txt'), 'v0');
+  });
+
+  test('基线未落盘也能就绪；首轮自动等基线，不拍出撕裂状态', () async {
+    final (String root, String projectDir) = _workspace();
+    final Context app = Context.root();
+    provideTools(app);
+    provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
+    final SessionStore sessions = provideSessions(app);
+    app.provide(
+      'checkpointManager',
+      CheckpointManager(
+        store: CheckpointStore(root: root, projectDir: projectDir),
+        config: const CheckpointConfig(),
+      ),
+    );
+    final ConatusTuiController controller = ConatusTuiController(
+      app: app,
+      sessions: sessions,
+      name: 'test',
+      modelLabel: 'mock',
+      onExit: () {},
+    );
+    addTearDown(app.dispose);
+    _write(root, 'a.txt', 'v0');
+
+    // start() 返回即就绪——不等基线（大工作区上这一步可达数十秒）。
+    await controller.start();
+    expect(controller.ready, isTrue);
+
+    // 首轮：submit 自动等基线，其后的工具改动全部落在基线之后。
+    await controller.handleLine('跑一轮');
+    _write(root, 'a.txt', 'v1');
+    await controller.handleLine('跑一轮');
+
+    await controller.handleLine('/rewind 1');
+    // 基线拍到的是 v0（而非撕裂的中间态），回滚后仍是 v0。
     expect(_read(root, 'a.txt'), 'v0');
   });
 }
