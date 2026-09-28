@@ -7,14 +7,14 @@ import 'package:conatus_code/conatus_code.dart';
 import 'package:test/test.dart';
 
 /// 建临时工作区与 store，返回 (store, root, projectDir)。
-(CheckpointStore, String, String) _store() {
+(ArchiveCheckpointStore, String, String) _store() {
   final Directory dir = Directory.systemTemp.createTempSync('nava-cp-esc');
   addTearDown(() => dir.deleteSync(recursive: true));
   final String root = '${dir.path}${Platform.pathSeparator}ws';
   final String projectDir = '$root${Platform.pathSeparator}.conatus';
   Directory(projectDir).createSync(recursive: true);
   return (
-    CheckpointStore(root: root, projectDir: projectDir),
+    ArchiveCheckpointStore(root: root, projectDir: projectDir),
     root,
     projectDir,
   );
@@ -29,7 +29,7 @@ void _write(String root, String rel, String content) {
 void main() {
   test('rewind 不穿透文件符号链接覆写工作区外文件', () async {
     if (Platform.isWindows) return; // symlink 需权限
-    final (CheckpointStore store, String root, _) = _store();
+    final (ArchiveCheckpointStore store, String root, _) = _store();
     final Directory outside = Directory.systemTemp.createTempSync(
       'nava-cp-ext',
     );
@@ -43,7 +43,7 @@ void main() {
     File('$root${Platform.pathSeparator}a.txt').deleteSync();
     Link('$root${Platform.pathSeparator}a.txt').createSync(external);
 
-    await restoreCheckpoint(store, 's', 0);
+    await store.restore('s', 0);
 
     expect(File(external).readAsStringSync(), '外部原文');
     final String restored = '$root${Platform.pathSeparator}a.txt';
@@ -56,7 +56,7 @@ void main() {
 
   test('rewind 父目录为外部 symlink 时 fail-closed 且工作区不动', () async {
     if (Platform.isWindows) return;
-    final (CheckpointStore store, String root, _) = _store();
+    final (ArchiveCheckpointStore store, String root, _) = _store();
     final Directory outside = Directory.systemTemp.createTempSync(
       'nava-cp-ext',
     );
@@ -69,7 +69,7 @@ void main() {
     Link('$root${Platform.pathSeparator}sub').createSync(outside.path);
 
     await expectLater(
-      restoreCheckpoint(store, 's', 0),
+      store.restore('s', 0),
       throwsA(
         isA<CheckpointException>().having(
           (CheckpointException e) => e.code,

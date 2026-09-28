@@ -17,7 +17,7 @@ import 'package:test/test.dart';
   final String projectDir = '$root${Platform.pathSeparator}.conatus';
   Directory(projectDir).createSync();
   final CheckpointManager manager = CheckpointManager(
-    store: CheckpointStore(root: root, projectDir: projectDir, keep: keep),
+    store: ArchiveCheckpointStore(root: root, projectDir: projectDir, keep: keep),
     config: CheckpointConfig(enabled: enabled, keep: keep),
   );
   return (manager, root, projectDir);

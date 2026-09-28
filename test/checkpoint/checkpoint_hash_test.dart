@@ -6,14 +6,14 @@ import 'dart:io';
 import 'package:conatus_code/conatus_code.dart';
 import 'package:test/test.dart';
 
-(CheckpointStore, String, String) _setup() {
+(ArchiveCheckpointStore, String, String) _setup() {
   final Directory dir = Directory.systemTemp.createTempSync('nava-cp-hash');
   addTearDown(() => dir.deleteSync(recursive: true));
   final String root = dir.path;
   final String projectDir = '$root${Platform.pathSeparator}.conatus';
   Directory(projectDir).createSync();
   return (
-    CheckpointStore(root: root, projectDir: projectDir),
+    ArchiveCheckpointStore(root: root, projectDir: projectDir),
     root,
     projectDir,
   );
@@ -31,7 +31,7 @@ void _writeFixedStat(String root, String rel, String content) {
 
 void main() {
   test('内容变但 mtime+size 一致 → 差量仍包含（哈希兜底）', () async {
-    final (CheckpointStore store, String root, _) = _setup();
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
     _writeFixedStat(root, 'a.txt', 'AAAA');
     await store.snapshot('s1', 0);
     // 哈希在旁挂文件里（清单头只留 stat，避免为算哈希多读一遍内容）。
@@ -49,7 +49,7 @@ void main() {
   });
 
   test('mtime+size 一致且内容未变 → 不进差量（哈希校验通过）', () async {
-    final (CheckpointStore store, String root, _) = _setup();
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
     _writeFixedStat(root, 'a.txt', 'AAAA');
     await store.snapshot('s1', 0);
 
@@ -61,7 +61,7 @@ void main() {
   });
 
   test('旧清单（无 hash 条目）→ 保守按变化处理', () async {
-    final (CheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
     _writeFixedStat(root, 'a.txt', 'AAAA');
     await store.snapshot('s1', 0);
     // 用旧格式明文清单（files 为字符串路径、无 hash）替换新归档。

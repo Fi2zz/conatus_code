@@ -14,7 +14,6 @@ library;
 import 'dart:async';
 
 import '../config/config_schema.dart';
-import 'checkpoint_restore.dart';
 import 'checkpoint_store.dart';
 import 'checkpoint_types.dart';
 
@@ -136,11 +135,7 @@ class CheckpointManager {
         ? turns[turns.length - 1 - back]
         : turns.first;
     final CheckpointManifest manifest = await _store.loadManifest(id, target);
-    final CheckpointRestore restore = await restoreCheckpoint(
-      _store,
-      id,
-      target,
-    );
+    final CheckpointRestore restore = await _store.restore(id, target);
     return CheckpointRewindResult(
       turn: target,
       restore: restore,

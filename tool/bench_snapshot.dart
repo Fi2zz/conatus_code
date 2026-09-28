@@ -20,7 +20,7 @@ Future<void> main(List<String> args) async {
   stdout.writeln('文件数：$files  总量：${(bytes / 1048576).toStringAsFixed(1)}MB');
 
   final File target = File('${scratch.path}${sep}bench.cp');
-  final CheckpointStore store = CheckpointStore(
+  final ArchiveCheckpointStore store = ArchiveCheckpointStore(
     root: root,
     projectDir: projectDir.path,
     keep: 0,

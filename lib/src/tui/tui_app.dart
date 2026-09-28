@@ -23,7 +23,7 @@ import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
 import '../checkpoint/checkpoint_manager.dart';
-import '../checkpoint/checkpoint_store.dart';
+import '../checkpoint/checkpoint_store_archive.dart';
 import '../config/config_schema.dart';
 import '../config/project_data_dir.dart';
 import '../hooks/hooks.dart';
@@ -398,7 +398,7 @@ class ConatusTuiRuntime {
       app.provide(
         'checkpointManager',
         CheckpointManager(
-          store: CheckpointStore(
+          store: ArchiveCheckpointStore(
             root: resolvedWorkdir,
             projectDir: Directory(resolvedBaseDir).absolute.path,
             keep: checkpoint.keep,

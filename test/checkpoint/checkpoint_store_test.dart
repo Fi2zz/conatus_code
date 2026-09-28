@@ -8,7 +8,7 @@ import 'package:conatus_code/conatus_code.dart';
 import 'package:test/test.dart';
 
 /// 建临时「工作区 + 项目数据目录」，返回 (store, root, projectDir)。
-(CheckpointStore, String, String) _setup({
+(ArchiveCheckpointStore, String, String) _setup({
   int keep = 5,
   List<String> ignore = const <String>[],
 }) {
@@ -18,7 +18,7 @@ import 'package:test/test.dart';
   final String projectDir = '$root${Platform.pathSeparator}.conatus';
   Directory(projectDir).createSync();
   return (
-    CheckpointStore(root: root, projectDir: projectDir, keep: keep, ignore: ignore),
+    ArchiveCheckpointStore(root: root, projectDir: projectDir, keep: keep, ignore: ignore),
     root,
     projectDir,
   );
@@ -36,7 +36,7 @@ void _touch(String root, String rel, String content) =>
 
 void main() {
   test('turn 0 全量 base（含 mtime/size），跳过排除项，写 manifest', () async {
-    final (CheckpointStore store, String root, String projectDir) = _setup(
+    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup(
       ignore: const <String>['node_modules'],
     );
     _write(root, 'lib/main.dart', 'void main() {}');
@@ -61,7 +61,7 @@ void main() {
   });
 
   test('turn 1 差量：只存变化/新增文件，deleted 记录删除', () async {
-    final (CheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
     _write(root, 'a.txt', 'v0');
     _write(root, 'b.txt', 'b0');
     await store.snapshot('s1', 0);
@@ -98,7 +98,7 @@ void main() {
   });
 
   test('mtime+size 不变的文件不进差量（不重复复制）', () async {
-    final (CheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
     _write(root, 'a.txt', 'same');
     await store.snapshot('s1', 0);
     await store.snapshot('s1', 1);
@@ -109,7 +109,7 @@ void main() {
   });
 
   test('prune 保留 base + 最近 keep-1 个差量；keep<=0 不裁剪', () async {
-    final (CheckpointStore store, String root, String projectDir) =
+    final (ArchiveCheckpointStore store, String root, String projectDir) =
         _setup(keep: 3);
     _write(root, 'a.txt', 'v0');
     await store.snapshot('s1', 0);
@@ -119,7 +119,7 @@ void main() {
     }
     expect(store.turnsOf('s1'), <int>[0, 3, 4]);
 
-    final (CheckpointStore unlimited, _, _) = _setup(keep: 0);
+    final (ArchiveCheckpointStore unlimited, _, _) = _setup(keep: 0);
     await unlimited.snapshot('s2', 0);
     for (int turn = 1; turn < 4; turn++) {
       await unlimited.snapshot('s2', turn);
@@ -128,7 +128,7 @@ void main() {
   });
 
   test('缺失检查点 / 缺失清单抛 CheckpointException', () async {
-    final (CheckpointStore store, _, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, _, String projectDir) = _setup();
     expect(
       () => store.manifestOf('s1', 9),
       throwsA(isA<CheckpointException>()),
@@ -142,7 +142,7 @@ void main() {
   });
 
   test('旧格式兼容：无 kind 的清单按 base 读（files 为字符串路径）', () {
-    final (CheckpointStore store, _, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, _, String projectDir) = _setup();
     final String legacy = '$projectDir${Platform.pathSeparator}checkpoints'
         '${Platform.pathSeparator}s1${Platform.pathSeparator}0';
     Directory(legacy).createSync(recursive: true);
@@ -158,7 +158,7 @@ void main() {
   });
 
   test('符号链接跳过；空工作区 base 清单为空', () async {
-    final (CheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
     _write(root, 'a.txt', 'x');
     final Link link = Link('$root${Platform.pathSeparator}link.txt');
     link.createSync('$root${Platform.pathSeparator}a.txt');
@@ -169,7 +169,7 @@ void main() {
     expect(base.files.map((CheckpointFileEntry e) => e.path),
         <String>['a.txt']);
 
-    final (CheckpointStore emptyStore, _, _) = _setup();
+    final (ArchiveCheckpointStore emptyStore, _, _) = _setup();
     await emptyStore.snapshot('s2', 0);
     expect(emptyStore.manifestOf('s2', 0).files, isEmpty);
   });

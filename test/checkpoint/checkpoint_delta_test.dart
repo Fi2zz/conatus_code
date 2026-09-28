@@ -6,14 +6,14 @@ import 'dart:io';
 import 'package:conatus_code/conatus_code.dart';
 import 'package:test/test.dart';
 
-(CheckpointStore, String, String) _setup({int keep = 5}) {
+(ArchiveCheckpointStore, String, String) _setup({int keep = 5}) {
   final Directory dir = Directory.systemTemp.createTempSync('nava-cp-restore');
   addTearDown(() => dir.deleteSync(recursive: true));
   final String root = dir.path;
   final String projectDir = '$root${Platform.pathSeparator}.conatus';
   Directory(projectDir).createSync();
   return (
-    CheckpointStore(root: root, projectDir: projectDir, keep: keep),
+    ArchiveCheckpointStore(root: root, projectDir: projectDir, keep: keep),
     root,
     projectDir,
   );
@@ -32,7 +32,7 @@ bool _exists(String root, String rel) =>
     File('$root${Platform.pathSeparator}$rel').existsSync();
 
 /// 典型场景：base(a,b) → turn1 改 a 删 b 加 c → turn2 改 a。
-Future<void> _scenario(String root, CheckpointStore store) async {
+Future<void> _scenario(String root, ArchiveCheckpointStore store) async {
   _write(root, 'a.txt', 'a0');
   _write(root, 'b.txt', 'b0');
   await store.snapshot('s1', 0);
@@ -46,14 +46,14 @@ Future<void> _scenario(String root, CheckpointStore store) async {
 
 void main() {
   test('恢复 base：全量铺底 + 删当前多余', () async {
-    final (CheckpointStore store, String root, _) = _setup();
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
     await _scenario(root, store);
     // 把工作区改乱。
     _write(root, 'a.txt', '乱改');
     _write(root, 'x.txt', '多余');
 
     final CheckpointRestore result =
-        await restoreCheckpoint(store, 's1', 0);
+        await store.restore('s1', 0);
 
     expect(result.restored, 2); // a.txt + b.txt 铺底
     expect(result.deleted, 2); // c.txt + x.txt 删除（base 后创建的都删）
@@ -64,7 +64,7 @@ void main() {
   });
 
   test('恢复差量：base 铺底 + changed 覆盖 + deleted 删除 + 删多余', () async {
-    final (CheckpointStore store, String root, _) = _setup();
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
     await _scenario(root, store);
     // 改乱：a 被改、b 被加回、c 被删、x 多余。
     _write(root, 'a.txt', '乱改');
@@ -73,7 +73,7 @@ void main() {
     _write(root, 'x.txt', '多余');
 
     final CheckpointRestore result =
-        await restoreCheckpoint(store, 's1', 1);
+        await store.restore('s1', 1);
 
     expect(result.restored, 3); // base a + changed a,c
     expect(result.deleted, 2); // b（目标态删除）+ x（多余）
@@ -84,11 +84,11 @@ void main() {
   });
 
   test('恢复到最新差量得到最新状态', () async {
-    final (CheckpointStore store, String root, _) = _setup();
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
     await _scenario(root, store);
 
     final CheckpointRestore result =
-        await restoreCheckpoint(store, 's1', 2);
+        await store.restore('s1', 2);
 
     expect(_read(root, 'a.txt'), 'a2');
     expect(_exists(root, 'b.txt'), isFalse);
@@ -97,7 +97,7 @@ void main() {
   });
 
   test('恢复不触碰排除项（.conatus / .git）', () async {
-    final (CheckpointStore store, String root, String projectDir) = _setup();
+    final (ArchiveCheckpointStore store, String root, String projectDir) = _setup();
     _write(root, 'a.txt', 'v0');
     _write(root, '.git/config', 'git-state');
     await store.snapshot('s1', 0);
@@ -105,7 +105,7 @@ void main() {
     _write(root, 'a.txt', 'v1');
     _write(root, '.git/config', 'new-git');
     _write(root, '.conatus/new.json', 'data');
-    await restoreCheckpoint(store, 's1', 0);
+    await store.restore('s1', 0);
 
     expect(_read(root, 'a.txt'), 'v0');
     expect(_read(root, '.git/config'), 'new-git');
@@ -113,9 +113,9 @@ void main() {
   });
 
   test('缺失检查点抛 CheckpointException', () async {
-    final (CheckpointStore store, _, _) = _setup();
+    final (ArchiveCheckpointStore store, _, _) = _setup();
     await expectLater(
-      restoreCheckpoint(store, 's1', 9),
+      store.restore('s1', 9),
       throwsA(isA<CheckpointException>()),
     );
   });

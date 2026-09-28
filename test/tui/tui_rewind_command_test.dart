@@ -74,7 +74,7 @@ Future<(ConatusTuiController, Context, String)> _build({
   app.provide(
     'checkpointManager',
     CheckpointManager(
-      store: CheckpointStore(root: root, projectDir: projectDir),
+      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
       config: const CheckpointConfig(),
     ),
   );
@@ -148,7 +148,7 @@ void main() {
     app.provide(
       'checkpointManager',
       CheckpointManager(
-        store: CheckpointStore(root: root, projectDir: projectDir),
+        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
         config: const CheckpointConfig(enabled: false),
       ),
     );
@@ -200,7 +200,7 @@ void main() {
     app.provide(
       'checkpointManager',
       CheckpointManager(
-        store: CheckpointStore(root: root, projectDir: projectDir),
+        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
         config: const CheckpointConfig(),
       ),
     );

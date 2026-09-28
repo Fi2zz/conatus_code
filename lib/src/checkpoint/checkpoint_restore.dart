@@ -1,17 +1,19 @@
-/// 检查点恢复：目标检查点 = base 全量铺底 +（差量时）changed 覆盖 / deleted
-/// 删除 + 删当前多余文件（rsync 语义）。新格式读单文件归档，旧版目录树回退。
+/// 归档式检查点恢复：目标检查点 = base 全量铺底 +（差量时）changed 覆盖 /
+/// deleted 删除 + 删当前多余文件（rsync 语义）。
+///
+/// 由 [ArchiveCheckpointStore.restore] 调用；也可直接用于测试。
 library;
 
 import 'dart:io';
 
 import 'checkpoint_archive.dart';
 import 'checkpoint_paths.dart';
-import 'checkpoint_store.dart';
+import 'checkpoint_store_archive.dart';
 import 'checkpoint_types.dart';
 
 /// 把工作区恢复到 [turn] 轮的文件状态；返回恢复计数。
-Future<CheckpointRestore> restoreCheckpoint(
-  CheckpointStore store,
+Future<CheckpointRestore> restoreArchiveCheckpoint(
+  ArchiveCheckpointStore store,
   String sessionId,
   int turn,
 ) async {
@@ -25,7 +27,7 @@ Future<CheckpointRestore> restoreCheckpoint(
 /// 新格式（单文件归档）恢复：清单走流式头部读取，条目流式产出、按条写盘
 /// （内存 ≈ 最大单文件而非全归档）。
 Future<CheckpointRestore> _restoreArchive(
-  CheckpointStore store,
+  ArchiveCheckpointStore store,
   String sessionId,
   int turn,
   File archive,
@@ -56,7 +58,7 @@ Future<CheckpointRestore> _restoreArchive(
 /// base 恢复：先校验清单里的全部路径（fail-closed），再流式铺底。
 /// 返回 (目标状态集, 写入文件数)。
 Future<(Set<String>, int)> _restoreBase(
-  CheckpointStore store,
+  ArchiveCheckpointStore store,
   File archive,
   CheckpointManifest manifest,
 ) async {
@@ -78,7 +80,7 @@ Future<(Set<String>, int)> _restoreBase(
 /// (目标状态集给 `_deleteExtras` 清多余文件, 写入文件数, 被删文件数)。
 /// 目标态里同一文件被 base 与 changed 各写一遍时计数也各计一遍。
 Future<(Set<String>, int, int)> _restoreDelta(
-  CheckpointStore store,
+  ArchiveCheckpointStore store,
   String sessionId,
   File archive,
   CheckpointManifest manifest,
@@ -121,7 +123,7 @@ Future<(Set<String>, int, int)> _restoreDelta(
 
 /// 旧版目录树检查点恢复（逐文件 gz/明文回退）。
 Future<CheckpointRestore> _restoreLegacy(
-  CheckpointStore store,
+  ArchiveCheckpointStore store,
   String sessionId,
   int turn,
 ) async {
@@ -189,7 +191,7 @@ Future<CheckpointRestore> _restoreLegacy(
 }
 
 /// 删除当前工作区中「不在目标状态、且未被排除」的文件；返回删除数。
-Future<int> _deleteExtras(CheckpointStore store, Set<String> target) async {
+Future<int> _deleteExtras(ArchiveCheckpointStore store, Set<String> target) async {
   final List<File> extras = <File>[];
   await for (final FileSystemEntity entity in Directory(
     store.root,

@@ -1,419 +1,71 @@
-/// 工作区快照存储：每个检查点 = 单个不可读名的 gzip 归档文件。
+/// 检查点存储的抽象接口：把「快照存到哪、怎么存」与检查点编排解耦。
 ///
-/// 布局：`<projectDir>/checkpoints/<sessionId>/<sha256前16位>.gz`（文件名是
-/// 确定性哈希，**不可读、不暴露轮次**；轮次只记录在归档头部与会话级 `index`
-/// 里）+ `index`（gzip 小索引：turn → 有效文件数，`list`/`prune` 只读它）。
-/// turn 0 全量 base + 各轮相对 base 差量；base 永不 prune，prune 只裁差量、
-/// 保留最近 `keep - 1` 个。旧版目录树检查点（`<turn>/` 可读名）读时兼容，
-/// 索引缺失时按旧格式重建。恢复见 `checkpoint_restore.dart`。
+/// 编排（轮次计数、串行链、基线/差量的时序、绑定解绑）在
+/// `checkpoint_manager.dart`；存储（怎么把工作区状态落成可回滚的形态）在
+/// 实现里。现有两种实现：
+///
+/// - [ArchiveCheckpointStore]：自研 gzip 归档（`checkpoint_store_archive.dart`）。
+///   零外部依赖，任何环境可跑；代价是每轮要自己处理容器格式，且同一文件
+///   的每个版本各存一份完整内容。
+/// - 影子 git 仓库（`checkpoint_store_git.dart`）：把工作区提交进一个独立
+///   的 git dir。内容寻址 + zlib + 增量全由 git 提供，跨会话复用对象。
+///
+/// 两种实现都必须满足的语义（`checkpoint_restore.dart` 依赖之）：
+///
+/// - 快照内容是工作区文件；`projectDir` 整树、`.git` 与 `ignore` 命中的
+///   路径一律不进快照（见 `checkpoint_paths.dart`）。
+/// - 恢复是 rsync 语义：目标态有的覆盖/补回，当前有而目标态没有的删除。
+/// - 恢复前做符号链接越界校验（fail-closed），越界时一个文件都不动。
+/// - 符号链接不进快照。
+/// - 单轮快照失败不抛给调用方（编排层转成提示）。
 library;
 
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:crypto/crypto.dart';
-
-import 'checkpoint_archive.dart';
-import 'checkpoint_hashes.dart';
-import 'checkpoint_paths.dart';
 import 'checkpoint_types.dart';
 
 /// 工作区快照存储。
-class CheckpointStore {
-  CheckpointStore({
-    required String root,
-    required this.projectDir,
-    this.keep = 5,
-    this.ignore = const <String>[],
-  }) : root = Directory(root).absolute.path;
+///
+/// 同步方法（[list] / [prune]）供 UI 展示与编排判定用，故不返回 Future；
+/// 需要 I/O 的（[snapshot] / [clearSession] / [loadManifest] / [restore]）
+/// 走异步。
+abstract class CheckpointStore {
+  /// 工作区根（绝对路径）。
+  String get root;
 
-  /// 工作区根（构造时归一化为绝对路径）。
-  final String root;
+  /// 项目数据目录（绝对路径）；连同其整树排除在快照外。
+  String get projectDir;
 
-  /// 项目数据目录（相对 [root]，缺省 `.conatus`）；连同其整树排除在快照外。
-  final String projectDir;
-
-  /// 回滚点数（含 base）；`<=0` 不限制。
-  final int keep;
+  /// 回滚点数（含基线）；`<= 0` 不限制。
+  int get keep;
 
   /// 额外忽略的相对路径前缀。
-  final List<String> ignore;
+  List<String> get ignore;
 
-  /// 某会话的检查点目录。
-  Directory sessionDir(String sessionId) => Directory(
-    '$projectDir${Platform.pathSeparator}checkpoints'
-    '${Platform.pathSeparator}$sessionId',
-  );
-
-  /// 清空某会话的全部检查点（重绑即新时间线：旧 base/差量一并移除，
-  /// 避免「新 base + 旧 delta」合成从未存在过的混合状态）。
-  Future<void> clearSession(String sessionId) async {
-    final Directory dir = sessionDir(sessionId);
-    if (dir.existsSync()) await dir.delete(recursive: true);
-  }
-
-  /// 某检查点的归档文件（不可读哈希名）。
-  File archiveFile(String sessionId, int turn) => File(
-    '${sessionDir(sessionId).path}${Platform.pathSeparator}'
-    '${checkpointArchiveName(sessionId, turn)}',
-  );
-
-  /// 会话检查点索引文件。
-  File indexFile(String sessionId) =>
-      File('${sessionDir(sessionId).path}${Platform.pathSeparator}index');
-
-  /// 某检查点的旧版目录（格式迁移前；不存在返回 `null`）。
-  Directory? legacyDir(String sessionId, int turn) {
-    final Directory dir = Directory(
-      '${sessionDir(sessionId).path}'
-      '${Platform.pathSeparator}$turn',
-    );
-    return dir.existsSync() ? dir : null;
-  }
-
-  /// 快照当前工作区为 [turn] 轮（turn 0 全量 base，其余相对 base 差量）。
-  Future<void> snapshot(
-    String sessionId,
-    int turn, {
-    String? lastEventId,
-  }) => _snapshot(
-        archiveFile(sessionId, turn),
-        sessionId,
-        turn,
-        indexTurn: turn,
-        lastEventId: lastEventId,
-      );
-
-  /// 快照到指定归档文件（覆盖），**不**动索引与裁剪。
+  /// 快照当前工作区为 [turn] 轮。
   ///
-  /// 供基准测量在临时目录里跑同一份实现；生产路径用 [snapshot]。
-  Future<void> snapshotUnindexed(
-    File target,
-    String sessionId,
-    int turn, {
-    String? lastEventId,
-  }) =>
-      _snapshot(target, sessionId, turn, lastEventId: lastEventId);
+  /// [lastEventId] 是快照时刻会话的最后一条事件 id（对话 fork 的切点），
+  /// 随该轮一起持久化，恢复时回传给调用方。
+  Future<void> snapshot(String sessionId, int turn, {String? lastEventId});
 
-  Future<void> _snapshot(
-    File target,
-    String sessionId,
-    int turn, {
-    int? indexTurn,
-    String? lastEventId,
-  }) async {
-    final CheckpointInfo files;
-    if (turn == 0) {
-      files = await _snapshotBase(sessionId, target, lastEventId);
-    } else {
-      files = await _snapshotDelta(sessionId, turn, target, lastEventId);
-    }
-    if (indexTurn == null) return; // 基准路径：不写索引、不裁剪
-    // 清掉同轮的旧版目录（格式迁移）。
-    legacyDir(sessionId, indexTurn)?.deleteSync(recursive: true);
-    _upsertIndex(sessionId, files);
-    prune(sessionId);
-  }
-
-  Future<CheckpointInfo> _snapshotBase(
-    String sessionId,
-    File target,
-    String? lastEventId,
-  ) async {
-    // 两遍式，但工作区**内容只读一遍**（旧实现读了两遍：pass 1 为算哈希、
-    // pass 2 为写内容，882MB 就是 1.76GB 的读）：
-    //   pass 1：只 stat，收集 path/mtime/size 写清单头——不需要读内容；
-    //   pass 2：流式写内容，同一遍里顺带算 sha256，落 <归档>.hashes 旁挂文件。
-    // 清单先行是容器格式约束（gzip 不可回填头部），故两遍结构保留。
-    final List<CheckpointFileEntry> entries = await _scanStats();
-    final CheckpointArchiveWriter writer = CheckpointArchiveWriter(
-      target,
-      CheckpointManifest(
-        kind: 'base',
-        turn: 0,
-        lastEventId: lastEventId,
-        files: entries,
-      ),
-      collectHashes: true,
-    );
-    await for (final FileSystemEntity entity in _walk()) {
-      await writer.addFile(checkpointRelativeTo(entity, root), entity as File);
-    }
-    await writer.close();
-    writeCheckpointHashes(target, writer.hashes);
-    return CheckpointInfo(turn: 0, files: entries.length);
-  }
-
-  Future<CheckpointInfo> _snapshotDelta(
-    String sessionId,
-    int turn,
-    File target,
-    String? lastEventId,
-  ) async {
-    final CheckpointManifest base = await loadManifest(sessionId, 0);
-    final Map<String, CheckpointFileEntry> baseStats =
-        <String, CheckpointFileEntry>{
-          for (final CheckpointFileEntry entry in base.files) entry.path: entry,
-        };
-    // 基线内容哈希在旁挂文件里（旧检查点 / 手删则无 → 退化为纯 stat 比较）。
-    final Map<String, String>? baseHashes =
-        readCheckpointHashes(archiveFile(sessionId, 0));
-    // pass 1：walk 分类（stat 变化直接记 changed；stat 未变的哈希兜底
-    // 「mtime+size 同内容变」），得到完整 changed/deleted 才能写清单头。
-    final _DeltaScan scan = await _scanDelta(baseStats, baseHashes);
-    final List<String> changed = scan.changed;
-    final Set<String> current = scan.current;
-    final List<String> deleted = <String>[
-      for (final String path in baseStats.keys)
-        if (!current.contains(path)) path,
-    ];
-    // pass 2：把 changed 文件流式写进归档。
-    final CheckpointArchiveWriter writer = CheckpointArchiveWriter(
-      target,
-      CheckpointManifest(
-        kind: 'delta',
-        turn: turn,
-        lastEventId: lastEventId,
-        changed: changed,
-        deleted: deleted,
-      ),
-    );
-    for (final String rel in changed) {
-      await writer.addFile(rel, File('$root${Platform.pathSeparator}$rel'));
-    }
-    await writer.close();
-    final Set<String> basePaths = baseStats.keys.toSet();
-    final Set<String> deletedSet = deleted.toSet();
-    final int files =
-        basePaths.where((String p) => !deletedSet.contains(p)).length +
-        changed.where((String p) => !basePaths.contains(p)).length;
-    return CheckpointInfo(turn: turn, files: files);
-  }
-
-  /// 差量 pass 1：按基线锚点把当前工作区分类为 changed / 全量现存路径。
+  /// 清空某会话的全部检查点。
   ///
-  /// 读内容的次数取决于 [baseHashes]：stat 变化即判定、无需哈希；只有
-  /// 「mtime+size 未变」的文件才读内容比对哈希。
-  Future<_DeltaScan> _scanDelta(
-    Map<String, CheckpointFileEntry> baseStats,
-    Map<String, String>? baseHashes,
-  ) async {
-    final List<String> changed = <String>[];
-    final Set<String> current = <String>{};
-    await for (final FileSystemEntity entity in _walk()) {
-      final String rel = checkpointRelativeTo(entity, root);
-      current.add(rel);
-      final CheckpointFileEntry? old = baseStats[rel];
-      if (old == null || _statMoved(old, entity.statSync())) {
-        changed.add(rel);
-        continue;
-      }
-      if (await _contentMoved(rel, baseHashes, entity as File)) {
-        changed.add(rel);
-      }
-    }
-    return _DeltaScan(changed: changed, current: current);
-  }
+  /// 重绑即新时间线：旧基线/差量一并移除，避免「新基线 + 旧差量」合成从未
+  /// 存在过的混合状态。
+  Future<void> clearSession(String sessionId);
 
-  /// mtime 或大小相对基线锚点有变动。
-  static bool _statMoved(CheckpointFileEntry old, FileStat now) =>
-      old.size != now.size ||
-      old.mtimeMs != now.modified.millisecondsSinceEpoch;
-
-  /// 「stat 未变但内容变了」的兜底判定。
-  ///
-  /// 无基线哈希时（旧检查点 / 旁挂文件缺失或损坏）返回 `true`——保守按变化
-  /// 处理，与旧实现「`hash == null` 即记 changed」一致。多记进差量只是让
-  /// 差量虚胖（回滚仍正确）；漏记则会让 rewind 恢复出陈旧内容。
-  static Future<bool> _contentMoved(
-    String rel,
-    Map<String, String>? baseHashes,
-    File file,
-  ) async {
-    final String? known = baseHashes?[rel];
-    if (known == null) return true;
-    return known != await _sha256File(file);
-  }
-
-  /// 流式列出工作区内需快照的文件（排除目录树、跟随链接关闭）。
-  Stream<FileSystemEntity> _walk() => Directory(
-    root,
-  ).list(recursive: true, followLinks: false).where(_included);
-
-  bool _included(FileSystemEntity entity) {
-    if (entity is! File) return false;
-    final String rel = checkpointRelativeTo(entity, root);
-    return !checkpointExcluded(rel, projectRel, ignore);
-  }
-
-  /// pass 1 用：全部条目的 stat（不读内容——哈希在 pass 2 顺带产出）。
-  Future<List<CheckpointFileEntry>> _scanStats() async {
-    final List<CheckpointFileEntry> entries = <CheckpointFileEntry>[];
-    await for (final FileSystemEntity entity in _walk()) {
-      final FileStat stat = entity.statSync();
-      entries.add(
-        CheckpointFileEntry(
-          path: checkpointRelativeTo(entity, root),
-          mtimeMs: stat.modified.millisecondsSinceEpoch,
-          size: stat.size,
-        ),
-      );
-    }
-    return entries;
-  }
-
-  /// 读某检查点的清单（新归档头部；旧版目录清单自动回退）；缺失抛异常。
-  ///
-  /// 同步版本：新归档会**整包解压**取头——大归档场景请用 [loadManifest]
-  /// （流式只读头部）。保留给旧版目录与索引重建等同步路径。
-  CheckpointManifest manifestOf(String sessionId, int turn) {
-    final File archive = archiveFile(sessionId, turn);
-    if (archive.existsSync()) {
-      return readCheckpointArchive(archive).$1;
-    }
-    final Directory? legacy = legacyDir(sessionId, turn);
-    if (legacy != null) {
-      final File gz = File(
-        '${legacy.path}${Platform.pathSeparator}manifest.json.gz',
-      );
-      final File plain = File(
-        '${legacy.path}${Platform.pathSeparator}manifest.json',
-      );
-      if (gz.existsSync() || plain.existsSync()) {
-        final List<int> bytes = gz.existsSync()
-            ? gzip.decode(gz.readAsBytesSync())
-            : plain.readAsBytesSync();
-        return CheckpointManifest.fromJson(
-          jsonDecode(utf8.decode(bytes)) as Map<String, Object?>,
-        );
-      }
-    }
-    throw CheckpointException('missing-manifest', '检查点 $turn 缺少清单');
-  }
-
-  /// 异步读清单：新归档走流式头部读取（不整包解压），旧版目录回退 [manifestOf]。
-  Future<CheckpointManifest> loadManifest(String sessionId, int turn) async {
-    final File archive = archiveFile(sessionId, turn);
-    if (archive.existsSync()) {
-      return readCheckpointManifest(archive);
-    }
-    return manifestOf(sessionId, turn);
-  }
-
-  /// 现有检查点的摘要（turn 升序 + 有效文件数；索引缺失时按目录重建）。
-  List<CheckpointInfo> list(String sessionId) {
-    final List<CheckpointInfo>? cached = readCheckpointIndex(
-      indexFile(sessionId),
-    );
-    if (cached != null) return cached;
-    return _rebuildIndex(sessionId);
-  }
+  /// 现有检查点摘要（轮次升序）。
+  List<CheckpointInfo> list(String sessionId);
 
   /// 现有检查点的轮次（升序）。
-  List<int> turnsOf(String sessionId) => <int>[
-    for (final CheckpointInfo info in list(sessionId)) info.turn,
-  ];
+  List<int> turnsOf(String sessionId);
 
-  /// 保留 turn 0（base）+ 最近 `keep - 1` 个差量；[keep] 非正不裁剪。
-  void prune(String sessionId) {
-    if (keep <= 0) return;
-    final List<CheckpointInfo> infos = list(sessionId);
-    final List<CheckpointInfo> deltas = infos
-        .where((CheckpointInfo i) => i.turn > 0)
-        .toList();
-    final int excess = deltas.length - (keep - 1);
-    if (excess <= 0) return;
-    for (int index = 0; index < excess; index++) {
-      _deleteTurn(sessionId, deltas[index].turn);
-    }
-    writeCheckpointIndex(indexFile(sessionId), <CheckpointInfo>[
-      ...infos.where((CheckpointInfo i) => i.turn == 0),
-      ...deltas.sublist(excess),
-    ]);
-  }
+  /// 读某轮检查点的清单；缺失抛 [CheckpointException]。
+  Future<CheckpointManifest> loadManifest(String sessionId, int turn);
 
-  void _upsertIndex(String sessionId, CheckpointInfo info) {
-    final List<CheckpointInfo> infos = <CheckpointInfo>[
-      ...list(sessionId).where((CheckpointInfo i) => i.turn != info.turn),
-      info,
-    ]..sort((CheckpointInfo a, CheckpointInfo b) => a.turn.compareTo(b.turn));
-    writeCheckpointIndex(indexFile(sessionId), infos);
-  }
+  /// 把工作区恢复到 [turn] 轮的文件状态；返回恢复计数。
+  ///
+  /// 实现须在改动任何文件之前完成全部越界校验（fail-closed）。
+  Future<CheckpointRestore> restore(String sessionId, int turn);
 
-  /// 索引缺失时重建：旧版可读目录 + 现有哈希归档头部。
-  List<CheckpointInfo> _rebuildIndex(String sessionId) {
-    final Directory dir = sessionDir(sessionId);
-    if (!dir.existsSync()) return const <CheckpointInfo>[];
-    final List<CheckpointInfo> infos = <CheckpointInfo>[];
-    for (final FileSystemEntity entity in dir.listSync()) {
-      final String name = entity.path.split(Platform.pathSeparator).last;
-      // 索引本身与哈希旁挂文件都不是归档（旁挂是纯 gzip JSON，无归档头）。
-      if (name == 'index' || name.endsWith(kCheckpointHashesSuffix)) continue;
-      if (entity is Directory) {
-        final int? turn = int.tryParse(name);
-        if (turn == null) continue;
-        final CheckpointManifest manifest = manifestOf(sessionId, turn);
-        infos.add(
-          CheckpointInfo(turn: turn, files: _countFor(sessionId, manifest)),
-        );
-      } else if (entity is File) {
-        // 无扩展名的哈希归档：读头部拿轮次。
-        final (CheckpointManifest manifest, _) = readCheckpointArchive(entity);
-        infos.add(
-          CheckpointInfo(
-            turn: manifest.turn,
-            files: _countFor(sessionId, manifest),
-          ),
-        );
-      }
-    }
-    infos.sort(
-      (CheckpointInfo a, CheckpointInfo b) => a.turn.compareTo(b.turn),
-    );
-    writeCheckpointIndex(indexFile(sessionId), infos);
-    return infos;
-  }
-
-  int _countFor(String sessionId, CheckpointManifest manifest) {
-    if (!manifest.isDelta) return manifest.files.length;
-    final Set<String> basePaths = <String>{
-      for (final CheckpointFileEntry entry in manifestOf(sessionId, 0).files)
-        entry.path,
-    };
-    final Set<String> deleted = manifest.deleted.toSet();
-    return basePaths.where((String p) => !deleted.contains(p)).length +
-        manifest.changed.where((String p) => !basePaths.contains(p)).length;
-  }
-
-  void _deleteTurn(String sessionId, int turn) {
-    final File archive = archiveFile(sessionId, turn);
-    if (archive.existsSync()) archive.deleteSync();
-    deleteCheckpointHashes(archive); // 旁挂哈希随归档一起清
-    legacyDir(sessionId, turn)?.deleteSync(recursive: true);
-  }
-
-  /// `projectDir` 相对 [root] 的路径（排除按相对路径比较）。
-  String get projectRel {
-    final String sep = Platform.pathSeparator;
-    final String absRoot = root.endsWith(sep) ? root : '$root$sep';
-    if (projectDir.startsWith(absRoot)) {
-      return projectDir.substring(absRoot.length);
-    }
-    return projectDir;
-  }
+  /// 保留基线 + 最近 `keep - 1` 轮；`keep` 非正不裁剪。
+  void prune(String sessionId);
 }
-
-/// 差量 pass 1 的分类结果。
-class _DeltaScan {
-  const _DeltaScan({required this.changed, required this.current});
-
-  /// 相对基线新增或修改的路径。
-  final List<String> changed;
-
-  /// 当前工作区的全部路径（用于算 deleted）。
-  final Set<String> current;
-}
-
-/// 单文件 SHA-256（内存 ≈ 该文件自身；调用方逐文件调用，不累积）。
-Future<String> _sha256File(File file) async =>
-    sha256.convert(await file.readAsBytes()).toString();

@@ -221,7 +221,7 @@ void main() {
       final Directory projectDir = Directory('${root.path}/.conatus')
         ..createSync();
       addTearDown(() => root.deleteSync(recursive: true));
-      final CheckpointStore store = CheckpointStore(
+      final ArchiveCheckpointStore store = ArchiveCheckpointStore(
         root: root.path,
         projectDir: projectDir.path,
       );
@@ -241,12 +241,12 @@ void main() {
   group('快照默认排除构建目录', () {
     late Directory root;
     late Directory projectDir;
-    late CheckpointStore store;
+    late ArchiveCheckpointStore store;
 
     setUp(() {
       root = _tempDir();
       projectDir = Directory('${root.path}/.conatus')..createSync();
-      store = CheckpointStore(root: root.path, projectDir: projectDir.path);
+      store = ArchiveCheckpointStore(root: root.path, projectDir: projectDir.path);
       addTearDown(() => root.deleteSync(recursive: true));
     });
 
