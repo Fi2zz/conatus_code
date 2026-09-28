@@ -22,6 +22,9 @@ import 'checkpoint_paths.dart';
 
 /// 遍历 [root] 下需进快照的文件。
 ///
+/// [extra] 是额外的排除集（全局 gitignore 的解析结果，见
+/// `global_git_ignore.dart`）。它同时作用于采集与删除判定——两者必须同源。
+///
 /// 剪掉两类子树：
 /// - 含 `.git` 的目录（嵌套版本库 / `git worktree` 检出）——git 收不了它们
 ///   内部的文件（`git add` 对嵌套仓库内的显式路径**静默跳过**，rc=0 无告警），
@@ -33,8 +36,9 @@ import 'checkpoint_paths.dart';
 Stream<FileSystemEntity> checkpointWalk(
   String root,
   String projectRel,
-  List<String> ignore,
-) async* {
+  List<String> ignore, [
+  Set<String> extra = const <String>{},
+]) async* {
   final List<Directory> queue = <Directory>[Directory(root)];
   while (queue.isNotEmpty) {
     final Directory dir = queue.removeAt(0);
@@ -46,12 +50,19 @@ Stream<FileSystemEntity> checkpointWalk(
     }
     for (final FileSystemEntity entry in entries) {
       if (entry is Directory) {
-        if (_prune(entry, root, projectRel, ignore)) continue;
+        if (_prune(entry, root, projectRel, ignore, extra)) continue;
         queue.add(entry);
         continue;
       }
       if (entry is! File) continue;
-      if (checkpointIncluded(entry, root, projectRel, ignore)) yield entry;
+      if (!_excluded(
+        checkpointRelativeTo(entry, root),
+        projectRel,
+        ignore,
+        extra,
+      )) {
+        yield entry;
+      }
     }
   }
 }
@@ -62,6 +73,7 @@ bool _prune(
   String root,
   String projectRel,
   List<String> ignore,
+  Set<String> extra,
 ) {
   // 嵌套版本库：目录里存在 `.git`（目录或 worktree 的 gitfile 都算）。
   if (FileSystemEntity.typeSync(
@@ -72,22 +84,35 @@ bool _prune(
     return true;
   }
   final String rel = checkpointRelativeTo(dir, root);
-  return rel.isEmpty || checkpointExcluded(rel, projectRel, ignore);
+  return rel.isEmpty || _excluded(rel, projectRel, ignore, extra);
 }
+
+/// 排除判定（内置规则 + 额外集）。删除侧走同一条路径，保证同源。
+bool _excluded(
+  String rel,
+  String projectRel,
+  List<String> ignore,
+  Set<String> extra,
+) => extra.contains(rel) || checkpointExcluded(rel, projectRel, ignore);
 
 /// 单个实体是否进快照（是文件 + 未命中排除）。
 ///
 /// 注意：这只判**路径级**排除；嵌套版本库的子树剪枝在 [_prune] 里做，
-/// 单文件调用方（如删除判定）需自行保证不落在嵌套仓库内。
+/// 单文件调用方需自行保证不落在嵌套仓库内。
 bool checkpointIncluded(
   FileSystemEntity entity,
   String root,
   String projectRel,
-  List<String> ignore,
-) {
+  List<String> ignore, [
+  Set<String> extra = const <String>{},
+]) {
   if (entity is! File) return false;
-  final String rel = checkpointRelativeTo(entity, root);
-  return !checkpointExcluded(rel, projectRel, ignore);
+  return !_excluded(
+    checkpointRelativeTo(entity, root),
+    projectRel,
+    ignore,
+    extra,
+  );
 }
 
 /// [rel] 是否落在某个嵌套版本库内（`a/.git/b` 形态）。

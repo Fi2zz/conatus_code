@@ -36,8 +36,46 @@ const List<String> kCheckpointDefaultIgnores = <String>[
 /// 版本库元数据目录名。**任意层级都排除**（不是顶层匹配）。
 const String kCheckpointVcsDir = '.git';
 
-/// 相对路径是否命中排除：[kCheckpointDefaultIgnores]（顶层）、[projectDir]
-/// 整树、任意层级的 [kCheckpointVcsDir]、[ignore] 前缀。
+/// 敏感文件名（**任意层级**，按 basename 匹配）：凭据 / 私钥。
+///
+/// 为什么必须挡：快照是**明文落盘**（gzip 不是加密），影子实现还会把它写进
+/// git 对象库——即便之后删掉检查点，blob 仍留在库里直到 gc 回收。凭据不该
+/// 因为「开了检查点」而多出一份副本。
+const List<String> kCheckpointSecretNames = <String>[
+  '.netrc',
+  '.npmrc',
+  '.pypirc',
+  'credentials.json',
+  'id_dsa',
+  'id_ecdsa',
+  'id_ed25519',
+  'id_rsa',
+  'secrets.json',
+  'secrets.yaml',
+  'secrets.yml',
+];
+
+/// 敏感文件后缀（任意层级）：证书 / 私钥 / 签名容器。
+const List<String> kCheckpointSecretExtensions = <String>[
+  '.asc',
+  '.jks',
+  '.key',
+  '.keystore',
+  '.p12',
+  '.pem',
+  '.pfx',
+];
+
+/// `.env` 的**安全变体**：模板 / 示例，不含真实凭据，应当照常进快照。
+const List<String> kCheckpointEnvSafeSuffixes = <String>[
+  '.defaults',
+  '.example',
+  '.sample',
+  '.template',
+];
+
+/// 相对路径是否命中排除：敏感文件（任意层级）、[kCheckpointDefaultIgnores]
+/// （顶层）、`projectDir` 整树、任意层级的 [kCheckpointVcsDir]、[ignore] 前缀。
 ///
 /// [projectDir] 必须是相对 [root] 的路径（调用方算好再传，见 store 的
 /// `projectRel`）；绝对路径会永远匹配不上相对路径。
@@ -52,14 +90,57 @@ const String kCheckpointVcsDir = '.git';
 ///
 /// 故嵌套版本库一律不进快照、也不被恢复删除——代价是该子树的改动不可回滚
 /// （它有自己的历史，用户可在其中自行处理）。
-bool checkpointExcluded(String rel, String projectDir, List<String> ignore) {
+///
+/// 敏感文件同理：既不收，也不会在恢复时被当成「多余文件」删掉（那会毁掉用户
+/// 的凭据文件）。取舍是宁可漏收——漏收的后果是「该文件的改动不可回滚」，
+/// 多收的后果是「凭据明文外泄」。
+/// 故嵌套版本库一律不进快照、也不被恢复删除——代价是该子树的改动不可回滚
+/// （它有自己的历史，用户可在其中自行处理）。
+///
+/// 敏感文件同理：既不收，也不会在恢复时被当成「多余文件」删掉（那会毁掉用户
+/// 的凭据文件）。取舍是宁可漏收——漏收的后果是「该文件的改动不可回滚」，
+/// 多收的后果是「凭据明文外泄」。
+///
+/// [extra] 是额外排除集（全局 gitignore 的解析结果，见
+/// `global_git_ignore.dart`）。它必须走这里，不能只作用于采集：
+/// **采集与删除判定不同源，就是 swiftus 那次删 9119 个文件的根因**。
+bool checkpointExcluded(
+  String rel,
+  String projectDir,
+  List<String> ignore, [
+  Set<String> extra = const <String>{},
+]) {
+  if (extra.contains(rel)) return true;
   if (_hasSegment(rel, kCheckpointVcsDir)) return true;
+  if (checkpointSensitive(rel)) return true;
   for (final String prefix in kCheckpointDefaultIgnores) {
     if (_under(rel, prefix)) return true;
   }
   if (_under(rel, projectDir)) return true;
   for (final String prefix in ignore) {
     if (_under(rel, prefix)) return true;
+  }
+  return false;
+}
+
+/// 敏感文件判定：既不收进快照，也不会在恢复时被当成「多余文件」删掉
+/// （那会毁掉用户的凭据文件）。
+///
+/// 取舍是宁可漏收——漏收的后果是「该文件的改动不可回滚」，多收的后果是
+/// 「凭据明文外泄 + 恢复时把旧凭据写回去」。模板类文件（`.env.example` 等）
+/// 不含真实凭据，照常进快照。
+bool checkpointSensitive(String rel) {
+  final int slash = rel.lastIndexOf(Platform.pathSeparator);
+  final String name = slash < 0 ? rel : rel.substring(slash + 1);
+  if (kCheckpointSecretNames.contains(name)) return true;
+  final int dot = name.lastIndexOf('.');
+  if (dot > 0 && kCheckpointSecretExtensions.contains(name.substring(dot))) {
+    return true;
+  }
+  // `.env` 及其变体（`.env.local` / `.env.production` …）都是凭据；模板变体
+  // 除外。`.envrc` 是 direnv 配置、非凭据，故只匹配 `.env` 与 `.env.` 前缀。
+  if (name == '.env' || name.startsWith('.env.')) {
+    return !kCheckpointEnvSafeSuffixes.any(name.endsWith);
   }
   return false;
 }

@@ -64,6 +64,7 @@ export 'src/checkpoint/checkpoint_types.dart'
         CheckpointManifest,
         CheckpointRestore,
         CheckpointRewindResult;
+export 'src/checkpoint/global_git_ignore.dart' show resolveGlobalGitIgnore;
 export 'src/checkpoint/shadow_git_runner.dart'
     show GitResult, GitRunner, ProcessGitRunner, UnavailableGitRunner;
 export 'src/config/config_credentials.dart' show ConfigCredentials;

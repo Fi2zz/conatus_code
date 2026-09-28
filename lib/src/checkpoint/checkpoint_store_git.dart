@@ -24,6 +24,7 @@ import 'checkpoint_paths.dart';
 import 'checkpoint_scan.dart';
 import 'checkpoint_store.dart';
 import 'checkpoint_types.dart';
+import 'global_git_ignore.dart';
 import 'shadow_git_runner.dart';
 import 'shadow_index.dart';
 
@@ -51,6 +52,22 @@ class GitShadowStore implements CheckpointStore {
   final List<String> ignore;
 
   final GitRunner _git;
+
+  /// 全局 gitignore 解析出的排除集（每轮快照重算：文件在变）。
+  ///
+  /// 采集与删除判定共用它——两者不同源就是 swiftus 删 9119 个文件的根因。
+  Set<String> _extraExcluded = const <String>{};
+
+  /// 解析全局 gitignore 并记入 [_extraExcluded]；解析不出来就留空集
+  /// （保守降级：多收只是快照大一点，不会丢数据）。
+  Future<void> _resolveGlobalIgnores(List<String> candidates) async {
+    _extraExcluded = await resolveGlobalGitIgnore(
+      git: _git,
+      gitDir: gitDir,
+      workTree: root,
+      candidates: candidates,
+    );
+  }
 
   /// 影子仓库目录（[projectDir] 下的 `checkpoints/shadow.git`）。
   ///
@@ -217,6 +234,11 @@ class GitShadowStore implements CheckpointStore {
   /// 规则，既然只传我们想要的，结果就等于自定义排除面。分批是因为 argv
   /// 长度有限。
   Future<void> _stageWorktree() async {
+    // 先按 conatus 自己的规则 walk 一遍（此时还没有全局 gitignore 的信息），
+    // 拿候选集去问 git；再带着结果重走一次——两遍只为把全局排除并进同一个
+    // 判定源，避免采集与删除判定分家。
+    final List<String> candidates = await _walkPaths();
+    await _resolveGlobalIgnores(candidates);
     final List<String> wanted = await _walkPaths();
     for (final List<String> batch in _batched(wanted)) {
       _expect(await _gitObj(<String>['add', '-f', '--', ...batch]), '暂存工作区');
@@ -282,6 +304,7 @@ class GitShadowStore implements CheckpointStore {
       root,
       projectRel,
       ignore,
+      _extraExcluded,
     )) {
       paths.add(checkpointRelativeTo(entity, root));
     }
@@ -384,6 +407,7 @@ class GitShadowStore implements CheckpointStore {
       root,
       projectRel,
       ignore,
+      _extraExcluded,
     )) {
       final String rel = checkpointRelativeTo(entity, root);
       if (!target.contains(rel)) extras.add(rel);
