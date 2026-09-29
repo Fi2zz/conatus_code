@@ -114,6 +114,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     argHint: '[轮数]',
   ),
   TuiCommand(
+    name: 'export',
+    description: '把当前会话导出为 markdown（缺省落在项目数据目录的 exports/）',
+    argHint: '[路径]',
+  ),
+  TuiCommand(
     name: 'team',
     description: '进入团队视图（Esc 返回）；status 摘要 / interrupt <成员 id> 中断',
     argHint: '<子命令>',

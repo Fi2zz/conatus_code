@@ -27,7 +27,9 @@ import '../background/background_tasks.dart';
 import '../budget/cost_tracker.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
+import '../config/config_path.dart';
 import '../config/config_writer.dart';
+import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
 import '../subagent/subagent_progress.dart';
@@ -35,6 +37,7 @@ import '../subagent/swarm_member.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
+import 'session_exporter.dart';
 import 'team_snapshot.dart';
 import 'team_subscription.dart';
 import 'trace_renderer.dart';
@@ -754,6 +757,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         _showTelemetry();
       case 'trace':
         _showTrace(arg);
+      case 'export':
+        await _exportSession(arg);
       case 'clear':
         transcript.clear();
       default:
@@ -902,6 +907,56 @@ class ConatusTuiController implements TuiUserPromptHost {
     transcript.add(
       TuiRole.system,
       const TraceRenderer().render(session.events, turns: turns),
+    );
+  }
+
+  /// `/export [路径]`：把当前会话导出为 markdown。
+  ///
+  /// 缺省落项目数据目录的 `exports/`（不在工作区留文件）；给路径则照写。
+  Future<void> _exportSession(String arg) async {
+    final Session? session = _session;
+    if (session == null) {
+      transcript.add(TuiRole.system, '导出不可用：会话尚未绑定。');
+      return;
+    }
+    // 先落盘再提示——导出会新增事件，导出内容里不该包含「导出这条记录」。
+    final String? path = await _writeExport(session, arg);
+    if (path == null) return;
+    transcript.add(TuiRole.system, '已导出：$path');
+  }
+
+  /// 写导出文件；失败时把错误上屏并返回 `null`。
+  Future<String?> _writeExport(Session session, String arg) async {
+    final CostTrackerImpl? tracker = _app.get<CostTrackerImpl>('costTracker');
+    final SessionExport export = SessionExport(
+      session: session,
+      modelLabel: modelLabel,
+      workdir: _app.get<String>('workdir') ?? '',
+      cost: tracker?.todayCost ?? 0,
+      promptTokens: tracker?.promptTokens ?? 0,
+      completionTokens: tracker?.completionTokens ?? 0,
+      rateSummary: tracker?.profile?.rateSummary ?? '未知',
+    );
+    try {
+      return await export.write(
+        target: arg.trim().isEmpty ? null : arg.trim(),
+        projectDataDir: _projectDataDir(),
+      );
+    } on FileSystemException catch (error) {
+      transcript.add(TuiRole.system, '导出失败：${error.message}（${error.path}）');
+      return null;
+    }
+  }
+
+  /// 项目数据目录：`workdir` 服务在时由它与 `project_dir` 推出。
+  String _projectDataDir() {
+    final String? workdir = _app.get<String>('workdir');
+    if (workdir == null) {
+      return resolveConfigDir();
+    }
+    return resolveProjectDataDir(
+      workdir: workdir,
+      projectDir: _app.get<String>('projectDir'),
     );
   }
 

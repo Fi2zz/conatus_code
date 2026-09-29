@@ -200,6 +200,39 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 
 `/doctor` 查的是**装配**（配置、沙箱、工具表）；`/trace` 查的是**这一轮发生了什么**。
 
+### `/export` 导出
+
+`/export [路径]` 把当前会话导出为 markdown —— 存档、贴给同事、喂给别的工具
+分析。缺省落在项目数据目录的 `exports/`，给路径则照写（支持 `~` 展开）。
+
+```
+# nava 会话 session_abc123
+
+- 会话：`session_abc123`
+- 模型：ark/doubao-seed-2-0-lite
+- 工作目录：`/Users/fitz/REPO/conatus`
+- 事件：42 条
+- 成本：$0.0873（models.dev 口径，非账单）
+
+## 你
+给 checkpoint 加上 git 存储后端
+
+<details><summary>思考</summary>
+先看 openCheckpointStore 怎么选后端的
+</details>
+
+### ✗ edit_file
+OS Error: Path does not exist, path = 'lib/…/nope.dart'
+```
+
+与 `/trace` 的分工：`/trace` 回答「刚才那轮发生了什么」（只管屏上能读的一屏，
+会截断）；`/export` 回答「把这次会话留下来」，**内容不截断**——截断是显示层的事。
+只有单条工具结果超过 8000 字符才截，且**显式标注被截了多少**（静默截断会让读
+的人以为那就是全部）。
+
+思考折叠进 `<details>`，内部事件（`agent/round` / `plan/updated`）不进导出。
+**不放工作区**——与会话 / 检查点同一取舍，导出是工具产物，不该往代码仓库留垃圾。
+
 ### git 工具面
 `git_status` / `git_diff`（只读）· `git_add` / `git_branch` / `git_stash`
 （medium，默认不拦）· `git_commit`（high，走审批）。

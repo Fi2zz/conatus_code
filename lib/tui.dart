@@ -23,6 +23,7 @@ export 'src/tui/ask_user_tool.dart'
 export 'src/tui/at_ref.dart' show expandAtRefs, kAtRefMaxBytes, kAtRefMaxCount;
 export 'src/tui/at_ref_menu.dart';
 export 'src/tui/at_ref_menu_view.dart';
+export 'src/tui/session_exporter.dart';
 export 'src/tui/team_lanes.dart';
 export 'src/tui/team_snapshot.dart';
 export 'src/tui/team_subscription.dart';
