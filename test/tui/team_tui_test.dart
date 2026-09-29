@@ -76,16 +76,16 @@ void main() {
       expect(tester.terminalState, containsText('团队: 1 成员'));
       expect(tester.terminalState, containsText('任务: 0/0 完成'));
 
-      // /team：进入团队视图。
+      // /team：进入团队泳道视图。
       await controller.handleLine('/team');
       await tester.pump();
-      expect(tester.terminalState, containsText('团队视图'));
+      expect(tester.terminalState, containsText('团队泳道'));
       expect(tester.terminalState, containsText('reviewer'));
 
       // Esc：返回对话视图。
       await tester.sendEscape();
       await tester.pump();
-      expect(tester.terminalState, isNot(containsText('团队视图')));
+      expect(tester.terminalState, isNot(containsText('团队泳道')));
     } finally {
       tester.dispose();
       controller.dispose();

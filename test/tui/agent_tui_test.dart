@@ -95,15 +95,15 @@ void main() {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();
     try {
-      // /team 进入团队视图。
+      // /team 进入团队泳道视图。
       await controller.handleLine('/team');
       await tester.pump();
-      expect(tester.terminalState, containsText('团队视图'));
+      expect(tester.terminalState, containsText('团队泳道'));
 
       // Esc 返回对话视图。
       await tester.sendEscape();
       await tester.pump();
-      expect(tester.terminalState, isNot(containsText('团队视图')));
+      expect(tester.terminalState, isNot(containsText('团队泳道')));
       expect(tester.terminalState, containsText('输入文字开始对话'));
     } finally {
       tester.dispose();

@@ -32,6 +32,7 @@ import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
 import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
+import '../subagent/swarm_member.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
 import 'project_context.dart';
@@ -384,10 +385,18 @@ class ConatusTuiRuntime {
     final SubAgentProgressStore subagentProgress = SubAgentProgressStore();
     app.provide('subagentProgress', subagentProgress);
     app.onDispose(subagentProgress.close);
+    // 泳道投影：子 Agent 的活动也进团队视图（它不在 AgentTeam 里，故直接写
+    // 订阅的泳道表）。`sink` 要等控制器订阅团队后才接得上，故用可后设的出口。
+    final SwarmProjection swarm = SwarmProjection();
+    app.provide('swarmProjection', swarm);
     provideSpawnAgent(
       app,
       llm: resolvedLlm,
-      onProgress: subagentProgress.report,
+      // 两个出口都接：对话视图的逐行提示 + 团队视图的泳道。
+      onProgress: (SubAgentEvent e) {
+        subagentProgress.report(e);
+        swarm.report(e);
+      },
       childLlm: (LlmProvider base) => BudgetedLlmProvider(
         base,
         budget: resolvedBudget,

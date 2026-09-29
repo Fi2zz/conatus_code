@@ -31,6 +31,7 @@ import '../config/config_writer.dart';
 import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
 import '../subagent/subagent_progress.dart';
+import '../subagent/swarm_member.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
@@ -1655,7 +1656,20 @@ class ConatusTuiController implements TuiUserPromptHost {
     _teamSub = TeamSubscription(
       team: team,
       onChanged: (TeamSnapshot _) => _refresh(),
+      // 成员共用 costTracker，成本从根上下文取——此前这个 seam 从没被注入过，
+      // 状态栏的成本位一直是 0。
+      costSource: _CostBridge(_app.get<CostTrackerImpl>('costTracker')),
     );
+    // 子 Agent 泳道：子 Agent 不在 AgentTeam 里，但视图层统一，故把它的活动
+    // 直接写进同一张泳道表。名字由投影器维护。
+    final SwarmProjection? swarm = _app.get<SwarmProjection>('swarmProjection');
+    swarm?.sink.attach((String laneId, String line, bool failed) =>
+        _teamSub?.addSwarmLine(
+          laneId,
+          line,
+          failed: failed,
+          label: swarm.labels[laneId] ?? '子 Agent',
+        ));
     final TtsService? tts = this.tts;
     if (tts != null) {
       _voice = VoiceReporter(team: team, tts: tts, sink: ttsSink);
@@ -1760,4 +1774,18 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   void _refresh() => onChanged?.call();
+}
+
+/// 把 costTracker 适配成团队的 [TeamCostSource]。
+///
+/// 成员共用根上下文的 costTracker（子 Agent 也记进同一个），故团队总成本就是
+/// 它累计的 `todayCost`——不再单开一套计费。此前这个 seam 从没被注入过，
+/// 状态栏的成本位一直是 0。
+class _CostBridge implements TeamCostSource {
+  const _CostBridge(this._tracker);
+
+  final CostTrackerImpl? _tracker;
+
+  @override
+  double get totalCost => _tracker?.todayCost ?? 0.0;
 }

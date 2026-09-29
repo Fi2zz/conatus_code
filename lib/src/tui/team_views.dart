@@ -8,6 +8,7 @@ library;
 import 'package:conatus_team/conatus_team.dart';
 import 'package:nocterm/nocterm.dart';
 
+import '../subagent/swarm_member.dart';
 import 'team_snapshot.dart';
 
 /// 成员状态图标与文案。
@@ -153,7 +154,83 @@ class TaskRow extends StatelessComponent {
   }
 }
 
-/// 团队视图：成员列表 + 任务板，按需滚动。
+/// 成员泳道：标题行（名字 + 状态 + 当前任务）+ 最近活动。
+///
+/// 定高 [kTeamLaneMaxLines] 行——成员一多，泳道就得比行数更省，否则彼此挤出
+/// 视野，就失去了"swarm 总览"的意义。
+class MemberLaneView extends StatelessComponent {
+  const MemberLaneView({
+    super.key,
+    required this.id,
+    required this.lane,
+    this.member,
+  });
+
+  /// 泳道 id（团队成员 id 或子 Agent 投影 id）。
+  ///
+  /// 团队成员显示成员名；子 Agent 泳道没有成员可显示，故退回 id——
+  /// 它的**行**里带着投影器给的阶段描述（`→ rg` / `✓ 收口：3 轮`），
+  /// 那才是有用的信息。
+  final String id;
+
+  /// 该泳道的近期活动。
+  final MemberLane lane;
+
+  /// 团队成员；子 Agent 投影的泳道为 `null`。
+  final Teammate? member;
+
+  @override
+  Component build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Component>[
+          _header(),
+          for (final TeamActivityLine line in _visible())
+            _line(line),
+        ],
+      ),
+    );
+  }
+
+  /// 泳道头：团队成员按状态着色；子 Agent 投影用自带名字。
+  Component _header() {
+    final Teammate? mate = member;
+    if (mate == null) return _swarmHeader();
+    final (String icon, String status) = memberStatusDisplay(mate.status);
+    return Text(
+      '$icon ${mate.name}  [$status]',
+      style: TextStyle(
+        color: lane.active ? Colors.cyan : Colors.gray,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  /// 子 Agent 泳道的头：没有成员状态可言，只标出它是投影来的。
+  Component _swarmHeader() => Text(
+        '◆ $id',
+        style: TextStyle(
+          color: lane.active ? Colors.cyan : Colors.gray,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+
+  /// 泳道头：正在跑的成员亮一点，静默的用暗色。
+  Component _line(TeamActivityLine line) => Text(
+        '  ${line.text}',
+        style: TextStyle(color: line.failed ? Colors.red : Colors.gray),
+      );
+
+  /// 只留最后 N 行，活动的最新一条永远可见。
+  List<TeamActivityLine> _visible() {
+    if (lane.lines.length <= kTeamLaneMaxLines) return lane.lines;
+    return lane.lines.sublist(lane.lines.length - kTeamLaneMaxLines);
+  }
+}
+
+/// 团队视图：每个成员一条泳道（实时活动），下接任务板。
 class TeamView extends StatelessComponent {
   const TeamView({super.key, required this.snapshot});
 
@@ -167,23 +244,30 @@ class TeamView extends StatelessComponent {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Component>[
           const Text(
-            '团队视图（按 Ctrl+T 或 Esc 返回对话）',
+            '团队泳道（Esc 或 Ctrl+T 返回对话；/team interrupt <成员> 中断）',
             style: TextStyle(color: Colors.cyan),
           ),
           const SizedBox(height: 1),
-          const Text(
-            '成员',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
           for (final Teammate member in snapshot.members)
-            MemberCard(member: member, tasks: snapshot.tasks),
-          const SizedBox(height: 1),
-          const Text(
-            '任务板',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          for (final TeamTask task in snapshot.tasks)
-            TaskRow(task: task, members: snapshot.members),
+            MemberLaneView(
+              id: member.id,
+              member: member,
+              lane: snapshot.lanes[member.id] ?? const MemberLane(),
+            ),
+          // 子 Agent 投影泳道：不在成员表里，但同处一个视图。
+          for (final MapEntry<String, MemberLane> e
+              in snapshot.lanes.entries)
+            if (e.key.startsWith(SwarmMember.kSwarmLanePrefix))
+              MemberLaneView(id: e.key, lane: e.value),
+          if (snapshot.tasks.isNotEmpty) ...<Component>[
+            const SizedBox(height: 1),
+            const Text(
+              '任务板',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            for (final TeamTask task in snapshot.tasks)
+              TaskRow(task: task, members: snapshot.members),
+          ],
         ],
       ),
     );

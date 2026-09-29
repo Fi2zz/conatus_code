@@ -74,8 +74,9 @@ class _AgentTuiState extends State<AgentTui> {
   void initState() {
     super.initState();
     _controller.onChanged = _refresh;
+    // /team 无参数时切视图；重复进同一视图会「切不回来」，故显式置位。
     _controller.onOpenTeamView = () => setState(() {
-      _view = ViewMode.team;
+      _view = _view == ViewMode.team ? ViewMode.chat : ViewMode.team;
     });
     _input.addListener(_onInputChanged);
     _spin = Timer.periodic(const Duration(milliseconds: 120), (_) {
@@ -598,9 +599,15 @@ class _AgentTuiState extends State<AgentTui> {
   }
 
   bool _onKey(KeyboardEvent event) {
-    // Ctrl+T 展开 / 收起 TODO 列表（兜底：输入框聚焦时由 _onInputKey 先行处理）。
+    // Ctrl+T 在团队视图下切视图（TeamView 的提示语一直这么写，此前与 TODO
+    // 展开撞了——同一按键两种行为，提示语还是在骗人）。对话视图下才是展开
+    // TODO 列表（兜底：输入框聚焦时由 _onInputKey 先行处理）。
     if (event.matches(LogicalKey.keyT, ctrl: true)) {
-      _controller.togglePlanExpanded();
+      if (_view == ViewMode.team) {
+        _toggleView();
+      } else {
+        _controller.togglePlanExpanded();
+      }
       return true;
     }
     // Ctrl+O 展开 / 收起最近一条工具结果。

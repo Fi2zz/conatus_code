@@ -131,7 +131,7 @@ void main() {
     expect(state, containsText('◐ 审查t1  [执行中]'));
   });
 
-  test('TeamView：成员与任务板按序渲染', () async {
+  test('TeamView：泳道 + 任务板按序渲染', () async {
     final TeamSnapshot snapshot = TeamSnapshot(
       members: <Teammate>[
         _mate('reviewer', TeammateStatus.working),
@@ -143,13 +143,57 @@ void main() {
       ],
     );
     final TerminalState state = await _render(TeamView(snapshot: snapshot));
-    expect(state, containsText('团队视图'));
-    expect(state, containsText('成员'));
+    expect(state, containsText('团队泳道'));
     expect(state, containsText('任务板'));
-    expect(state.getText().indexOf('成员'),
+    expect(state.getText().indexOf('reviewer'),
         lessThan(state.getText().indexOf('任务板')));
     expect(state, containsText('◐ reviewer  [执行中]'));
     expect(state, containsText('✓ 审查t1  [完成]'));
     expect(state, containsText('○ 审查t2  [待领取]'));
+  });
+
+  test('MemberLaneView：活动行在标题之下，失败标红', () async {
+    final TerminalState state = await _render(MemberLaneView(
+      id: 'researcher',
+      member: _mate('researcher', TeammateStatus.working),
+      lane: const MemberLane(
+        active: true,
+        lines: <TeamActivityLine>[
+          TeamActivityLine('· 第 1 轮'),
+          TeamActivityLine('→ rg'),
+          TeamActivityLine('✗ read_file', failed: true),
+        ],
+      ),
+    ));
+
+    expect(state, containsText('◐ researcher  [执行中]'));
+    expect(state.getText().indexOf('researcher'),
+        lessThan(state.getText().indexOf('→ rg')));
+    expect(state, containsText('✗ read_file'));
+  });
+
+  test('MemberLaneView：活动过多时只留末尾若干行', () async {
+    final TerminalState state = await _render(MemberLaneView(
+      id: 'w',
+      member: _mate('w', TeammateStatus.working),
+      lane: MemberLane(
+        lines: <TeamActivityLine>[
+          for (int i = 0; i < kTeamLaneMaxLines + 5; i++)
+            TeamActivityLine('· 第 $i 轮'),
+        ],
+      ),
+    ));
+
+    expect(state.containsText('· 第 0 轮'), isFalse);
+    expect(state, containsText('· 第 ${kTeamLaneMaxLines + 4} 轮'));
+  });
+
+  test('MemberLaneView：无活动时只渲染标题', () async {
+    final TerminalState state = await _render(MemberLaneView(
+      id: 'idle-one',
+      member: _mate('idle-one', TeammateStatus.idle),
+      lane: const MemberLane(),
+    ));
+    expect(state, containsText('○ idle-one  [空闲]'));
   });
 }

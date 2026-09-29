@@ -148,6 +148,8 @@ export 'src/sandbox/seatbelt_profile.dart'
         seatbeltMachAllowlist;
 export 'src/subagent/subagent_progress.dart'
     show SubAgentLine, SubAgentProgressStore;
+export 'src/subagent/swarm_member.dart'
+    show SwarmMember, SwarmProjection, SwarmSink;
 export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
 export 'src/tools/git_tools.dart'
