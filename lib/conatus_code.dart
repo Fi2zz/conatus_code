@@ -119,8 +119,22 @@ export 'src/diff/unified_diff.dart'
 export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
 export 'src/hooks/hooks.dart' show HookResult, Hooks, provideHooks, runHooks;
+export 'src/lint/dart_machine.dart'
+    show
+        DartDiagnostic,
+        formatDartDiagnostics,
+        kDartMachineFields,
+        kLintMaxPerFile,
+        parseDartMachine;
+export 'src/lint/lint_probe.dart'
+    show LintOutputFormat, LintProbe, detectLintProbe;
 export 'src/lint/linter.dart'
-    show LinterService, provideLinter, kLintFeedbackChars, kLintToolNames;
+    show
+        LinterService,
+        provideLinter,
+        kLintFeedbackChars,
+        kLintMaxTargets,
+        kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
 export 'src/sandbox/command_policy.dart'

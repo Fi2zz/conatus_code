@@ -4,6 +4,28 @@
 
 ## [未发布]
 
+- 编辑后校验（LinterService）对 Dart 项目改为**只校验这次改动的文件**，并解析成结构化
+  诊断回灌。实测同仓库全仓 `dart analyze` 2.55s → 单文件
+  `dart analyze --format=machine <file>` 0.35s（约 7 倍），且诊断带稳定码
+  （`RETURN_OF_INVALID_TYPE` / `UNUSED_IMPORT` …）与精确行列，回灌文本从纯文本升级为：
+  ```
+  lib/svc2.dart
+    ERROR [4:10] RETURN_OF_INVALID_TYPE: A value of type 'int' can't be returned...
+    WARNING [2:8] UNUSED_IMPORT: Unused import: 'dart:math'.
+  ```
+  - 新增 `LintProbe` / `LintOutputFormat` 抽象：探针自己声明是否支持按文件限定。
+    Go（package 级）、Rust（crate 级）的校验单位不是单文件，ESLint 尚无实测，因此
+    这两者维持原样跑全项目，不硬套单文件。
+  - **判定不依赖退出码**：`dart analyze` 的 0（干净）/ 3（有诊断）/ 64（路径不存在）
+    语义各异，按码判断会把用法提示当告警回灌。改为只解析能识别的 machine 行，解析
+    不到就当作「没问题」。
+  - 调用前过滤已删除的路径：`apply_patch` 会删文件，且实测混传一个不存在的路径会让
+    整次运行无输出。
+  - 去抖改为**按目标集合分键**：原先全局一个时间戳，改 a 再改 b 会被误抑制；现在
+    同文件抑制、异文件各查一次。过期条目顺带清理，不会无限增长。
+  - `[lint] command` 覆盖行为不变（按原始文本处理，因为自定义命令输出格式无从判断）。
+  - Go / Rust / ESLint 的命令与行为未变。
+
 - `/init` 生成的 AGENTS.md 新增「诊断与自检命令」一节：要求写明本项目改动**交付
   前**该跑的确切校验命令（类型检查 / lint），并要求每次交付前先跑一遍确认没有
   新增错误；命令以仓库自身的脚本与 CI 配置为准，不让模型凭空编。
