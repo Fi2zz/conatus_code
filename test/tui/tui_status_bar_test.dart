@@ -24,16 +24,65 @@ void main() {
   });
 
   group('resolveWorkspaceLocation', () {
-    test('git 仓库内返回目录 + 分支，HOME 缩写为 ~', () {
-      final String? home = Platform.environment['HOME'];
-      final String path = Directory.current.path;
-      final bool underHome = home != null && path.startsWith('$home/');
+    // 自建临时仓库断言，不依赖调用者处于什么 git 状态。此前这个用例硬编码
+    // 'master' 且隐式用 Directory.current —— 换个 checkout 形态（比如 CI 用
+    // `clone --recurse-submodules`，子模块落在**游离 HEAD**）就红，而生产代码
+    // 其实是对的：游离 HEAD 本来就不该显示分支。
+    late Directory repo;
 
-      final Future<String> future = resolveWorkspaceLocation();
-      expect(future, completion(isNotEmpty));
-      expect(future, completion(underHome ? startsWith('~/') : anything));
-      // conatus_code 是 git 仓库：应带分支名。
-      expect(future, completion(contains('master')));
+    setUp(() {
+      repo = Directory.systemTemp.createTempSync('nava-loc');
+      addTearDown(() => repo.deleteSync(recursive: true));
+    });
+
+    void git(String args) {
+      final ProcessResult r =
+          Process.runSync('git', args.split(' '), workingDirectory: repo.path);
+      expect(r.exitCode, 0, reason: 'git $args 失败：${r.stderr}');
+    }
+
+    test('有分支时返回「目录 + 分支」', () async {
+      git('init -q -b main');
+      git('config user.email t@example.com');
+      git('config user.name t');
+      File('${repo.path}${Platform.pathSeparator}a.txt').writeAsStringSync('x');
+      git('add a.txt');
+      git('commit -qm init');
+      git('checkout -qb feature/x');
+
+      expect(await resolveWorkspaceLocation(cwd: repo.path),
+          '${repo.path} feature/x');
+    });
+
+    test('游离 HEAD：只显示目录，不显示 HEAD', () async {
+      git('init -q -b main');
+      git('config user.email t@example.com');
+      git('config user.name t');
+      File('${repo.path}${Platform.pathSeparator}a.txt').writeAsStringSync('x');
+      git('add a.txt');
+      git('commit -qm init');
+      final String sha = (Process.runSync(
+              'git', <String>['rev-parse', 'HEAD'],
+              workingDirectory: repo.path)
+          .stdout as String)
+          .trim();
+      git('checkout -q $sha');
+
+      expect(await resolveWorkspaceLocation(cwd: repo.path), repo.path);
+    });
+
+    test('非 git 目录：只显示目录', () async {
+      expect(await resolveWorkspaceLocation(cwd: repo.path), repo.path);
+    });
+
+    test('HOME 下的路径缩写成 ~', () async {
+      final String? home = Platform.environment['HOME'];
+      if (home == null) return; // 无 HOME 环境下跳过这条。
+      final Directory under = Directory('$home/.nava-test-tmp')
+        ..createSync(recursive: true);
+      addTearDown(() => under.deleteSync(recursive: true));
+
+      expect(await resolveWorkspaceLocation(cwd: under.path), startsWith('~/'));
     });
   });
 

@@ -4,10 +4,14 @@ library;
 import 'dart:io';
 
 /// 解析状态栏位置信息：`~/REPO/conatus master`；非 git 仓库只显示目录。
-Future<String> resolveWorkspaceLocation() async {
-  final String cwd = _shortenHome(Directory.current.path);
-  final String? branch = await _gitBranch(Directory.current.path);
-  return branch == null ? cwd : '$cwd $branch';
+///
+/// [cwd] 缺省为当前目录；显式传入是为了让测试能在**自建仓库**里断言，而不是
+/// 依赖调用者碰巧处于什么 git 状态（分支名、还是游离 HEAD）。
+Future<String> resolveWorkspaceLocation({String? cwd}) async {
+  final String base = cwd ?? Directory.current.path;
+  final String path = _shortenHome(base);
+  final String? branch = await _gitBranch(base);
+  return branch == null ? path : '$path $branch';
 }
 
 /// 格式化上下文用量：`ctx 299k/1M (30%)`；[maxTokens] 为 0（未知窗口）时

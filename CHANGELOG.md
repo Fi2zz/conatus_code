@@ -4,6 +4,17 @@
 
 ## [未发布]
 
+- 修一个**环境依赖的测试**：`tui_status_bar_test` 里 `resolveWorkspaceLocation`
+  那条用例硬编码了分支名 `master`，且隐式用 `Directory.current`。换个 checkout
+  形态就红——CI 用 `clone --recurse-submodules` 时子模块落在**游离 HEAD**
+  （`rev-parse --abbrev-ref HEAD` 返回 `HEAD`），而生产代码正确地把 `HEAD` 当
+  「无分支」处理。**测试错了，代码没错。**
+  - `resolveWorkspaceLocation` 增可选 `cwd` 参数，让测试在**自建临时仓库**里断言
+    有分支 / 游离 HEAD / 非 git 目录 / `~` 缩写四种情形，不再依赖调用者的 git
+    状态。
+  - 这条用例是新增的父仓库 `workspace-integration` CI job 暴露出来的——两个仓库
+    的 CI 都绿，并不代表集成被验证过。
+
 - **新增 `/export [路径]`**：把当前会话导出为 markdown（存档 / 分享 / 喂别的
   工具分析）。头带会话 id、时间、模型、工作目录、事件数、token、费率来源与成本。
   - 与 `/trace` 分工：`/trace` 回答「刚才那轮发生了什么」，只管屏上能读的一屏、
