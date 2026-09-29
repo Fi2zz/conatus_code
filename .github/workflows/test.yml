@@ -28,7 +28,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dart-lang/setup-dart@v1
         with:
@@ -40,7 +40,7 @@ jobs:
       # 独立形态的依赖解析要 clone 整个 conatus 仓库（22 条 override 指向
       # git 源），冷缓存 40s 起（网络抖动时更久），重复跑时缓存收益明显。
       # pubspec.lock 未入库，故按 pubspec.yaml 做 key。
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.pub-cache
           key: pub-${{ runner.os }}-${{ hashFiles('pubspec.yaml') }}
