@@ -4,6 +4,20 @@
 
 ## [未发布]
 
+- 修状态栏中段被**裁一半并与右段撞在一起**的布局 bug。窄终端（80 列）且挂起退出
+  确认时，原本渲染成 `再按一次 Ct~/REPO/conatus master · ctx ~4t` —— 提示中间
+  消失、右段直接压上来。两个原因叠加：
+  - `Spacer()` 与 `Expanded` 同为 `flex: 1`，中段只分到空闲空间的一半；
+  - `showHint` 用固定常数 12 列判断放不放得下，完全没看提示真实宽度
+    （`再按一次 Ctrl+C 退出` 是 20 列，CJK 按 2 列算）。`softWrap: false` 的文本
+    被裁到框宽后与右段重叠。
+  - 现在：去掉多余的 `Spacer`（中段只留一个 flex 子件），`_fit()` 按各段**实际
+    显示宽度** + 间隙算去留，提示优先于右段环境信息，放不下就整段舍右段而不是
+    裁半截；提示两侧各留 2 列间隙。`build` 拆出 `_hint` / `_fit` / `_bar`。
+  - 这条也是被父仓库 `workspace-integration` CI 暴露的：它从**仓库根**跑测试，
+    `Directory.current` 与包目录不同 → 位置串更短 → 右段没那么容易被舍掉 →
+    才走到那条碰撞分支。
+
 - 修一个**环境依赖的测试**：`tui_status_bar_test` 里 `resolveWorkspaceLocation`
   那条用例硬编码了分支名 `master`，且隐式用 `Directory.current`。换个 checkout
   形态就红——CI 用 `clone --recurse-submodules` 时子模块落在**游离 HEAD**

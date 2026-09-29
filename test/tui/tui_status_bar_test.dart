@@ -113,6 +113,30 @@ void main() {
     expect(tester.terminalState, containsText('回车发送'));
   });
 
+  // 回归：退出确认挂起时提示（20 列）比默认提示长，此前 `showHint` 只按固定 12
+  // 列判断放得下，且中段被 Spacer + Expanded 两个 flex:1 各分一半，于是提示被裁成
+  // 「再按一次 Ct」并与右段撞在一起。窄终端下提示优先于环境信息。
+  test('窄终端：退出确认提示完整显示，必要时舍右段', () async {
+    final NoctermTester tester = await NoctermTester.create();
+    addTearDown(tester.dispose);
+    await tester.pumpComponent(
+      const TuiStatusBar(
+        pickerOpen: false,
+        busy: false,
+        tick: 0,
+        exitPending: true,
+        modelLabel: 'mock',
+        permissionLabel: 'Ask When Needed',
+        location: '~/REPO/conatus master',
+        contextText: 'ctx ~4t',
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.terminalState, containsText('再按一次 Ctrl+C 退出'));
+    expect(tester.terminalState, containsText('Ask When Needed   mock'));
+  });
+
   test('状态栏缺省：无权限/位置/上下文时不显示对应段', () async {
     final NoctermTester tester = await NoctermTester.create();
     addTearDown(tester.dispose);

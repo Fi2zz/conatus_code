@@ -95,6 +95,9 @@ class TuiInputBar extends StatelessComponent {
 }
 
 /// 状态栏：左（权限 + 模型）/ 中（操作提示）/ 右（目录 + 分支 + 上下文用量）。
+/// 状态栏三段之间保留的最小空隙（列）。
+const int _kSegmentGap = 2;
+
 class TuiStatusBar extends StatelessComponent {
   const TuiStatusBar({
     super.key,
@@ -150,26 +153,6 @@ class TuiStatusBar extends StatelessComponent {
 
   @override
   Component build(BuildContext context) {
-    final String hint;
-    if (shellMode) {
-      hint = shellStatusHint();
-    } else if (exitPending) {
-      hint = '再按一次 Ctrl+C 退出';
-    } else if (choiceOpen) {
-      hint = '[↑↓] 选择 | [Enter] 确认 | [Esc] 取消';
-    } else if (pickerOpen) {
-      hint = '[↑↓] 选择会话 | [Enter] 切换 | [Esc] 关闭';
-    } else if (menuOpen) {
-      hint = '[↑↓] 选择命令 | [Enter] 运行 | [Tab] 补全 | [Esc] 关闭';
-    } else if (busy) {
-      hint = '${tuiSpinner(tick)} 思考中${tuiDots(tick)}';
-    } else if (hasSelection) {
-      hint = Platform.isMacOS
-          ? '已自动复制到系统剪贴板 | /help 命令'
-          : '选中后 Ctrl+C 复制 | /help 命令';
-    } else {
-      hint = '回车发送 | /help 命令 | /sessions 会话 | Ctrl+C 退出';
-    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       // decoration: const BoxDecoration(
@@ -178,58 +161,101 @@ class TuiStatusBar extends StatelessComponent {
       // ),
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
-          final String left = _leftText();
-          final String right = _rightText();
-          final int width = constraints.maxWidth.toInt();
-          final int leftWidth = _displayWidth(left);
-          // 窄终端先舍右段（环境信息），保住左段与中间操作提示。
-          final bool showRight = leftWidth + _displayWidth(right) + 12 <= width;
-          final int spare =
-              width - leftWidth - (showRight ? _displayWidth(right) : 0);
-          final bool showHint = spare >= 12;
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Component>[
-              Row(
-                children: <Component>[
-                  if (permissionLabel.isNotEmpty)
-                    Text(
-                      permissionLabel,
-                      maxLines: 1,
-                      softWrap: false,
-                      style: const TextStyle(color: Colors.brightYellow),
-                    ),
-                  Text(
-                    permissionLabel.isEmpty ? modelLabel : '   $modelLabel',
-                    maxLines: 1,
-                    softWrap: false,
-                  ),
-                ],
-              ),
-              const Spacer(),
-
-              Expanded(
-                child: showHint
-                    ? Text(
-                        hint,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          color: busy ? Colors.brightYellow : Colors.gray,
-                        ),
-                      )
-                    : const SizedBox(),
-              ),
-              Text(
-                showRight ? right : '',
-                maxLines: 1,
-                softWrap: false,
-                style: const TextStyle(color: Colors.gray),
-              ),
-            ],
+          final String hint = _hint();
+          final (bool showRight, bool showHint) = _fit(
+            constraints.maxWidth.toInt(),
+            _leftText(),
+            hint,
+            _rightText(),
           );
+          return _bar(hint, showRight, showHint);
         },
       ),
+    );
+  }
+
+  /// 中段提示：按当前状态取一条。
+  String _hint() {
+    if (shellMode) {
+      return shellStatusHint();
+    } else if (exitPending) {
+      return '再按一次 Ctrl+C 退出';
+    } else if (choiceOpen) {
+      return '[↑↓] 选择 | [Enter] 确认 | [Esc] 取消';
+    } else if (pickerOpen) {
+      return '[↑↓] 选择会话 | [Enter] 切换 | [Esc] 关闭';
+    } else if (menuOpen) {
+      return '[↑↓] 选择命令 | [Enter] 运行 | [Tab] 补全 | [Esc] 关闭';
+    } else if (busy) {
+      return '${tuiSpinner(tick)} 思考中${tuiDots(tick)}';
+    } else if (hasSelection) {
+      return Platform.isMacOS
+          ? '已自动复制到系统剪贴板 | /help 命令'
+          : '选中后 Ctrl+C 复制 | /help 命令';
+    }
+    return '回车发送 | /help 命令 | /sessions 会话 | Ctrl+C 退出';
+  }
+
+  /// 按屏宽决定三段去留：返回 (是否显示右段, 是否显示中段提示)。
+  ///
+  /// 提示优先于右段环境信息；提示两侧各留 [_kSegmentGap] 列（其 `Padding` 宽度
+  /// 已计入 [_kSegmentGap] * 2）。阈值按**实际显示宽度**判断，不用固定常数——
+  /// 「再按一次 Ctrl+C 退出」有 20 列，按 12 列判断等于让它挤进放不下的空间
+  /// 再被裁掉半截。
+  (bool, bool) _fit(int width, String left, String hint, String right) {
+    final int leftBox = _displayWidth(left);
+    final int hintBox = _displayWidth(hint) + _kSegmentGap * 2;
+    final int rightBox = _displayWidth(right) + _kSegmentGap;
+    final bool showRight = leftBox + hintBox + rightBox <= width;
+    final int spare = width - leftBox - (showRight ? rightBox : 0);
+    return (showRight, spare >= hintBox);
+  }
+
+  /// 三段布局：左段固定，中段 `Expanded` 独占剩余空间，右段贴右。
+  ///
+  /// 中段只能有**一个** flex 子件——早前这里叠了 `Spacer` + `Expanded`（都是
+  /// `flex: 1`），中段被对半砍，提示裁掉半截还和右段撞在一起。
+  Component _bar(String hint, bool showRight, bool showHint) {
+    return Row(
+      children: <Component>[
+        Row(
+          children: <Component>[
+            if (permissionLabel.isNotEmpty)
+              Text(
+                permissionLabel,
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(color: Colors.brightYellow),
+              ),
+            Text(
+              permissionLabel.isEmpty ? modelLabel : '   $modelLabel',
+              maxLines: 1,
+              softWrap: false,
+            ),
+          ],
+        ),
+        Expanded(
+          child: showHint
+              ? Padding(
+                  padding: EdgeInsets.symmetric(horizontal: _kSegmentGap.toDouble()),
+                  child: Text(
+                    hint,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      color: busy ? Colors.brightYellow : Colors.gray,
+                    ),
+                  ),
+                )
+              : const SizedBox(),
+        ),
+        Text(
+          showRight ? _rightText() : '',
+          maxLines: 1,
+          softWrap: false,
+          style: const TextStyle(color: Colors.gray),
+        ),
+      ],
     );
   }
 
