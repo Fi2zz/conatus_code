@@ -27,6 +27,7 @@ export 'src/tui/team_lanes.dart';
 export 'src/tui/team_snapshot.dart';
 export 'src/tui/team_subscription.dart';
 export 'src/tui/team_views.dart';
+export 'src/tui/trace_renderer.dart';
 export 'src/tui/transcript.dart';
 export 'src/tui/tui.dart';
 export 'src/tui/tui_app.dart';
@@ -69,4 +70,5 @@ export 'src/tui/tui_shell_mode.dart'
 export 'src/tui/tui_skill_command.dart';
 export 'src/tui/tui_status_info.dart';
 export 'src/tui/tui_views.dart';
+
 export 'src/tui/voice_reporter.dart';

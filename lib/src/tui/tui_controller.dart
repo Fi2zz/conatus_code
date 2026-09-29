@@ -37,6 +37,7 @@ import 'ask_user_tool.dart';
 import 'at_ref.dart';
 import 'team_snapshot.dart';
 import 'team_subscription.dart';
+import 'trace_renderer.dart';
 import 'transcript.dart';
 import 'tui_attachment.dart';
 import 'tui_choice.dart';
@@ -751,6 +752,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _forget(arg);
       case 'telemetry':
         _showTelemetry();
+      case 'trace':
+        _showTrace(arg);
       case 'clear':
         transcript.clear();
       default:
@@ -878,6 +881,28 @@ class ConatusTuiController implements TuiUserPromptHost {
     } catch (error) {
       transcript.add(TuiRole.system, '压缩失败：$error');
     }
+  }
+
+  /// `/trace [N]`：复盘最近 N 轮（缺省 1）的事件时间线。
+  ///
+  /// 回答的是「模型当时看到了什么、为什么那么判断」——屏上只有结论，复盘给的是
+  /// 过程。数据本来就是可读 JSONL，这里只是给个入口。
+  void _showTrace(String arg) {
+    final Session? session = _session;
+    if (session == null) {
+      transcript.add(TuiRole.system, '复盘不可用：会话尚未绑定。');
+      return;
+    }
+    final String trimmed = arg.trim();
+    final int? turns = trimmed.isEmpty ? null : int.tryParse(trimmed);
+    if (trimmed.isNotEmpty && turns == null) {
+      transcript.add(TuiRole.system, '/trace 的参数是轮数（正整数），收到 "$arg"。');
+      return;
+    }
+    transcript.add(
+      TuiRole.system,
+      const TraceRenderer().render(session.events, turns: turns),
+    );
   }
 
   /// `/cost`：今日成本、token 用量与当前模型的费率来源。

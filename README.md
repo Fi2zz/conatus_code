@@ -176,8 +176,31 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 - `/doctor`：体检——配置 / 提供商 / 回退链 / 模型窗口与费率 / 沙箱（Layer 1/2）/
   工具表 / MCP / rg 逐项 ✓/✗ + 修复提示，自查用。
 
-### git 工具面
+### `/trace` 复盘
 
+```
+你 › 把 checkpoint 的存储后端加上 git 选项
+思考 › 先看存储实现是怎么选后端的
+✓ rg › lib/src/checkpoint/checkpoint_backend.dart:24（+11 行）
+✗ edit_file › OS Error: Path does not exist, path = .../nope.dart
+助手 › 路径写错了，改用 checkpoint_backend.dart
+```
+
+回答「模型当时看到了什么、为什么那么判断」——屏上只有结论，复盘给的是过程。
+`/trace` 渲染最近一轮，`/trace 3` 看最近三轮。
+
+会话日志本来就是可读 JSONL、事件也全都在盘上，**缺的不是数据而是能看的入口**，
+所以这里不新建埋点，只把 `Session.events` 摊成时间线：
+
+- 失败项标 `✗` 并带出原因——模型为什么停下、哪一步炸了
+- 工具结果只取首行但**报出总行数**：`rg` 命中 12 处和 1 处是不同的信息，
+  砍到首行不能把条数也丢了
+- 不可读的事件（`agent/round` / `plan/updated` 等）跳过，不产生噪声行
+- 压缩事件标出来（压缩失败也会显式提示）
+
+`/doctor` 查的是**装配**（配置、沙箱、工具表）；`/trace` 查的是**这一轮发生了什么**。
+
+### git 工具面
 `git_status` / `git_diff`（只读）· `git_add` / `git_branch` / `git_stash`
 （medium，默认不拦）· `git_commit`（high，走审批）。
 

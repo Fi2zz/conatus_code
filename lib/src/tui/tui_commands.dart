@@ -109,6 +109,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   ),
   TuiCommand(name: 'telemetry', description: '显示最近的可观测性事件'),
   TuiCommand(
+    name: 'trace',
+    description: '复盘最近一轮：模型看到了什么、调了什么、哪里失败（缺省 1 轮）',
+    argHint: '[轮数]',
+  ),
+  TuiCommand(
     name: 'team',
     description: '进入团队视图（Esc 返回）；status 摘要 / interrupt <成员 id> 中断',
     argHint: '<子命令>',
