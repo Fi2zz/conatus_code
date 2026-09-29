@@ -85,7 +85,28 @@ void main() {
       expect(result.content, 'ok');
       expect(result.usage['prompt_tokens'], 1000000);
       expect(provider.calls, 1);
-      expect(tracker.todayCost, closeTo(kInputRatePerMillion, 1e-9));
+      expect(tracker.promptTokens, 1000000);
+    });
+
+    // 回归：TUI 恒带 onStream 走 chatStream，而旧实现直接 `yield*` 透传、
+    // 从不调 recordUsage —— 用量因此永远记不上，`/cost` 恒为 $0。
+    test('chatStream 从终态帧记录用量', () async {
+      final CostTrackerImpl tracker = CostTrackerImpl();
+      final _FakeProvider provider = _FakeProvider(_reply(
+        usage: <String, dynamic>{'prompt_tokens': 2000, 'completion_tokens': 8},
+      ));
+      final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
+        provider,
+        budget: const TurnBudget(maxTokens: 1000000),
+        costTracker: tracker,
+      );
+
+      await budgeted
+          .chatStream(<LlmMessage>[const LlmMessage('user', 'hi')]).toList();
+
+      expect(tracker.promptTokens, 2000);
+      expect(tracker.completionTokens, 8);
+      expect(tracker.hasRealUsage, isTrue);
     });
 
     test('chatStream 超限时只产出一个 LlmStreamDone', () async {
@@ -139,7 +160,9 @@ class _FakeProvider implements LlmProvider {
     List<Map<String, dynamic>>? tools,
   }) async* {
     calls++;
-    yield const LlmStreamDone();
+    yield const LlmTextDelta('ok');
+    // 用量只出现在终态帧上，与真实 provider 一致。
+    yield LlmStreamDone(usage: reply.usage, model: reply.model);
   }
 
   @override

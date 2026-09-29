@@ -9,6 +9,7 @@ import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
 
 import '../../providers.dart';
+import '../budget/cost_tracker.dart';
 import '../sandbox/jailed_file_system.dart';
 import '../sandbox/rejecting_shell.dart';
 import '../sandbox/sandboxed_shell.dart';
@@ -44,6 +45,7 @@ List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
       ),
       _providerCheck(app),
       _llmChainCheck(app),
+      _modelProfileCheck(app),
       _mcpCheck(app),
       DoctorCheck(
         name: '工具表',
@@ -125,6 +127,36 @@ DoctorCheck _mcpCheck(Context app) {
     ok: false,
     warning: true,
     hint: '未配置（config.toml [mcp.servers.*]）',
+  );
+}
+
+/// 上下文窗口与费率（models.dev）；拿不到就说未知，不猜。
+DoctorCheck _modelProfileCheck(Context app) {
+  final CostTrackerImpl? tracker = app.get<CostTrackerImpl>('costTracker');
+  final ModelProfile? profile = tracker?.profile;
+  if (tracker == null) {
+    return const DoctorCheck(
+      name: '模型窗口 / 费率',
+      ok: false,
+      warning: true,
+      hint: '未装配 costTracker',
+    );
+  }
+  if (profile == null) {
+    return DoctorCheck(
+      name: '模型窗口 / 费率',
+      ok: false,
+      warning: true,
+      hint: '${tracker.provider}/${tracker.model}：models.dev 无此记录'
+          '（上下文未知、费率按 0 计）',
+    );
+  }
+  return DoctorCheck(
+    name: '模型窗口 / 费率',
+    ok: true,
+    warning: !profile.hasContext || !profile.hasPricing,
+    hint: '窗口 ${profile.hasContext ? '${profile.contextLength ~/ 1000}k' : '未知'}'
+        ' · ${profile.rateSummary}',
   );
 }
 

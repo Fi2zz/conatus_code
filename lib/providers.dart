@@ -13,6 +13,8 @@ export 'src/providers/llm_chain.dart'
     show LlmChain, LlmNotice, LlmNotices, buildLlmChain;
 export 'src/providers/model_catalog.dart'
     show ModelCapability, ModelSpec, ProviderPreset, kProviderPresets;
+export 'src/providers/model_profile.dart'
+    show ModelProfile, ModelProfileStore;
 export 'src/providers/models_dev.dart'
     show ModelsDevClient, ModelsDevException, ModelsDevModel, keepForCoding;
 export 'src/providers/provider_profile.dart' show ProviderProfile;

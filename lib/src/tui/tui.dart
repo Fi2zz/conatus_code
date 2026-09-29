@@ -819,6 +819,7 @@ class _AgentTuiState extends State<AgentTui> {
             contextText: formatContextUsage(
               _controller.contextTokens,
               _controller.modelContextLength,
+              estimated: _controller.contextTokensEstimated,
             ),
             menuOpen: _menu.open,
             choiceOpen: _controller.choice.open,

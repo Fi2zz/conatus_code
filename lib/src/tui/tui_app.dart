@@ -3,6 +3,7 @@
 /// 这是一个独立的 [Context] 根，所有服务都随 [dispose] 一并释放。
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
@@ -323,9 +324,24 @@ class ConatusTuiRuntime {
             notices: notices,
           );
 
+    // 模型档案（上下文窗口 + 真实费率）：先给空索引、后台预热，拿到后广播。
+    // 冷启动不等网络——冷缓存下这一下可达 30s，而窗口/价格拿不到时一切照常，
+    // 只是状态栏与 `/cost` 显示「未知」。
+    final ModelProfileStore modelProfiles = ModelProfileStore(
+      cachePath: _modelsDevCachePath(configPath),
+    );
+    app.provide('modelProfiles', modelProfiles);
+    app.onDispose(modelProfiles.close);
+    unawaited(modelProfiles.warmUp());
+
+
     // 预算护栏：包装 `'llm'` 服务（每轮墙钟 + 上下文 token 估算），并把首个
     // CostTracker 实现注册到 `'costTracker'`（供未来 autonomous runner 消费）。
-    final CostTrackerImpl costTracker = CostTrackerImpl();
+    final CostTrackerImpl costTracker = CostTrackerImpl(
+      store: modelProfiles,
+      provider: provider ?? registry?.currentName,
+      model: model,
+    );
     app.provide('costTracker', costTracker);
     final TurnBudget resolvedBudget = turnBudget ?? const TurnBudget();
     if (configPath != null) {
@@ -532,6 +548,13 @@ class ConatusTuiRuntime {
     if (credentials.get('ARK_API_KEY') != null) return 'doubao-seed-1-8-251228';
     if (credentials.get('DEEPSEEK_API_KEY') != null) return 'deepseek-flash';
     return '未配置（设置 ARK_API_KEY / DEEPSEEK_API_KEY）';
+  }
+
+  /// models.dev 缓存放 config 同目录（如 `~/.nava/models.dev.json`）。
+  static String? _modelsDevCachePath(String? configPath) {
+    if (configPath == null) return null;
+    final File file = File(configPath);
+    return '${file.parent.path}${Platform.pathSeparator}models.dev.json';
   }
 }
 

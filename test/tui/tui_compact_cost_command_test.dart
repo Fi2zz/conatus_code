@@ -1,12 +1,18 @@
 /// `/compact` / `/cost` 命令：手动压缩与成本展示。
 library;
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_compaction/conatus_compaction.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 /// 脚本化 LLM：记录是否收到汇总调用。
@@ -104,6 +110,35 @@ Future<(ConatusTuiController, Context)> _build({
   return (controller, app);
 }
 
+/// 一份只含 `testprov/test-model`（$1/M in、$3/M out）的 models.dev 档案。
+Future<ModelProfileStore> _profileStore() async {
+  final ModelProfileStore store = ModelProfileStore(
+    client: ModelsDevClient(
+      client: MockClient(
+        (_) async => http.Response(
+              jsonEncode(<String, dynamic>{
+                'testprov': <String, dynamic>{
+                  'models': <String, dynamic>{
+                    'test-model': <String, dynamic>{
+                      'id': 'test-model',
+                      'name': 'Test',
+                      'tool_call': true,
+                      'reasoning': true,
+                      'limit': <String, dynamic>{'context': 200000},
+                      'cost': <String, dynamic>{'input': 1.0, 'output': 3.0},
+                    },
+                  },
+                },
+              }),
+              200,
+            ),
+      ),
+    ),
+  );
+  await store.warmUp();
+  return store;
+}
+
 void main() {
   group('/compact', () {
     test('压缩成功：提示已压缩条数，keepRecent 用手动值', () async {
@@ -145,8 +180,15 @@ void main() {
   });
 
   group('/cost', () {
-    test('展示估算成本与 token 数', () async {
-      final CostTrackerImpl tracker = CostTrackerImpl();
+    test('按当前模型费率展示成本与 token 数', () async {
+      // 费率来自 models.dev 档案：$1/M in、$3/M out。
+      final ModelProfileStore store = await _profileStore();
+      addTearDown(store.close);
+      final CostTrackerImpl tracker = CostTrackerImpl(
+        store: store,
+        provider: 'testprov',
+        model: 'test-model',
+      );
       tracker.recordUsage(<String, Object?>{
         'prompt_tokens': 1000000,
         'completion_tokens': 100000,
@@ -159,9 +201,38 @@ void main() {
       await controller.handleLine('/cost');
 
       final String text = controller.transcript.messages.last.text;
-      expect(text, contains(r'$0.4200'));
+      // 1M × $1 + 0.1M × $3 = 1.3
+      expect(text, contains(r'$1.3000'));
       expect(text, contains('1000000'));
       expect(text, contains('100000'));
+      expect(text, contains(r'$1/M in'), reason: '要讲清费用是怎么算出来的');
+    });
+
+    test('费率未知时明说未知，不编一个数字', () async {
+      final CostTrackerImpl tracker = CostTrackerImpl();
+      tracker.recordUsage(<String, Object?>{'prompt_tokens': 1000});
+      final (ConatusTuiController controller, Context app) = await _build(
+        costTracker: tracker,
+      );
+      addTearDown(app.dispose);
+
+      await controller.handleLine('/cost');
+
+      final String text = controller.transcript.messages.last.text;
+      expect(text, contains('未知'));
+      expect(text, contains('按 0 计'));
+    });
+
+    test('还没有用量时不报 0.0000', () async {
+      final CostTrackerImpl tracker = CostTrackerImpl();
+      final (ConatusTuiController controller, Context app) = await _build(
+        costTracker: tracker,
+      );
+      addTearDown(app.dispose);
+
+      await controller.handleLine('/cost');
+
+      expect(controller.transcript.messages.last.text, contains('尚无用量记录'));
     });
 
     test('未装配成本追踪：提示不可用', () async {

@@ -4,6 +4,37 @@
 
 ## [未发布]
 
+- **修 `/cost` 恒为 $0**：`BudgetedLlmProvider.chatStream` 此前直接 `yield*`
+  透传、从不调 `recordUsage`，而 TUI 始终带 `onStream` 走流式——用量永远记不上，
+  成本追踪在真实路径下完全失效。改为在透传时盯住终态帧
+  （`LlmStreamDone.usage`，用量只出现在流末尾）。
+- **修 Responses 形态成本恒为 0**：`CostTrackerImpl` 只读 Chat Completions 的
+  `prompt_tokens` / `completion_tokens`，而 `type = "kimi"`（Ark / responses）
+  返回 `input_tokens` / `output_tokens`。两种键名现在都收，并支持
+  `prompt_tokens_details` / `input_tokens_details` 里的缓存命中数按折价计。
+- **成本改用真实费率**（models.dev），删掉写死的 `kInputRatePerMillion = 0.3` /
+  `kOutputRatePerMillion = 1.2`——那两个常数对 DeepSeek 差一个量级、对 Gemini
+  差得更多，且用户无从判断那个数字是编的。费率查不到时 `/cost` 明说「未知」
+  并按 0 计，而不是报一个假数字。
+- **上下文窗口真正参与决策**，不再只画在状态栏上：
+  - 单轮 token 封顶改为 `min(模型窗口 × 0.75, [budget] max_turn_tokens)`。
+    此前是写死的 20 万——32k 窗口的模型永远等不到这条闸门（请求先被 API 拒
+    掉），1M 窗口的模型又在 20% 处过早收口。模型窗口是硬约束，配置只能让封顶
+    更严，不能放宽到超过窗口。
+  - 状态栏分子在有真实用量后改用接口返回的 `prompt_tokens`（含 system
+    prompt、工具定义、工具结果），比按屏上记录 chars/4 猜准得多；首轮之前的
+    估算值前缀加 `~`。
+- 新增 `ModelProfileStore`（挂 `'modelProfiles'` 服务）：装配期后台预热
+  models.dev，同步查档案，拿到后广播。顺带修掉每次 `start()` 都走一次网络
+  拉取整份 models.dev 的问题（冷启动可达 30s），现在复用 24h 磁盘缓存。
+  provider 名对不上时按模型 id 跨 provider 查——窗口与价格是模型属性。
+- `/cost` 改为分列输入/输出/缓存命中 token 与调用次数，并讲清费率来源。
+- `/doctor` 新增「模型窗口 / 费率」项。
+- 修 `subprocess_runtime_test` 的临时目录断言：此前数系统临时目录下 `nava-`
+  前缀的**总数**，而并行跑的 28 个其它测试文件各自建 `nava-cp-*` / `nava-lint`
+  等目录，全量跑时偶发「多了一个」，与被测代码无关。改为从命令串取出本次执行
+  真正用到的那条路径再断言。
+
 - 新增 CI（`.github/workflows/test.yml`）：push / PR 触发，跑 `dart analyze
   --fatal-infos` → 全量测试 → 打包二进制并 `--version` 自检。此前 709 个测试
   只在本机跑过，每次 push 都没有验证；打包路径更是从未被自动验证过。

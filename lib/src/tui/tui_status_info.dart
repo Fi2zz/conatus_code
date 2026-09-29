@@ -11,9 +11,12 @@ Future<String> resolveWorkspaceLocation() async {
 }
 
 /// 格式化上下文用量：`ctx 299k/1M (30%)`；[maxTokens] 为 0（未知窗口）时
-/// 只显示估算值。口径是 chars/4 粗估，只作展示不用于计费。
-String formatContextUsage(int tokens, int maxTokens) {
-  final String used = _compact(tokens);
+/// 只显示数值。
+///
+/// [estimated] 为真时数值前缀加 `~`——那是 chars/4 粗估（首轮之前没有真实
+/// 用量），与接口返回的 `prompt_tokens` 不是一回事，不该看着一样确定。
+String formatContextUsage(int tokens, int maxTokens, {bool estimated = false}) {
+  final String used = '${estimated ? '~' : ''}${_compact(tokens)}';
   if (maxTokens <= 0) {
     return 'ctx $used';
   }

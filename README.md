@@ -346,13 +346,33 @@ jail 继续生效。Layer 1 与 Layer 2 可独立关闭；`preset = "danger_full
 
 ## 预算护栏
 
-每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 20 万估算 token 护栏；
+每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 上下文 token 护栏；
 超限时模型收到收口提示而非直接报错。估算按约 4 字符 1 token 的粗口径
-（`estimateMessagesTokens`），**只作护栏，不用于计费**。成本跟踪
-（`CostTrackerImpl`）按用量与粗略单价累计 `todayCost`，供自主运行
-（`provideAutonomous`）的预算检查消费。上限可用 `[budget]` 配置，或
-`ConatusTuiRuntime.create(turnBudget: TurnBudget(maxDuration: null, maxTokens: null))`
-关闭。
+（`estimateMessagesTokens`），**只作护栏，不用于计费**。
+
+**token 封顶跟模型窗口走**：已知窗口时取 `窗口 × 0.75`（余下 1/4 留给模型
+输出与工具回填）与 `[budget] max_turn_tokens` 的较小者。此前是一个写死的
+20 万——32k 窗口的模型永远等不到这条闸门（请求会先被 API 拒掉），1M 窗口的
+模型又在 20% 处过早收口。窗口来自 models.dev（见下）。
+
+## 成本与上下文窗口（models.dev）
+
+models.dev 提供的**上下文窗口**与**真实单价**此前只用来填 `/model` 浮层的
+候选表，两项都被丢掉。现由 `ModelProfileStore` 收成一份可查档案：
+
+- **`/cost`**：按当前模型的真实费率算，输入/输出/缓存命中 token 分列，并
+  讲清费率来源。**费率查不到就明说「未知」并按 0 计**——此前用的是两条写死
+  的常数（$0.3/M in、$1.2/M out），对 DeepSeek 差一个量级、对 Gemini 差得
+  更多，而用户看不出那个数字是编的。
+- **状态栏 `ctx`**：分母是真实窗口。有一轮真实用量后，分子也换成接口返回的
+  `prompt_tokens`（正是下一次请求要发的全部内容，含 system prompt、工具定义
+  与工具结果），比按屏上记录 chars/4 猜准得多；首轮之前没有真实数据时前缀加
+  `~` 表示是估算。
+- **`/doctor`** 新增「模型窗口 / 费率」项。
+- `/model` 切换后费率与窗口自动跟着换；provider 名对不上时按模型 id 跨
+  provider 查（窗口与价格是模型属性）。
+
+数据源离线且无缓存时全部显示「未知」，**不影响模型正常调用**。
 
 ## 开发
 

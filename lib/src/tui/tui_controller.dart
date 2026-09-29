@@ -139,6 +139,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// LLM 重试 / 回退的提示订阅；控制器销毁时随 `_unbind` 一并取消。
   StreamSubscription<LlmNotice>? _noticeSubscription;
 
+  /// models.dev 档案就绪通知；用来在冷启动拉到数据后补上上下文窗口。
+  StreamSubscription<void>? _modelProfileSub;
+
   /// 选项浮层（`ask_user` 与工具审批共用）。
   ///
   /// 优先复用根上下文里已提供的 `'tuiChoice'`（审批门持有的是同一个），
@@ -164,11 +167,26 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 由 `/model` 选中项或 models.dev 元数据回填。
   int modelContextLength = 0;
 
-  /// 当前会话消息体量的粗估 token（chars/4 口径，只作状态栏展示）。
-  int get contextTokens => estimateMessagesTokens(<LlmMessage>[
-        for (final TuiMessage message in transcript.messages)
-          LlmMessage(message.role.name, message.text),
-      ]);
+  /// 当前会话消息体量（token）。
+  ///
+  /// 有一轮真实用量后用**接口返回的 `prompt_tokens`**——它正是下一次请求要发的
+  /// 全部内容（含 system prompt、工具定义、工具结果），比拿屏上记录按 chars/4
+  /// 猜准得多。首轮之前没有真实数据，才退回估算。
+  int get contextTokens {
+    final CostTrackerImpl? tracker = _app.get<CostTrackerImpl>('costTracker');
+    if (tracker != null && tracker.hasRealUsage) {
+      return tracker.lastPromptTokens;
+    }
+    return estimateMessagesTokens(<LlmMessage>[
+      for (final TuiMessage message in transcript.messages)
+        LlmMessage(message.role.name, message.text),
+    ]);
+  }
+
+  /// 上下文用量是估算还是实测（状态栏据此决定加不加 `~`）。
+  bool get contextTokensEstimated => !(_app.get<CostTrackerImpl>('costTracker')
+          ?.hasRealUsage ??
+      false);
 
   /// Agent Loop 单轮最大步数。
   final int maxSteps;
@@ -350,8 +368,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     await _bind(_sessionId);
     _refresh();
-    // 回填当前模型的上下文窗口（models.dev 缓存优先，失败保持未知）。
-    unawaited(seedModelContextLength());
+    // 回填当前模型的上下文窗口（来自 models.dev 档案，未就绪则稍后补）。
+    seedModelContextLength();
+    _watchModelProfiles();
     if (_app.get<bool>('providerSetupNeeded') ?? false) {
       final ProviderRegistry? registry = _app.providers;
       if (registry != null) {
@@ -367,6 +386,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 真正销毁时取消。
     unawaited(_noticeSubscription?.cancel());
     _noticeSubscription = null;
+    unawaited(_modelProfileSub?.cancel());
+    _modelProfileSub = null;
   }
 
   /// 重新绑定当前会话：替换根上下文服务（如 `'llm'`）后调用，让 Agent Loop
@@ -837,19 +858,38 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
   }
 
-  /// `/cost`：展示今日估算成本与 token 用量（护栏口径，非计费）。
+  /// `/cost`：今日成本、token 用量与当前模型的费率来源。
+  ///
+  /// 费率来自 models.dev（非计费口径）。查不到时**明说「费率未知」**而不是
+  /// 报一个数——此前用的是两条写死的常数，对 DeepSeek 差一个量级、对 Gemini
+  /// 差得更多，而用户没有任何办法看出那个数字是编的。
   void _showCost() {
     final CostTracker? tracker = _app.get<CostTracker>('costTracker');
     if (tracker is! CostTrackerImpl) {
       transcript.add(TuiRole.system, '成本追踪不可用。');
       return;
     }
-    transcript.add(
-      TuiRole.system,
-      '今日估算成本：\$${tracker.todayCost.toStringAsFixed(4)}'
-      '（输入 ${tracker.promptTokens} / 输出 ${tracker.completionTokens} token，'
-      '粗略护栏口径，非计费）',
-    );
+    transcript.add(TuiRole.system, _costReport(tracker));
+  }
+
+  /// `/cost` 正文。
+  String _costReport(CostTrackerImpl tracker) {
+    final StringBuffer buffer = StringBuffer();
+    if (tracker.hasRealUsage) {
+      buffer.write('今日成本：\$${tracker.todayCost.toStringAsFixed(4)}');
+    } else {
+      buffer.write('尚无用量记录（跑一轮后才有数）');
+    }
+    buffer.write('\n输入 ${tracker.promptTokens} / 输出 ${tracker.completionTokens}');
+    if (tracker.cachedTokens > 0) {
+      buffer.write('（其中 ${tracker.cachedTokens} 命中缓存）');
+    }
+    buffer.write(' token，共 ${tracker.calls} 次调用');
+    buffer.write('\n费率：${tracker.profile?.rateSummary ?? '未知'}');
+    if (!tracker.ratesKnown && tracker.hasRealUsage) {
+      buffer.write('—— models.dev 无该模型记录，成本按 0 计');
+    }
+    return buffer.toString();
   }
 
   /// `/rewind [N]`：回滚 N 轮（缺省 1）——工作区文件 + 对话都回到该轮之前。

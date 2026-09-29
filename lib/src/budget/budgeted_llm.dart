@@ -66,7 +66,16 @@ class BudgetedLlmProvider implements LlmProvider {
       yield const LlmStreamDone();
       return;
     }
-    yield* base.chatStream(messages, options: options, tools: tools);
+    // 透传的同时**盯着终态帧**：用量只出现在流末尾的 LlmStreamDone 上。直接
+    // `yield*` 不看内容的话这次调用的用量就丢了——而 TUI 恒走流式，于是
+    // recordUsage 永远不会被调用，`/cost` 恒为 $0。
+    await for (final LlmStreamEvent event
+        in base.chatStream(messages, options: options, tools: tools)) {
+      if (event is LlmStreamDone) {
+        costTracker?.recordUsage(event.usage);
+      }
+      yield event;
+    }
   }
 
   @override
@@ -83,6 +92,10 @@ class BudgetedLlmProvider implements LlmProvider {
   }
 
   /// 重置新一轮并累计本次估算；超限返回 true。
+  ///
+  /// 封顶按**当前模型的真实窗口**算（经 costTracker 查 models.dev），而不是一个
+  /// 写死的常数——32k 窗口的模型上 200k 的封顶永远等不到，1M 窗口的模型上又会
+  /// 在 20% 处过早收口。
   bool _overLimit(int estimated) {
     final DateTime now = DateTime.now();
     final DateTime? start = _turnStart;
@@ -92,7 +105,9 @@ class BudgetedLlmProvider implements LlmProvider {
     }
     _turnTokens += estimated;
     final Duration elapsed = now.difference(_turnStart!);
-    return budget.exceededClock(elapsed) || budget.exceededTokens(_turnTokens);
+    return budget.exceededClock(elapsed) ||
+        budget.exceededTokens(_turnTokens,
+            windowTokens: costTracker?.contextLength ?? 0);
   }
 }
 

@@ -64,8 +64,8 @@ extension _ProviderCommands on ConatusTuiController {
         transcript.add(TuiRole.system, '已取消模型切换。');
         return;
       }
-      // 回填上下文窗口不阻塞切换：models.dev 冷缓存时联网可达 30s。
-      unawaited(_resolveModelContext(item));
+      // 回填上下文窗口：档案已由装配层预热，这里是同步查。
+      _resolveModelContext(item);
       transcript.add(TuiRole.system,
           await _applyLlm(registry, item.provider, model: item.model));
       return;
@@ -409,44 +409,42 @@ extension _ProviderCommands on ConatusTuiController {
     return '${file.parent.path}${Platform.pathSeparator}models.dev.json';
   }
 
-  /// 启动时回填当前模型的上下文窗口（缓存优先；无缓存/离线保持 0）。
-  Future<void> seedModelContextLength() async {
-    final ProviderRegistry? registry = _app.providers;
-    final String? provider = registry?.currentName;
-    if (provider == null || modelLabel.isEmpty) {
-      return;
-    }
-    modelContextLength = await _lookupContextLength(provider, modelLabel);
+
+  /// 启动时回填当前模型的上下文窗口（来自 models.dev 档案；查不到保持 0）。
+  ///
+  /// 档案由装配层预热（`unawaited(modelProfiles.warmUp())`），此处只做同步查
+  /// 询——旧实现是每次 `start()` 都走一次网络拉取整份 models.dev，冷启动可达
+  /// 30s，且拿到的窗口只用于画状态栏。
+  void seedModelContextLength() {
+    final ModelProfileStore? store = _app.get<ModelProfileStore>('modelProfiles');
+    final String? provider = _app.providers?.currentName;
+    if (store == null || provider == null || modelLabel.isEmpty) return;
+    modelContextLength = store.profileOf(provider, modelLabel)?.contextLength ?? 0;
+  }
+
+  /// 档案异步就绪后补一次窗口并刷新（启动时多半还没拉到）。
+  void _watchModelProfiles() {
+    final ModelProfileStore? store = _app.get<ModelProfileStore>('modelProfiles');
+    if (store == null) return;
+    _modelProfileSub = store.updates.listen((_) {
+      seedModelContextLength();
+      _refresh();
+    });
   }
 
   /// 异步回填选中模型的上下文窗口（不阻塞切换；查不到保持原值）。
-  Future<void> _resolveModelContext(TuiModelItem item) async {
-    final int length = item.contextLength > 0
-        ? item.contextLength
-        : await _lookupContextLength(item.provider, item.model);
-    if (length > 0) {
+  void _resolveModelContext(TuiModelItem item) {
+    final ModelProfileStore? store = _app.get<ModelProfileStore>('modelProfiles');
+    final int length =
+        item.contextLength > 0 ? item.contextLength : _windowOf(store, item);
+    if (length > 0 && length != modelContextLength) {
       modelContextLength = length;
       _refresh();
     }
   }
 
-  /// 在 models.dev 目录里查模型的上下文窗口；查不到返回 0。
-  Future<int> _lookupContextLength(String provider, String model) async {
-    final Future<Map<String, List<ModelsDevModel>>> Function() loader =
-        modelsDevLoader ?? _defaultModelsDevLoader;
-    try {
-      final Map<String, List<ModelsDevModel>> catalog = await loader();
-      for (final ModelsDevModel meta
-          in catalog[provider] ?? const <ModelsDevModel>[]) {
-        if (meta.id == model) {
-          return meta.contextLength;
-        }
-      }
-    } on ModelsDevException {
-      // 无缓存且离线：状态栏只显示估算值。
-    }
-    return 0;
-  }
+  int _windowOf(ModelProfileStore? store, TuiModelItem item) =>
+      store?.profileOf(item.provider, item.model)?.contextLength ?? 0;
 
   /// 按 provider（可指定模型）替换 LLM 服务并重绑；返回提示文本。
   ///

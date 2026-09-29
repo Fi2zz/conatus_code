@@ -24,11 +24,12 @@ ShellRunResult _run({
 SubprocessCodeRuntime _runtime(FakeShellExecutor shell) =>
     SubprocessCodeRuntime(shell: shell, executable: 'dart', extension: '.dart');
 
-List<Directory> _tempDirs(String prefix) => Directory.systemTemp
-    .listSync()
-    .whereType<Directory>()
-    .where((Directory d) => d.path.contains(prefix))
-    .toList();
+/// 从命令串里取出 runtime 用的临时目录（`.../nava-XXXX/program.dart` 的上级）。
+String? _tempDirOf(String command) {
+  final RegExpMatch? match =
+      RegExp(r'([^\s"]*[/\\]nava-[^/\\" ]+)').firstMatch(command);
+  return match?.group(1);
+}
 
 void main() {
   group('SubprocessCodeRuntime', () {
@@ -176,13 +177,18 @@ void main() {
       );
     });
 
+    // 断言只针对**这个 runtime 那一条**目录：从命令串里把路径取出来再看它
+    // 还在不在。此前是数系统临时目录下 nava- 前缀的目录总数，而并行跑的
+    // 28 个其它测试文件各自建 nava-cp-* / nava-lint 等目录，全量跑时偶发
+    // 「多了一个」——与被测代码无关。
     test('临时目录在执行后被清理', () async {
       final FakeShellExecutor shell = FakeShellExecutor(_run(exitCode: 0));
-      final int before = _tempDirs('nava-').length;
 
       await _runtime(shell).run(const CodeRunRequest(program: 'x'));
 
-      expect(_tempDirs('nava-').length, before);
+      final String? used = _tempDirOf(shell.lastRequest!.command);
+      expect(used, isNotNull, reason: '命令里应带临时目录路径');
+      expect(Directory(used!).existsSync(), isFalse);
     });
   });
 }
