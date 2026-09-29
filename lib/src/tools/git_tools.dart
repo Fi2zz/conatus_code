@@ -132,13 +132,16 @@ class GitDiffTool extends Tool {
     if (ctx.optional<bool>('staged') ?? false) parts.add('--staged');
     if (ctx.has('context')) parts.addAll(<String>['-U', '${ctx.integer('context')}']);
     parts.add('--');
-    if (ctx.has('path')) parts.add(_gitQuote(ctx.str('path')));
+    if (ctx.has('path')) parts.add(gitQuote(ctx.str('path')));
     return parts.join(' ');
   }
 }
 
 /// shell 单引号转义（`'` → `'\''`），用于把用户输入拼进 git 参数。
-String _gitQuote(String value) => "'${value.replaceAll("'", "'\\''")}'";
+///
+/// 公开是因为 git 写操作工具（`git_write_tools.dart`）拼参数要用同一套转义——
+/// 两边各写一份迟早会不一致。
+String gitQuote(String value) => "'${value.replaceAll("'", "'\\''")}'";
 
 /// 提交已暂存的改动（`git commit`）。写操作：high 风险走审批。
 class GitCommitTool extends Tool {
@@ -176,9 +179,9 @@ class GitCommitTool extends Tool {
   Future<ToolResult> call(ToolContext ctx) async {
     final String message = ctx.str('message');
     final String? body = ctx.string('body');
-    final StringBuffer args = StringBuffer('commit -m ${_gitQuote(message)}');
+    final StringBuffer args = StringBuffer('commit -m ${gitQuote(message)}');
     if (body != null) {
-      args.write(' -m ${_gitQuote(body)}');
+      args.write(' -m ${gitQuote(body)}');
     }
     final GitRun run = await runGit(_shell, args.toString(), timeout!);
     final ToolResult? failure = run.failure;

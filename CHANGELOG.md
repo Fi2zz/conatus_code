@@ -4,6 +4,23 @@
 
 ## [未发布]
 
+- **补齐 git 写操作工具**（`git_add` / `git_branch` / `git_stash`，均为
+  `ToolRisk.medium`）。此前只有 `git_status` / `git_diff` / `git_commit` 三个，
+  `/commit` 的提示词让模型「向用户说明并给出建议（如先 git add 暂存）」——
+  nava 把例行步骤推回了用户：模型想自己暂存只能走 `run_command`，而它是
+  `ToolRisk.high`，默认 `askWhenNeeded` 模式正好卡在 high 阈值上，于是每次提交
+  都要弹一次审批框。
+  - 三个工具**都不提供丢数据的入口**（无 `reset --hard` / `clean` /
+    `switch -C` / `push --force`）——切分支丢工作区、误删未跟踪文件是开发里最贵
+    的误操作，不该由模型来点。
+  - `git_add` 缺 `all` 与 `paths` 时报错而非默认全量暂存：默认全量的话模型
+    一次手滑就把整个仓库扫进去了。
+  - `git_branch` / `git_stash` 支持 `list` / `restore` 只读档。
+  - `_gitQuote` 公开为 `gitQuote`：写操作工具要拼 git 参数，两边各写一份转义
+    迟早不一致。
+- `/commit` 提示词改为完整流程（`git_status` → `git_add` → `git_diff --staged`
+  → `git_commit`），不再让模型把暂存这步推给用户。
+
 - **团队视图改成实时泳道**（`/team`）。此前是花名册：成员名 + 状态 + 任务描述，
   看不出成员在干什么还是卡住了；一次 `wait_agent` 可能 5 秒也可能 5 分钟，界面
   全程没有反馈。现在每个成员一条泳道，实时显示它调了什么工具、工具返回了什么、

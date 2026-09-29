@@ -153,7 +153,9 @@ export 'src/subagent/swarm_member.dart'
 export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
 export 'src/tools/git_tools.dart'
-    show GitCommitTool, GitDiffTool, GitRun, GitStatusTool, runGit;
+    show GitCommitTool, GitDiffTool, GitRun, GitStatusTool, gitQuote, runGit;
+export 'src/tools/git_write_tools.dart'
+    show GitAddTool, GitBranchTool, GitStashTool;
 export 'src/tools/list_files.dart' show ListFilesTool;
 export 'src/tools/run_command.dart' show RunCommandTool;
 export 'src/tools/run_tests.dart' show RunTestsTool;

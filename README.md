@@ -168,12 +168,26 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 
 ## `/commit` 与 `/doctor`
 
-- `/commit`：让模型查看 `git_diff --staged` 的暂存差异、写 Conventional
-  Commits 提交信息，并经 `git_commit` 工具提交（high 风险走审批）。
+- `/commit`：完整提交流程——`git_status` 看未暂存的 → `git_add` 暂存 →
+  `git_diff --staged` 复核 → 写 Conventional Commits 提交信息 → `git_commit`
+  提交（high 风险走审批）。
 - `/review`：审查当前未提交改动（命名/边界/安全/性能，**只审不改**），
   提交/提 PR 前自检。
-- `/doctor`：体检——配置 / 提供商 / 沙箱（Layer 1/2）/ 工具表 / MCP / rg
-  逐项 ✓/✗ + 修复提示，自查用。
+- `/doctor`：体检——配置 / 提供商 / 回退链 / 模型窗口与费率 / 沙箱（Layer 1/2）/
+  工具表 / MCP / rg 逐项 ✓/✗ + 修复提示，自查用。
+
+### git 工具面
+
+`git_status` / `git_diff`（只读）· `git_add` / `git_branch` / `git_stash`
+（medium，默认不拦）· `git_commit`（high，走审批）。
+
+**缺 `git_add` 曾经是条断路**：`/commit` 的提示词让模型「向用户说明并给出建议
+（如先 git add 暂存）」，而模型想自己暂存只能走 `run_command`（`ToolRisk.high`），
+于是每次提交都要弹一次审批框，例行步骤被推回给了用户。
+
+三个写操作工具**都不提供丢数据的入口**（无 `reset --hard` / `clean` /
+`switch -C` / `push --force`）——那些留给用户自己在终端里做。`git_add` 缺参时
+报错而不是默认全量暂存，避免模型一次手滑把整个仓库扫进去。
 
 ## `!` 快捷 shell 与 lint-on-edit
 

@@ -1097,10 +1097,13 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 信息并经 `git_commit` 工具提交（high 风险走审批）。
   Future<void> _handleCommit() async {
     await submit(
-      '执行提交流程：先用 git_diff --staged 查看已暂存的改动；'
-      '基于改动写一条 Conventional Commits 提交信息（scope + 中文描述），'
-      '然后用 git_commit 工具提交。'
-      '若没有已暂存的改动，向用户说明并给出建议（如先 git add 暂存）。',
+      '执行提交流程：\n'
+      '1. 先用 git_status 看有哪些未暂存的改动；'
+      '若还有未暂存的，用 git_add 暂存（all=true 暂存全部，'
+      '或按 paths 列出要暂存的路径）。\n'
+      '2. 用 git_diff --staged 查看已暂存的改动。\n'
+      '3. 基于改动写一条 Conventional Commits 提交信息（scope + 中文描述），'
+      '用 git_commit 工具提交。',
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 
 import 'apply_patch.dart';
 import 'git_tools.dart';
+import 'git_write_tools.dart';
 import 'list_files.dart';
 import 'run_command.dart';
 import 'run_tests.dart';
@@ -32,6 +33,9 @@ List<Tool> provideCodeTools(
     registered.addAll(<Tool>[
       GitStatusTool(shell: resolvedShell),
       GitDiffTool(shell: resolvedShell),
+      GitAddTool(shell: resolvedShell),
+      GitBranchTool(shell: resolvedShell),
+      GitStashTool(shell: resolvedShell),
       GitCommitTool(shell: resolvedShell),
       RunCommandTool(shell: resolvedShell),
       RunTestsTool(shell: resolvedShell),
