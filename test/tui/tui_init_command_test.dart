@@ -74,6 +74,25 @@ void main() {
     expect(p.prompts.single, contains('文件不存在'));
   });
 
+  // 校验命令写进 AGENTS.md，模型交付前自己跑——这是不引入语言服务器前提下
+  // 拿到诊断反馈的路径（对比：LSP 需要常驻进程 + 用户装服务器 + 内存代价）。
+  test('/init 提示词要求写明交付前的校验命令', () async {
+    final Directory dir =
+        Directory.systemTemp.createTempSync('nava-init');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final (ConatusTuiController controller, Context app, _InitCaptureProvider p) =
+        await _build(dir.path);
+    addTearDown(app.dispose);
+
+    await controller.handleLine('/init');
+
+    expect(p.prompts.single, contains('诊断与自检命令'));
+    expect(p.prompts.single, contains('交付前'));
+    expect(p.prompts.single, contains('CI 配置'));
+    // 校验命令要来自仓库自身，别让模型凭空编一条。
+    expect(p.prompts.single, contains('不要凭空编'));
+  });
+
   test('/init 已存在 AGENTS.md 时提示更新分支', () async {
     final Directory dir =
         Directory.systemTemp.createTempSync('nava-init');

@@ -1200,6 +1200,20 @@ class ConatusTuiController implements TuiUserPromptHost {
   ///
   /// 不直接写文件：提交固定提示词走正常轮次，由模型经 write_file 落盘
   /// （沙箱限定工作区、审批照常）。
+  /// `/init` 生成的 AGENTS.md 章节骨架。
+  ///
+  /// 「诊断与自检命令」是刻意加的一节：把校验命令写进项目指令，让模型**交付前**
+  /// 主动跑一遍。与 [LinterService] 的编辑后自动 lint 不重复——那管「刚改完有没有
+  /// 弄坏」，这管「整体过不过得去」，两者时间尺度不同。
+  static const String kInitSections =
+      '项目概述、构建与测试命令、代码风格约定、诊断与自检命令、边界与注意事项';
+
+  /// 诊断一节的写法约束：命令要来自仓库自身，别让模型凭空编。
+  static const String kInitDiagnosticsHint =
+      '「诊断与自检命令」一节要写明本项目改动交付前该跑的确切校验命令'
+      '（类型检查 / lint），并要求每次交付前先跑一遍确认没有新增错误。'
+      '命令以仓库自身的脚本与 CI 配置为准，按实际技术栈选，不要凭空编。';
+
   Future<void> _handleInit() async {
     final String? workdir = _app.get<String>('workdir');
     final bool exists = workdir != null &&
@@ -1209,7 +1223,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     await submit(
       '扫描当前仓库（工作目录）的结构与关键文件，生成 AGENTS.md：'
-      '项目概述、构建与测试命令、代码风格约定、边界与注意事项。'
+      '$kInitSections。$kInitDiagnosticsHint'
       '${exists ? '文件已存在：先读取再改写，保留仍有用的内容。' : '文件不存在：用 write_file 创建到仓库根。'}',
     );
   }
