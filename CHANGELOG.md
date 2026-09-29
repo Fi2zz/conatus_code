@@ -4,6 +4,17 @@
 
 ## [未发布]
 
+- 新增 CI（`.github/workflows/test.yml`）：push / PR 触发，跑 `dart analyze
+  --fatal-infos` → 全量测试 → 打包二进制并 `--version` 自检。此前 709 个测试
+  只在本机跑过，每次 push 都没有验证；打包路径更是从未被自动验证过。
+  跑在 `macos-latest`（沙箱只在 macOS 可用），钉死 Dart 3.12.2，缓存 pub。
+  刻意不加 Gitee 镜像——发布路径只有 `dist/nava` 二进制，不走仓库分发。
+- 修 `analysis_options.yaml` 在独立形态下失效：它只有一行
+  `include: ../../analysis_options.yaml`，而独立 clone（本仓库 README「快速开始」
+  给出的安装方式）里那个路径不存在，include 失败导致整套 lint 规则不生效，
+  `dart analyze` 报 `include_file_not_found`。改为自包含（规则与 conatus 仓库根
+  一致）。兄弟包的同一写法保留——它们不作为独立仓库分发。
+
 - 新增 **LLM 回退链**（`[llm] fallback_models`）：主模型失败后按序尝试备用
   `provider/model`，每项可同 provider 换模型（换模型比换网关更常见的降级手段）。
   此前只有单提供商——README 明写「没有缺省回退链」，一次 401 或一次持续限流就

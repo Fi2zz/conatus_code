@@ -384,6 +384,21 @@ coding 相关的能力（文件工具、代码执行）在 conatus 的
 [conatus_fs_tools](https://github.com/Fi2zz/conatus/tree/master/packages/conatus_fs_tools)
 和 conatus_coding 包里，conatus_code 负责装配它们并暴露终端界面。
 
+## CI
+
+`.github/workflows/test.yml` 在每次 push / PR 跑：静态检查（`--fatal-infos`）
+→ 全部测试 → 打包二进制。跑在 `macos-latest`——沙箱 Layer 2 只在 macOS 可用，
+`test/sandbox/` 下两个测试文件没有跳过保护，放到 ubuntu 上要么必红、要么被迫
+跳过最有价值的那批。
+
+CI 验的是**独立形态**：checkout 拿到的是提交态 pubspec（`resolution: workspace`
+被 git filter 注释掉，依赖经 git 拉 conatus master），也就是「用户 clone 本仓库
+后拿到的东西」。conatus 工作区内的跨仓集成由 conatus 仓库的 CI 负责。
+
+本仓库的 lint 规则因此**自包含**在 `analysis_options.yaml`（不像兄弟包那样
+`include ../../analysis_options.yaml`）——独立形态下那个路径不存在。规则与
+conatus 仓库根保持一致，改一处请同步另一处。
+
 ## 许可证
 
 MIT

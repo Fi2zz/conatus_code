@@ -1,1 +1,28 @@
-include: ../../analysis_options.yaml
+# 本包的 lint 规则自包含（**不**像兄弟包那样 include ../../analysis_options.yaml）：
+# conatus_code 同时是一个可独立 clone 的仓库（见 README「快速开始」），独立
+# 形态下 ../../analysis_options.yaml 不存在，include 会失败并使整套规则失效。
+# 规则与 conatus 仓库根的 analysis_options.yaml 保持一致；改一处请同步另一处。
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    todo: ignore
+
+linter:
+  rules:
+    - always_declare_return_types
+    - prefer_final_locals
+    - prefer_single_quotes
+    - unawaited_futures
+    - avoid_redundant_argument_values
+    - directives_ordering
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_relative_imports
+    - sort_pub_dependencies
+    - unnecessary_lambdas
+    - use_super_parameters

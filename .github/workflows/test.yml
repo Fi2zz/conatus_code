@@ -1,0 +1,61 @@
+# conatus_code 的 CI。
+#
+# 跑的是**独立形态**：checkout 拿到的是提交态 pubspec —— `resolution: workspace`
+# 被 git filter（tool/setup_code_filter.sh，见 .gitattributes）注释掉，
+# dependency_overrides 照常生效，依赖经 git 拉 conatus 的 master。
+# 即这里验证的正是「用户 git clone 本仓库后拿到的东西」，而不是 conatus
+# 工作区内的集成状态。跨仓集成由 conatus 仓库的 CI 负责。
+#
+# 刻意不加 Gitee 镜像：发布路径只有 dist/nava 二进制，不走仓库分发。
+name: Test
+
+on:
+  push:
+  pull_request:
+
+# 同一分支连推多次时取消旧 run，不必排队等一串过期结果。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # 沙箱 Layer 2 只在 macOS 可用（probeSandboxBackend 首行即
+    # `if (!Platform.isMacOS) throw`）。test/sandbox/sandbox_review_test.dart 与
+    # sandbox_assembly_test.dart 没有跳过保护，放到 ubuntu 上必红；更糟的是
+    # 即便补了跳过，最有价值的沙箱测试也全被跳掉，等于绿得没有意义。
+    # conatus_code 暂不支持非 macOS（见 README「沙箱分层与已知边界」）。
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          # 钉到本地验证过的版本。pubspec 下限是 ^3.10.0（dart_io_sandbox），
+          # 但让 SDK 自由漂移会让「代码回归」与「SDK 行为变化」分不开；
+          # 升 SDK 请显式改这一行，好让 diff 里看得出是刻意为之。
+          sdk: "3.12.2"
+
+      # 独立形态的依赖解析要 clone 整个 conatus 仓库（22 条 override 指向
+      # git 源），冷缓存 40s 起（网络抖动时更久），重复跑时缓存收益明显。
+      # pubspec.lock 未入库，故按 pubspec.yaml 做 key。
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-${{ runner.os }}-
+
+      - run: dart pub get
+
+      # --fatal-infos：本仓库把 info 也当错误治（见 analysis_options.yaml）。
+      - run: dart analyze --fatal-infos
+
+      - run: dart test
+
+      # 本仓库唯一的产物是自包含二进制，这条打包路径此前从未被自动验证过。
+      # dist/ 已 gitignore，不会污染工作区。
+      - name: Build binary
+        run: |
+          bash tool/build_binary.sh
+          ./dist/nava --version
