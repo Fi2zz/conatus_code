@@ -48,8 +48,7 @@ export 'src/checkpoint/checkpoint_paths.dart'
         checkpointRelativeTo,
         kCheckpointDefaultIgnores,
         kCheckpointVcsDir;
-export 'src/checkpoint/checkpoint_restore.dart'
-    show restoreArchiveCheckpoint;
+export 'src/checkpoint/checkpoint_restore.dart' show restoreArchiveCheckpoint;
 export 'src/checkpoint/checkpoint_scan.dart'
     show checkpointIncluded, checkpointWalk;
 export 'src/checkpoint/checkpoint_store.dart' show CheckpointStore;
@@ -147,6 +146,8 @@ export 'src/sandbox/seatbelt_profile.dart'
         buildSeatbeltProfile,
         defaultWritableCaches,
         seatbeltMachAllowlist;
+export 'src/subagent/subagent_progress.dart'
+    show SubAgentLine, SubAgentProgressStore;
 export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
 export 'src/tools/git_tools.dart'

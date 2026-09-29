@@ -306,6 +306,30 @@ max_attempts = 4
 框架侧（`conatus_llm`）的入口是 `RetryingLlm` / `RetryPolicy` / `LlmErrorKind`
 与 `FallbackLlm`，任何宿主都能单独取用。
 
+## 子 Agent（`spawn_agent`）
+
+把一个自包含的子任务委托给隔离子 Agent（独立 `Session` + 受限工具白名单），
+只把结论回传主链路。**每一步实时上屏**——子 Agent 一次能跑几十秒，屏上如果
+完全静止就既判断不了它有没有跑偏，也不敢中途打断：
+
+```
+◆ 子 Agent：调研 checkpoint 存储的实现
+  · 第 1 轮 思考中（工具已 0 次）
+  → rg
+  ✓ rg
+  · 第 2 轮 输出 380 字符
+  → read_file
+  ✗ read_file
+✓ 子 Agent success：3 轮 （rg、read_file）
+```
+
+（`TuiRole.stage` 暗色行，不污染助手正文的排版。）
+
+**独立预算**：子 Agent 用自己计数的 `BudgetedLlmProvider`，不共用主轮次的
+token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn_tokens` 提前收口，
+而子 Agent 的半截结论会被当成结论回传。成本仍记进同一个 costTracker（那部分
+是真实花费）。
+
 ## 沙箱分层与已知边界
 
 沙箱（`lib/src/sandbox/`）分两层，各自独立开关、独立失败语义：

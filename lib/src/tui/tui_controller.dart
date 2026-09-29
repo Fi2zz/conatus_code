@@ -30,6 +30,7 @@ import '../checkpoint/checkpoint_types.dart';
 import '../config/config_writer.dart';
 import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
+import '../subagent/subagent_progress.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
@@ -112,6 +113,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     _gate = gate;
     choice.onChanged = _refresh;
     _watchLlmNotices();
+    _watchSubagent();
     _syncPermissionMode();
   }
 
@@ -123,6 +125,20 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (notices == null) return;
     _noticeSubscription = notices.stream.listen((LlmNotice notice) {
       transcript.add(TuiRole.system, notice.text);
+      _refresh();
+    });
+  }
+
+  /// 订阅子 Agent 进度并即时上屏。
+  ///
+  /// 子 Agent 一次能跑几十秒，期间主链路在 `await` 里完全静止。看不到它调了
+  /// 什么工具，用户既判断不了它有没有跑偏，也不敢中途打断。
+  void _watchSubagent() {
+    final SubAgentProgressStore? store =
+        _app.get<SubAgentProgressStore>('subagentProgress');
+    if (store == null) return;
+    _subagentSub = store.lines.listen((SubAgentLine line) {
+      transcript.add(TuiRole.stage, line.text);
       _refresh();
     });
   }
@@ -141,6 +157,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// models.dev 档案就绪通知；用来在冷启动拉到数据后补上上下文窗口。
   StreamSubscription<void>? _modelProfileSub;
+
+  /// 子 Agent 进度订阅；控制器销毁时取消。
+  StreamSubscription<SubAgentLine>? _subagentSub;
 
   /// 选项浮层（`ask_user` 与工具审批共用）。
   ///
@@ -388,6 +407,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     _noticeSubscription = null;
     unawaited(_modelProfileSub?.cancel());
     _modelProfileSub = null;
+    unawaited(_subagentSub?.cancel());
+    _subagentSub = null;
   }
 
   /// 重新绑定当前会话：替换根上下文服务（如 `'llm'`）后调用，让 Agent Loop

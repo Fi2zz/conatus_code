@@ -4,6 +4,20 @@
 
 ## [未发布]
 
+- **子 Agent 进度实时上屏**（`spawn_agent`）。此前子 Agent 跑在自己的
+  `Session` 上、那个会话不参与屏上记录，于是它是黑箱：界面静止几十秒，结束后
+  只吐一段结论字符串，看不出它调了什么、卡在哪、是不是跑偏。现在经
+  `SubAgentProgressStore` 逐条广播起手 / 每轮 / 工具调用与返回 / 收口，控制器
+  订阅后写成 `TuiRole.stage` 暗色行。看不见就不敢用——这是让它值得用的前提。
+- **子 Agent 预算独立于主轮次**。此前 `provideSpawnAgent` 取 app 上的 `'llm'`，
+  那已经是 `BudgetedLlmProvider`；子 Agent 跑的每一轮都记进**主**轮次的 token
+  计数器，`[budget] max_turn_tokens` 会在它跑到一半时把整个主轮次收口，而它
+  的半截结论会被当成结论回传。现传未包装的 `resolvedLlm`，并用 `childLlm`
+  工厂为每次委托新建一个自己计数的包装。成本仍记进同一个 costTracker。
+- 已知未做：子 `AgentLoop` 仍不接 compactor / memory，调研型子任务历史长了
+  不会被压缩；默认白名单仍只有 `get_time` / `echo` / `read_file`，也没有
+  中途 interrupt。这些留待实际用起来之后再按需补。
+
 - **修 `/cost` 恒为 $0**：`BudgetedLlmProvider.chatStream` 此前直接 `yield*`
   透传、从不调 `recordUsage`，而 TUI 始终带 `onStream` 走流式——用量永远记不上，
   成本追踪在真实路径下完全失效。改为在透传时盯住终态帧

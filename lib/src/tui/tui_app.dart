@@ -31,6 +31,7 @@ import '../hooks/hooks.dart';
 import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
 import '../sandbox/sandboxed_shell.dart';
+import '../subagent/subagent_progress.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
 import 'project_context.dart';
@@ -373,9 +374,26 @@ class ConatusTuiRuntime {
     }
 
     provideReflection(app);
+
+    // 子 Agent：进度出口 + **独立的轮次预算**。
+    //
+    // `llm` 传未包装的 resolvedLlm，让每个子 Agent 拿一个自己计数的新
+    // BudgetedLlmProvider：否则子 Agent 那十几轮调用会全记进**主**轮次，把
+    // 主轮次撞爆 max_turn_tokens 提前收口，而子 Agent 的半截结论会被当成结论
+    // 回传。成本仍记进同一个 costTracker（那部分是真实花费）。
+    final SubAgentProgressStore subagentProgress = SubAgentProgressStore();
+    app.provide('subagentProgress', subagentProgress);
+    app.onDispose(subagentProgress.close);
     provideSpawnAgent(
       app,
-      defaultTools: <String>['get_time', 'echo', 'read_file'],
+      llm: resolvedLlm,
+      onProgress: subagentProgress.report,
+      childLlm: (LlmProvider base) => BudgetedLlmProvider(
+        base,
+        budget: resolvedBudget,
+        costTracker: costTracker,
+      ),
+      defaultTools: const <String>['get_time', 'echo', 'read_file'],
     );
 
     // ── 后台任务：消费 [background] 配置与 'shell' 的 start() 能力缝 ──
