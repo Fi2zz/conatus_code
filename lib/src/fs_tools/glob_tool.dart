@@ -12,7 +12,7 @@ class GlobTool extends Tool {
 
   /// 遍历时跳过的目录（按 basename）。
   static const Set<String> _skipDirs =
-      <String>{'.git', 'node_modules', '.dart_tool', 'build'};
+      <String>{'.git', '.nava', 'node_modules', '.dart_tool', 'build'};
 
   @override
   String get name => 'glob';

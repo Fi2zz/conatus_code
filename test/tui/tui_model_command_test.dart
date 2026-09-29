@@ -40,6 +40,7 @@ class _ScriptedProvider implements LlmProvider {
 Future<(ConatusTuiController, Context, Disposer)> _build(String reply) async {
   final Context app = Context.root();
   provideTools(app);
+  app.provide('llmChainSlot', LlmChainSlot());
   final Disposer llm = provideLlm(
     app,
     llm: FallbackLlm(<LlmProvider>[_ScriptedProvider(reply)]),

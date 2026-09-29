@@ -469,7 +469,9 @@ extension _ProviderCommands on ConatusTuiController {
     if (chain == null) {
       return '无法切换到 $provider · $label：没有可用模型。';
     }
-    _app.provide('llmChain', chain);
+    // 改槽位内容而不是重复 provide：'llmChainSlot' 在装配期已 provide 过一次，
+    // 重复 provide 会抛 StateError。缺槽位属于装配漏项，直接失败而不是静默 no-op。
+    _app.require<LlmChainSlot>('llmChainSlot').current = chain;
     swap(chain.llm);
     modelLabel = label;
     final bool rebound = await rebind();

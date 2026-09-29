@@ -9,4 +9,6 @@ export 'src/fs_tools/glob_tool.dart' show GlobTool;
 export 'src/fs_tools/read_file.dart' show ReadFileTool;
 export 'src/fs_tools/ripgrep_binary.dart' show RipgrepBinary, RipgrepSource;
 export 'src/fs_tools/ripgrep_tool.dart' show RipgrepTool;
+export 'src/fs_tools/spill_dir.dart'
+    show kNavaProjectDirName, toolResultSpillDir;
 export 'src/fs_tools/write_file.dart' show WriteFileTool, WriteMode;

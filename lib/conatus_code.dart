@@ -116,6 +116,8 @@ export 'src/diff/diff_types.dart' show DiffFile, DiffHunk, DiffOp, DiffOpKind;
 export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
 export 'src/diff/unified_diff.dart'
     show buildUnifiedDiff, kMaxDiffLines, splitLines;
+export 'src/fs_tools/spill_dir.dart'
+    show kNavaProjectDirName, toolResultSpillDir;
 export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
 export 'src/hooks/hooks.dart' show HookResult, Hooks, provideHooks, runHooks;

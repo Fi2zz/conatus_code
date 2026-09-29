@@ -82,7 +82,7 @@ DoctorCheck _providerCheck(Context app) {
 /// 回退是静默发生的——没有这项，用户只会看到回答风格突然变了，却不知道
 /// 主模型已经挂过一次。
 DoctorCheck _llmChainCheck(Context app) {
-  final LlmChain? chain = app.get<LlmChain>('llmChain');
+  final LlmChain? chain = app.get<LlmChainSlot>('llmChainSlot')?.current;
   if (chain == null) {
     return const DoctorCheck(
       name: '模型回退链',

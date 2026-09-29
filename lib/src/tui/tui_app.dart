@@ -43,6 +43,19 @@ import 'tui_permission.dart';
 import 'tui_permission_gate.dart';
 
 /// conatus TUI 运行时：持有根 [Context] 与已装配的服务。
+/// 解析工作目录的真实路径；失败（目录不存在等）时原样返回。
+///
+/// macOS 上 `/tmp`、`/var` 都是 `/private/...` 的别名，而 bin 传给 fs jail 的根是
+/// 规范化过的。溢出目录若用未规范化的拼写，jail 在目标父链尚不存在时无法解析符号
+/// 链接、退回字符串前缀比对，就会把合法路径误判为越界。
+String _canonicalize(String path) {
+  try {
+    return Directory(path).resolveSymbolicLinksSync();
+  } on FileSystemException {
+    return path;
+  }
+}
+
 class ConatusTuiRuntime {
   ConatusTuiRuntime._({
     required this.app,
@@ -148,6 +161,9 @@ class ConatusTuiRuntime {
     final Context app = Context.root(name: 'conatus');
     final String sep = Platform.pathSeparator;
     final String resolvedWorkdir = workdir ?? Directory.current.path;
+    // 规范化形式：与 bin 传给 fs jail 的根保持同一拼写。解析失败（如目录不存在）
+    // 时退回原值——后续 fs 操作会给出更具体的报错。
+    final String canonicalWorkdir = _canonicalize(resolvedWorkdir);
     final String resolvedBaseDir =
         baseDir ?? resolveProjectDataDir(workdir: resolvedWorkdir);
 
@@ -186,7 +202,12 @@ class ConatusTuiRuntime {
     // 不过模型命令白名单（对齐 OpenCode）；模型命令仍走上面的 'shell' 沙箱缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
     provideFsTools(app);
-    provideToolResultEviction(app);
+    // 溢出目录必须落在工作目录内（fs jail 以工作目录为根，而溢出预览要让模型
+    // 用 read_file 读回来，见 spill_dir.dart）。且必须用**规范化**路径：jail 在
+    // 目标父链尚不存在时无法解析符号链接，退回字符串前缀比对，而 jail 的根是
+    // 规范化过的 —— macOS 上 /var → /private/var、/tmp → /private/tmp 这种别名
+    // 会让首次写入被误判越界。
+    provideToolResultEviction(app, dir: toolResultSpillDir(canonicalWorkdir));
     // conatus_code 自己的工具：list_files / git_status / git_diff（M3 起再加
     // run_command / run_tests / apply_patch）。同样跟随上面的 fs / shell 接缝。
     provideCodeTools(app);
@@ -357,7 +378,8 @@ class ConatusTuiRuntime {
         llm ??
         chain?.llm ??
         FallbackLlm(<LlmProvider>[_UnconfiguredProvider()]);
-    app.provide('llmChain', chain);
+    // 换模型时不能重复 provide（服务键唯一，重复会抛 StateError），所以放可替换槽位。
+    app.provide('llmChainSlot', LlmChainSlot(chain));
     Disposer llmDisposer = provideBudgetedLlm(
       app,
       llm: resolvedLlm,

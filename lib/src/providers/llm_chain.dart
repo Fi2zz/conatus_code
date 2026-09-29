@@ -141,3 +141,16 @@ ProviderProfile? _profileFor(ProviderRegistry registry, String entry) {
   if (slash <= 0 || slash >= entry.length - 1) return null;
   return registry.byName(entry.substring(0, slash));
 }
+
+/// 可整体替换的 LLM 链槽位。
+///
+/// 换模型（`/model`、`/provider add`）时不能再次 `provide('llmChain', ...)`：Context
+/// 的服务键唯一，重复 provide 直接抛 `StateError`（见 `conatus_core/context.dart`
+/// 的 `provide`）。而装配期已经无条件 provide 过一次，于是**第一次换模型必崩**。
+/// 所以服务键上放这个可变槽位，换模型只改内容。
+class LlmChainSlot {
+  LlmChainSlot([this.current]);
+
+  /// 当前生效的链；`null` 表示没有可用模型（未装配或解析失败）。
+  LlmChain? current;
+}

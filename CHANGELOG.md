@@ -4,6 +4,25 @@
 
 ## [未发布]
 
+- 修两个**必然发生**的装配级 bug。两者都曾因「测试绕开真实装配」而长期漏网：
+  - **读大文件直接失败**：工具结果超过 80 000 字符时，`ToolResultEviction` 用
+    **被 jail 的** `fs` 往 `systemTemp` 写溢出文件，而 fs jail 默认以工作目录为根
+    → `FS_SANDBOX_DENIED`。而且溢出预览会告诉模型「调用 read_file 读取该路径」，
+    所以就算写得出去，模型读回来也会被拒——预览里那句话是假的。现在溢出目录改为
+    `<workdir>/.nava/tool-results`（`.nava` 已加入 `glob` / `list_files` 跳过集）。
+    路径用**规范化**形式：jail 在目标父链尚不存在时无法解析符号链接、退回字符串
+    前缀比对，而 jail 的根是规范化过的，macOS 上 `/tmp`→`/private/tmp`、
+    `/var`→`/private/var` 这种别名会让首次写入被误判越界。
+  - **切换模型必崩**：装配期无条件 `provide('llmChain', chain)` 且不留 disposer，
+    而 Context 的服务键唯一，`/model`、`/provider add` 再 provide 一次就撞
+    `StateError`（未捕获 → 裸栈叠在 TUI 上，切换静默失效）。改为服务键上放可替换
+    的 `LlmChainSlot`，换模型只改槽位内容；`/doctor` 相应改为从槽位读当前链。
+- 顺带记录一个**本次未修**的既有问题：`JailedFileSystem` 在目标父链不存在时无法
+  规范化目标路径，退回字符串前缀比对。macOS 上若工作目录本身位于 `/tmp` 或 `/var`
+  这类别名路径下（而非 `/Users/...`），**首次往任何新目录写文件都会被误判越界**。
+  实测矩阵：root 规范化 + 目标未规范化 + 中间目录不存在 → 拒绝；其余三种组合均允许。
+  溢出目录已用规范化路径规避，但根因在 fs jail 本身，属安全组件，未擅自改动。
+
 - 编辑后校验（LinterService）对 Dart 项目改为**只校验这次改动的文件**，并解析成结构化
   诊断回灌。实测同仓库全仓 `dart analyze` 2.55s → 单文件
   `dart analyze --format=machine <file>` 0.35s（约 7 倍），且诊断带稳定码

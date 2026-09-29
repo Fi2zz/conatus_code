@@ -41,6 +41,7 @@ Future<(ConatusTuiController, Context, Directory)> _controller({
   final Directory dir = Directory.systemTemp.createTempSync('model-view-');
   final Context app = Context.root();
   provideTools(app);
+  app.provide('llmChainSlot', LlmChainSlot());
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_NoopProvider()]));
   if (withProviders) {
     provideProviders(

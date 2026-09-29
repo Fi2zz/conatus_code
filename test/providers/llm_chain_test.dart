@@ -176,7 +176,7 @@ void main() {
         entries: <String>['ark/doubao', 'ghost/x'],
         policy: const RetryPolicy(),
       )!;
-      app.provide('llmChain', chain);
+      app.provide('llmChainSlot', LlmChainSlot(chain));
 
       final DoctorCheck check = doctorChecks(app)
           .firstWhere((DoctorCheck c) => c.name == '模型回退链');

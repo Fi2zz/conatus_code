@@ -54,6 +54,7 @@ Future<(ConatusTuiController, Context, Directory)> _build({
   final Directory dir = Directory.systemTemp.createTempSync('tui-provider-');
   final Context app = Context.root();
   provideTools(app);
+  app.provide('llmChainSlot', LlmChainSlot());
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider('initial')]));
   provideMemory(app);
   if (withProviders) {
@@ -91,6 +92,7 @@ Future<(ConatusTuiController, Context, Directory)> _buildBare({
   final Directory dir = Directory.systemTemp.createTempSync('tui-model-');
   final Context app = Context.root();
   provideTools(app);
+  app.provide('llmChainSlot', LlmChainSlot());
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider('initial')]));
   provideMemory(app);
   provideProviders(
