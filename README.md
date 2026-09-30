@@ -417,6 +417,9 @@ max_attempts = 4
 - `ask`：每个子工具调用都要确认（阈值 low）。
 - `auto`：子调用免审批（仍在 Layer 2 沙箱内；high 工具仍被白名单风险上限挡掉）。
 
+无审批人时（headless 不装审批服务）`ask` **退化为只读**：写 / 执行类拒绝，低风险
+读取照常，而不是把所有子工具静默拒掉。
+
 **Esc 打断会收掉在跑子 Agent**：子 Agent 跑在自己的 `Session`、不参与主轮次的取消
 竞速，`Esc` 只丢主轮次结果的话它会在后台继续烧 token；现在 `Esc` 一并把在途子 Agent
 取消，收敛为 `status=failed`。

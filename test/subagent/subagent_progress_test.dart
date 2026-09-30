@@ -243,5 +243,31 @@ void main() {
       // 缺省继承宿主权限。
       expect(spawn.permissionMode, SubAgentPermission.inherit);
     });
+
+    test('headless（interactive:false）也吃 subagentPermission', () async {
+      final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+        baseDir: Directory.systemTemp.createTempSync('nava-sub3').path,
+        providers: <ProviderConfig>[
+          const ProviderConfig(
+            name: 'testprov',
+            baseUrl: 'https://testprov.example/v1',
+            apiKey: 'k',
+          ),
+        ],
+        provider: 'testprov',
+        model: 'm1',
+        retryPolicy: const RetryPolicy(maxAttempts: 1),
+        interactive: false,
+        webTools: false,
+        skills: false,
+        subagentPermission: SubAgentPermission.readonly,
+      );
+      addTearDown(runtime.dispose);
+
+      final SpawnAgentTool spawn =
+          runtime.app.tools.get('spawn_agent') as SpawnAgentTool;
+
+      expect(spawn.permissionMode, SubAgentPermission.readonly);
+    });
   });
 }
