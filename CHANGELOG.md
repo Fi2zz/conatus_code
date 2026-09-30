@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **子 Agent 工具调用复用宿主管线**：子注册表复制主注册表的守卫与中间件
+  （`conatus_agent` 经 `ToolRegistry.copyPipelineTo`），审批与工具结果驱逐对子调用
+  生效——大文件结果落盘成预览，写操作照常弹审批。
+
 - **子 Agent（`spawn_agent`）默认白名单放开只读探索工具**：由
   `get_time/echo/read_file` 扩展为加上 `rg` / `glob` / `list_files` /
   `git_status` / `git_diff`。此前默认集没有任何搜索能力，模型没显式传 `tools`
