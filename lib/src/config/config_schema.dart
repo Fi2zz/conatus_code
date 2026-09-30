@@ -99,7 +99,12 @@ class ProviderConfig {
 
 /// Agent Loop 行为。
 class AgentConfig {
-  const AgentConfig({this.maxSteps = 8, this.workdir, this.projectDir});
+  const AgentConfig({
+    this.maxSteps = 8,
+    this.workdir,
+    this.projectDir,
+    this.subagentPermission = 'inherit',
+  });
 
   /// 单轮最大步数。
   final int maxSteps;
@@ -111,6 +116,10 @@ class AgentConfig {
   /// 按工作区路径分目录（见 [resolveProjectDataDir]），不在工作区建目录；
   /// 显式设置时相对 [workdir] 解析（旧语义）。
   final String? projectDir;
+
+  /// 子代理默认权限模式（`[agent] subagent_permission`）：`inherit` / `readonly`
+  /// / `ask` / `auto`。模型可在 `spawn_agent` 里请求，但只能收紧。
+  final String subagentPermission;
 }
 
 /// 审批模式，对应 TUI 的三档权限。

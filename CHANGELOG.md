@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- 新增 `[agent] subagent_permission`（`inherit` / `readonly` / `ask` / `auto`）：
+  子代理默认权限模式，模型可在 `spawn_agent` 里收紧。非法值报 ConfigException；
+  首次生成的配置模板与 README 已补。
+- `Esc` 打断主轮次时一并取消在跑子 Agent（此前它在后台继续烧 token）。
+
 - **子 Agent 工具调用复用宿主管线**：子注册表复制主注册表的守卫与中间件
   （`conatus_agent` 经 `ToolRegistry.copyPipelineTo`），审批与工具结果驱逐对子调用
   生效——大文件结果落盘成预览，写操作照常弹审批。

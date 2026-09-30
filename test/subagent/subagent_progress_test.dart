@@ -240,6 +240,8 @@ void main() {
       // 写 / 执行类不进默认白名单。
       expect(spawn.defaultTools, isNot(contains('write_file')));
       expect(spawn.defaultTools, isNot(contains('run_command')));
+      // 缺省继承宿主权限。
+      expect(spawn.permissionMode, SubAgentPermission.inherit);
     });
   });
 }

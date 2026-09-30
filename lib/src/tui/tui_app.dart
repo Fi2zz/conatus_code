@@ -141,6 +141,7 @@ class ConatusTuiRuntime {
     String? provider,
     String? model,
     int maxSteps = 8,
+    SubAgentPermission subagentPermission = SubAgentPermission.inherit,
     FallbackLlm? llm,
     RetryPolicy? retryPolicy,
     List<String> fallbackModels = const <String>[],
@@ -439,6 +440,7 @@ class ConatusTuiRuntime {
         'git_status',
         'git_diff',
       ],
+      permissionMode: subagentPermission,
     );
 
     // ── 后台任务：消费 [background] 配置与 'shell' 的 start() 能力缝 ──

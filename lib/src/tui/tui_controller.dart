@@ -552,6 +552,10 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     cancel.cancel();
+    // 子 Agent 跑在自己的 Session、不参与主轮次的取消竞速，一并收掉，
+    // 否则它在后台继续烧 token（界面已不再跟踪）。
+    final Tool? spawn = _app.tools.get('spawn_agent');
+    if (spawn is SpawnAgentTool) spawn.interrupt();
     final int queued = _queue.length;
     if (queued > 0) {
       _queue.clear();

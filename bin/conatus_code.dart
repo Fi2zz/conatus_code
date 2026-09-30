@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import 'package:conatus_agent/conatus_agent.dart'
+    show SubAgentPermission, parseSubAgentPermission;
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/tui.dart';
 
@@ -79,6 +81,9 @@ Future<void> main(List<String> args) async {
     provider: provider,
     model: model,
     maxSteps: config.agent.maxSteps,
+    subagentPermission: parseSubAgentPermission(
+            config.agent.subagentPermission) ??
+        SubAgentPermission.inherit,
     retryPolicy: config.llm.retry.toPolicy(),
     fallbackModels: config.llm.fallbackModels,
     turnBudget: TurnBudget(

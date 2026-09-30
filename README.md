@@ -83,6 +83,7 @@ type = "openai"
 [agent]
 max_steps = 8                 # 单轮最大模型步数
 workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
+# subagent_permission = "inherit"  # 子代理默认权限：inherit/readonly/ask/auto（模型只能收紧）
 # project_dir = ".conatus"    # 项目数据目录（会话/记忆/数据库/检查点）；缺省不放工作区，
                               # 落 ~/.nava/projects/<编码工作区路径>；显式设置才
                               # 相对工作目录（旧行为，工作区会出现该目录）
@@ -406,6 +407,19 @@ max_attempts = 4
 
 **历史照样压缩**：子 Agent 接上上下文的 `'compaction'`；配合上面的结果驱逐，长调研
 不会顶爆模型窗口直接失败。
+
+**权限模式（`permissionMode`）**：子代理级策略，对齐 Claude Code。宿主在
+`[agent] subagent_permission` 设默认（`inherit` / `readonly` / `ask` / `auto`），模型可在
+`spawn_agent` 的 `permission_mode` 请求，但**只能收紧**：
+
+- `inherit`（默认）：走宿主同一条审批管线。
+- `readonly`：仅 low 风险工具，medium/high 直接拒（不弹审批）。
+- `ask`：每个子工具调用都要确认（阈值 low）。
+- `auto`：子调用免审批（仍在 Layer 2 沙箱内；high 工具仍被白名单风险上限挡掉）。
+
+**Esc 打断会收掉在跑子 Agent**：子 Agent 跑在自己的 `Session`、不参与主轮次的取消
+竞速，`Esc` 只丢主轮次结果的话它会在后台继续烧 token；现在 `Esc` 一并把在途子 Agent
+取消，收敛为 `status=failed`。
 
 **独立预算**：子 Agent 用自己计数的 `BudgetedLlmProvider`，不共用主轮次的
 token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn_tokens` 提前收口，

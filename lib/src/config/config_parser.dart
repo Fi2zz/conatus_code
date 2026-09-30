@@ -133,7 +133,18 @@ class ConfigParser extends ConfigValues {
       maxSteps: readPositiveInt(table, 'max_steps', 8),
       workdir: readString(table, 'workdir'),
       projectDir: readString(table, 'project_dir'),
+      subagentPermission:
+          _subagentPermission(readString(table, 'subagent_permission')),
     );
+  }
+
+  /// 子代理权限模式：`inherit` / `readonly` / `ask` / `auto`。
+  String _subagentPermission(String? value) {
+    if (value == null) return 'inherit';
+    const Set<String> known = <String>{'inherit', 'readonly', 'ask', 'auto'};
+    if (known.contains(value)) return value;
+    throw ConfigException(
+        '$source：subagent_permission "$value" 不合法（inherit/readonly/ask/auto）。');
   }
 
   ApprovalConfig _readApproval() {
