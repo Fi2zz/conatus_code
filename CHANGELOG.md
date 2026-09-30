@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+- **子 Agent（`spawn_agent`）默认白名单放开只读探索工具**：由
+  `get_time/echo/read_file` 扩展为加上 `rg` / `glob` / `list_files` /
+  `git_status` / `git_diff`。此前默认集没有任何搜索能力，模型没显式传 `tools`
+  时子 Agent 只能读它已知道路径的文件，等于废掉一半作用。写 / 执行类
+  （`write_file` medium、`run_command` 等 high）仍不进默认集——子 Agent 无人看管。
+  同时框架侧（conatus_agent）把显式 `tools` 也按风险过滤掉 high，堵住绕过审批。
+
 - **新增 `[providers.*] credential_key`**：填环境变量 / 凭据服务里的键名（如
   `ARK_API_KEY`），`api_key` 为空时用它取。此前 `ProviderConfig` 缺这个字段，而
   下游 `ProviderProfile.credentialKey` → `ProviderRegistry` → LLM 的管道一直通着

@@ -395,6 +395,15 @@ max_attempts = 4
 
 （`TuiRole.stage` 暗色行，不污染助手正文的排版。）
 
+**默认只读白名单**：不传 `tools` 时子 Agent 拿到 `get_time` / `echo` /
+`read_file` / `rg` / `glob` / `list_files` / `git_status` / `git_diff`——够调研，
+但不给写 / 执行类（子 Agent 无人看管）。显式传 `tools` 也**一律排除 high 风险**
+工具：子注册表是新建的、不带主注册表的审批中间件，high 工具进来就等于绕过人工确认。
+
+**历史照样压缩**：子 Agent 接上上下文的 `'compaction'`。它不带主注册表的工具结果
+驱逐中间件，`read_file` 单次上限 20 万字符，读两个大文件就会顶爆模型窗口；没有
+压缩时子任务会直接以失败收场。
+
 **独立预算**：子 Agent 用自己计数的 `BudgetedLlmProvider`，不共用主轮次的
 token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn_tokens` 提前收口，
 而子 Agent 的半截结论会被当成结论回传。成本仍记进同一个 costTracker（那部分

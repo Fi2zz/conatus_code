@@ -210,5 +210,36 @@ void main() {
       );
       expect(spawn.childLlm, isNotNull, reason: '要有独立计数的派生工厂');
     });
+
+    test('子 Agent 默认给只读探索工具', () async {
+      final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+        baseDir: Directory.systemTemp.createTempSync('nava-sub2').path,
+        providers: <ProviderConfig>[
+          const ProviderConfig(
+            name: 'testprov',
+            baseUrl: 'https://testprov.example/v1',
+            apiKey: 'k',
+          ),
+        ],
+        provider: 'testprov',
+        model: 'm1',
+        retryPolicy: const RetryPolicy(maxAttempts: 1),
+        interactive: false,
+        webTools: false,
+        skills: false,
+      );
+      addTearDown(runtime.dispose);
+
+      final SpawnAgentTool spawn =
+          runtime.app.tools.get('spawn_agent') as SpawnAgentTool;
+
+      // 只读探索类默认放开：模型没传 tools 时子 Agent 也要能搜项目、定位文件
+      //（此前只有 get_time/echo/read_file，等于无法定位）。
+      expect(spawn.defaultTools,
+          containsAll(<String>['rg', 'glob', 'list_files']));
+      // 写 / 执行类不进默认白名单。
+      expect(spawn.defaultTools, isNot(contains('write_file')));
+      expect(spawn.defaultTools, isNot(contains('run_command')));
+    });
   });
 }

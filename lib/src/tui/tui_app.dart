@@ -425,7 +425,20 @@ class ConatusTuiRuntime {
         budget: resolvedBudget,
         costTracker: costTracker,
       ),
-      defaultTools: const <String>['get_time', 'echo', 'read_file'],
+      // 默认只读探索集：子 Agent 无人看管，默认不给写 / 执行类（write_file 等
+      // 是 medium、run_command 等是 high；high 在框架层已被 `_allowedTools`
+      // 挡掉，这里再把 medium 写操作排除）。rg/glob/list_files 是定位文件的
+      // 入口——缺了它们，模型没显式传 tools 时子 Agent 只能读已知路径。
+      defaultTools: const <String>[
+        'get_time',
+        'echo',
+        'read_file',
+        'rg',
+        'glob',
+        'list_files',
+        'git_status',
+        'git_diff',
+      ],
     );
 
     // ── 后台任务：消费 [background] 配置与 'shell' 的 start() 能力缝 ──
