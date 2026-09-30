@@ -49,6 +49,17 @@ void main() {
     expect(File('${root.path}/b.txt').readAsStringSync(), 'content');
   });
 
+  test('写根内尚未创建的深层路径（中间目录不存在）成功', () async {
+    // root 取自 Directory.systemTemp：macOS 上是 /var/... 别名，真实路径为
+    // /private/var/...。目标父链不存在时 LocalFileSystem 给不出 realpath，
+    // 键会退回字面 /var/...，与已规范化的 root 前缀比对不上 → 误判越界。
+    final FsTarget target = await fs.resolve('deep/nested/c.txt');
+
+    await fs.writeText(target, 'ok');
+
+    expect(File('${root.path}/deep/nested/c.txt').readAsStringSync(), 'ok');
+  });
+
   test('写越界相对路径 → sandboxDenied', () async {
     final FsTarget outside =
         await LocalFileSystem(cwd: root.path).resolve('../cc-jail-out.txt');

@@ -31,11 +31,11 @@
     而 Context 的服务键唯一，`/model`、`/provider add` 再 provide 一次就撞
     `StateError`（未捕获 → 裸栈叠在 TUI 上，切换静默失效）。改为服务键上放可替换
     的 `LlmChainSlot`，换模型只改槽位内容；`/doctor` 相应改为从槽位读当前链。
-- 顺带记录一个**本次未修**的既有问题：`JailedFileSystem` 在目标父链不存在时无法
-  规范化目标路径，退回字符串前缀比对。macOS 上若工作目录本身位于 `/tmp` 或 `/var`
-  这类别名路径下（而非 `/Users/...`），**首次往任何新目录写文件都会被误判越界**。
-  实测矩阵：root 规范化 + 目标未规范化 + 中间目录不存在 → 拒绝；其余三种组合均允许。
-  溢出目录已用规范化路径规避，但根因在 fs jail 本身，属安全组件，未擅自改动。
+- 修 `JailedFileSystem` 把工作区内新文件**误判越界**：目标父链不存在时 `FsTarget`
+  的键会退回字面路径，与已规范化的沙箱根前缀比对不上。macOS 上若工作目录本身
+  位于 `/tmp` 或 `/var` 这类别名下（真实路径是 `/private/...`），**首次往任何新
+  目录写文件都会被判越界**。根因在 `LocalFileSystem` 的键派生只解父目录一层，
+  已在 conatus_foundation 修复（见其 CHANGELOG）；本包补端到端回归用例。
 
 - 编辑后校验（LinterService）对 Dart 项目改为**只校验这次改动的文件**，并解析成结构化
   诊断回灌。实测同仓库全仓 `dart analyze` 2.55s → 单文件
