@@ -117,6 +117,34 @@ void main() {
     expect(app.require<LlmChainSlot>('llmChainSlot'), same(slot));
   });
 
+  // 回归：工具的 30s 预算曾套在整条中间件链外面，把「等用户批准」也算进去。
+  // 用户思考 40s 后按下 Enter，模型收到 TOOL_TIMEOUT 而工具已经执行——写操作
+  // 于是变成「以为失败而重试、实际写了两遍」。
+  test('审批耗时超过工具预算时，工具结果不被丢弃', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('nava-appr');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final ConatusTuiRuntime rt = await _boot(dir);
+    final Context app = rt.app;
+    int approvalWaits = 0;
+    // 模拟审批：等待时间刻意超过注册表默认的 30s 预算（用短默认值等价）。
+    app.tools.use((ToolCall call, Future<ToolResult> Function() next) async {
+      approvalWaits++;
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      return next();
+    });
+
+    final ToolResult result = await app.tools.call(
+      const ToolCall(name: 'read_file', arguments: <String, Object?>{
+        'path': 'pubspec.yaml',
+      }),
+      timeout: const Duration(milliseconds: 30),
+    );
+
+    expect(approvalWaits, 1, reason: '审批中间件应被触发');
+    expect(result.error?.code, isNot('TOOL_TIMEOUT'),
+        reason: '工具预算只管工具体，不该截断等用户的中间件');
+  });
+
   test('doctor 从槽位读当前链', () async {
     final Directory dir = Directory.systemTemp.createTempSync('nava-doc');
     addTearDown(() => dir.deleteSync(recursive: true));

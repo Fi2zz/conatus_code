@@ -9,6 +9,7 @@ import 'config_parser.dart';
 import 'config_path.dart';
 import 'config_schema.dart';
 import 'config_values.dart';
+import 'config_writer.dart';
 
 export 'config_values.dart' show ConfigException;
 
@@ -101,8 +102,9 @@ ConatusCodeConfig loadConfig({String? path, Map<String, String>? env}) {
   final String file = resolveConfigPath(explicit: path, env: env);
   final File source = File(file);
   if (!source.existsSync()) {
-    source.parent.createSync(recursive: true);
-    source.writeAsStringSync(kDefaultConfigToml);
+    // 走 writer 而不是直接写：它会 chmod 600。裸 writeAsStringSync 是 0644，
+    // 模板里就含 API Key 的位置——本机 ~/.nava/config.toml 一直是这样。
+    writeConfigFile(file, kDefaultConfigToml);
   }
   return ConfigParser(decodeToml(source), file).parse();
 }

@@ -4,6 +4,20 @@
 
 ## [未发布]
 
+- **新增 `[providers.*] credential_key`**：填环境变量 / 凭据服务里的键名（如
+  `ARK_API_KEY`），`api_key` 为空时用它取。此前 `ProviderConfig` 缺这个字段，而
+  下游 `ProviderProfile.credentialKey` → `ProviderRegistry` → LLM 的管道一直通着
+  （且 `hasKey` 已实现），于是环境变量对配置声明的 provider **完全无效**，而状态栏
+  却在提示「设置 ARK_API_KEY / DEEPSEEK_API_KEY」。
+- 修首次生成的 `config.toml` 以 **0644** 落盘：模板走的是裸 `writeAsStringSync`，
+  没有 `chmod 600`（`/provider add` 那条路径经 `config_writer` 才有）。而模板里就
+  含 `api_key` 的位置。现在改为复用 `writeConfigFile`，与另一条路径统一并收紧权限。
+- 修工具超时预算把「等用户批准」也算进去：见 conatus_foundation 的行为变更。
+  在 nava 侧表现为——每个会话首次读文件都会弹审批框（目录信任只在会话内有效），
+  用户思考超过 30s 按下 Enter 时，模型收到 `TOOL_TIMEOUT` 而 `read_file` 其实
+  已经读完。`run_command` / `run_tests` 未自声明 timeout，仍由 30s 默认预算兜底。
+
+
 - 修两个**必然发生**的装配级 bug。两者都曾因「测试绕开真实装配」而长期漏网：
   - **读大文件直接失败**：工具结果超过 80 000 字符时，`ToolResultEviction` 用
     **被 jail 的** `fs` 往 `systemTemp` 写溢出文件，而 fs jail 默认以工作目录为根

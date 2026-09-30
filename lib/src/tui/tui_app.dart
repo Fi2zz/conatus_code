@@ -306,6 +306,7 @@ class ConatusTuiRuntime {
               name: config.name,
               baseUrl: config.baseUrl,
               apiKey: config.apiKey,
+              credentialKey: config.credentialKey,
               apiStyle: config.type == ProviderType.kimi
                   ? LlmApiStyle.responses
                   : LlmApiStyle.chat,

@@ -69,12 +69,20 @@ class ProviderConfig {
     required this.name,
     required this.baseUrl,
     this.apiKey = '',
+    this.credentialKey = '',
     this.type = ProviderType.openai,
     this.oauthKey,
   });
 
   /// 提供商名（`[providers.<name>]` 的键，可含 `.` / `:`）。
   final String name;
+
+  /// 凭据服务里的键名（如 `ARK_API_KEY`）；`api_key` 为空时用它取。
+  ///
+  /// 此前 `ProviderConfig` 缺这个字段，而下游 `ProviderProfile.credentialKey` →
+  /// `ProviderRegistry` → LLM 的管道一直通着，于是环境变量对配置声明的 provider
+  /// 完全无效——状态栏却在提示「设置 ARK_API_KEY / DEEPSEEK_API_KEY」。
+  final String credentialKey;
 
   /// OpenAI 兼容端点根地址。
   final String baseUrl;
