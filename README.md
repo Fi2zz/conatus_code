@@ -10,7 +10,7 @@
 
 ## 特性
 
-- 🖥️ 终端交互（基于 conatus_tui）
+- 🖥️ 终端交互（内置 TUI，入口 `lib/tui.dart`）
 - 🔍 文件读写与搜索（read_file / write_file / edit_file / rg / glob）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
@@ -520,10 +520,11 @@ models.dev 提供的**上下文窗口**与**真实单价**此前只用来填 `/m
 
 ## 与 conatus 的关系
 
-conatus_code 是 conatus 的**上层应用**，不是框架的一部分。
-coding 相关的能力（文件工具、代码执行）在 conatus 的
-[conatus_fs_tools](https://github.com/Fi2zz/conatus/tree/master/packages/conatus_fs_tools)
-和 conatus_coding 包里，conatus_code 负责装配它们并暴露终端界面。
+conatus_code 是 conatus 的**上层应用**，不是框架的一部分。框架提供 Agent Loop、
+工具系统、技能沉淀等底座；coding 相关能力（终端 UI、文件工具、代码执行）原为
+`conatus_tui` / `conatus_fs_tools` / `conatus_coding` 三个独立包，**现已并入本包**，
+入口分别为 `lib/tui.dart` / `lib/fs_tools.dart` / `lib/coding.dart`。本包负责装配
+这些能力并暴露终端界面。
 
 ## CI
 

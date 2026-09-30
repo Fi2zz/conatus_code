@@ -6,10 +6,10 @@
 /// ```bash
 /// # 真实调用 DeepSeek
 /// export DEEPSEEK_API_KEY="sk-..."
-/// dart run packages/conatus_tui/example/deepseek_demo.dart
+/// dart run packages/conatus_code/example/deepseek_demo.dart
 ///
 /// # 指定模型 / 会话
-/// dart run packages/conatus_tui/example/deepseek_demo.dart \
+/// dart run packages/conatus_code/example/deepseek_demo.dart \
 ///   --model deepseek-chat --session session_<uuid>
 /// ```
 library;
