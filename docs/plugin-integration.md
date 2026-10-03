@@ -1,13 +1,23 @@
 # 插件接入指南
 
 nava 是 AOT 编译的 Dart 二进制，**运行时不加载插件代码**。接入任何插件的
-原则只有一条：
+原则有两条：
 
-> **插件方不需要写一行 Dart**。nava 侧把插件映射到已有机制——技能、MCP、
-> hooks、斜杠命令——按插件的接口形态分档接入。
+> 1. **插件方不需要写一行 Dart**。nava 侧把插件映射到已有机制——技能、MCP、
+>    hooks、斜杠命令——按插件的接口形态分档接入。
+> 2. **兼容现有插件体系，不发明新体系**。目标是让别的宿主（Claude Code、
+>    Codex、Cursor 等）的插件尽量原样可用，nava 只做消费端适配，不定义
+>    nava 专属的插件格式。
 
-本指南给出决策树、每档的实操步骤、一个完整实例（superpowers），以及必须
-知道的信任边界。
+第二条原则直接排除了一批"看着诱人"的做法：
+
+- ❌ 自定义插件 manifest（`plugin.toml` 之类）
+- ❌ 自有插件目录约定与命名空间（`/plugin:*` 命令前缀）
+- ❌ 插件市场 / 签名体系
+
+生态里已有的原语——SKILL.md 技能约定、MCP 协议、`mcpServers` 配置形状、
+Claude Code 插件仓库的目录形态——够用，缺的只是挂接点。本指南给出决策树、
+每档的实操步骤、一个完整实例（superpowers），以及必须知道的信任边界。
 
 ## 决策树
 
@@ -39,6 +49,17 @@ nava 是 AOT 编译的 Dart 二进制，**运行时不加载插件代码**。接
 项目根 = 最近的含 `.git` 的祖先目录。frontmatter 支持
 `name` / `description` / `whenToUse` / `disable-model-invocation`，
 与主流技能格式兼容。
+
+**`.agents/skills` 是跨宿主约定**：Claude Code、Codex 等都认这个目录，
+项目级技能放这里对所有宿主同时生效。Claude 侧独有的 `.claude/skills/`
+不在默认发现根，软链即可接入（是否要把它加进默认根，见文末兼容性矩阵）。
+
+### 兼容细节：commands/*.md 直接可读
+
+Claude Code 插件的 `commands/*.md`（frontmatter + 正文）与 SKILL.md 同构。
+技能文件系统的 provider 同时接受两种形态：`<dir>/SKILL.md` 和发现根下
+散落的 `<name>.md` 文件。所以把插件的 `commands/` 目录软链进发现根，
+每条命令就变成一条可调用技能，不需要任何转换。
 
 ### 实例：接入 superpowers
 
@@ -72,7 +93,8 @@ superpowers 依赖 Claude Code 的 SessionStart hook 在会话开始时**强制*
 **补缺（未来小改动）**：给 hooks 加对称的 `session_start` 事件，stdout 落成
 system prompt 常驻段（而非一次性消息，压缩后仍在）；或加配置式
 `[bootstrap] skills = ["using-superpowers"]`，装配期把技能正文渲染成常驻段。
-两者都是对称小特性，不需要动技能机制本身。
+两者都是对称小特性，不需要动技能机制本身，也不引入新格式——SessionStart
+是 Claude Code hooks 的既有事件名，照抄即兼容。
 
 ### 兼容性注意
 
@@ -102,6 +124,14 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${KEY} 经凭据服务解析
   server 照常（`/mcp` 看状态）
 - `type = "http"` / `"sse"` 用 `url` + `headers`，同样支持 `${KEY}` 占位符
 - **解析出的凭据不进日志、不进会话事件**
+
+### 与生态标准配置形状的关系
+
+生态里 MCP 的标准配置形状是 `mcpServers` JSON（Claude Desktop 的
+`claude_desktop_config.json`、项目级的 `.mcp.json`）。nava 目前只认
+config.toml 的 `[mcp.servers.*]`——形状等价但格式不同。支持直接读取项目级
+`.mcp.json` 是个小改动（解析后映射进现有 `McpServerSpec` 装配，不新增
+机制），属于兼容性矩阵里的待办项。
 
 ### 注意事项
 
@@ -135,6 +165,11 @@ hook 收到环境变量 `NAVA_HOOK_EVENT` / `NAVA_HOOK_TOOL` /
 
 **注意**：hook 是**直连 shell、不经沙箱**的本机命令——它的权限等于运行 nava
 的用户本人。只挂你信任的脚本。
+
+Claude Code 的 `settings.json` hooks 是带 matcher 的结构化 JSON，与 nava 的
+命令列表形状不同——不做自动映射，手工改写即可（事件名对照：
+`PreToolUse`→`pre_tool_use`、`PostToolUse`→`post_tool_use`、`Stop`→`stop`，
+其余 matcher 语义 nava 暂无对应）。
 
 ## 形态四：纯库（只暴露编程 API）
 
@@ -196,10 +231,18 @@ args = ["/home/you/.nava/wrappers/thing/server.mjs"]
 - MCP server 行为异常：先用独立 MCP 客户端（如官方 inspector）单独验 server
   本身，排除 nava 侧因素
 
-## 与「插件系统」的关系
+## 兼容性矩阵
 
-本指南是「用现成插件」的路。如果未来要做**第一方插件系统**（插件目录 +
-manifest + 生命周期管理），正确的形态是把这些机制收成组合层：插件 = 目录 +
-manifest，能力分别落到技能根挂载、`[mcp.servers.*]`、hooks 与命令投影，
-而不是发明第五套机制。superpowers 式的软链接入就是这个方向已经验证过的
-第一个用例。
+对齐现状一览（✅ 已兼容 / ○ 部分兼容 / ⚠️ 有缺口）：
+
+| 现有体系 | 约定 | nava 现状 | 差距 |
+|---|---|---|---|
+| Skills | SKILL.md + frontmatter，`.agents/skills` | 发现根含项目/用户级 `.agents/skills`，frontmatter 兼容 | ✅ 基本零差距；`.claude/skills` 软链可入 |
+| Claude Code 插件 | 仓库含 `skills/` `commands/` `agents/` `hooks/` | `skills/`、`commands/` 软链可入（`commands/*.md` 按散落 `.md` 技能直接读）；`agents/`、`hooks/` 无对应 | ○ 主体可用；SessionStart hook 是缺口 |
+| MCP | `mcpServers` JSON（`.mcp.json` / `claude_desktop_config.json`） | 自有 TOML `[mcp.servers.*]`，形状等价 | ⚠️ 待支持读取 `.mcp.json`（小改动） |
+| Hooks | Claude `settings.json` 结构化 hooks（matcher 等） | `[hooks]` 命令列表，事件名对照兼容 | ○ 手工改写，不做自动映射 |
+| superpowers | 技能目录软链 + SessionStart 注入 | 技能软链 ✅ | ⚠️ bootstrap 强制注入缺口（见形态一） |
+
+**明确不做的事**：自定义 manifest、自有插件命名空间、插件市场。当且仅当
+某个生态标准本身要求一个新挂点时，才在消费端加适配（如 `.mcp.json` 解析），
+且适配的产出必须落回现有机制（`McpServerSpec`、技能注册表），不得绕开。
