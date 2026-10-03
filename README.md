@@ -50,8 +50,9 @@ export PATH="$PWD/dist:$PATH"
 `<包根>/dist/nava`；第一个参数可覆盖输出路径，例如把产物写到
 `/tmp/nava`。
 
-注意：OS 沙箱后端（launcher）仍在运行时从 pub 缓存定位，换机器或清理 pub 缓存后
-沙箱会 fail-closed（命令执行被禁用，文件 jail 保留），这与源码运行时的行为一致。
+注意：OS 沙箱后端（launcher）仍在运行时从 pub 缓存定位，换机器或清理 pub
+缓存后沙箱会 fail-closed（命令执行被禁用，文件 jail 保留），这与源码运行
+时的行为一致。
 
 ## 配置
 
@@ -284,6 +285,8 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
   解析；**解析结果不得写进日志**。
 - **安全边界**：MCP server 是用户在配置里显式声明的受信端，其 stdio 子进程
   **不走** Layer 2 OS 沙箱（沙箱管的是模型临时写出的命令，二者风险面不同）。
+- 接入第三方插件（Markdown 技能包 / MCP server / CLI 脚本 / 纯库）的分档指南：
+  [docs/plugin-integration.md](docs/plugin-integration.md)。
 
 ## 模型提供商（`/provider` / `/model`）
 
@@ -338,8 +341,9 @@ final LlmProvider? llm = registry.buildLlm('ark', model: 'doubao-seed-1-8-251228
 ```
 
 **Plan 端点只认订阅后生成的专属 Key**：`ark-agent-plan` 用
-`ARK_AGENT_PLAN_API_KEY`、`volcengine-coding-plan` 用 `ARK_CODING_PLAN_API_KEY`，
-普通方舟 Key（`ARK_API_KEY`）对 plan 端点会返回 401。
+`ARK_AGENT_PLAN_API_KEY`、`volcengine-coding-plan` 用
+`ARK_CODING_PLAN_API_KEY`，普通方舟 Key（`ARK_API_KEY`）对 plan 端点
+会返回 401。
 
 ## LLM 韧性（重试 / 退避 / 回退链）
 
@@ -409,7 +413,8 @@ max_attempts = 4
 不会顶爆模型窗口直接失败。
 
 **权限模式（`permissionMode`）**：子代理级策略，对齐 Claude Code。宿主在
-`[agent] subagent_permission` 设默认（`inherit` / `readonly` / `ask` / `auto`），模型可在
+`[agent] subagent_permission` 设默认（`inherit` / `readonly` / `ask` / `auto`），
+模型可在
 `spawn_agent` 的 `permission_mode` 请求，但**只能收紧**：
 
 - `inherit`（默认）：走宿主同一条审批管线。
@@ -421,8 +426,8 @@ max_attempts = 4
 读取照常，而不是把所有子工具静默拒掉。
 
 **Esc 打断会收掉在跑子 Agent**：子 Agent 跑在自己的 `Session`、不参与主轮次的取消
-竞速，`Esc` 只丢主轮次结果的话它会在后台继续烧 token；现在 `Esc` 一并把在途子 Agent
-取消，收敛为 `status=failed`。
+竞速，`Esc` 只丢主轮次结果的话它会在后台继续烧 token；现在 `Esc` 一并把在途子
+Agent 取消，收敛为 `status=failed`。
 
 **独立预算**：子 Agent 用自己计数的 `BudgetedLlmProvider`，不共用主轮次的
 token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn_tokens` 提前收口，
@@ -529,18 +534,21 @@ models.dev 提供的**上下文窗口**与**真实单价**此前只用来填 `/m
 默认（独立使用）：`pubspec.yaml` 用 git 依赖引 conatus 仓库，clone 后直接
 `dart pub get` 即可。
 
-在 [conatus](https://github.com/Fi2zz/conatus) 仓库内开发时，本仓库作为 submodule
-挂在 `packages/conatus_code`。该仓库的 `tool/setup_code_filter.sh` 会：
+在 [conatus](https://github.com/Fi2zz/conatus) 仓库内开发时，本仓库作为
+submodule 挂在 `packages/conatus_code`。该仓库的 `tool/setup_code_filter.sh`
+会：
 
-- 装一个 git clean/smudge filter，让 `pubspec.yaml` 里的 `resolution: workspace`
-  在工作区保持生效 —— 本包成为 conatus pub workspace 的成员，依赖解析到本地
-  `packages/*`，改框架对这里立即生效，不必先推送；而 `git add` 时该行会被自动
-  注释掉，推送出去的内容因此不带 `resolution`；
-- 生成一个本地 `pubspec_overrides.yaml`（已进 `.gitignore`），清空 `pubspec.yaml`
-  的 `dependency_overrides` —— workspace 内禁止 override 成员包。
+- 装一个 git clean/smudge filter，让 `pubspec.yaml` 里的 `resolution:
+  workspace` 在工作区保持生效 —— 本包成为 conatus pub workspace 的
+  成员，依赖解析到本地 `packages/*`，改框架对这里立即生效，不必先推送；
+  而 `git add` 时该行会被自动注释掉，推送出去的内容因此不带
+  `resolution`；
+- 生成一个本地 `pubspec_overrides.yaml`（已进 `.gitignore`），清空
+  `pubspec.yaml` 的 `dependency_overrides` —— workspace 内禁止 override
+  成员包。
 
-未装 filter 的 clone（例如直接 clone 本仓库）拿到的是注释态、且 override 原样生效，
-行为与上面「独立使用」一致。
+未装 filter 的 clone（例如直接 clone 本仓库）拿到的是注释态、且 override
+原样生效，行为与上面「独立使用」一致。
 
 ## 依赖
 
@@ -549,11 +557,11 @@ models.dev 提供的**上下文窗口**与**真实单价**此前只用来填 `/m
 
 ## 与 conatus 的关系
 
-conatus_code 是 conatus 的**上层应用**，不是框架的一部分。框架提供 Agent Loop、
-工具系统、技能沉淀等底座；coding 相关能力（终端 UI、文件工具、代码执行）原为
-`conatus_tui` / `conatus_fs_tools` / `conatus_coding` 三个独立包，**现已并入本包**，
-入口分别为 `lib/tui.dart` / `lib/fs_tools.dart` / `lib/coding.dart`。本包负责装配
-这些能力并暴露终端界面。
+conatus_code 是 conatus 的**上层应用**，不是框架的一部分。框架提供 Agent
+Loop、工具系统、技能沉淀等底座；coding 相关能力（终端 UI、文件工具、代码
+执行）原为 `conatus_tui` / `conatus_fs_tools` / `conatus_coding` 三个独立包，
+**现已并入本包**，入口分别为 `lib/tui.dart` / `lib/fs_tools.dart` /
+`lib/coding.dart`。本包负责装配这些能力并暴露终端界面。
 
 ## CI
 
@@ -562,9 +570,10 @@ conatus_code 是 conatus 的**上层应用**，不是框架的一部分。框架
 `test/sandbox/` 下两个测试文件没有跳过保护，放到 ubuntu 上要么必红、要么被迫
 跳过最有价值的那批。
 
-CI 验的是**独立形态**：checkout 拿到的是提交态 pubspec（`resolution: workspace`
-被 git filter 注释掉，依赖经 git 拉 conatus master），也就是「用户 clone 本仓库
-后拿到的东西」。conatus 工作区内的跨仓集成由 conatus 仓库的 CI 负责。
+CI 验的是**独立形态**：checkout 拿到的是提交态 pubspec（`resolution:
+workspace` 被 git filter 注释掉，依赖经 git 拉 conatus master），也就是
+「用户 clone 本仓库后拿到的东西」。conatus 工作区内的跨仓集成由 conatus
+仓库的 CI 负责。
 
 本仓库的 lint 规则因此**自包含**在 `analysis_options.yaml`（不像兄弟包那样
 `include ../../analysis_options.yaml`）——独立形态下那个路径不存在。规则与
