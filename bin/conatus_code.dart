@@ -17,6 +17,12 @@ Future<void> main(List<String> args) async {
     stdout.writeln('nava $navaVersion');
     return;
   }
+  // `-p` 出现但没有任务文本：报错退出，而不是静默落回全交互 TUI——
+  // 脚本里 `$TASK` 为空时否则会挂起等输入（E-16）。
+  if (options.printRequested && options.print == null) {
+    stderr.writeln('用法错误：-p / --print 缺少任务文本。');
+    exit(2);
+  }
 
   final ConatusCodeConfig config;
   try {

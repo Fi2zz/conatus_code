@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **headless 杂项（E-16）**：OAuth 未实现提示改走 stderr（此前 `print` 污染
+  stdout，`--output-format json` 下 `jq` 解析失败）；`-p` / `--print` 缺任务文本
+  时报错退出码 2，不再静默落回全交互 TUI（脚本里 `$TASK` 为空会挂起）。
 - **安全（E-11）项目上下文防符号链接越界**：`AGENTS.md` / `NAVA.md` 读取前
   对文件与工作区根各取 canonical 路径，落在工作区外一律不读——不可信仓库放
   `AGENTS.md -> ~/.nava/config.toml` 时不再把外部 Key 拼进 system prompt 外发。

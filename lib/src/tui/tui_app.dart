@@ -319,9 +319,9 @@ class ConatusTuiRuntime {
       );
       for (final ProviderConfig config in providers) {
         if (config.apiKey.isEmpty && config.oauthKey != null) {
-          // REASON: 启动提示走 stdout，与其它装配警告一致（OAuth 未实现，
-          // 该 provider 不可用但其余照常）。
-          print('OAuth 未实现：请为 ${config.name} 配置 api_key。');
+          // REASON: 走 stderr 而非 stdout——headless `--output-format json` 要求
+          // stdout 只有可解析的单行 JSON，启动警告写 stdout 会让 jq 失败。
+          stderr.writeln('OAuth 未实现：请为 ${config.name} 配置 api_key。');
         }
       }
     }
@@ -337,7 +337,10 @@ class ConatusTuiRuntime {
     app.provide('llmNotices', notices);
     app.onDispose(notices.close);
     final List<String> chainEntries = <String>[
-      if (model != null && model.isNotEmpty) '$provider/$model' else if (provider != null) provider,
+      if (model != null && model.isNotEmpty)
+        '$provider/$model'
+      else if (provider != null)
+        provider,
       ...fallbackModels,
     ];
     final LlmChain? chain = registry == null
@@ -358,7 +361,6 @@ class ConatusTuiRuntime {
     app.provide('modelProfiles', modelProfiles);
     app.onDispose(modelProfiles.close);
     unawaited(modelProfiles.warmUp());
-
 
     // 预算护栏：包装 `'llm'` 服务（每轮墙钟 + 上下文 token 估算），并把首个
     // CostTracker 实现注册到 `'costTracker'`（供未来 autonomous runner 消费）。

@@ -32,6 +32,7 @@ class TuiOptions {
     this.versionRequested = false,
     this.continueRequested = false,
     this.allowUnsafeHeadless = false,
+    this.printRequested = false,
   });
 
   /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
@@ -56,6 +57,13 @@ class TuiOptions {
 
   /// 是否出现了 `--continue`：恢复最近一次会话（无 `--session` 时生效）。
   final bool continueRequested;
+
+  /// 命令行里是否出现了 `-p` / `--print`（无论是否带值）。
+  ///
+  /// 与 [print] 的区别：`-p` 缺值时 [print] 为 `null`，这里仍为 `true`——
+  /// 调用方据此报错退出，而不是静默落回全交互 TUI（脚本里 `$TASK` 为空会
+  /// 直接挂起）。见 E-16。
+  final bool printRequested;
 
   /// 是否出现了 `--allow-unsafe-headless`：允许 headless 在 OS 沙箱关闭时
   /// 启动（见 `validateHeadlessSafety`）。
@@ -92,6 +100,7 @@ class TuiOptions {
     bool versionRequested = false;
     bool continueRequested = false;
     bool allowUnsafeHeadless = false;
+    bool printRequested = false;
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
@@ -114,6 +123,7 @@ class TuiOptions {
       } else if (arg == '--config' && index + 1 < args.length) {
         configPath = args[++index];
       } else if (arg == '--print' || arg == '-p') {
+        printRequested = true;
         final bool hasValue =
             index + 1 < args.length && !args[index + 1].startsWith('-');
         if (hasValue) {
@@ -135,6 +145,7 @@ class TuiOptions {
       versionRequested: versionRequested,
       continueRequested: continueRequested,
       allowUnsafeHeadless: allowUnsafeHeadless,
+      printRequested: printRequested,
     );
   }
 }

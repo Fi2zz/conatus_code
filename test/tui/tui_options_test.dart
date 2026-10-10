@@ -119,6 +119,16 @@ void main() {
     );
   });
 
+  test('-p 缺值：printRequested 为真但 print 为空（E-16，调用方据此报错）', () {
+    final TuiOptions options = TuiOptions.parse(const <String>['-p']);
+    expect(options.printRequested, isTrue);
+    expect(options.print, isNull);
+  });
+
+  test('未出现 -p：printRequested 为假（照常进 TUI）', () {
+    expect(TuiOptions.parse(const <String>[]).printRequested, isFalse);
+  });
+
   test('isCanonicalSessionId 识别 session_<uuid> 格式', () {
     expect(
       isCanonicalSessionId('session_c8898262-4a76-4bd4-93dc-f757fd4ef666'),
