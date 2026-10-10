@@ -134,6 +134,8 @@ class ArchiveCheckpointStore implements CheckpointStore {
       if (file.existsSync()) await restrictFilePermissions(file.path);
     }
     await restrictDirectoryPermissions(sessionDir(sessionId).path);
+    // 父目录（checkpoints）也收紧：否则其他用户能遍历列出会话 id 列表。
+    await restrictDirectoryPermissions(sessionDir(sessionId).parent.path);
   }
 
   Future<CheckpointInfo> _snapshotBase(

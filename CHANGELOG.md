@@ -11,8 +11,9 @@
   对文件与工作区根各取 canonical 路径，落在工作区外一律不读——不可信仓库放
   `AGENTS.md -> ~/.nava/config.toml` 时不再把外部 Key 拼进 system prompt 外发。
 - **安全（E-12）检查点落盘权限收紧**：归档 / index 写后 0600、会话目录与
-  影子仓库 `checkpoints` 目录 0700（此前随 umask 0644/0755）；澄清归档注释
-  「gzip 是压缩不是加密」。
+  影子仓库 `checkpoints` 目录 0700（此前随 umask 0644/0755）；打开 store 时
+  对升级前已存在的检查点目录做一次迁移收敛（旧会话不再无限期可读）；澄清
+  归档注释「gzip 是压缩不是加密」。
 - **安全（E-9）headless 启动闸门**：`-p` 不装审批链（无人可应答），OS 沙箱是
   唯一防线；当 `[sandbox] enabled = false` 或 `preset = "danger_full_access"`
   （两者最终都让命令回本地直执）时 headless **拒绝启动**（退出码 2，指明原因

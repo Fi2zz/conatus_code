@@ -64,4 +64,38 @@ void main() {
     expect(_bits(store.sessionRoot()), 0x1C0); // 0o700
     expect(_bits(store.indexFile('s1').path), 0x180); // 0o600
   });
+
+  test('打开 store 时迁移旧检查点目录权限为 0700', () async {
+    if (Platform.isWindows) return;
+    final Directory dir = Directory.systemTemp.createTempSync(
+      'nava-cp-migrate',
+    );
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String root = '${dir.path}${Platform.pathSeparator}ws';
+    final String projectDir = '$root${Platform.pathSeparator}.conatus';
+    final Directory checkpointRoot = Directory(
+      '$projectDir${Platform.pathSeparator}checkpoints',
+    )..createSync(recursive: true);
+    final Directory legacy = Directory(
+      '${checkpointRoot.path}${Platform.pathSeparator}s-old',
+    )..createSync();
+    File(
+      '${legacy.path}${Platform.pathSeparator}deadbeef',
+    ).writeAsStringSync('旧检查点');
+    // 旧版本的宽松权限（目录 0755、文件 0644）。
+    Process.runSync('chmod', <String>['755', checkpointRoot.path]);
+    Process.runSync('chmod', <String>[
+      '644',
+      '${legacy.path}${Platform.pathSeparator}deadbeef',
+    ]);
+    expect(_bits(checkpointRoot.path), 0x1ED); // 0o755
+
+    await openCheckpointStore(
+      config: const CheckpointConfig(backend: CheckpointBackend.archive),
+      root: root,
+      projectDir: projectDir,
+    );
+
+    expect(_bits(checkpointRoot.path), 0x1C0); // 0o700
+  });
 }

@@ -9,6 +9,7 @@
 library;
 
 import '../config/config_schema.dart';
+import 'checkpoint_permissions.dart';
 import 'checkpoint_store.dart';
 import 'checkpoint_store_archive.dart';
 import 'checkpoint_store_git.dart';
@@ -29,19 +30,22 @@ Future<CheckpointStore> openCheckpointStore({
     CheckpointBackend.archive => false,
     CheckpointBackend.auto => await runner.available(),
   };
-  if (shadowWanted) {
-    return GitShadowStore(
-      root: root,
-      projectDir: projectDir,
-      keep: config.keep,
-      ignore: config.ignore,
-      git: runner,
-    );
-  }
-  return ArchiveCheckpointStore(
-    root: root,
-    projectDir: projectDir,
-    keep: config.keep,
-    ignore: config.ignore,
-  );
+  final CheckpointStore store = shadowWanted
+      ? GitShadowStore(
+          root: root,
+          projectDir: projectDir,
+          keep: config.keep,
+          ignore: config.ignore,
+          git: runner,
+        )
+      : ArchiveCheckpointStore(
+          root: root,
+          projectDir: projectDir,
+          keep: config.keep,
+          ignore: config.ignore,
+        );
+  // 迁移：升级前已存在的检查点目录（0755）补收紧为 0700；否则旧会话的敏感
+  // 内容会一直保持同机可读（见 checkpoint_permissions.dart）。
+  await tightenExistingCheckpoints(projectDir);
+  return store;
 }
