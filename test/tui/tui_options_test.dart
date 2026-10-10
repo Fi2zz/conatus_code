@@ -70,13 +70,21 @@ void main() {
   });
 
   test('--session 取值非规范格式视为新建会话，不抛错', () {
-    expect(TuiOptions.parse(const <String>['--session', 'tui']).session, isNull);
     expect(
-      TuiOptions.parse(const <String>['--session', 'session-1727083200-1'])
-          .session,
+      TuiOptions.parse(const <String>['--session', 'tui']).session,
       isNull,
     );
-    expect(TuiOptions.parse(const <String>['--session', 'a b']).session, isNull);
+    expect(
+      TuiOptions.parse(const <String>[
+        '--session',
+        'session-1727083200-1',
+      ]).session,
+      isNull,
+    );
+    expect(
+      TuiOptions.parse(const <String>['--session', 'a b']).session,
+      isNull,
+    );
   });
 
   test('未知参数忽略', () {
@@ -91,6 +99,24 @@ void main() {
   test('用法文案列出全部开关', () {
     expect(TuiOptions.usage, contains('--session <id>'));
     expect(TuiOptions.usage, contains('--config <路径>'));
+  });
+
+  test('用法文案明示 -p 跳过审批（E-9c）', () {
+    expect(TuiOptions.usage, contains('不装审批链'));
+    expect(TuiOptions.usage, contains('--allow-unsafe-headless'));
+  });
+
+  test('--allow-unsafe-headless 解析与缺省（E-9a）', () {
+    expect(
+      TuiOptions.parse(const <String>[
+        '--allow-unsafe-headless',
+      ]).allowUnsafeHeadless,
+      isTrue,
+    );
+    expect(
+      TuiOptions.parse(const <String>['-p', '跑测试']).allowUnsafeHeadless,
+      isFalse,
+    );
   });
 
   test('isCanonicalSessionId 识别 session_<uuid> 格式', () {
@@ -113,7 +139,8 @@ void main() {
     expect(isCanonicalSessionId('session_xxx'), isFalse);
     expect(
       isCanonicalSessionId(
-          'session_c8898262-4a76-4bd4-93dc-f757fd4ef666-fork-1'),
+        'session_c8898262-4a76-4bd4-93dc-f757fd4ef666-fork-1',
+      ),
       isFalse,
     );
     expect(isCanonicalSessionId(''), isFalse);

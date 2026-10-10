@@ -118,6 +118,11 @@ export 'src/diff/unified_diff.dart'
     show buildUnifiedDiff, kMaxDiffLines, splitLines;
 export 'src/fs_tools/spill_dir.dart'
     show kNavaProjectDirName, toolResultSpillDir;
+export 'src/headless/headless_guard.dart'
+    show
+        approvalModeIgnoredNotice,
+        sandboxDisabledReason,
+        validateHeadlessSafety;
 export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
 export 'src/hooks/hooks.dart' show HookResult, Hooks, provideHooks, runHooks;

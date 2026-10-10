@@ -4,6 +4,16 @@
 
 ## [未发布]
 
+- **安全（E-9）headless 启动闸门**：`-p` 不装审批链（无人可应答），OS 沙箱是
+  唯一防线；当 `[sandbox] enabled = false` 或 `preset = "danger_full_access"`
+  （两者最终都让命令回本地直执）时 headless **拒绝启动**（退出码 2，指明原因
+  与修复方式），确认风险可传 `--allow-unsafe-headless` 显式放行——把「危险」
+  变成调用方当场做出的决定，而不是配置文件里一处早已遗忘的设置。
+- **安全（E-9）审批配置不再静默落空**：headless 下 `approval.mode = "always_ask"`
+  不生效（没有审批人可应答），启动时 stderr 明示；usage 与 README 补「`-p`
+  跳过审批、沙箱为唯一防线」的说明。
+- 配套（E-10，conatus_mcp）：未声明风险的 MCP 工具缺省提级 `high`，
+  缺省审批阈值才拦得住。
 - 新增 `[agent] subagent_permission`（`inherit` / `readonly` / `ask` / `auto`）：
   子代理默认权限模式，模型可在 `spawn_agent` 里收紧。非法值报 ConfigException；
   首次生成的配置模板与 README 已补。

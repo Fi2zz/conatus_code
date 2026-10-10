@@ -16,8 +16,9 @@ bool isValidSessionId(String id) =>
 /// 只有命中该格式的 id 才可被 `nava --session <id>` 打开/恢复；其余一律视为
 /// 新建会话。
 bool isCanonicalSessionId(String id) => RegExp(
-    r'^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-    caseSensitive: false).hasMatch(id);
+  r'^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+  caseSensitive: false,
+).hasMatch(id);
 
 /// 命令行选项。
 class TuiOptions {
@@ -30,6 +31,7 @@ class TuiOptions {
     this.outputFormat = 'text',
     this.versionRequested = false,
     this.continueRequested = false,
+    this.allowUnsafeHeadless = false,
   });
 
   /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
@@ -55,6 +57,10 @@ class TuiOptions {
   /// 是否出现了 `--continue`：恢复最近一次会话（无 `--session` 时生效）。
   final bool continueRequested;
 
+  /// 是否出现了 `--allow-unsafe-headless`：允许 headless 在 OS 沙箱关闭时
+  /// 启动（见 `validateHeadlessSafety`）。
+  final bool allowUnsafeHeadless;
+
   /// 用法文案。
   static const String usage =
       '用法：nava '
@@ -63,6 +69,10 @@ class TuiOptions {
       '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
       '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n'
       '  -p, --print <任务>  headless 单轮执行：跑完即退出，不启动 TUI\n'
+      '       注意：headless 不装审批链——高危工具直接执行、[approval] 配置\n'
+      '       不生效，安全兜底只有 OS 沙箱；沙箱关闭时需\n'
+      '       --allow-unsafe-headless 才能启动\n'
+      '  --allow-unsafe-headless  允许 headless 在沙箱关闭时启动（危险）\n'
       '  --output-format   headless 输出格式：text / json（缺省 text）\n'
       '  --continue        恢复最近一次会话（--session 优先于它）\n'
       '  --version         打印版本号后退出\n';
@@ -81,6 +91,7 @@ class TuiOptions {
     String outputFormat = 'text';
     bool versionRequested = false;
     bool continueRequested = false;
+    bool allowUnsafeHeadless = false;
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
@@ -89,6 +100,8 @@ class TuiOptions {
         versionRequested = true;
       } else if (arg == '--continue') {
         continueRequested = true;
+      } else if (arg == '--allow-unsafe-headless') {
+        allowUnsafeHeadless = true;
       } else if (arg == '--session') {
         final bool hasValue =
             index + 1 < args.length && !args[index + 1].startsWith('-');
@@ -121,6 +134,7 @@ class TuiOptions {
       outputFormat: outputFormat,
       versionRequested: versionRequested,
       continueRequested: continueRequested,
+      allowUnsafeHeadless: allowUnsafeHeadless,
     );
   }
 }

@@ -26,6 +26,26 @@ Future<void> main(List<String> args) async {
     exit(2);
   }
 
+  // headless 安全闸门（E-9）：`-p` 不装审批链，OS 沙箱是唯一防线；沙箱被
+  // 显式关掉时无人值守 = 裸奔，拒绝启动（除非 --allow-unsafe-headless 显式
+  // 承担风险）。always_ask 这类显式加严的审批配置在 headless 落空时也不
+  // 静默——启动就把话说清楚。
+  final bool headless = options.print != null;
+  final String? refusal = validateHeadlessSafety(
+    headless: headless,
+    sandbox: config.sandbox,
+    allowUnsafe: options.allowUnsafeHeadless,
+  );
+  if (refusal != null) {
+    stderr.writeln(refusal);
+    exit(2);
+  }
+  final String? notice = approvalModeIgnoredNotice(
+    headless: headless,
+    approval: config.approval,
+  );
+  if (notice != null) stderr.writeln(notice);
+
   final String workdir = config.agent.workdir ?? Directory.current.path;
   final String sep = Platform.pathSeparator;
 
@@ -81,8 +101,8 @@ Future<void> main(List<String> args) async {
     provider: provider,
     model: model,
     maxSteps: config.agent.maxSteps,
-    subagentPermission: parseSubAgentPermission(
-            config.agent.subagentPermission) ??
+    subagentPermission:
+        parseSubAgentPermission(config.agent.subagentPermission) ??
         SubAgentPermission.inherit,
     retryPolicy: config.llm.retry.toPolicy(),
     fallbackModels: config.llm.fallbackModels,
@@ -96,7 +116,7 @@ Future<void> main(List<String> args) async {
     fs: layers.fs,
     shell: layers.shell,
     mcpServers: config.mcp.servers,
-    interactive: options.print == null,
+    interactive: !headless,
     workdir: workdir,
     checkpoint: config.checkpoint,
     background: config.background,
@@ -105,8 +125,8 @@ Future<void> main(List<String> args) async {
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。
-  // 异常（模型调用失败等）映射为退出码 1；配置错误已是 2。
-  if (options.print != null) {
+  // 异常（模型调用失败等）映射为退出码 1；配置错误与安全闸门已是 2。
+  if (headless) {
     int code = 1;
     try {
       final HeadlessResult result = await runHeadless(

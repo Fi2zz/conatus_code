@@ -1,6 +1,8 @@
 /// MCP 装配：逐台挂载、失败跳过、占位符解析、默认传输分派。
 library;
 
+import 'package:conatus_agent/conatus_agent.dart'
+    show AutoApproval, provideApproval;
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
@@ -57,7 +59,10 @@ void main() {
     expect(ctx.mcp.servers, <String>['fs', 'net']);
     expect(registry.clientOf('fs')?.ready, isTrue);
     expect(registry.toolsOf('fs').single.name, 'fs__read_file');
-    expect(tools.names, containsAll(<String>['fs__read_file', 'net__read_file']));
+    expect(
+      tools.names,
+      containsAll(<String>['fs__read_file', 'net__read_file']),
+    );
   });
 
   test('单台连接失败 → 提示并跳过，其余照常挂载', () async {
@@ -65,12 +70,21 @@ void main() {
     final McpRegistry registry = (await attachMcpServers(
       ctx,
       <McpServerSpec>[
-        const McpServerSpec(name: 'broken', type: McpServerType.stdio, command: 'x'),
-        const McpServerSpec(name: 'ok', type: McpServerType.stdio, command: 'npx'),
+        const McpServerSpec(
+          name: 'broken',
+          type: McpServerType.stdio,
+          command: 'x',
+        ),
+        const McpServerSpec(
+          name: 'ok',
+          type: McpServerType.stdio,
+          command: 'npx',
+        ),
       ],
       transportFactory: (McpServerConfig config) {
-        final FakeMcpTransport transport =
-            config.name == 'broken' ? FakeMcpTransport() : fakes.build(config);
+        final FakeMcpTransport transport = config.name == 'broken'
+            ? FakeMcpTransport()
+            : fakes.build(config);
         if (config.name == 'broken') {
           transport.connectError = StateError('npx 不在 PATH');
         }
@@ -99,36 +113,65 @@ void main() {
       transportFactory: fakes.build,
     );
 
-    expect(fakes.configs['fs']?.env, <String, String>{'API_KEY': 'tvly-secret'});
-    expect(
-      fakes.configs['net']?.headers,
-      <String, String>{'Authorization': r'Bearer ${MISSING_KEY}'},
+    expect(fakes.configs['fs']?.env, <String, String>{
+      'API_KEY': 'tvly-secret',
+    });
+    expect(fakes.configs['net']?.headers, <String, String>{
+      'Authorization': r'Bearer ${MISSING_KEY}',
+    });
+  });
+
+  // E-10 回归：假 server 未声明任何风险信号，工具须提级 high——缺省审批阈值
+  // （provideApproval threshold=high）才拦得住；medium 会静默放行，而 MCP
+  // stdio 子进程不经本地沙箱，审批是唯一防线。
+  test('未声明风险的 MCP 工具在缺省阈值下被审批拦截', () async {
+    final McpRegistry? registry = await attachMcpServers(ctx, <McpServerSpec>[
+      const McpServerSpec(
+        name: 'fs',
+        type: McpServerType.stdio,
+        command: 'npx',
+      ),
+    ], transportFactory: fakes.build);
+
+    expect(registry!.toolsOf('fs').single.riskLevel, ToolRisk.high);
+    provideApproval(ctx, approval: AutoApproval(false));
+    final ToolResult result = await ctx.tools.call(
+      const ToolCall(name: 'fs__read_file'),
     );
+
+    expect(result.isError, isTrue);
+    expect(result.error!.code, 'APPROVAL_DENIED');
   });
 
   test('toMcpTransport 按类型分派默认实现', () {
     expect(
-      toMcpTransport(McpServerConfig(
-        name: 's',
-        type: McpTransportType.stdio,
-        command: 'npx',
-      )),
+      toMcpTransport(
+        McpServerConfig(
+          name: 's',
+          type: McpTransportType.stdio,
+          command: 'npx',
+        ),
+      ),
       isA<StdioTransport>(),
     );
     expect(
-      toMcpTransport(McpServerConfig(
-        name: 'h',
-        type: McpTransportType.http,
-        url: 'https://x',
-      )),
+      toMcpTransport(
+        McpServerConfig(
+          name: 'h',
+          type: McpTransportType.http,
+          url: 'https://x',
+        ),
+      ),
       isA<HttpTransport>(),
     );
     expect(
-      toMcpTransport(McpServerConfig(
-        name: 'e',
-        type: McpTransportType.sse,
-        url: 'https://x',
-      )),
+      toMcpTransport(
+        McpServerConfig(
+          name: 'e',
+          type: McpTransportType.sse,
+          url: 'https://x',
+        ),
+      ),
       isA<SseTransport>(),
     );
   });

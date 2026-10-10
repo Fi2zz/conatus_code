@@ -254,6 +254,9 @@ void main() {
     expect(runtime.tools.names, isNot(contains(kAskUserToolName)));
 
     // 高危工具无审批仍可直执（headless 无人值守，沙箱是安全底线）。
+    // 注意与启动闸门的分工：这里只固化「运行时行为」——headless 不装审批链；
+    // 「沙箱关着就别跑 headless」在入口 bin/conatus_code.dart 经
+    // validateHeadlessSafety 拒绝，两件事各管一层（见 headless_guard.dart）。
     runtime.app.effect(
       () => runtime.tools.fn(
         'danger',

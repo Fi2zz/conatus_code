@@ -461,7 +461,33 @@ token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn
 **已知边界**：泳道视图是**独占**的——切过去就没有对话区。若要「边看边聊」需要改
 布局，那不是本次动的范围。
 
-## 沙箱分层与已知边界
+## headless（`-p`）与安全姿态
+
+`nava -p <任务>` 跑**无人值守的单轮**：装配完整运行时（工具 / 沙箱 / MCP /
+预算）但不启动 TUI，输出回复即退出（`--output-format text|json`）。
+
+**为什么不装审批链**：审批需要一个能应答的人——`AskUserApproval` 依赖 TUI
+浮层，headless 里没有任何东西能回答它，超时还会一律判拒（fail-closed），
+等于把每个 high 调用都卡死。所以 headless 干脆不挂审批中间件，模型调用
+`high` 工具直接执行。这带来一个必须写明的推论：
+
+> **headless 的安全兜底只剩 OS 沙箱（Layer 2）。** `[approval]` 整段配置
+> （包括显式加严的 `always_ask`）在 `-p` 下都不生效——启动时会在 stderr
+> 提示，而不是静默丢弃。
+
+因此启动期设了一道闸门（`validateHeadlessSafety`）：
+
+- 沙箱照常（`enabled = true` 且 `preset = "workspace_write"`）→ 正常启动；
+- `enabled = false` 或 `preset = "danger_full_access"`（两者最终都让命令
+  回本地直执）→ **拒绝启动**，退出码 2：无人值守 + 无审批 + 无沙箱 =
+  模型可无人监督执行任意命令，交互模式能接受的配置在这里不能；
+- 确知风险要在无沙箱环境跑 headless（如已受控的容器），显式传
+  `--allow-unsafe-headless` 放行——把「危险」变成调用方当场做出的决定，
+  而不是配置文件里一处早已遗忘的设置。
+
+同理，未声明风险的 MCP 工具缺省提级 `high`（见 conatus_mcp 的
+`mcpToolRisk`）：stdio 子进程不经本地沙箱，审批是未知风险的唯一防线，
+缺省必须进得去审批阈值。
 
 沙箱（`lib/src/sandbox/`）分两层，各自独立开关、独立失败语义：
 
