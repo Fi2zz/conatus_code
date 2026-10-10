@@ -20,6 +20,8 @@ library;
 
 import 'dart:io';
 
+import 'package:conatus_foundation/conatus_foundation.dart';
+
 import 'checkpoint_paths.dart';
 import 'checkpoint_scan.dart';
 import 'checkpoint_store.dart';
@@ -143,7 +145,16 @@ class GitShadowStore implements CheckpointStore {
         lastEventId: lastEventId,
       ),
     );
+    await _restrictArtifacts(sessionId);
     prune(sessionId);
+  }
+
+  /// 收紧影子仓库落盘权限（E-12）：`checkpoints` 目录 0700 挡住其他用户遍历
+  /// （`shadow.git` 与 `shadow-index` 都在其下），会话索引 600 兜底。
+  Future<void> _restrictArtifacts(String sessionId) async {
+    final File index = indexFile(sessionId);
+    if (index.existsSync()) await restrictFilePermissions(index.path);
+    await restrictDirectoryPermissions(sessionRoot());
   }
 
   @override

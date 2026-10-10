@@ -14,6 +14,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:crypto/crypto.dart';
 
 import 'checkpoint_archive.dart';
@@ -118,7 +119,21 @@ class ArchiveCheckpointStore implements CheckpointStore {
     // 清掉同轮的旧版目录（格式迁移）。
     legacyDir(sessionId, indexTurn)?.deleteSync(recursive: true);
     _upsertIndex(sessionId, files);
+    await _restrictArtifacts(sessionId, target);
     prune(sessionId);
+  }
+
+  /// 收紧会话检查点落盘权限（E-12）：目录 0700 挡遍历、归档 / index / 哈希
+  /// 600 兜底。检查点含工作区全文（可能夹带密钥），此前随 umask 0644 落盘。
+  Future<void> _restrictArtifacts(String sessionId, File archive) async {
+    for (final File file in <File>[
+      archive,
+      indexFile(sessionId),
+      checkpointHashesFile(archive),
+    ]) {
+      if (file.existsSync()) await restrictFilePermissions(file.path);
+    }
+    await restrictDirectoryPermissions(sessionDir(sessionId).path);
   }
 
   Future<CheckpointInfo> _snapshotBase(
