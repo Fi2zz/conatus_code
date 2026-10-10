@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **杂项（E-18）**：MCP 装配的错误收敛包住整段（配置转换 / 传输构造抛错不再
+  中断其余 server）；未解析的 `${KEY}` 占位符报告「哪个键的哪个占位符名」
+  （不打印值），不再静默以 401 收场；检查点归档改临时文件 + rename 原子落盘
+  （崩溃不留半截归档，`_rebuildIndex` 顺带跳过 `.tmp`），临时文件尽力收紧 0600。
 - **后台任务（E-15）**：kill 改走进程树终结（`killProcessTree`，需 conatus
   `process_kill`），沙箱路径不再依赖「sandbox-exec 会杀子进程树」的未验证
   假设；`/background output` 与 `background_output` 工具统一按 8000 字符截尾

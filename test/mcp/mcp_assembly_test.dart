@@ -101,8 +101,50 @@ void main() {
     expect(tools.names, isNot(contains('broken__read_file')));
   });
 
-  test('env/headers 占位符经凭据解析；缺失键原样保留', () async {
-    final Credentials credentials = InMemoryCredentials(
+  test('传输构造抛错不中断整循环：报告并跳过，其余照常挂载', () async {
+    final List<String> messages = <String>[];
+    final McpRegistry registry = (await attachMcpServers(
+      ctx,
+      <McpServerSpec>[
+        const McpServerSpec(name: 'bad', type: McpServerType.stdio, command: 'x'),
+        const McpServerSpec(name: 'ok', type: McpServerType.stdio, command: 'npx'),
+      ],
+      transportFactory: (McpServerConfig config) {
+        if (config.name == 'bad') throw StateError('构造传输即炸');
+        return fakes.build(config);
+      },
+      onError: messages.add,
+    ))!;
+
+    expect(messages, hasLength(1));
+    expect(messages.single, contains('bad'));
+    expect(registry.servers, <String>['ok']);
+    expect(tools.names, contains('ok__read_file'));
+  });
+
+  test('未解析的占位符报告键名（不泄露值）', () async {
+    final List<String> messages = <String>[];
+    await attachMcpServers(
+      ctx,
+      <McpServerSpec>[
+        const McpServerSpec(
+          name: 'net',
+          type: McpServerType.http,
+          url: 'https://x',
+          headers: <String, String>{'Authorization': r'Bearer ${MISSING_KEY}'},
+        ),
+      ],
+      transportFactory: fakes.build,
+      onError: messages.add,
+    );
+
+    expect(messages, hasLength(1));
+    expect(messages.single, contains('MISSING_KEY'));
+    expect(messages.single, contains('headers'));
+    expect(messages.single, isNot(contains('Bearer')));
+  });
+
+  test('env/headers 占位符经凭据解析；缺失键原样保留', () async {    final Credentials credentials = InMemoryCredentials(
       initial: <String, String>{'TAVILY_API_KEY': 'tvly-secret'},
     );
 

@@ -31,6 +31,7 @@ export 'src/checkpoint/checkpoint_archive.dart'
         CheckpointArchiveEntry,
         CheckpointArchiveWriter,
         checkpointArchiveName,
+        kCheckpointArchiveTempSuffix,
         readCheckpointArchive,
         readCheckpointEntries,
         readCheckpointManifest,

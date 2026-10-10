@@ -374,8 +374,12 @@ class ArchiveCheckpointStore implements CheckpointStore {
     final List<CheckpointInfo> infos = <CheckpointInfo>[];
     for (final FileSystemEntity entity in dir.listSync()) {
       final String name = entity.path.split(Platform.pathSeparator).last;
-      // 索引本身与哈希旁挂文件都不是归档（旁挂是纯 gzip JSON，无归档头）。
-      if (name == 'index' || name.endsWith(kCheckpointHashesSuffix)) continue;
+      // 索引本身、哈希旁挂文件、原子写的临时文件都不是归档。
+      if (name == 'index' ||
+          name.endsWith(kCheckpointHashesSuffix) ||
+          name.endsWith(kCheckpointArchiveTempSuffix)) {
+        continue;
+      }
       if (entity is Directory) {
         final int? turn = int.tryParse(name);
         if (turn == null) continue;

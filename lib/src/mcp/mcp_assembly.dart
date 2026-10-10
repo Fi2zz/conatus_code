@@ -32,19 +32,52 @@ Future<McpRegistry?> attachMcpServers(
   final McpRegistry registry = await provideMcp(app, const <McpServerConfig>[]);
   final void Function(String) report = onError ?? stderr.writeln;
   for (final McpServerSpec spec in specs) {
-    final McpServerConfig config = toMcpServerConfig(spec, credentials);
-    final McpClient client = McpClient(
-      transport: transportFactory?.call(config) ?? toMcpTransport(config),
-      serverName: config.name,
-    );
     try {
+      final McpServerConfig config = toMcpServerConfig(spec, credentials);
+      reportUnresolvedPlaceholders(spec.name, config, report);
+      final McpClient client = McpClient(
+        transport: transportFactory?.call(config) ?? toMcpTransport(config),
+        serverName: config.name,
+      );
       await registry.attach(app, client);
     } catch (error) {
+      // 收敛整段：配置转换 / 传输构造 / 握手中任一抛错都只跳过这一台，
+      // 不中断其余 server 的装配（此前只包住 attach，程序化调用会整循环中断）。
       report('MCP server ${spec.name} 连接失败，已跳过：$error');
     }
   }
   return registry;
 }
+
+/// 报告 [config] 的 `env` / `headers` 里仍以 `${KEY}` 形式存在的未解析占位符。
+///
+/// 只报「哪个键的哪个占位符名」——**绝不打印值**（值可能含明文凭据）。解析失败
+/// 会被原样下发，通常以 401 收场；此前完全静默，排障只能从 401 倒推（E-18）。
+void reportUnresolvedPlaceholders(
+  String server,
+  McpServerConfig config,
+  void Function(String message) report,
+) {
+  final Map<String, Map<String, String>> sections = <String, Map<String, String>>{
+    'env': config.env,
+    'headers': config.headers,
+  };
+  for (final MapEntry<String, Map<String, String>> section
+      in sections.entries) {
+    for (final MapEntry<String, String> item in section.value.entries) {
+      for (final RegExpMatch match
+          in _placeholderPattern.allMatches(item.value)) {
+        report(
+          'MCP server $server：${section.key} 键 ${item.key} 的占位符 '
+          '\${${match.group(1)}} 未解析（原样下发，通常导致鉴权失败）',
+        );
+      }
+    }
+  }
+}
+
+/// `${KEY}` 占位符识别；只用来找「没被替换掉」的键名，不解析值。
+final RegExp _placeholderPattern = RegExp(r'\$\{([^}]+)\}');
 
 /// 把 config 层的 [McpServerSpec] 映射为 `conatus_mcp` 的 [McpServerConfig]，
 /// 并解析 `env` / `headers` 里的 `${KEY}` 占位符（解析不了的键原样保留）。

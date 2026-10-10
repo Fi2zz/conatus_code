@@ -30,6 +30,10 @@ typedef CheckpointArchiveEntry = (String path, List<int> bytes);
 String checkpointArchiveName(String sessionId, int turn) =>
     sha256.convert(utf8.encode('$sessionId:$turn')).toString().substring(0, 16);
 
+/// 归档落盘用的临时文件后缀：写临时文件、close 时 rename 覆盖目标，避免崩溃
+/// 留下半截归档（旧实现直接 `openWrite` 目标，写到一半崩即损坏）。
+const String kCheckpointArchiveTempSuffix = '.tmp';
+
 /// 流式归档写入器：构造时写清单头（gzip 流内），随后逐条目写入
 /// （[addBytes] 写内存字节；[addFile] 按 chunk 读文件），[close] 收尾落盘。
 /// 输出格式与 [readCheckpointArchive] 完全兼容。
@@ -41,14 +45,23 @@ class CheckpointArchiveWriter {
     File target,
     CheckpointManifest manifest, {
     this.collectHashes = false,
-  }) : _controller = StreamController<List<int>>() {
-    target.parent.createSync(recursive: true);
-    _done = _controller.stream.transform(gzip.encoder).pipe(target.openWrite());
+  }) : _target = target,
+       _controller = StreamController<List<int>>() {
+    _target.parent.createSync(recursive: true);
+    _temp = File('${target.path}$kCheckpointArchiveTempSuffix')..createSync();
+    // 临时文件同样含工作区内容：尽力收紧 600，别在落盘前的窗口留下 0644 副本
+    // （失败静默——原子性不依赖它，权限最终由 close 后的 _restrictArtifacts 兜底）。
+    if (!Platform.isWindows) {
+      Process.runSync('chmod', <String>['600', _temp.path]);
+    }
+    _done = _controller.stream.transform(gzip.encoder).pipe(_temp.openWrite());
     _controller
       ..add(utf8.encode(jsonEncode(manifest.toJson())))
       ..add(<int>[0x0a]);
   }
 
+  final File _target;
+  late final File _temp;
   final StreamController<List<int>> _controller;
   late final Future<dynamic> _done;
 
@@ -83,10 +96,12 @@ class CheckpointArchiveWriter {
     await sink.absorb(file.openRead());
   }
 
-  /// 关闭 gzip 管道并落盘；之后不可再写。
+  /// 关闭 gzip 管道并**原子落盘**：先写临时文件，收尾 rename 覆盖目标——
+  /// 崩溃只留临时文件，不会把目标截断成半截归档。
   Future<void> close() async {
     await _controller.close();
     await _done;
+    _temp.renameSync(_target.path);
   }
 
   void _writeFrameHeader(String path, int contentLen) {
