@@ -10,7 +10,7 @@ import 'sandboxed_shell_process.dart';
 
 /// 命令被拒时的面向用户说明（含关闭路径）。
 const String kSandboxUnavailable =
-    'OS 沙箱后端不可用（launcher / Rosetta / Seatbelt），命令执行已禁用；'
+    'OS 沙箱后端不可用（sandbox-exec / Seatbelt），命令执行已禁用；'
     '如需关闭请在 config.toml 设置 [sandbox] enabled = false';
 
 /// 沙箱后端不可用时的占位执行器。
