@@ -25,6 +25,20 @@ class BackgroundException implements Exception {
   String toString() => 'BackgroundException($code): $message';
 }
 
+/// 后台任务输出在界面上展示的上限（字符，取尾部）；工具与 TUI 共用同一口径。
+///
+/// 此前工具侧截尾 8000、TUI `/background output` 不截断，同一份输出在两处
+/// 显示不一致；抽成共享常量与 helper 消除歧义。
+const int kBackgroundOutputLimit = 8000;
+
+/// 取 [output] 的展示尾部：超过 [kBackgroundOutputLimit] 时截尾并加前缀标注
+/// （提示已被截断，避免误以为这是全部输出）；未超限原样返回。
+String backgroundOutputTail(String output) {
+  if (output.length <= kBackgroundOutputLimit) return output;
+  return '（输出超长，仅显示末尾 $kBackgroundOutputLimit 字符）\n'
+      '${output.substring(output.length - kBackgroundOutputLimit)}';
+}
+
 /// 一个后台任务的只读视图。
 class BackgroundTaskView {
   const BackgroundTaskView({

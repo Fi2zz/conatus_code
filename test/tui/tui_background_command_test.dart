@@ -92,6 +92,26 @@ void main() {
     expect(controller.transcript.messages.last.text, contains('后台任务不可用'));
   });
 
+  test('/background output 超长时截尾并标注（与工具同口径）', () async {
+    final String big = '${'x' * kBackgroundOutputLimit}尾巴';
+    final (ConatusTuiController controller, Context app) = await _build(
+      processes: <FakeShellProcess>[
+        FakeShellProcess(outputs: <String>[big], killResult: true),
+      ],
+    );
+    addTearDown(app.dispose);
+    await app
+        .get<BackgroundTaskService>('backgroundTasks')!
+        .start('dart build');
+
+    await controller.handleLine('/background output bg-1');
+
+    final String text = controller.transcript.messages.last.text;
+    expect(text, contains('输出超长'));
+    expect(text, endsWith('尾巴'));
+    expect(text.length, lessThan(kBackgroundOutputLimit + 200));
+  });
+
   test('非法子命令给用法提示', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       processes: <FakeShellProcess>[FakeShellProcess()],

@@ -12,14 +12,15 @@ export 'src/background/background_tasks.dart'
         BackgroundException,
         BackgroundTask,
         BackgroundTaskService,
-        BackgroundTaskView;
+        BackgroundTaskView,
+        backgroundOutputTail,
+        kBackgroundOutputLimit;
 export 'src/background/background_tools.dart'
     show
         BackgroundKillTool,
         BackgroundOutputTool,
         ListBackgroundTasksTool,
         RunCommandBackgroundTool,
-        kBackgroundOutputLimit,
         provideBackgroundTools;
 export 'src/budget/budgeted_llm.dart'
     show BudgetedLlmProvider, kBudgetExhaustedReply, provideBudgetedLlm;

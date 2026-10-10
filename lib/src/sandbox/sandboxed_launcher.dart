@@ -53,12 +53,12 @@ Future<CollectedOutput> collectOutput(
   );
 }
 
-/// 先 SIGTERM（sandbox-exec 会杀子进程树），250ms 后补 SIGKILL。
+/// 终结 sandbox-exec 及其全部后代进程（先后代、后根）。
+///
+/// 此前注释假设「sandbox-exec 会杀子进程树」——那是**未验证**的假设；改为显式
+/// 用 `pgrep -P` 递归收后代（[killProcessTree]），不再依赖包装器行为（E-15）。
 void killGracefully(Process process) {
-  process.kill();
-  Timer(const Duration(milliseconds: 250), () {
-    process.kill(ProcessSignal.sigkill);
-  });
+  unawaited(killProcessTree(process.pid));
 }
 
 /// 拒绝结果：不抛异常，exitCode 为 null（调用方按非零处理并看到理由）。

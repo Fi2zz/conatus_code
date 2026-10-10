@@ -61,10 +61,8 @@ class SandboxedShellProcess implements ShellProcess {
   bool kill() {
     if (_status != ShellProcessStatus.running) return false;
     _status = ShellProcessStatus.killed;
-    _process.kill();
-    Timer(const Duration(milliseconds: 250), () {
-      _process.kill(ProcessSignal.sigkill);
-    });
+    // 连后代一起杀：不再依赖「sandbox-exec 会杀子进程树」这一未验证假设（E-15）。
+    unawaited(killProcessTree(_process.pid));
     return true;
   }
 

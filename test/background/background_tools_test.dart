@@ -92,6 +92,27 @@ void main() {
     expect(denied.error?.code, 'rejected');
   });
 
+  test('background_output 超长截尾并标注（工具与 TUI 同口径）', () async {
+    final String big = '${'x' * kBackgroundOutputLimit}尾巴';
+    final (Context app, _, _) = _boot(<FakeShellProcess>[
+      FakeShellProcess(outputs: <String>[big], killResult: true),
+    ]);
+    addTearDown(app.dispose);
+    await app.tools.call(const ToolCall(
+      name: 'run_command_background',
+      arguments: <String, Object?>{'command': 'c'},
+    ));
+
+    final ToolResult output = await app.tools.call(const ToolCall(
+      name: 'background_output',
+      arguments: <String, Object?>{'task_id': 'bg-1'},
+    ));
+
+    expect(output.content, startsWith('（输出超长'));
+    expect(output.content, endsWith('尾巴'));
+    expect(output.content.length, lessThan(kBackgroundOutputLimit + 200));
+  });
+
   test('工具缺参 / 不存在的任务 → 失败', () async {
     final (Context app, _, _) = _boot(<FakeShellProcess>[]);
     addTearDown(app.dispose);

@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **后台任务（E-15）**：kill 改走进程树终结（`killProcessTree`，需 conatus
+  `process_kill`），沙箱路径不再依赖「sandbox-exec 会杀子进程树」的未验证
+  假设；`/background output` 与 `background_output` 工具统一按 8000 字符截尾
+  并标注（此前 TUI 不截断，两处口径不一）。
 - **headless 杂项（E-16）**：OAuth 未实现提示改走 stderr（此前 `print` 污染
   stdout，`--output-format json` 下 `jq` 解析失败）；`-p` / `--print` 缺任务文本
   时报错退出码 2，不再静默落回全交互 TUI（脚本里 `$TASK` 为空会挂起）。

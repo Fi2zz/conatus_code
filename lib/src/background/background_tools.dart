@@ -110,9 +110,7 @@ class BackgroundOutputTool extends Tool {
     try {
       final String output = _service.output(id);
       if (output.isEmpty) return ToolResult.success('（尚无输出）');
-      return ToolResult.success(output.length > kBackgroundOutputLimit
-          ? output.substring(output.length - kBackgroundOutputLimit)
-          : output);
+      return ToolResult.success(backgroundOutputTail(output));
     } on BackgroundException catch (error) {
       return ToolResult.failure(
         error.message,
@@ -157,9 +155,6 @@ class BackgroundKillTool extends Tool {
     }
   }
 }
-
-/// 工具结果里展示的输出上限（取尾部）。
-const int kBackgroundOutputLimit = 8000;
 
 /// 注册 4 个后台任务工具。
 List<Tool> provideBackgroundTools(

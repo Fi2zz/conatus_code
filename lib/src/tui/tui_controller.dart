@@ -1110,7 +1110,8 @@ class ConatusTuiController implements TuiUserPromptHost {
           final String output = service.output(rest);
           transcript.add(
             TuiRole.system,
-            '后台任务 $rest 输出：${output.isEmpty ? '（尚无输出）' : output}',
+            '后台任务 $rest 输出：'
+            '${output.isEmpty ? '（尚无输出）' : backgroundOutputTail(output)}',
           );
         case 'kill':
           if (rest.isEmpty) {
