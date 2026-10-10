@@ -22,35 +22,35 @@ environment:
 dependencies:
   command_shield: ^1.4.0
   conatus:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b}
   conatus_agent:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_agent}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_agent}
   conatus_compaction:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_compaction}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_compaction}
   conatus_core:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_core}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_core}
   conatus_credentials:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_credentials}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_credentials}
   conatus_cron:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_cron}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_cron}
   conatus_foundation:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_foundation}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_foundation}
   conatus_llm:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_llm}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_llm}
   conatus_mcp:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_mcp}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_mcp}
   conatus_schedule:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_schedule}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_schedule}
   conatus_search:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_search}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_search}
   conatus_skill:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_skill}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_skill}
   conatus_tasks:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_tasks}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_tasks}
   conatus_team:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_team}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_team}
   conatus_tts:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_tts}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_tts}
   crypto: ^3.0.0
   dart_io_sandbox: ^1.2.3
   file: ^7.0.0
@@ -70,46 +70,46 @@ dev_dependencies:
 # tool/setup_code_filter.sh 生成）会清空本节 —— workspace 禁止 override 成员包。
 dependency_overrides:
   conatus_agent:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_agent}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_agent}
   conatus_alerting:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_alerting}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_alerting}
   conatus_asr:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_asr}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_asr}
   conatus_browser_use:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_browser_use}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_browser_use}
   conatus_compaction:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_compaction}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_compaction}
   conatus_computer_use:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_computer_use}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_computer_use}
   conatus_core:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_core}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_core}
   conatus_credentials:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_credentials}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_credentials}
   conatus_cron:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_cron}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_cron}
   conatus_foundation:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_foundation}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_foundation}
   conatus_intent:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_intent}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_intent}
   conatus_llm:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_llm}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_llm}
   conatus_mcp:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_mcp}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_mcp}
   conatus_observability:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_observability}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_observability}
   conatus_ontology:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_ontology}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_ontology}
   conatus_schedule:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_schedule}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_schedule}
   conatus_search:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_search}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_search}
   conatus_skill:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_skill}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_skill}
   conatus_tasks:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_tasks}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_tasks}
   conatus_team:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_team}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_team}
   conatus_tts:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_tts}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_tts}
   conatus_workflow:
-    git: {url: https://github.com/Fi2zz/conatus.git, ref: c0621be83054dd2676a9d74a2502abd109395939, path: packages/conatus_workflow}
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 5d6a97dd2d2f0313ea637f0cf28fe0715d9a382b, path: packages/conatus_workflow}
