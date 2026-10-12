@@ -81,7 +81,6 @@ class RipgrepTool extends Tool {
   String _command(ToolContext ctx, bool filesOnly) {
     final List<String> args = <String>[
       '--max-count', '${ctx.optional<int>('limit') ?? defaultLimit}',
-      '--max-count-matches', '$maxMatches',
     ];
     if (ctx.has('type')) args.addAll(<String>['--type', ctx.str('type')]);
     if (ctx.has('context')) args.addAll(<String>['-C', '${ctx.integer('context')}']);

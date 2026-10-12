@@ -59,14 +59,14 @@ void main() {
       expect(result.content, _text.trimRight());
     });
 
-    test('构造参数：max-count / max-count-matches / -- 分隔', () async {
+    test('构造参数：max-count / -- 分隔', () async {
       final FakeShellExecutor shell = FakeShellExecutor(_run(exitCode: 1));
 
       await _tool(shell)
           .call(_context(<String, Object?>{'pattern': 'foo.*bar', 'path': 'lib'}));
 
       expect(shell.lastRequest!.command,
-          "'rg' '--max-count' '50' '--max-count-matches' '1000' '--' 'foo.*bar' 'lib'");
+          "'rg' '--max-count' '50' '--' 'foo.*bar' 'lib'");
     });
 
     test('type / context / limit 参数追加', () async {
