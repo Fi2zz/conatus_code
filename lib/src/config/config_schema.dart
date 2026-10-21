@@ -394,6 +394,7 @@ class XerjConfig {
     this.url = 'http://127.0.0.1:19200',
     this.dataDir,
     this.prefix,
+    this.autoIndex = true,
   });
 
   /// 是否启用 XERJ 工具；`false` 时完全不注册。
@@ -407,6 +408,9 @@ class XerjConfig {
 
   /// 索引前缀；为空时按工作区派生。
   final String? prefix;
+
+  /// 编辑后是否后台增量刷新索引（仅在项目至少索引过一次后生效）。
+  final bool autoIndex;
 }
 
 /// Hooks 配置；对应 `[hooks]` 表（事件 → 命令列表）。

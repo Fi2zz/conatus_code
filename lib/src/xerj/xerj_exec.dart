@@ -8,6 +8,7 @@ import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
 import 'xerj_endpoint.dart';
+import 'xerj_marker.dart';
 
 /// 一次 XERJ 调用的执行器。
 class XerjExec {
@@ -18,6 +19,7 @@ class XerjExec {
     required String url,
     required String prefix,
     this.eviction,
+    this.marker,
     this.searchTimeout = const Duration(seconds: 20),
   }) : _shell = shell,
        _endpoint = endpoint,
@@ -34,10 +36,15 @@ class XerjExec {
   /// 输出超限时落盘（可选）。
   final ToolResultEviction? eviction;
 
+  /// 已索引标记（可选）；成功索引后写入，供自动刷新判断。
+  final XerjMarker? marker;
+
   /// 单次检索超时。
   final Duration searchTimeout;
 
   static const int _maxOutputBytes = 20 * 1024 * 1024;
+
+  Future<ToolResult>? _indexing;
 
   /// 定义优先的代码检索。
   Future<ToolResult> search(String query, {int limit = 5}) => _run(
@@ -83,24 +90,42 @@ class XerjExec {
   );
 
   /// 索引一个目录；`exit 3`（completed-with-junk）按成功处理。
-  Future<ToolResult> index(String path, Duration timeout) => _run(
-    <String>[
-      'autoindex',
-      path,
-      '--url',
-      _url,
-      '--prefix',
-      _prefix,
-      '--progress',
-      'none',
-      '--no-semantic',
-      '--no-graph',
-      '--disable-feedback',
-    ],
-    timeout: timeout,
-    successCodes: const <int>{0, 3},
-    failureCode: 'XERJ_INDEX_FAILED',
-  );
+  ///
+  /// 并发调用合并为同一次运行（自动刷新与用户显式调用不会互相踩）。
+  Future<ToolResult> index(String path, Duration timeout) {
+    final Future<ToolResult>? pending = _indexing;
+    if (pending != null) return pending;
+    final Future<ToolResult> future =
+        _index(path, timeout).whenComplete(() => _indexing = null);
+    _indexing = future;
+    return future;
+  }
+
+  /// 项目是否至少成功索引过一次。
+  Future<bool> hasIndex() async => marker?.marked() ?? false;
+
+  Future<ToolResult> _index(String path, Duration timeout) async {
+    final ToolResult result = await _run(
+      <String>[
+        'autoindex',
+        path,
+        '--url',
+        _url,
+        '--prefix',
+        _prefix,
+        '--progress',
+        'none',
+        '--no-semantic',
+        '--no-graph',
+        '--disable-feedback',
+      ],
+      timeout: timeout,
+      successCodes: const <int>{0, 3},
+      failureCode: 'XERJ_INDEX_FAILED',
+    );
+    if (!result.isError) await marker?.mark();
+    return result;
+  }
 
   Future<ToolResult> _run(
     List<String> arguments, {

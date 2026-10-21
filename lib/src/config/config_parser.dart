@@ -339,6 +339,7 @@ class ConfigParser extends ConfigValues {
       url: readString(table, 'url') ?? 'http://127.0.0.1:19200',
       dataDir: readString(table, 'data_dir'),
       prefix: readString(table, 'prefix'),
+      autoIndex: readBool(table, 'auto_index', true),
     );
   }
 

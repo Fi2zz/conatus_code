@@ -5,13 +5,17 @@
 /// 调用方的行为与接入前完全一致。
 library;
 
+import 'dart:io';
+
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import 'xerj_auto_indexer.dart';
 import 'xerj_binary.dart';
 import 'xerj_endpoint.dart';
 import 'xerj_exec.dart';
+import 'xerj_marker.dart';
 import 'xerj_node.dart';
 import 'xerj_tools.dart';
 
@@ -29,6 +33,8 @@ class XerjOptions {
     this.searchTimeout = const Duration(seconds: 20),
     this.indexTimeout = const Duration(minutes: 10),
     this.defaultLimit = 5,
+    this.autoIndex = true,
+    this.autoIndexDelay = const Duration(seconds: 20),
   });
 
   /// 当前项目目录（索引范围与 `index_project` 的默认路径）。
@@ -64,6 +70,12 @@ class XerjOptions {
   /// 检索默认条数。
   final int defaultLimit;
 
+  /// 编辑后是否在后台增量刷新索引（仅当项目至少索引过一次）。
+  final bool autoIndex;
+
+  /// 编辑停止多久后刷新。
+  final Duration autoIndexDelay;
+
   /// 实际使用的索引前缀：显式优先，否则 `<品牌>-<工作区哈希>`。
   ///
   /// 按工作区隔离，避免同一节点上多个项目的索引互相污染。
@@ -81,20 +93,32 @@ class XerjOptions {
 
 /// 注册 XERJ 检索工具；不可用时返回空列表。
 ///
-/// 依赖 `'shell'` 子进程接缝（缺省从上下文取）。节点由本函数创建时，其
-/// 释放挂在上下文上；注入 [XerjOptions.endpoint] 时由调用方负责生命周期。
+/// 子进程默认走 [LocalShellExecutor]（XERJ 不在模型命令沙箱的白名单里），
+/// 测试可注入替身。节点由本函数创建时，其释放挂在上下文上；注入
+/// [XerjOptions.endpoint] 时由调用方负责生命周期。
 List<Tool> provideXerjSearch(
   Context ctx, {
   required XerjOptions options,
   ShellExecutor? shell,
   ToolResultEviction? eviction,
 }) {
-  final ShellExecutor? executor = shell ?? ctx.get<ShellExecutor>('shell');
   final XerjBinary? binary = options.binary ?? XerjBinary.discover();
   final XerjEndpoint? endpoint =
       options.endpoint ?? _node(ctx, options, binary);
-  if (executor == null || endpoint == null) return const <Tool>[];
+  if (endpoint == null) return const <Tool>[];
+  // XERJ 是用户自行安装的受信二进制，且只在环回地址上工作；默认沙箱会同时
+  // 拒绝它的可执行文件与网络，所以这里固定用本地执行器，不经模型命令沙箱。
+  // 参数由适配层拼装，index_project 的路径被限制在工作区内。
+  final ShellExecutor executor = shell ?? LocalShellExecutor();
 
+  final String? dataDir =
+      options.dataDir == null ? null : _expandHome(options.dataDir!);
+  final XerjMarker? marker = dataDir == null
+      ? null
+      : XerjMarker(
+          '$dataDir${Platform.pathSeparator}indexed'
+          '${Platform.pathSeparator}${_fileSafe(options.resolvedPrefix)}',
+        );
   final XerjExec exec = XerjExec(
     shell: executor,
     endpoint: endpoint,
@@ -102,6 +126,7 @@ List<Tool> provideXerjSearch(
     url: options.url,
     prefix: options.resolvedPrefix,
     eviction: eviction,
+    marker: marker,
     searchTimeout: options.searchTimeout,
   );
   final List<Tool> tools = <Tool>[
@@ -115,6 +140,16 @@ List<Tool> provideXerjSearch(
   ];
   for (final Tool tool in tools) {
     ctx.effect(() => ctx.tools.register(tool));
+  }
+  if (options.autoIndex && dataDir != null) {
+    final XerjAutoIndexer indexer = XerjAutoIndexer(
+      exec: exec,
+      workdir: options.workdir,
+      delay: options.autoIndexDelay,
+      timeout: options.indexTimeout,
+    );
+    indexer.mount(ctx.tools);
+    ctx.onDispose(indexer.dispose);
   }
   return tools;
 }
@@ -131,3 +166,14 @@ XerjEndpoint? _node(Context ctx, XerjOptions options, XerjBinary? binary) {
   ctx.onDispose(node.dispose);
   return node;
 }
+
+String _expandHome(String path) {
+  if (!path.startsWith('~/')) return path;
+  final String? home =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  return home == null ? path : '$home${path.substring(1)}';
+}
+
+final RegExp _unsafeFileChars = RegExp(r'[^A-Za-z0-9._-]');
+
+String _fileSafe(String value) => value.replaceAll(_unsafeFileChars, '_');

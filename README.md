@@ -232,14 +232,16 @@ curl -fsSL https://xerj.org/get | sh    # 装 xerj（不装也能用 nava）
 | `find_definition` | 已知符号名时定位定义与签名 |
 | `index_project` | 为当前项目建/刷新索引（幂等、可续跑） |
 
-首次使用先 `index_project`，之后 `code_search`；大规模改动后重新索引一次。索引不是
-文件 watcher，编辑后不会自动更新。节点由 nava 懒启动在 `127.0.0.1:19200`，同时占用
+首次使用先 `index_project`。之后 `write_file` / `edit_file` / `apply_patch` 成功后，
+会在 20 秒静默期后于后台增量刷新一次（同一时间只跑一个；项目必须先成功索引过一次，
+避免首次使用时突然全量索引）。想关掉设 `auto_index = false`。节点由 nava 懒启动在 `127.0.0.1:19200`，同时占用
 `19201`（XERJ 的 native REST），数据目录 `~/.nava/xerj`（不在工作区内），退出时只停止
 自己启动的节点。索引前缀按工作区哈希派生，多个项目共用同一节点也不会互相污染。
 
 默认 embedder 是**词法哈希**而非神经语义；索引时关闭 semantic 与 graph
 （`--no-semantic --no-graph`），更快更小。检索走本地节点，数据不出本机。命令统一带
-`--disable-feedback`，不会触发 XERJ 的自动反馈上报。
+`--disable-feedback`。XERJ 不在模型命令沙箱的可执行白名单里，适配层直接经本地
+shell 执行它（参数由适配层拼装，`index_project` 的路径限制在工作区内）。
 
 ```toml
 [xerj]
@@ -247,6 +249,7 @@ enabled = true
 url = "http://127.0.0.1:19200"
 # data_dir = "~/.nava/xerj"
 # prefix = ""              # 留空 = 按工作区派生
+# auto_index = true        # 编辑后后台增量刷新
 ```
 
 ## 你

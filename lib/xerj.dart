@@ -6,10 +6,12 @@
 library;
 
 export 'src/xerj/xerj.dart' show XerjOptions, provideXerjSearch;
+export 'src/xerj/xerj_auto_indexer.dart' show XerjAutoIndexer, kXerjWriteTools;
 export 'src/xerj/xerj_binary.dart' show XerjBinary;
 export 'src/xerj/xerj_endpoint.dart'
     show XerjEndpoint, XerjHealthProbe, XerjProcess, XerjProcessStarter;
 export 'src/xerj/xerj_exec.dart' show XerjExec;
+export 'src/xerj/xerj_marker.dart' show XerjMarker;
 export 'src/xerj/xerj_node.dart' show XerjNode;
 export 'src/xerj/xerj_tools.dart'
     show CodeSearchTool, FindDefinitionTool, IndexProjectTool;

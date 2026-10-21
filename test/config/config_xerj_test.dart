@@ -26,6 +26,7 @@ void main() {
     expect(config.xerj.url, 'http://127.0.0.1:19200');
     expect(config.xerj.dataDir, isNull);
     expect(config.xerj.prefix, isNull);
+    expect(config.xerj.autoIndex, isTrue);
   });
 
   test('完整解析', () {
@@ -35,12 +36,14 @@ enabled = false
 url = "http://127.0.0.1:19300"
 data_dir = "~/xerj-data"
 prefix = "nava-fixed"
+auto_index = false
 ''');
 
     expect(config.xerj.enabled, isFalse);
     expect(config.xerj.url, 'http://127.0.0.1:19300');
     expect(config.xerj.dataDir, '~/xerj-data');
     expect(config.xerj.prefix, 'nava-fixed');
+    expect(config.xerj.autoIndex, isFalse);
   });
 
   test('enabled 非布尔抛 ConfigException', () {

@@ -114,7 +114,14 @@ class IndexProjectTool extends Tool {
   @override
   Future<ToolResult> call(ToolContext ctx) async {
     final String path = ctx.string('path') ?? _workdir;
-    final ToolResult result = await _exec.index(_absolute(path), _timeout);
+    final String target = _absolute(path);
+    if (!_within(target, _workdir)) {
+      return _invalid(
+        'path 必须位于项目目录内：$target',
+        code: 'XERJ_PATH_OUTSIDE_WORKDIR',
+      );
+    }
+    final ToolResult result = await _exec.index(target, _timeout);
     final Object? value = result.value;
     final bool junk = value is Map<String, Object?> && value['exitCode'] == 3;
     if (result.isError || !junk) return result;
@@ -130,6 +137,18 @@ class IndexProjectTool extends Tool {
     }
     return '$_workdir${Platform.pathSeparator}$path';
   }
+
+  /// 解析 `..` 后判断 [target] 是否落在 [root] 内。
+  bool _within(String target, String root) {
+    final String normalizedTarget = _normalize(target);
+    final String normalizedRoot = _normalize(root);
+    return normalizedTarget == normalizedRoot ||
+        normalizedTarget.startsWith(
+          '$normalizedRoot${Platform.pathSeparator}',
+        );
+  }
+
+  String _normalize(String path) => Uri.file(path).normalizePath().toFilePath();
 }
 
 int _limit(ToolContext ctx, int fallback) {
@@ -138,7 +157,10 @@ int _limit(ToolContext ctx, int fallback) {
   return value > 50 ? 50 : value;
 }
 
-ToolResult _invalid(String message) => ToolResult.failure(
+ToolResult _invalid(
+  String message, {
+  String code = 'XERJ_INVALID_QUERY',
+}) => ToolResult.failure(
   message,
-  error: ToolError('XERJ_INVALID_QUERY', message),
+  error: ToolError(code, message),
 );

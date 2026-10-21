@@ -217,6 +217,7 @@ class ConatusTuiRuntime {
           url: xerjConfig.url,
           dataDir: xerjConfig.dataDir ?? '${resolveConfigDir()}$sep$xerj',
           prefix: xerjConfig.prefix,
+          autoIndex: xerjConfig.autoIndex,
         ),
       );
     }

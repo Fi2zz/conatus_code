@@ -193,6 +193,19 @@ void main() {
       );
     });
 
+    test('索引路径越出工作区 → 拒绝，不执行命令', () async {
+      final FakeShellExecutor shell = FakeShellExecutor(_run());
+      final IndexProjectTool tool =
+          IndexProjectTool(_exec(shell), workdir: '/repo');
+
+      final ToolResult result = await tool.call(
+        _context('index_project', <String, Object?>{'path': '/etc'}),
+      );
+
+      expect(result.error!.code, 'XERJ_PATH_OUTSIDE_WORKDIR');
+      expect(shell.calls, 0);
+    });
+
     test('exitCode 3（completed-with-junk）视为成功并说明跳过项', () async {
       final FakeShellExecutor shell = FakeShellExecutor(
         _run(exitCode: 3, stdout: '2 junk/skipped'),

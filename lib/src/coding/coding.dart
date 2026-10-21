@@ -55,7 +55,7 @@ List<Tool> provideCoding(
   );
   if (xerj != null) {
     registered.addAll(
-      provideXerjSearch(ctx, options: xerj, shell: shell, eviction: eviction),
+      provideXerjSearch(ctx, options: xerj, eviction: eviction),
     );
   }
   if (enableRuntime && codeRuntime != null) {
