@@ -125,6 +125,7 @@ Future<void> main(List<String> args) async {
     interactive: !headless,
     workdir: workdir,
     checkpoint: config.checkpoint,
+    xerj: config.xerj,
     background: config.background,
     hooks: config.hooks,
     lint: config.lint,

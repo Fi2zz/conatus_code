@@ -22,6 +22,7 @@ class ConfigParser extends ConfigValues {
     services: _readServices(),
     mcp: _readMcp(),
     checkpoint: _readCheckpoint(),
+    xerj: _readXerj(),
     hooks: _readHooks(),
     lint: _readLint(),
     background: _readBackground(),
@@ -328,6 +329,16 @@ class ConfigParser extends ConfigValues {
       keep: readNonNegativeInt(table, 'keep', 5),
       ignore: readStringList(table, 'ignore'),
       backend: CheckpointBackend.parse(readString(table, 'backend')),
+    );
+  }
+
+  XerjConfig _readXerj() {
+    final Map<String, dynamic> table = readTable('xerj');
+    return XerjConfig(
+      enabled: readBool(table, 'enabled', true),
+      url: readString(table, 'url') ?? 'http://127.0.0.1:19200',
+      dataDir: readString(table, 'data_dir'),
+      prefix: readString(table, 'prefix'),
     );
   }
 

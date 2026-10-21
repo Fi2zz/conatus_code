@@ -18,6 +18,7 @@ import 'package:conatus_skill/conatus_skill.dart';
 
 import '../../fs_tools.dart';
 import '../../providers.dart';
+import '../../xerj.dart';
 import '../background/background_tasks.dart';
 import '../background/background_tools.dart';
 import '../budget/budgeted_llm.dart';
@@ -25,6 +26,7 @@ import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
 import '../checkpoint/checkpoint_backend.dart';
 import '../checkpoint/checkpoint_manager.dart';
+import '../config/config_path.dart';
 import '../config/config_schema.dart';
 import '../config/project_data_dir.dart';
 import '../hooks/hooks.dart';
@@ -155,6 +157,7 @@ class ConatusTuiRuntime {
     bool interactive = true,
     String? workdir,
     CheckpointConfig? checkpoint,
+    XerjConfig? xerj,
     BackgroundConfig? background,
     HooksConfig? hooks,
     LintConfig? lint,
@@ -203,6 +206,20 @@ class ConatusTuiRuntime {
     // 不过模型命令白名单（对齐 OpenCode）；模型命令仍走上面的 'shell' 沙箱缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
     provideFsTools(app);
+    // XERJ 代码检索（可选外部二进制）：找不到 xerj 时 provide 返回空列表，
+    // 工具面与未启用完全一致。节点懒启动、数据目录在工作区之外。
+    final XerjConfig xerjConfig = xerj ?? const XerjConfig();
+    if (xerjConfig.enabled) {
+      provideXerjSearch(
+        app,
+        options: XerjOptions(
+          workdir: canonicalWorkdir,
+          url: xerjConfig.url,
+          dataDir: xerjConfig.dataDir ?? '${resolveConfigDir()}$sep$xerj',
+          prefix: xerjConfig.prefix,
+        ),
+      );
+    }
     // 溢出目录必须落在工作目录内（fs jail 以工作目录为根，而溢出预览要让模型
     // 用 read_file 读回来，见 spill_dir.dart）。且必须用**规范化**路径：jail 在
     // 目标父链尚不存在时无法解析符号链接，退回字符串前缀比对，而 jail 的根是

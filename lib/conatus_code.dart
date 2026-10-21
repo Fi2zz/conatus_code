@@ -101,7 +101,8 @@ export 'src/config/config_schema.dart'
         SandboxPreset,
         SandboxSettings,
         ServiceConfig,
-        ThinkingConfig;
+        ThinkingConfig,
+        XerjConfig;
 export 'src/config/config_writer.dart'
     show
         ModelEntry,

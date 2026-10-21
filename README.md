@@ -216,6 +216,39 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 - 事件：42 条
 - 成本：$0.0873（models.dev 口径，非账单）
 
+## 代码检索（XERJ，可选）
+
+[XERJ](https://xerj.org) 是一个本地检索二进制：索引一次源码后，按「定义优先」返回
+`file:line` + 片段，比 `rg` 少读很多上下文。它是**可选外部依赖**——PATH 上没有
+`xerj` 时三个工具都不注册，nava 的行为与接入前完全一致。
+
+```bash
+curl -fsSL https://xerj.org/get | sh    # 装 xerj（不装也能用 nava）
+```
+
+| 工具 | 用途 |
+|------|------|
+| `code_search` | 自然语言/关键词检索，返回定义与片段 |
+| `find_definition` | 已知符号名时定位定义与签名 |
+| `index_project` | 为当前项目建/刷新索引（幂等、可续跑） |
+
+首次使用先 `index_project`，之后 `code_search`；大规模改动后重新索引一次。索引不是
+文件 watcher，编辑后不会自动更新。节点由 nava 懒启动在 `127.0.0.1:19200`，数据目录
+`~/.nava/xerj`（不在工作区内），退出时只停止自己启动的节点。索引前缀按工作区哈希
+派生，多个项目共用同一节点也不会互相污染。
+
+默认 embedder 是**词法哈希**而非神经语义；索引时关闭 semantic 与 graph
+（`--no-semantic --no-graph`），更快更小。检索走本地节点，数据不出本机。命令统一带
+`--disable-feedback`，不会触发 XERJ 的自动反馈上报。
+
+```toml
+[xerj]
+enabled = true
+url = "http://127.0.0.1:19200"
+# data_dir = "~/.nava/xerj"
+# prefix = ""              # 留空 = 按工作区派生
+```
+
 ## 你
 给 checkpoint 加上 git 存储后端
 

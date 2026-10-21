@@ -7,6 +7,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_tasks/conatus_tasks.dart';
 
 import '../../fs_tools.dart';
+import '../../xerj.dart';
 import 'runtime/code_runtime.dart';
 import 'tools/run_code_tool.dart';
 
@@ -39,6 +40,7 @@ List<Tool> provideCoding(
   bool enableSearch = true,
   bool enableRuntime = false,
   int rgLimit = 50,
+  XerjOptions? xerj,
 }) {
   final ToolRegistry registry = tools ?? ctx.tools;
   final List<Tool> registered = provideFsTools(
@@ -51,6 +53,11 @@ List<Tool> provideCoding(
     rgLimit: rgLimit,
     enableSearch: enableSearch,
   );
+  if (xerj != null) {
+    registered.addAll(
+      provideXerjSearch(ctx, options: xerj, shell: shell, eviction: eviction),
+    );
+  }
   if (enableRuntime && codeRuntime != null) {
     ctx.provide('codeRuntime', codeRuntime);
     ctx.onDispose(codeRuntime.dispose);

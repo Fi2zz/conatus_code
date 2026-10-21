@@ -385,6 +385,30 @@ class CheckpointConfig {
   final CheckpointBackend backend;
 }
 
+/// XERJ 代码检索配置；对应 `[xerj]` 表。
+///
+/// 空 [dataDir] / 空 [prefix] 表示按配置目录与工作区自动派生。
+class XerjConfig {
+  const XerjConfig({
+    this.enabled = true,
+    this.url = 'http://127.0.0.1:19200',
+    this.dataDir,
+    this.prefix,
+  });
+
+  /// 是否启用 XERJ 工具；`false` 时完全不注册。
+  final bool enabled;
+
+  /// ES 兼容端点；缺省 19200 以避开本机 Elasticsearch。
+  final String url;
+
+  /// 节点数据目录；不能位于被索引的工作区内。
+  final String? dataDir;
+
+  /// 索引前缀；为空时按工作区派生。
+  final String? prefix;
+}
+
 /// Hooks 配置；对应 `[hooks]` 表（事件 → 命令列表）。
 class HooksConfig {
   const HooksConfig({
@@ -468,6 +492,7 @@ class ConatusCodeConfig {
     this.services = const <ServiceConfig>[],
     this.mcp = const McpConfig(),
     this.checkpoint = const CheckpointConfig(),
+    this.xerj = const XerjConfig(),
     this.hooks = const HooksConfig(),
     this.lint = const LintConfig(),
     this.background = const BackgroundConfig(),
@@ -505,6 +530,9 @@ class ConatusCodeConfig {
 
   /// `[checkpoint]` 表。
   final CheckpointConfig checkpoint;
+
+  /// `[xerj]` 表。
+  final XerjConfig xerj;
 
   /// `[hooks]` 表。
   final HooksConfig hooks;

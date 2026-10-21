@@ -60,6 +60,14 @@ keep = 5                    # 每会话保留最近 N 个检查点（0 = 不限�
                             # git / archive 为显式固定，不做自动降级
                             # 影子仓库更快：开第二个会话不必重拍全量
 
+# XERJ 代码检索（可选）：需自行安装 https://xerj.org 的 xerj 二进制。
+# 节点按需启动，数据目录不能放在被索引的工作区内。
+# [xerj]
+# enabled = true
+# url = "http://127.0.0.1:19200"
+# data_dir = "~/.nava/xerj"
+# prefix = ""                 # 留空 = 按工作区派生独立索引前缀
+
 # Hooks：工具执行前/后与轮次收口的用户命令（经 /bin/sh -c 直连运行）。
 # [hooks]
 # pre_tool_use = ["echo 将在工具前运行 > /tmp/nava-hook.log"]
