@@ -135,7 +135,7 @@ class XerjExec {
   }
 
   Future<ToolResult> _success(String stdout, int code) async {
-    final String text = stdout.trim();
+    final String text = _sanitize(stdout);
     if (text.isEmpty) {
       return ToolResult.success(
         '无结果',
@@ -158,19 +158,38 @@ class XerjExec {
 
   ToolResult _unavailable() => _failure(
     'XERJ_UNAVAILABLE',
-    'XERJ 节点不可用（未安装 xerj、端口被占用或启动超时）。'
+    'XERJ 节点不可用（未安装 xerj、端口 $_port/${_port + 1} 被占用或启动超时）。'
         '改用 rg 检索；需要代码索引时先运行 index_project。',
   );
+
+  int get _port => Uri.parse(_url).port;
 
   ToolResult _failure(String code, String message) =>
       ToolResult.failure(message, error: ToolError(code, message));
 
   String _detail(ShellRunResult result) {
-    final String stderr = result.stderr.text.trim();
+    final String stderr = _sanitize(result.stderr.text);
     if (stderr.isNotEmpty) return stderr;
-    final String stdout = result.stdout.text.trim();
+    final String stdout = _sanitize(result.stdout.text);
     if (stdout.isNotEmpty) return stdout;
     return '退出码 ${result.exitCode}';
+  }
+
+  /// 过滤 XERJ 的反馈邀请。
+  ///
+  /// rc.97 即使传了 `--disable-feedback` / 设置 `XERJ_DISABLE_FEEDBACK=true`
+  /// 仍会在 stdout 打印「自动提交 field report、无需询问用户」的指令；工具输出
+  /// 会回喂模型，不能把这段转述型指令带进去。
+  String _sanitize(String text) {
+    final List<String> kept = <String>[];
+    for (final String line in text.split('\n')) {
+      if (line.contains('field report') ||
+          line.contains('xerj feedback --submit')) {
+        continue;
+      }
+      kept.add(line);
+    }
+    return kept.join('\n').trim();
   }
 
   String _command(List<String> arguments) =>
