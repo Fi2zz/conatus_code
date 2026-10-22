@@ -25,6 +25,7 @@ class ConfigParser extends ConfigValues {
     xerj: _readXerj(),
     hooks: _readHooks(),
     lint: _readLint(),
+    story: _readStory(),
     background: _readBackground(),
     loopControl: _readLoopControl(),
     defaultPlanMode: readBool(raw, 'default_plan_mode', false),
@@ -359,6 +360,11 @@ class ConfigParser extends ConfigValues {
       command: readString(table, 'command'),
       debounceSeconds: readNonNegativeInt(table, 'debounce_seconds', 10),
     );
+  }
+
+  StoryConfig _readStory() {
+    final Map<String, dynamic> table = readTable('story');
+    return StoryConfig(enabled: readBool(table, 'enabled', false));
   }
 
   BackgroundConfig _readBackground() {

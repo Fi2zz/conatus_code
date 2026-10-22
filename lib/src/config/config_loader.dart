@@ -75,6 +75,11 @@ keep = 5                    # 每会话保留最近 N 个检查点（0 = 不限�
 # post_tool_use = []
 # stop = []
 
+# 人机双写故事层（可选，默认关闭）：开启后写工具先成待定补丁，
+# /story 查看时间轴、apply/reject 待定补丁。关闭时行为与普通编码会话一致。
+# [story]
+# enabled = true
+
 # lint-on-edit：模型编辑文件后自动跑 linter 并把告警塞回上下文。
 [lint]
 enabled = true

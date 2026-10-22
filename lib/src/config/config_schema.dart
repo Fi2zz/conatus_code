@@ -449,6 +449,14 @@ class LintConfig {
   final int debounceSeconds;
 }
 
+/// 故事层（人机双写）配置；对应 `[story]` 表。
+class StoryConfig {
+  const StoryConfig({this.enabled = false});
+
+  /// 是否启用故事层：编辑先成待定补丁、`/story` 可用。
+  final bool enabled;
+}
+
 /// 后台任务行为；对应 `[background]` 表（解析保留，供未来执行器消费）。
 class BackgroundConfig {
   const BackgroundConfig({
@@ -499,6 +507,7 @@ class ConatusCodeConfig {
     this.xerj = const XerjConfig(),
     this.hooks = const HooksConfig(),
     this.lint = const LintConfig(),
+    this.story = const StoryConfig(),
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
     this.defaultPlanMode = false,
@@ -543,6 +552,9 @@ class ConatusCodeConfig {
 
   /// `[lint]` 表。
   final LintConfig lint;
+
+  /// `[story]` 表。
+  final StoryConfig story;
 
   /// `[background]` 表。
   final BackgroundConfig background;

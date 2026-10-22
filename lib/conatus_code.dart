@@ -101,6 +101,7 @@ export 'src/config/config_schema.dart'
         SandboxPreset,
         SandboxSettings,
         ServiceConfig,
+        StoryConfig,
         ThinkingConfig,
         XerjConfig;
 export 'src/config/config_writer.dart'
