@@ -4,6 +4,8 @@
 
 ## [未发布]
 
+- **TUI 多行输入**：输入框支持 Shift/Ctrl/Alt+Enter 与 Ctrl+J 换行（最多 8 行，
+  超出内部滚动），Enter 仍提交整段文本。
 - **故事层（可选）**：从 cowriter 并入故事层——编辑即补丁、事前审阅、`/story`
   时间轴与分叉；`[story] enabled` 默认 false，关闭时行为与既有编码会话一致。
   同时合入轮内 steering（排队消息在下一请求边界注入）与 diff 应用纯函数面。

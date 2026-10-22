@@ -10,7 +10,7 @@
 
 ## 特性
 
-- 🖥️ 终端交互（内置 TUI，入口 `lib/tui.dart`）
+- 🖥️ 终端交互（内置 TUI，入口 `lib/tui.dart`；Enter 提交，Shift+Enter / Ctrl+J 换行）
 - 🔍 文件读写与搜索（read_file / write_file / edit_file / rg / glob）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）

@@ -11,8 +11,13 @@ const borderSode = BorderSide(color: Colors.blue);
 /// shell 模式下的输入框边框（紫色，与普通模式的蓝色区分）。
 const BorderSide kShellInputBorder = BorderSide(color: Colors.magenta);
 
-/// 输入栏：`> ` 前缀 + 单行输入框。思考中保持可编辑：回车把消息排队
-/// （控制器侧队列），占位提示显示已排队条数；「思考中」动画在状态栏。
+/// 输入框最多显示的行数（超出后内部滚动；终端高度有限，不无限吃屏）。
+const int kInputMaxLines = 8;
+
+/// 输入栏：`> ` 前缀 + 可换行输入框（最多 [kInputMaxLines] 行）。
+/// Enter 提交，Shift/Ctrl/Alt+Enter 或 Ctrl+J 换行（终端不支持修饰键时
+/// Ctrl+J 始终可用）。思考中保持可编辑：回车把消息排队（控制器侧队列），
+/// 占位提示显示已排队条数；「思考中」动画在状态栏。
 ///
 /// 附件以占位标记（`[image #N (宽×高)]`）形式留在输入框文本里，随文本提交时
 /// 提取（见 `tui_attachment.dart`），不再单独渲染附件行。
@@ -53,7 +58,9 @@ class TuiInputBar extends StatelessComponent {
   String _placeholder() {
     if (busy && queuedCount > 0) return '已排队 $queuedCount 条，回车继续排队';
     if (busy) return '思考中…可继续输入，回车排队';
-    return shellMode ? shellInputPlaceholder() : '输入消息，/help 查看命令';
+    return shellMode
+        ? shellInputPlaceholder()
+        : '输入消息，/help 查看命令（Shift+Enter 换行）';
   }
 
   /// 输入框边框：shell 模式紫色（一眼区分当前在跑 shell），其余蓝色。
@@ -86,6 +93,8 @@ class TuiInputBar extends StatelessComponent {
             child: TextField(
               controller: controller,
               focused: focused,
+              minLines: 1,
+              maxLines: kInputMaxLines,
               style: const TextStyle(color: Colors.white),
               placeholder: _placeholder(),
               onSubmitted: onSubmitted,
