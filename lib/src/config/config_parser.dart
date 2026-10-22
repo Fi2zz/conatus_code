@@ -1,6 +1,9 @@
 /// 把 TOML 顶层表映射为强类型配置。
 library;
 
+import 'package:conatus_agent/conatus_agent.dart'
+    show PermissionEffect, PermissionRule;
+
 import 'config_schema.dart';
 import 'config_values.dart';
 
@@ -15,6 +18,7 @@ class ConfigParser extends ConfigValues {
     models: _readModels(),
     agent: _readAgent(),
     approval: _readApproval(),
+    permissions: _readPermissions(),
     sandbox: _readSandbox(),
     budget: _readBudget(),
     credentials: _readCredentials(),
@@ -157,6 +161,40 @@ class ConfigParser extends ConfigValues {
     final String? mode =
         readString(raw, 'default_permission_mode') ?? readString(table, 'mode');
     return ApprovalConfig(mode: _approvalMode(mode));
+  }
+
+  /// 顶层 `[[permissions]]`：`action` / `resource` / `effect` 三项必填。
+  PermissionConfig _readPermissions() {
+    final List<Map<String, dynamic>> tables = readTableList('permissions');
+    return PermissionConfig(
+      rules: <PermissionRule>[
+        for (final Map<String, dynamic> table in tables) _readPermission(table),
+      ],
+    );
+  }
+
+  PermissionRule _readPermission(Map<String, dynamic> table) => PermissionRule(
+        action: _requiredPermissionField(table, 'action'),
+        resource: _requiredPermissionField(table, 'resource'),
+        effect: _permissionEffect(_requiredPermissionField(table, 'effect')),
+        source: 'config',
+      );
+
+  String _requiredPermissionField(Map<String, dynamic> table, String key) {
+    final String? value = readString(table, key);
+    if (value == null) {
+      throw ConfigException('$source：permissions 的 $key 不能为空。');
+    }
+    return value;
+  }
+
+  PermissionEffect _permissionEffect(String value) {
+    for (final PermissionEffect effect in PermissionEffect.values) {
+      if (effect.name == value) return effect;
+    }
+    throw ConfigException(
+      '$source：permissions 的 effect "$value" 不合法（allow/ask/deny）。',
+    );
   }
 
   SandboxSettings _readSandbox() {

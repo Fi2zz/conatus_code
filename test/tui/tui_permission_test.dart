@@ -332,6 +332,33 @@ void main() {
     });
   });
 
+  group('总是允许持久化', () {
+    test('选择后把推导出的规则交给 rememberRule，并保留会话内放行', () async {
+      final TuiChoicePrompt choice = TuiChoicePrompt();
+      final List<PermissionRule> rules = <PermissionRule>[];
+      final TuiPermissionGate gate = TuiPermissionGate(
+        choice: choice,
+        rememberRule: rules.add,
+      );
+      final ApprovalRequest request = ApprovalRequest(
+        id: 'r5',
+        toolName: 'run_command',
+        action: 'shell',
+        resources: const <String>['git status --short'],
+      );
+
+      final Future<bool> pending = gate.request(request);
+      choice
+        ..move(1)
+        ..confirm();
+
+      expect(await pending, isTrue);
+      expect(rules.single.resource, 'git *');
+      expect(rules.single.effect, PermissionEffect.allow);
+      expect(gate.alwaysAllowed, contains('run_command'));
+    });
+  });
+
   group('restorePermissionMode', () {    test('无记录时为默认档', () {
       final Session session = Session(id: 's');
       expect(restorePermissionMode(session), TuiPermissionMode.askWhenNeeded);

@@ -253,10 +253,8 @@ void main() {
     expect(runtime.app.get<TuiChoicePrompt>('tuiChoice'), isNull);
     expect(runtime.tools.names, isNot(contains(kAskUserToolName)));
 
-    // 高危工具无审批仍可直执（headless 无人值守，沙箱是安全底线）。
-    // 注意与启动闸门的分工：这里只固化「运行时行为」——headless 不装审批链；
-    // 「沙箱关着就别跑 headless」在入口 bin/conatus_code.dart 经
-    // validateHeadlessSafety 拒绝，两件事各管一层（见 headless_guard.dart）。
+    // headless 不装审批人：需要询问的高危工具按拒绝处理（fail-closed），
+    // 而不是静默直执。沙箱仍是执行层的安全底线。
     runtime.app.effect(
       () => runtime.tools.fn(
         'danger',
@@ -265,10 +263,10 @@ void main() {
         handler: (ToolContext ctx) async => ToolResult.success('danger'),
       ),
     );
-    expect(
-      (await runtime.tools.call(const ToolCall(name: 'danger'))).isError,
-      isFalse,
-    );
+    final ToolResult denied =
+        await runtime.tools.call(const ToolCall(name: 'danger'));
+    expect(denied.isError, isTrue);
+    expect(denied.error!.code, 'PERMISSION_ASK_UNATTENDED');
 
     await runtime.dispose();
   });

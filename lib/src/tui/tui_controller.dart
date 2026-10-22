@@ -33,6 +33,7 @@ import '../config/config_writer.dart';
 import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
+import '../permissions/permission_wiring.dart';
 import '../story/story.dart';
 import '../story/story_commands.dart';
 import '../story/story_notices.dart';
@@ -320,9 +321,6 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 团队语音播报（随会话绑定/解绑；tts 注入时启用）。
   VoiceReporter? _voice;
 
-  /// 当前权限模式下挂着的审批中间件撤销句柄；Never Ask 时为 `null`。
-  Disposer? _approvalGate;
-
   /// 当前权限模式（随绑定的会话变化）。
   TuiPermissionMode _permissionMode = TuiPermissionMode.askWhenNeeded;
 
@@ -359,7 +357,25 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 团队状态快照（未装配团队或未绑定时为空）。
   TeamSnapshot get teamSnapshot => _teamSub?.snapshot ?? const TeamSnapshot();
 
-  /// 切换权限模式：持久化到当前会话、按新阈值重挂审批中间件并提示。
+  /// 追加一条系统提示并重绘（权限规则保存失败等降级路径用）。
+  void showSystemNotice(String text) {
+    transcript.add(TuiRole.system, text);
+    _refresh();
+  }
+
+  /// 把一条「总是允许」规则写入项目 `permissions.json` 并更新根作用域。
+  ///
+  /// 写入失败时保留会话内临时放行（调用方已加白名单），只把原因上屏：权限
+  /// 文件损坏时拒绝覆盖是 `PermissionStore` 的既定契约，不能静默吞掉。
+  Future<void> rememberPermissionRule(PermissionRule rule) async {
+    final PermissionWiring? wiring =
+        _app.get<PermissionWiring>('permissionWiring');
+    if (wiring == null) return;
+    final String? warning = await wiring.remember(rule);
+    if (warning != null) showSystemNotice('权限规则未保存：$warning');
+  }
+
+  /// 切换权限模式：持久化到当前会话、更新根权限作用域阈值并提示。
   ///
   /// 会话未绑定时拒绝：此时既无法持久化、模式也会在绑定后被恢复逻辑覆盖，
   /// 静默生效只会让界面提示与实际状态不符。
@@ -371,7 +387,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       _refresh();
       return;
     }
-    if (mode == _permissionMode && _approvalGate != null) {
+    if (mode == _permissionMode) {
       return;
     }
     _permissionMode = mode;
@@ -381,21 +397,24 @@ class ConatusTuiController implements TuiUserPromptHost {
     _refresh();
   }
 
-  /// 按当前模式挂载 / 卸载审批中间件（幂等）。
+  /// 按当前模式更新根权限作用域的兜底阈值（幂等）。
+  ///
+  /// 权限中间件只在根上下文挂一次（见 `instrumentPermission`），这里不需要
+  /// 重挂任何中间件：换会话 / 换模式只改槽位里的 `askThreshold`。
   void _syncPermissionMode() {
-    _approvalGate?.call();
-    _approvalGate = null;
-    final TuiPermissionGate? gate = _gate;
     final ToolRisk? threshold = _permissionMode.threshold;
-    if (gate == null || threshold == null) {
+    final PermissionWiring? wiring =
+        _app.get<PermissionWiring>('permissionWiring');
+    if (wiring != null) {
+      wiring.applyMode(askThreshold: threshold, agentId: 'build');
       return;
     }
-    _approvalGate = instrumentApproval(
-      _app,
-      approval: gate,
-      threshold: threshold,
-      timeout: kTuiDecisionTimeout,
-    );
+    final PermissionScopeSlot? slot =
+        _app.get<PermissionScopeSlot>(kPermissionScopeService);
+    slot?.set(PermissionScope(
+      rules: slot.current.rules,
+      askThreshold: threshold,
+    ));
   }
 
   /// 绑定初始会话；未配置 provider 时自动打开引导面板。
@@ -1777,7 +1796,7 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/permission`：打开权限模式选择面板（不经模型）。
   ///
-  /// 选中后经 [applyPermissionMode] 持久化到会话并重挂审批中间件；取消不切换。
+  /// 选中后经 [applyPermissionMode] 持久化到会话并更新作用域阈值；取消不切换。
   Future<void> _handlePermission() async {
     final TuiPermissionMode? mode =
         await permissionPrompt.choose(_permissionMode);
@@ -1929,8 +1948,6 @@ class ConatusTuiController implements TuiUserPromptHost {
     _eventSub = null;
     _voice?.dispose();
     _voice = null;
-    _approvalGate?.call();
-    _approvalGate = null;
     _teamSub?.dispose();
     _teamSub = null;
     _app.get<CheckpointManager>('checkpointManager')?.detach();

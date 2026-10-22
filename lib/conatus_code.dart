@@ -95,6 +95,7 @@ export 'src/config/config_schema.dart'
         McpServerSpec,
         McpServerType,
         ModelConfig,
+        PermissionConfig,
         ProviderConfig,
         ProviderType,
         RetrySettings,
@@ -150,6 +151,9 @@ export 'src/lint/linter.dart'
         kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
+export 'src/permissions/permission_rule_pattern.dart'
+    show kRememberedRuleSource, permissionRuleFor;
+export 'src/permissions/permission_wiring.dart' show PermissionWiring;
 export 'src/sandbox/command_policy.dart'
     show
         CommandDecision,

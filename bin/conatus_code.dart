@@ -130,6 +130,8 @@ Future<void> main(List<String> args) async {
     hooks: config.hooks,
     lint: config.lint,
     story: config.story,
+    permissions: config.permissions,
+    approvalMode: config.approval.mode,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。

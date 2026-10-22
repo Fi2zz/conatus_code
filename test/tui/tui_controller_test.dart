@@ -131,6 +131,9 @@ Future<(ConatusTuiController, Context)> _build(
       instrument: false,
     );
   }
+  // 权限中间件在根上下文只挂一次；控制器只更新槽位（见 _syncPermissionMode）。
+  app.provide(kPermissionScopeService, PermissionScopeSlot());
+  instrumentPermission(app);
   final SessionStore sessions = provideSessions(app);
   final ConatusTuiController controller = ConatusTuiController(
     app: app,
@@ -844,7 +847,7 @@ void main() {
     app.dispose();
   });
 
-  test('applyPermissionMode 切换模式并重挂审批中间件', () async {
+  test('applyPermissionMode 切换模式并更新作用域阈值', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
       withApproval: true,
@@ -901,7 +904,7 @@ void main() {
     app.dispose();
   });
 
-  test('dispose 撤销审批中间件', () async {
+  test('控制器销毁不撤销根权限中间件（中间件只在根挂一次）', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
       withApproval: true,
@@ -916,12 +919,12 @@ void main() {
 
     controller.dispose();
 
-    // 中间件已撤销：不再弹浮层，调用直接通过。
-    expect(
-      (await app.tools.call(const ToolCall(name: 'risky'))).isError,
-      isFalse,
-    );
-    expect(controller.choice.open, isFalse);
+    // 权限中间件属于根上下文，不随控制器销毁；会话切换也不重挂。
+    final Future<ToolResult> blocked =
+        app.tools.call(const ToolCall(name: 'risky'));
+    expect(controller.choice.open, isTrue);
+    controller.choice.cancel();
+    expect((await blocked).error!.code, 'APPROVAL_DENIED');
     app.dispose();
   });
 

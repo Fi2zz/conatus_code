@@ -12,8 +12,10 @@ import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
 import '../diff/preview.dart';
+import '../permissions/permission_rule_pattern.dart';
 import 'tui_choice.dart';
 import 'tui_permission.dart';
+import 'tui_permission_detail.dart';
 
 /// 等待用户决策的时长：交互类提问不受工具默认超时约束。
 const Duration kTuiDecisionTimeout = Duration(minutes: 30);
@@ -34,10 +36,17 @@ class TuiPermissionGate implements Approval {
     required this.choice,
     FileSystem? fs,
     this.mode = TuiPermissionMode.askWhenNeeded,
+    this.rememberRule,
   }) : _fs = fs;
 
   /// 选项浮层。
   final TuiChoicePrompt choice;
+
+  /// 「总是允许」时把推导出的规则交给宿主持久化（如写入项目 `permissions.json`）。
+  ///
+  /// 回调失败不应影响本次放行：会话内白名单照常生效，宿主可自行提示保存失败。
+  /// 未提供时只保留会话级白名单（旧行为）。
+  final void Function(PermissionRule)? rememberRule;
 
   /// 文件系统能力缝；用于把「信任此文件夹」判定为目录包含关系。
   /// 未提供时该选项不出现（退化为「总是允许该工具」）。
@@ -102,6 +111,7 @@ class TuiPermissionGate implements Approval {
     }
     if (picked == kApprovalAllowAlways) {
       _alwaysAllowed.add(request.toolName);
+      rememberRule?.call(permissionRuleFor(request));
       return true;
     }
     return picked == kApprovalAllowOnce;
@@ -153,6 +163,9 @@ class TuiPermissionGate implements Approval {
       arguments: request.arguments,
       description: preview,
       pathArgs: request.pathArgs,
+      action: request.action,
+      resources: request.resources,
+      rule: request.rule,
       createdAt: request.createdAt,
     );
   }
@@ -208,13 +221,12 @@ class TuiPermissionGate implements Approval {
     final String? folder = request.pathArgs.isEmpty || _fs == null
         ? null
         : _parentLabel(request.pathArgs.first);
+    final String detail = approvalRequestDetail(request);
     return <TuiChoice>[
       TuiChoice(
         id: kApprovalAllowOnce,
         label: '允许一次',
-        description: request.description.isEmpty
-            ? '本次调用后重新询问。'
-            : request.description,
+        description: detail.isEmpty ? '本次调用后重新询问。' : detail,
       ),
       if (folder != null)
         TuiChoice(

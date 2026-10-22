@@ -19,6 +19,7 @@ import 'package:conatus_skill/conatus_skill.dart';
 import '../../fs_tools.dart';
 import '../../providers.dart';
 import '../../xerj.dart';
+import '../assembly/permission_mode.dart';
 import '../background/background_tasks.dart';
 import '../background/background_tools.dart';
 import '../budget/budgeted_llm.dart';
@@ -32,6 +33,7 @@ import '../config/project_data_dir.dart';
 import '../hooks/hooks.dart';
 import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
+import '../permissions/permission_wiring.dart';
 import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
@@ -56,6 +58,22 @@ String _canonicalize(String path) {
   } on FileSystemException {
     return path;
   }
+}
+
+/// 持久化「总是允许」规则；失败时把原因作为系统提示上屏。
+Future<void> _rememberPermissionRule(
+  Context app,
+  PermissionWiring wiring,
+  PermissionRule rule,
+) async {
+  final ConatusTuiController? controller =
+      app.get<ConatusTuiController>('tuiController');
+  if (controller != null) {
+    await controller.rememberPermissionRule(rule);
+    return;
+  }
+  // 没有控制器（库用法）时仍然落盘，只是没有屏上提示。
+  await wiring.remember(rule);
 }
 
 class ConatusTuiRuntime {
@@ -166,6 +184,8 @@ class ConatusTuiRuntime {
     HooksConfig? hooks,
     LintConfig? lint,
     StoryConfig? story,
+    PermissionConfig? permissions,
+    ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
@@ -200,6 +220,27 @@ class ConatusTuiRuntime {
         handler: (ToolContext ctx) async => ToolResult.success(ctx.str('text')),
       ),
     );
+
+    // ── 权限：最外层工具中间件 ──────────────────────────────────
+    // 必须在 hooks / 结果驱逐 / lint / story 之前注册：那些中间件能短路调用，
+    // 晚注册就会让权限规则看不到被拦下的调用。会话切换只换槽位里的作用域
+    // （见 ConatusTuiController._syncPermissionMode），这里挂一次即可。
+    final PermissionWiring permissionWiring = PermissionWiring(
+      store: PermissionStore('$resolvedBaseDir${sep}permissions.json'),
+      configRules: permissions?.rules ?? const <PermissionRule>[],
+    );
+    await permissionWiring.load();
+    // 交互模式下阈值等控制器绑定会话后再设（`_syncPermissionMode`）：没有
+    // 控制器的库用法（只建 runtime 直接调工具）与旧行为一致——不弹审批。
+    // headless 没有绑定时机，配置里的 `[approval] mode` 直接落到这里。
+    permissionWiring.applyMode(
+      askThreshold:
+          interactive ? null : toTuiPermissionMode(approvalMode).threshold,
+      agentId: 'build',
+    );
+    app.provide('permissionWiring', permissionWiring);
+    app.provide(kPermissionScopeService, permissionWiring.slot);
+    instrumentPermission(app, interactive: interactive);
 
     provideTelemetry(app);
     instrumentTools(app);
@@ -269,6 +310,10 @@ class ConatusTuiRuntime {
       final TuiPermissionGate gate = TuiPermissionGate(
         choice: choice,
         fs: app.get<FileSystem>('fs'),
+        // 「总是允许」落盘到项目 permissions.json；失败只提示，不撤销本次放行。
+        rememberRule: (PermissionRule rule) {
+          unawaited(_rememberPermissionRule(app, permissionWiring, rule));
+        },
       );
       provideApproval(
         app,

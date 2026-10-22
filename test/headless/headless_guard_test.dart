@@ -87,7 +87,7 @@ void main() {
   });
 
   group('approvalModeIgnoredNotice', () {
-    test('headless + always_ask → 提示配置不生效', () {
+    test('headless + always_ask → 提示会直接拒绝需要确认的工具', () {
       final String? notice = approvalModeIgnoredNotice(
         headless: true,
         approval: const ApprovalConfig(mode: ApprovalMode.alwaysAsk),
@@ -95,7 +95,8 @@ void main() {
 
       expect(notice, isNotNull);
       expect(notice, contains('always_ask'));
-      expect(notice, contains('不生效'));
+      expect(notice, contains('拒绝'));
+      expect(notice, contains('PERMISSION_ASK_UNATTENDED'));
     });
 
     test('headless + 缺省/never_ask → 不打扰', () {

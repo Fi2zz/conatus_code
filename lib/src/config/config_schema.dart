@@ -1,6 +1,7 @@
 /// conatus_code 的配置模型，对应 `~/.nava/config.toml`。
 library;
 
+import 'package:conatus_agent/conatus_agent.dart' show PermissionRule;
 import 'package:conatus_llm/conatus_llm.dart';
 
 /// LLM 选择：`provider/model` 同时定当前提供商与默认模型。
@@ -142,6 +143,18 @@ class ApprovalConfig {
 
   /// 缺省「需要时询问」。
   final ApprovalMode mode;
+}
+
+/// 权限规则基线；对应顶层 `[[permissions]]`（array-of-tables）。
+///
+/// 这些规则只读，在 `config → project → session` 的合成顺序里排最前；项目
+/// `permissions.json` 与会话规则可以覆盖它们（后出现者生效，见
+/// `PermissionEngine`）。不配置时为空列表，行为与旧版审批阈值完全一致。
+class PermissionConfig {
+  const PermissionConfig({this.rules = const <PermissionRule>[]});
+
+  /// `config → project → session` 复合顺序里的第一层。
+  final List<PermissionRule> rules;
 }
 
 /// 沙箱预设。
@@ -508,6 +521,7 @@ class ConatusCodeConfig {
     this.models = const <ModelConfig>[],
     this.agent = const AgentConfig(),
     this.approval = const ApprovalConfig(),
+    this.permissions = const PermissionConfig(),
     this.sandbox = const SandboxSettings(),
     this.budget = const BudgetConfig(),
     this.credentials = const <String, String>{},
@@ -537,6 +551,10 @@ class ConatusCodeConfig {
 
   final AgentConfig agent;
   final ApprovalConfig approval;
+
+  /// 顶层 `[[permissions]]`：`config` 层的只读规则基线。
+  final PermissionConfig permissions;
+
   final SandboxSettings sandbox;
   final BudgetConfig budget;
 

@@ -32,6 +32,28 @@ class ConfigValues {
     return value.cast<String, dynamic>();
   }
 
+  /// 取表数组（TOML `[[key]]`）；缺失返回空列表。
+  ///
+  /// 用于顶层 `[[permissions]]` 这类 array-of-tables：每一项必须是表，元素
+  /// 顺序即书写顺序（规则优先级依赖它）。
+  List<Map<String, dynamic>> readTableList(String key) {
+    final Object? value = raw[key];
+    if (value == null) return const <Map<String, dynamic>>[];
+    if (value is! List) {
+      throw ConfigException('$source：$key 必须是表数组（[[$key]]）。');
+    }
+    return <Map<String, dynamic>>[
+      for (final Object? item in value) _readTableItem(key, item),
+    ];
+  }
+
+  Map<String, dynamic> _readTableItem(String key, Object? item) {
+    if (item is! Map) {
+      throw ConfigException('$source：$key 的每一项必须是表（[[$key]]）。');
+    }
+    return item.cast<String, dynamic>();
+  }
+
   /// 取非空字符串；缺失或空串返回 `null`。
   String? readString(Map<String, dynamic> table, String key) {
     final Object? value = table[key];
