@@ -6,33 +6,49 @@
 /// 时命令工具那条路径上能被字面识别的写法；变量拼接、`sh -c "$CMD"`、读脚本
 /// 再执行、`eval` 等都能绕过。
 ///
+/// 覆盖两个目录：项目级 `.opencode` 与全局 `~/.config/opencode`
+/// （`rm -rf ~/.config/opencode` 同样必须拒）。
+///
 /// 保守取舍：宁可误拒（例如 `cat .opencode/x > out.txt` 也被拒），也不放过
 /// 明显的写入形态。
 library;
 
+import '../read_only_paths.dart';
+
 /// 错误码（与 fs 闸门的 `FsErrorCode.permissionDenied` 同一文案体系）。
-const String kReadOnlyCommandCode = 'READ_ONLY_PATH';
+const String kReadOnlyCommandCode = kReadOnlyPathCode;
 
-/// 拒绝信息，与 `read_only_path_guard.dart` 的 `kReadOnlyPathMessage` 同文。
-const String kReadOnlyCommandMessage = 'READ_ONLY_PATH: .opencode 目录只读';
+/// 拒绝信息，与 fs 闸门共用同一文案。
+const String kReadOnlyCommandMessage = kReadOnlyPathMessage;
 
-/// 命令字面命中「`.opencode` 路径段 + 写类操作符」时返回拒绝信息，否则 null。
+/// 命令字面命中「受保护目录 + 写类操作符」时返回拒绝信息，否则 null。
 String? readOnlyCommandViolation(String command) {
   if (!_mentionsProtectedSegment(command)) return null;
   if (!_looksWrite(command)) return null;
   return kReadOnlyCommandMessage;
 }
 
-/// 去掉引号与反斜杠后，按「路径段边界」匹配 `.opencode`。
+/// 去掉引号与反斜杠后按「路径段边界」匹配两个受保护目录。
 ///
-/// 覆盖 `.opencode/x`、`x/.opencode`、`>.opencode/x`、`--path=.opencode/x`
-/// 等写法；`.opencode-backup`、`my.opencode.txt` 不算。
+/// 覆盖 `.opencode/x`、`x/.opencode`、`>.opencode/x`、`--path=.opencode/x`、
+/// `~/.config/opencode`、`$HOME/.config/opencode` 等写法；
+/// `.opencode-backup`、`my.opencode.txt` 不算。
 bool _mentionsProtectedSegment(String command) {
   final String flat = command.replaceAll(RegExp(r'''["'`\\]'''), ' ');
-  return RegExp(
-    r'(^|[\s=:;,()<>|&/])\.opencode($|[\s=:;,()<>|&/])',
-  ).hasMatch(flat);
+  return _projectSegment.hasMatch(flat) || _globalSegment.hasMatch(flat);
 }
+
+/// 项目级 `.opencode` 段；大小写不敏感（APFS 上 `.OPENCODE` 是同一目录）。
+final RegExp _projectSegment = RegExp(
+  r'(^|[\s=:;,()<>|&/])\.opencode($|[\s=:;,()<>|&/])',
+  caseSensitive: false,
+);
+
+/// 全局 `.../.config/opencode`（`~`、`$HOME` 或绝对路径拼写）。
+final RegExp _globalSegment = RegExp(
+  r'(^|[\s=:;,()<>|&/])\.config/opencode($|[\s=:;,()<>|&/])',
+  caseSensitive: false,
+);
 
 /// 写类操作符 / 命令：重定向、tee、rm、mv、cp、sed -i、truncate、touch……
 final RegExp _writeOps = RegExp(

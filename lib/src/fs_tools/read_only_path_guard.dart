@@ -8,30 +8,16 @@
 /// 判定同时看两种拼写：`inner.processPath`（已解析符号链接的规范路径）与
 /// `target.displayPath`（字面路径）。前者让别名 / 符号链接下的真实位置参与
 /// 比较，后者挡住「`.opencode` 下的链接指向外部」——任一命中即拒绝，
-/// fail-closed。
+/// fail-closed。受保护根本身也补规范拼写，且**根尚不存在时**沿最近的已存在
+/// 祖先解析（见 [realPathViaAncestor]），否则 `.opencode` 未创建时闸门会
+/// fail-open。
 library;
 
 import 'dart:io';
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-/// 拒绝信息（配 [FsErrorCode.permissionDenied] 回给模型）。
-const String kReadOnlyPathMessage = 'READ_ONLY_PATH: .opencode 目录只读';
-
-/// 项目级与全局 OpenCode 目录（绝对路径）。[home] 缺省取环境变量 `HOME`
-/// （再退到 `USERPROFILE`）；相对 [workdir] 按当前工作目录转绝对。
-List<String> defaultReadOnlyRoots(String workdir, {String? home}) {
-  final String sep = Platform.pathSeparator;
-  final String? resolvedHome =
-      home ??
-      Platform.environment['HOME'] ??
-      Platform.environment['USERPROFILE'];
-  return <String>[
-    _normalize('${Directory(workdir).absolute.path}$sep.opencode'),
-    if (resolvedHome != null && resolvedHome.isNotEmpty)
-      _normalize('$resolvedHome$sep.config${sep}opencode'),
-  ];
-}
+import '../read_only_paths.dart';
 
 /// 把写/删限制在受保护根之外的 [FileSystem] 装饰器。
 ///
@@ -42,7 +28,8 @@ class ReadOnlyPathGuard implements FileSystem {
   ReadOnlyPathGuard({required this.inner, required List<String> protectedRoots})
     : protectedRoots = <String>[
         for (final String root in protectedRoots)
-          if (root.trim().isNotEmpty) _normalize(Directory(root).absolute.path),
+          if (root.trim().isNotEmpty)
+            normalizeReadOnlyPath(Directory(root).absolute.path),
       ];
 
   /// 实际执行 I/O 的后端。
@@ -104,59 +91,41 @@ class ReadOnlyPathGuard implements FileSystem {
     return inner.remove(target);
   }
 
-  /// 命中任一受保护根（字面或规范拼写）即抛 [FsError]。
+  /// 命中任一受保护根的任何拼写即抛 [FsError]。
   void _denyIfProtected(FsTarget target) {
-    final List<String> written = <String>[
-      _normalize(target.displayPath),
-      _normalize(inner.processPath(target)),
-    ];
+    for (final String path in _spellings(target)) {
+      if (_hitsAnyRoot(path)) _throwDenied();
+    }
+  }
+
+  /// 目标的所有拼写：字面 displayPath 与后端规范路径。
+  List<String> _spellings(FsTarget target) => <String>[
+    normalizeReadOnlyPath(target.displayPath),
+    normalizeReadOnlyPath(inner.processPath(target)),
+  ];
+
+  bool _hitsAnyRoot(String path) {
     for (final String root in protectedRoots) {
-      final Iterable<String> forms = <String>[root, ..._canonicalForms(root)];
-      for (final String form in forms) {
-        if (written.any((String path) => _under(path, form))) {
-          throw const FsError(
-            FsErrorCode.permissionDenied,
-            kReadOnlyPathMessage,
-          );
-        }
-      }
+      if (_matchesRoot(path, root)) return true;
     }
+    return false;
   }
-}
 
-/// 受保护根的规范拼写；根尚不存在时为空（字面拼写仍然生效）。
-Iterable<String> _canonicalForms(String root) sync* {
-  try {
-    yield _normalize(Directory(root).resolveSymbolicLinksSync());
-  } on FileSystemException {
-    return;
-  }
-}
-
-/// 段级「相同或子孙」判定：`.opencode-backup` 不算 `.opencode`。
-bool _under(String path, String root) {
-  if (path.isEmpty || root.isEmpty) return false;
-  if (path == root) return true;
-  final String prefix = root.endsWith(Platform.pathSeparator)
-      ? root
-      : '$root${Platform.pathSeparator}';
-  return path.startsWith(prefix);
-}
-
-/// 去掉冗余的 `.` / `..` 与末尾分隔符（不解析符号链接）。
-String _normalize(String path) {
-  final RegExp separators = RegExp(r'[/\\]');
-  final bool absolute =
-      path.startsWith('/') || RegExp(r'^[A-Za-z]:[/\\]').hasMatch(path);
-  final List<String> parts = <String>[];
-  for (final String part in path.split(separators)) {
-    if (part.isEmpty || part == '.') continue;
-    if (part == '..' && parts.isNotEmpty && parts.last != '..') {
-      parts.removeLast();
-    } else {
-      parts.add(part);
+  bool _matchesRoot(String path, String root) {
+    for (final String form in _rootForms(root)) {
+      if (underReadOnlyRoot(path, form)) return true;
     }
+    return false;
   }
-  final String joined = parts.join(Platform.pathSeparator);
-  return absolute ? '${Platform.pathSeparator}$joined' : joined;
+
+  Never _throwDenied() =>
+      throw const FsError(FsErrorCode.permissionDenied, kReadOnlyPathMessage);
+}
+
+/// 受保护根的拼写：字面 + 规范（根不存在时沿最近已存在祖先解析）。
+Iterable<String> _rootForms(String root) {
+  final List<String> forms = <String>[root];
+  final String? real = realPathViaAncestor(root);
+  if (real != null) forms.add(normalizeReadOnlyPath(real));
+  return forms;
 }

@@ -217,4 +217,28 @@ void main() {
     expect(allowed.exitCode, 0);
     expect(File('$root/plain.txt').readAsStringSync().trim(), 'y');
   });
+
+  test('装配默认保护：.opencode 不存在时 mkdir 也被 Seatbelt 拒绝', () async {
+    final SandboxBackend? found = backend;
+    if (found == null) {
+      markTestSkipped('沙箱后端不可用，跳过集成测试');
+      return;
+    }
+    // 用全新根：上面的用例可能已创建 `<root>/.opencode`。
+    final Directory fresh = Directory('$root/fresh')..createSync();
+    final String freshRoot = fresh.resolveSymbolicLinksSync();
+    final SandboxLayers layers = resolveSandboxLayers(
+      root: freshRoot,
+      settings: const SandboxSettings(),
+      backend: found,
+    );
+    final ShellExecutor shell = layers.shell!;
+    expect(Directory('$freshRoot/.opencode').existsSync(), isFalse);
+
+    final ShellRunResult denied = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'mkdir -p .opencode/agents')));
+
+    expect(denied.exitCode, isNot(0));
+    expect(Directory('$freshRoot/.opencode').existsSync(), isFalse);
+  });
 }

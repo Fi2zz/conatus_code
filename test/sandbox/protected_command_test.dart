@@ -24,6 +24,11 @@ void main() {
       'sh -c "echo x > .opencode/x"',
       'echo x > /abs/work/.opencode/x',
       'echo x 2>.opencode/x',
+      'rm -rf ~/.config/opencode',
+      'echo x > ~/.config/opencode/x',
+      'cp a.txt \$HOME/.config/opencode/a.txt',
+      'sed -i s/a/b/ /Users/u/.config/opencode/opencode.json',
+      'rm -rf .OPENCODE',
     ]) {
       test('拒绝写类命令：$command', () {
         expect(readOnlyCommandViolation(command), kReadOnlyCommandMessage);
@@ -34,10 +39,12 @@ void main() {
       'cat .opencode/commands/x.md',
       'ls -la .opencode',
       'rg TODO .opencode',
+      'cat ~/.config/opencode/opencode.json',
       'echo hello > out.txt',
       'git status',
       'cp my.opencode.txt other.txt',
       'echo .opencode-backup/x',
+      'cmp .opencode/a .opencode/b',
     ]) {
       test('放行读类 / 无关命令：$command', () {
         expect(readOnlyCommandViolation(command), isNull);

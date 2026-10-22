@@ -3,6 +3,7 @@ library;
 
 import 'dart:io';
 
+import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/fs_tools.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
@@ -129,5 +130,81 @@ void main() {
     final List<String> relative = defaultReadOnlyRoots('rel', home: '');
     expect(relative.single, startsWith(sep));
     expect(relative.single, endsWith('${sep}rel$sep.opencode'));
+  });
+
+  test('workdir 是符号链接别名 + .opencode 尚未创建 → 仍然拒绝', () async {
+    final Directory real = Directory.systemTemp.createTempSync('nava-real-');
+    addTearDown(() {
+      if (real.existsSync()) real.deleteSync(recursive: true);
+    });
+    final String alias = '${dir.path}/alias';
+    Link(alias).createSync(real.path);
+    final String canonical = real.resolveSymbolicLinksSync();
+    // 与 CLI 一致：fs 根用规范拼写（macOS /var → /private/var），受保护根用
+    // 用户传入的字面 workdir 别名——两种拼写不同，且 .opencode 还不存在。
+    final ReadOnlyPathGuard aliasGuard = ReadOnlyPathGuard(
+      inner: LocalFileSystem(cwd: canonical),
+      protectedRoots: defaultReadOnlyRoots(alias, home: '/home/u'),
+    );
+
+    final FsTarget target = await aliasGuard.resolve('.opencode/commands/x.md');
+
+    expect(aliasGuard.processPath(target), startsWith(canonical));
+    expect(() => aliasGuard.writeText(target, 'x'), throwsA(isA<FsError>()));
+    expect(Directory('$canonical/.opencode').existsSync(), isFalse);
+  });
+
+  test('jail 后端（规范根）+ 字面 workdir + 未创建 → 拒绝', () async {
+    final Directory jail = Directory('${dir.path}/jail')..createSync();
+    final String canonical = jail.resolveSymbolicLinksSync();
+    final ReadOnlyPathGuard jailGuard = ReadOnlyPathGuard(
+      inner: JailedFileSystem(root: canonical),
+      protectedRoots: defaultReadOnlyRoots(jail.path, home: '/home/u'),
+    );
+
+    final FsTarget target = await jailGuard.resolve(
+      '.opencode/commands/x.md',
+      cwd: canonical,
+    );
+
+    expect(() => jailGuard.writeText(target, 'x'), throwsA(isA<FsError>()));
+    expect(Directory('$canonical/.opencode').existsSync(), isFalse);
+  });
+
+  test('全局 ~/.config/opencode 由 home 注入同样只读', () async {
+    final Directory home = Directory.systemTemp.createTempSync('nava-home-');
+    addTearDown(() {
+      if (home.existsSync()) home.deleteSync(recursive: true);
+    });
+    Directory('${home.path}/.config/opencode').createSync(recursive: true);
+    final ReadOnlyPathGuard homeGuard = ReadOnlyPathGuard(
+      inner: LocalFileSystem(),
+      protectedRoots: defaultReadOnlyRoots(dir.path, home: home.path),
+    );
+
+    final FsTarget target = await homeGuard.resolve(
+      '${home.path}/.config/opencode/x.md',
+    );
+
+    expect(() => homeGuard.writeText(target, 'x'), throwsA(isA<FsError>()));
+    expect(
+      File('${home.path}/.config/opencode/x.md').existsSync(),
+      isFalse,
+    );
+  });
+
+  test('大小写变体 .OPENCODE 也算受保护（APFS 大小写不敏感）', () async {
+    final Directory fresh = Directory('${dir.path}/fresh')..createSync();
+    final ReadOnlyPathGuard freshGuard = ReadOnlyPathGuard(
+      inner: LocalFileSystem(),
+      protectedRoots: defaultReadOnlyRoots(fresh.path, home: '/home/u'),
+    );
+
+    final FsTarget target = await freshGuard.resolve(
+      '${fresh.path}/.OPENCODE/commands/x.md',
+    );
+
+    expect(() => freshGuard.writeText(target, 'x'), throwsA(isA<FsError>()));
+    expect(Directory('${fresh.path}/.OPENCODE').existsSync(), isFalse);
   });
 }

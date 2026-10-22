@@ -34,6 +34,9 @@ class _ScriptedProvider implements LlmProvider {
   _ScriptedProvider(this._replies);
 
   final List<LlmResult> _replies;
+
+  /// 每次模型调用收到的完整消息（含 tool 结果），供断言错误透传。
+  final List<List<LlmMessage>> calls = <List<LlmMessage>>[];
   int _index = 0;
 
   @override
@@ -44,7 +47,20 @@ class _ScriptedProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) async => _replies[_index++];
+  }) async {
+    // 反思调用（`provideReflection` 的 onError 策略）也走同一 provider：
+    // 直接回「继续」，不消耗脚本回复，保证会话步数与脚本一一对应。
+    if (messages.length == 1 &&
+        messages.single.content.contains('任务执行监督者')) {
+      return const LlmResult(
+        content: '{"decision":"continue","reason":"只读约束"}',
+        provider: 's',
+        model: 'm',
+      );
+    }
+    calls.add(messages);
+    return _replies[_index++];
+  }
 
   @override
   Stream<LlmStreamEvent> chatStream(
@@ -65,12 +81,26 @@ LlmResult _tool(String id, String name, String args) => LlmResult(
 );
 
 /// 一轮 headless 会话：先试图写 `.opencode/**`，再写普通文件（证明会话本身
-/// 能落盘），最后收口。返回运行时供调用方断言。
-Future<HeadlessResult> _runSessionWithEdits(
+/// 能落盘），最后收口。返回结果与模型实际收到的消息（含 tool 错误）。
+Future<(HeadlessResult, List<List<LlmMessage>>)> _runSessionWithEdits(
   String workdir,
   String baseDir,
 ) async {
   final String sep = Platform.pathSeparator;
+  final _ScriptedProvider provider = _ScriptedProvider(<LlmResult>[
+    _tool(
+      'c1',
+      'write_file',
+      '{"path":".opencode/commands/x.md","content":"pwned"}',
+    ),
+    _tool(
+      'c2',
+      'edit_file',
+      '{"path":".opencode/agents/a.md","old_string":"agent","new_string":"pwned"}',
+    ),
+    _tool('c3', 'write_file', '{"path":"notes.txt","content":"hello"}'),
+    const LlmResult(content: '完成', provider: 's', model: 'm'),
+  ]);
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
     baseDir: baseDir,
     sessionDir: '$baseDir$sep/sessions',
@@ -80,27 +110,13 @@ Future<HeadlessResult> _runSessionWithEdits(
     skills: false,
     interactive: false,
     fs: LocalFileSystem(cwd: workdir),
-    llm: FallbackLlm(<LlmProvider>[
-      _ScriptedProvider(<LlmResult>[
-        _tool(
-          'c1',
-          'write_file',
-          '{"path":".opencode/commands/x.md","content":"pwned"}',
-        ),
-        _tool(
-          'c2',
-          'edit_file',
-          '{"path":".opencode/agents/a.md","old_string":"agent","new_string":"pwned"}',
-        ),
-        _tool('c3', 'write_file', '{"path":"notes.txt","content":"hello"}'),
-        const LlmResult(content: '完成', provider: 's', model: 'm'),
-      ]),
-    ]),
+    llm: FallbackLlm(<LlmProvider>[provider]),
   );
   addTearDown(runtime.dispose);
   // 装配确实把闸门包在 fs 接缝上（工具都从这里取 fs）。
   expect(runtime.app.require<FileSystem>('fs'), isA<ReadOnlyPathGuard>());
-  return runHeadless(runtime, prompt: '改文件');
+  final HeadlessResult result = await runHeadless(runtime, prompt: '改文件');
+  return (result, provider.calls);
 }
 
 void main() {
@@ -117,13 +133,22 @@ void main() {
     File('${dir.path}/.opencode/agents/a.md').writeAsStringSync('agent');
     final Map<String, String> before = _snapshot('${dir.path}/.opencode');
 
-    final HeadlessResult result = await _runSessionWithEdits(
-      dir.path,
-      base.path,
-    );
+    final (HeadlessResult result, List<List<LlmMessage>> calls) =
+        await _runSessionWithEdits(dir.path, base.path);
 
     expect(result.exitCode, 0);
     expect(_snapshot('${dir.path}/.opencode'), before);
+    // 两次 `.opencode` 写入都被拒绝，且拒绝原因是 READ_ONLY_PATH（不是
+    // 「文件已存在」等其它错误）。
+    final Iterable<LlmMessage> toolMessages = calls.last.where(
+      (LlmMessage m) => m.role == 'tool',
+    );
+    expect(
+      toolMessages
+          .where((LlmMessage m) => m.content.contains('READ_ONLY_PATH'))
+          .length,
+      2,
+    );
     // 会话本身确实执行了写入：普通文件落了盘，闸门不是「整个 fs 全拒」。
     expect(File('${dir.path}/notes.txt').readAsStringSync(), 'hello');
   });

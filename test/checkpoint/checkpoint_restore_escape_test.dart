@@ -1,10 +1,27 @@
 /// checkpoint 恢复侧符号链接防护：文件链接不穿透、父目录链接 fail-closed。
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
 import 'package:test/test.dart';
+
+/// 造一个归档（清单 + 条目），用于模拟旧版本产生的检查点。
+Future<void> _writeArchive(
+  File target,
+  CheckpointManifest manifest,
+  Map<String, String> files,
+) async {
+  final CheckpointArchiveWriter writer = CheckpointArchiveWriter(
+    target,
+    manifest,
+  );
+  for (final MapEntry<String, String> entry in files.entries) {
+    writer.addBytes(entry.key, utf8.encode(entry.value));
+  }
+  await writer.close();
+}
 
 /// 建临时工作区与 store，返回 (store, root, projectDir)。
 (ArchiveCheckpointStore, String, String) _store() {
@@ -81,6 +98,75 @@ void main() {
     expect(
       File('${outside.path}${Platform.pathSeparator}b.txt').readAsStringSync(),
       '外部原文',
+    );
+  });
+
+  test('restore base 不写回清单里的 .opencode（只读约束）', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _store();
+    await _writeArchive(
+      store.archiveFile('s', 0),
+      const CheckpointManifest(
+        kind: 'base',
+        turn: 0,
+        files: <CheckpointFileEntry>[
+          CheckpointFileEntry(path: 'a.txt', mtimeMs: 1, size: 2),
+          CheckpointFileEntry(
+            path: '.opencode/commands/x.md',
+            mtimeMs: 1,
+            size: 5,
+          ),
+        ],
+      ),
+      <String, String>{'a.txt': 'v0', '.opencode/commands/x.md': 'pwned'},
+    );
+
+    final CheckpointRestore result = await restoreArchiveCheckpoint(store, 's', 0);
+
+    expect(result.restored, 1);
+    expect(File('$root${Platform.pathSeparator}a.txt').readAsStringSync(), 'v0');
+    expect(Directory('$root${Platform.pathSeparator}.opencode').existsSync(), isFalse);
+  });
+
+  test('restore delta 不写回也不删除 .opencode 下文件', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _store();
+    _write(root, '.opencode/keep.md', 'mine');
+    await _writeArchive(
+      store.archiveFile('s', 0),
+      const CheckpointManifest(
+        kind: 'base',
+        turn: 0,
+        files: <CheckpointFileEntry>[
+          CheckpointFileEntry(path: 'a.txt', mtimeMs: 1, size: 2),
+        ],
+      ),
+      <String, String>{'a.txt': 'v0'},
+    );
+    await _writeArchive(
+      store.archiveFile('s', 1),
+      const CheckpointManifest(
+        kind: 'delta',
+        turn: 1,
+        changed: <String>['b.txt', '.opencode/evil.md'],
+        deleted: <String>['.opencode/keep.md'],
+      ),
+      <String, String>{'b.txt': 'v1', '.opencode/evil.md': 'pwned'},
+    );
+
+    final CheckpointRestore result = await restoreArchiveCheckpoint(store, 's', 1);
+
+    expect(result.restored, 2);
+    expect(File('$root${Platform.pathSeparator}b.txt').readAsStringSync(), 'v1');
+    expect(
+      File(
+        '$root${Platform.pathSeparator}.opencode${Platform.pathSeparator}keep.md',
+      ).readAsStringSync(),
+      'mine',
+    );
+    expect(
+      File(
+        '$root${Platform.pathSeparator}.opencode${Platform.pathSeparator}evil.md',
+      ).existsSync(),
+      isFalse,
     );
   });
 }

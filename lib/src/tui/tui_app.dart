@@ -208,11 +208,21 @@ class ConatusTuiRuntime {
     // 读取，绝不创建 / 写入 / 删除。闸门包在 fs 接缝上，write_file /
     // edit_file / apply_patch / story 写回等一切经 'fs' 的写操作自动继承
     // （见 read_only_path_guard.dart）；读操作透传。
+    //
+    // 受保护根同时用字面 workdir 与规范 workdir 两种拼写：`--workdir /tmp/x`
+    // 经符号链接（macOS `/var` → `/private/var`）时，模型看到的 displayPath
+    // 与 CLI 的 fs 根可能各用一种；闸门内部还会对根补规范拼写（根尚不存在时
+    // 沿最近已存在祖先解析），两层一起挡住「首次写就创建 `.opencode`」。
+    // 未注入 fs 时以 workdir 为相对路径基准：否则 `create(workdir: X)` 的
+    // 相对写入会落到进程 cwd，既不符合直觉，也让闸门按另一棵树判定。
     provideFileSystemLocal(
       app,
       fs: ReadOnlyPathGuard(
-        inner: fs ?? LocalFileSystem(),
-        protectedRoots: defaultReadOnlyRoots(resolvedWorkdir),
+        inner: fs ?? LocalFileSystem(cwd: resolvedWorkdir),
+        protectedRoots: <String>{
+          ...defaultReadOnlyRoots(resolvedWorkdir),
+          ...defaultReadOnlyRoots(canonicalWorkdir),
+        }.toList(),
       ),
     );
     // 'shell' 既是 rg 的必需依赖（fs 工具回落到 ctx.get('shell')），也是命令执行

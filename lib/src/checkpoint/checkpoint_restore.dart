@@ -64,13 +64,15 @@ Future<(Set<String>, int)> _restoreBase(
   CheckpointManifest manifest,
 ) async {
   final Set<String> target = <String>{
-    for (final CheckpointFileEntry entry in manifest.files) entry.path,
+    for (final CheckpointFileEntry entry in manifest.files)
+      if (_restorable(store, entry.path)) entry.path,
   };
   ensurePathsRestorable(store.root, target);
   int restored = 0;
   await for (final (String path, List<int> bytes) in readCheckpointEntries(
     archive,
   )) {
+    if (!_restorable(store, path)) continue;
     await checkpointWriteBytes(store.root, path, bytes);
     restored++;
   }
@@ -89,30 +91,34 @@ Future<(Set<String>, int, int)> _restoreDelta(
   final CheckpointManifest base = await store.loadManifest(sessionId, 0);
   final Set<String> deleted = manifest.deleted.toSet();
   final Set<String> basePaths = <String>{
-    for (final CheckpointFileEntry entry in base.files) entry.path,
+    for (final CheckpointFileEntry entry in base.files)
+      if (_restorable(store, entry.path)) entry.path,
   };
   final Set<String> target = <String>{
     ...basePaths.where((String p) => !deleted.contains(p)),
-    ...manifest.changed,
+    for (final String path in manifest.changed)
+      if (_restorable(store, path)) path,
   };
   ensurePathsRestorable(store.root, <String>[...target, ...manifest.deleted]);
   int restored = 0;
   await for (final (String path, List<int> bytes) in readCheckpointEntries(
     store.archiveFile(sessionId, 0),
   )) {
-    if (!deleted.contains(path)) {
-      await checkpointWriteBytes(store.root, path, bytes);
-      restored++;
-    }
+    if (deleted.contains(path)) continue;
+    if (!_restorable(store, path)) continue;
+    await checkpointWriteBytes(store.root, path, bytes);
+    restored++;
   }
   await for (final (String path, List<int> bytes) in readCheckpointEntries(
     archive,
   )) {
+    if (!_restorable(store, path)) continue;
     await checkpointWriteBytes(store.root, path, bytes);
     restored++;
   }
   int removed = 0;
   for (final String path in manifest.deleted) {
+    if (!_restorable(store, path)) continue;
     final File file = File('${store.root}${Platform.pathSeparator}$path');
     if (file.existsSync()) {
       file.deleteSync();
@@ -144,11 +150,13 @@ Future<CheckpointRestore> _restoreLegacy(
     final Directory? baseDir = store.legacyDir(sessionId, 0);
     final Set<String> deleted = manifest.deleted.toSet();
     final Set<String> basePaths = <String>{
-      for (final CheckpointFileEntry entry in base.files) entry.path,
+      for (final CheckpointFileEntry entry in base.files)
+        if (_restorable(store, entry.path)) entry.path,
     };
     target = <String>{
       ...basePaths.where((String p) => !deleted.contains(p)),
-      ...manifest.changed,
+      for (final String path in manifest.changed)
+        if (_restorable(store, path)) path,
     };
     ensurePathsRestorable(store.root, <String>[
       for (final CheckpointFileEntry entry in base.files)
@@ -159,15 +167,18 @@ Future<CheckpointRestore> _restoreLegacy(
     if (baseDir != null) {
       for (final CheckpointFileEntry entry in base.files) {
         if (deleted.contains(entry.path)) continue;
+        if (!_restorable(store, entry.path)) continue;
         await checkpointRestoreFromGz(baseDir.path, store.root, entry.path);
         restored++;
       }
     }
     for (final String path in manifest.changed) {
+      if (!_restorable(store, path)) continue;
       await checkpointRestoreFromGz(dir.path, store.root, path);
       restored++;
     }
     for (final String path in manifest.deleted) {
+      if (!_restorable(store, path)) continue;
       final File file = File('${store.root}${Platform.pathSeparator}$path');
       if (file.existsSync()) {
         file.deleteSync();
@@ -176,13 +187,15 @@ Future<CheckpointRestore> _restoreLegacy(
     }
   } else {
     target = <String>{
-      for (final CheckpointFileEntry entry in manifest.files) entry.path,
+      for (final CheckpointFileEntry entry in manifest.files)
+        if (_restorable(store, entry.path)) entry.path,
     };
     ensurePathsRestorable(store.root, <String>[
       for (final CheckpointFileEntry entry in manifest.files) entry.path,
       ...manifest.deleted,
     ]);
     for (final CheckpointFileEntry entry in manifest.files) {
+      if (!_restorable(store, entry.path)) continue;
       await checkpointRestoreFromGz(dir.path, store.root, entry.path);
       restored++;
     }
@@ -190,6 +203,16 @@ Future<CheckpointRestore> _restoreLegacy(
   final int extras = await _deleteExtras(store, target);
   return CheckpointRestore(restored: restored, deleted: removed + extras);
 }
+
+/// 恢复清单里的路径是否允许写回：与采集 / 删除判定**同源**
+/// （[checkpointExcluded]）。
+///
+/// 旧快照可能含 `.opencode`（本应只读）、凭据、`build/` 等——采集侧已经
+/// 排除，恢复侧若照写就会把它们重新创建出来（`.opencode` 更会直接破坏只读
+/// 约束）。写入与删除循环都逐条过滤，目标态同步剔除（`_deleteExtras` 自身
+/// 也排除这些路径，不会误删）。
+bool _restorable(ArchiveCheckpointStore store, String path) =>
+    !checkpointExcluded(path, store.projectRel, store.ignore);
 
 /// 删除当前工作区中「不在目标状态、且未被排除」的文件；返回删除数。
 ///
