@@ -107,6 +107,32 @@ void main() {
     expect(ignored, isEmpty);
   });
 
+  test('check-ignore 失败抛 git-failed 而非返回残缺集', () async {
+    const ProcessGitRunner base = ProcessGitRunner();
+    await base.run(
+      <String>['init', '--quiet'],
+      gitDir: _gitDir,
+      workTree: _root,
+    );
+    _write('debug.log', 'x');
+    await expectLater(
+      resolveGlobalGitIgnore(
+        git: _FailingCheckIgnoreRunner(base, _globalIgnore.path),
+        gitDir: _gitDir,
+        workTree: _root,
+        candidates: <String>['debug.log'],
+      ),
+      throwsA(
+        isA<CheckpointException>().having(
+          (CheckpointException e) => e.code,
+          'code',
+          'git-failed',
+        ),
+      ),
+      reason: '把失败当成「没有排除」会让恢复误删用户的文件',
+    );
+  });
+
   group('敏感文件排除', () {
     test('凭据 / 私钥类文件名与后缀被排除', () {
       for (final String p in <String>[
@@ -196,4 +222,42 @@ class _GlobalIgnoreRunner implements GitRunner {
     gitDir: gitDir,
     workTree: workTree,
   );
+}
+
+/// `check-ignore` 固定失败的执行器：验证解析失败不返回残缺集。
+class _FailingCheckIgnoreRunner implements GitRunner {
+  const _FailingCheckIgnoreRunner(this.inner, this.excludesFile);
+
+  final GitRunner inner;
+  final String excludesFile;
+
+  List<String> _wrap(List<String> args) => <String>[
+    '-c',
+    'core.excludesFile=$excludesFile',
+    ...args,
+  ];
+
+  @override
+  Future<bool> available() => inner.available();
+
+  @override
+  Future<GitResult> run(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) {
+    if (args.contains('check-ignore')) {
+      return Future<GitResult>.value(
+        const GitResult(128, '', 'fatal: 模拟 check-ignore 失败'),
+      );
+    }
+    return inner.run(_wrap(args), gitDir: gitDir, workTree: workTree);
+  }
+
+  @override
+  GitResult runSync(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) => inner.runSync(_wrap(args), gitDir: gitDir, workTree: workTree);
 }

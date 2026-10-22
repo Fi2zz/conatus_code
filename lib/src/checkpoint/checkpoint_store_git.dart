@@ -198,7 +198,9 @@ class GitShadowStore implements CheckpointStore {
     // 全局 gitignore 的排除集只有 snapshot 会算。接管已有时间线（bind 不拍
     // 快照）后首次恢复直接走到这里，不重算就会把它命中的文件当成「目标态
     // 没有的多余文件」删掉——不可恢复。恢复是显式低频动作，多两遍 walk 值得。
-    await _resolveGlobalIgnores(await _walkPaths());
+    // 候选集用 [_candidatePaths]：被上一轮排除集剪过的路径问不到 git，重算
+    // 反而会把它丢掉（自己抹掉自己）。
+    await _resolveGlobalIgnores(await _candidatePaths());
     final Set<String> target = paths.toSet();
     final int removed = await _deleteExtras(target);
     // `read-tree --reset -u` 把工作区精确重置到该提交（含删除之后新增的
@@ -321,10 +323,11 @@ class GitShadowStore implements CheckpointStore {
   /// 规则，既然只传我们想要的，结果就等于自定义排除面。分批是因为 argv
   /// 长度有限。
   Future<void> _stageWorktree() async {
-    // 先按 conatus 自己的规则 walk 一遍（此时还没有全局 gitignore 的信息），
-    // 拿候选集去问 git；再带着结果重走一次——两遍只为把全局排除并进同一个
-    // 判定源，避免采集与删除判定分家。
-    final List<String> candidates = await _walkPaths();
+    // 先用**不受全局 ignore 影响**的候选集问 git（[_candidatePaths]），再带着
+    // 结果重走一次——两遍只为把全局排除并进同一个判定源，避免采集与删除判定
+    // 分家。候选集不能按旧 `_extraExcluded` 剪枝：被上轮排除的文件问不到 git，
+    // 下一轮解析结果就少一项，全局忽略的文件会在第二轮快照里被重新收进来。
+    final List<String> candidates = await _candidatePaths();
     await _resolveGlobalIgnores(candidates);
     final List<String> wanted = await _walkPaths();
     for (final List<String> batch in _batched(wanted)) {
@@ -386,12 +389,25 @@ class GitShadowStore implements CheckpointStore {
 
   /// 自己 walk 出来的应入快照路径（与归档实现同一套排除判定）。
   Future<List<String>> _walkPaths() async {
+    return _walkWithExtra(_extraExcluded);
+  }
+
+  /// 解析全局 gitignore 用的候选集：**不按**当前 `_extraExcluded` 剪枝。
+  ///
+  /// `_extraExcluded` 是上一轮解析的产物，而 [_resolveGlobalIgnores] 会**整体
+  /// 替换**它。若拿被它剪过的路径去问 git，命中项根本不在候选集里，重算结果
+  /// 就会变小——全局忽略的文件在第二轮快照 / 恢复里被重新收进来或被删掉。
+  Future<List<String>> _candidatePaths() async {
+    return _walkWithExtra(const <String>{});
+  }
+
+  Future<List<String>> _walkWithExtra(Set<String> extra) async {
     final List<String> paths = <String>[];
     await for (final FileSystemEntity entity in checkpointWalk(
       root,
       projectRel,
       ignore,
-      _extraExcluded,
+      extra,
     )) {
       paths.add(checkpointRelativeTo(entity, root));
     }

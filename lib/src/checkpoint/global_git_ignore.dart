@@ -28,13 +28,14 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'checkpoint_types.dart';
 import 'shadow_git_runner.dart';
 
 /// 全局 gitignore 忽略了 [candidates] 里的哪些路径（工作区相对路径）。
 ///
-/// 解析不出全局 excludesFile（未配置 / git 不可用 / 任何一步失败）时返回空
-/// 集——即「不额外排除」，退回到 conatus 自己的规则。这是一个**保守**的
-/// 降级：多收不会造成数据丢失，只会让快照大一点。
+/// 未配置全局 excludesFile 时返回空集（等价于「没有额外排除」）。**解析失败
+/// 抛 [CheckpointException]（`git-failed`）**，不返回残缺集：恢复会按这个集合
+/// 决定删哪些「多余文件」，把失败当成「没有排除」就会误删用户的文件。
 Future<Set<String>> resolveGlobalGitIgnore({
   required GitRunner git,
   required String gitDir,
@@ -48,6 +49,8 @@ Future<Set<String>> resolveGlobalGitIgnore({
     workTree: workTree,
   );
   if (excludesFile == null) return const <String>{};
+  // 配置文件不存在 = 没有任何全局规则（不是解析失败）。
+  if (!File(excludesFile).existsSync()) return const <String>{};
 
   // check-ignore 一次只吃有限的 argv，分批以避上限。
   final Set<String> ignored = <String>{};
@@ -66,7 +69,12 @@ Future<Set<String>> resolveGlobalGitIgnore({
       workTree: workTree,
     );
     // check-ignore 对「有忽略命中」返回 0、对「全部未命中」返回 1，两者都正常。
-    if (result.exitCode != 0 && result.exitCode != 1) return ignored;
+    if (result.exitCode != 0 && result.exitCode != 1) {
+      throw CheckpointException(
+        'git-failed',
+        '解析全局 gitignore 失败：${_detail(result)}',
+      );
+    }
     for (final String line in const LineSplitter().convert(result.stdout)) {
       // check-ignore 的路径本身不会含换行，逐行拆安全。
       final int tab = line.indexOf('\t');
@@ -80,7 +88,7 @@ Future<Set<String>> resolveGlobalGitIgnore({
   return ignored;
 }
 
-/// 全局 excludesFile 的绝对路径；未配置返回 `null`。
+/// 全局 excludesFile 的绝对路径；未配置返回 `null`，读取失败抛错。
 Future<String?> _globalExcludesFile({
   required GitRunner git,
   required String gitDir,
@@ -91,9 +99,23 @@ Future<String?> _globalExcludesFile({
     gitDir: gitDir,
     workTree: workTree,
   );
+  // 未配置时 git 返回 1；其余非 0 一律按读取失败处理。
+  if (result.exitCode == 1) return null;
+  if (!result.ok) {
+    throw CheckpointException(
+      'git-failed',
+      '读取 core.excludesFile 失败：${_detail(result)}',
+    );
+  }
   final String path = result.stdout.trim();
-  if (result.exitCode != 0 || path.isEmpty) return null;
+  if (path.isEmpty) return null;
   return File(path).absolute.path;
+}
+
+/// 错误说明：stderr 优先，空则给退出码。
+String _detail(GitResult result) {
+  final String stderr = result.stderr.trim();
+  return stderr.isEmpty ? '退出码 ${result.exitCode}' : stderr;
 }
 
 /// 单次 check-ignore 传多少路径。

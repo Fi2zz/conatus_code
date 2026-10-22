@@ -472,13 +472,7 @@ void main() {
   test('接管已有时间线后首次恢复：全局 gitignore 命中的文件不被当多余文件删掉', () async {
     if (!_gitOk) return;
     _setUp();
-    final Directory home = Directory.systemTemp.createTempSync(
-      'nava-shadow-home',
-    );
-    addTearDown(() => home.deleteSync(recursive: true));
-    final File globalIgnore = File(
-      '${home.path}${Platform.pathSeparator}ignore',
-    )..writeAsStringSync('*.log\n');
+    final File globalIgnore = _globalIgnoreFile();
     final GitRunner runner = _GlobalIgnoresRunner(
       const ProcessGitRunner(),
       globalIgnore.path,
@@ -506,11 +500,113 @@ void main() {
     await resumed.restore('s1', 0);
 
     expect(_read('a.txt'), 'v0');
+    expect(_logSurvives(), isTrue, reason: '全局 gitignore 命中的文件不该被恢复删除');
+
+    // 同一实例的第二次恢复：不能因为上一轮排除集被剪过就把文件丢掉。
+    _write('a.txt', 'v2');
+    await resumed.restore('s1', 0);
+    expect(_read('a.txt'), 'v0');
+    expect(_logSurvives(), isTrue, reason: '第二次恢复不得抹掉排除集');
+  });
+
+  test('全局 gitignore：snapshot → restore 保住忽略文件', () async {
+    if (!_gitOk) return;
+    _setUp();
+    final GitShadowStore store = _ignoredStore(_globalIgnoreFile());
+    _write('a.txt', 'v0');
+    _write('debug.log', 'noise');
+    await store.snapshot('s1', 0);
+
+    _write('a.txt', 'v1');
+    await store.restore('s1', 0);
+
+    expect(_read('a.txt'), 'v0');
+    expect(_logSurvives(), isTrue);
+  });
+
+  test('全局 gitignore：连续两轮快照不把忽略文件重新收进来', () async {
+    if (!_gitOk) return;
+    _setUp();
+    final GitShadowStore store = _ignoredStore(_globalIgnoreFile());
+    _write('a.txt', 'v0');
+    _write('debug.log', 'noise');
+    await store.snapshot('s1', 0);
+    _write('a.txt', 'v1');
+    await store.snapshot('s1', 1);
+
     expect(
-      File('$_root${Platform.pathSeparator}debug.log').existsSync(),
-      isTrue,
-      reason: '全局 gitignore 命中的文件不该被恢复删除',
+      await store.readFile('s1', 1, 'debug.log'),
+      isNull,
+      reason: '第二轮候选集不得被上一轮排除集剪枝，否则会重新收进忽略文件',
     );
+    expect(
+      _lsTree(_commitOf('s1', 1)),
+      isNot(contains('debug.log')),
+      reason: '忽略文件不该出现在第二轮提交树里',
+    );
+  });
+
+  test('bind 接管后 recordTurn → restore 仍保住全局忽略文件', () async {
+    if (!_gitOk) return;
+    _setUp();
+    final File globalIgnore = _globalIgnoreFile();
+    final CheckpointManager manager = CheckpointManager(
+      store: _ignoredStore(globalIgnore),
+      config: const CheckpointConfig(),
+    );
+    _write('a.txt', 'v0');
+    _write('debug.log', 'noise');
+    await manager.bind('s1'); // turn 0
+    _write('a.txt', 'v1');
+    await manager.recordTurn(); // turn 1
+    manager.detach();
+
+    // `--session` 重开：新实例 bind 接管（不拍快照），跑一轮后恢复上一轮。
+    // 此时 store 的排除集刚被 recordTurn 算过；恢复侧若拿被它剪过的候选集
+    // 重算，就会把排除清空并把 debug.log 当多余文件删掉。
+    final CheckpointManager resumed = CheckpointManager(
+      store: _ignoredStore(globalIgnore),
+      config: const CheckpointConfig(),
+    );
+    await resumed.bind('s1'); // 接管 turn 1
+    _write('a.txt', 'v2');
+    await resumed.recordTurn(); // turn 2
+
+    final CheckpointRewindResult? back = await resumed.restoreTo('s1', 0);
+    expect(back, isNotNull);
+    expect(_read('a.txt'), 'v0');
+    expect(_logSurvives(), isTrue);
+  });
+
+  test('全局 gitignore 解析失败：恢复中止，一个文件都不动', () async {
+    if (!_gitOk) return;
+    _setUp();
+    final File globalIgnore = _globalIgnoreFile();
+    final GitShadowStore writer = _ignoredStore(globalIgnore);
+    _write('a.txt', 'v0');
+    await writer.snapshot('s1', 0);
+
+    final GitShadowStore broken = _ignoredStore(
+      globalIgnore,
+      git: _FailingCheckIgnoreRunner(
+        const ProcessGitRunner(),
+        globalIgnore.path,
+      ),
+    );
+    _write('a.txt', 'v1');
+
+    await expectLater(
+      broken.restore('s1', 0),
+      throwsA(
+        isA<CheckpointException>().having(
+          (CheckpointException e) => e.code,
+          'code',
+          'git-failed',
+        ),
+      ),
+      reason: '解析不出排除集时必须中止，不能带着更小的集合去删文件',
+    );
+    expect(_read('a.txt'), 'v1', reason: '中止发生在改动任何文件之前');
   });
 
   test('恢复拒绝含 .opencode 的旧快照（fail-closed，一个文件都不动）', () async {
@@ -590,6 +686,30 @@ class _DroppingRunner implements GitRunner {
   }
 }
 
+/// 固定 `*.log` 全局忽略的配置文件（每个用例一份临时 home）。
+File _globalIgnoreFile() {
+  final Directory home = Directory.systemTemp.createTempSync(
+    'nava-shadow-home',
+  );
+  addTearDown(() => home.deleteSync(recursive: true));
+  return File('${home.path}${Platform.pathSeparator}ignore')
+    ..writeAsStringSync('*.log\n');
+}
+
+/// 带全局 ignore 的 store（新实例 = 新进程语义）。
+GitShadowStore _ignoredStore(
+  File ignoreFile, {
+  GitRunner? git,
+}) => GitShadowStore(
+  root: _root,
+  projectDir: _projectDir,
+  git: git ?? _GlobalIgnoresRunner(const ProcessGitRunner(), ignoreFile.path),
+);
+
+/// `debug.log` 是否仍在工作区（全局忽略的文件必须活过恢复）。
+bool _logSurvives() =>
+    File('$_root${Platform.pathSeparator}debug.log').existsSync();
+
 /// 在影子仓库里跑一条 git 命令（测试造旧格式提交用），返回 stdout。
 String _shadowGit(List<String> args) {
   final ProcessResult result = Process.runSync('git', <String>[
@@ -634,6 +754,44 @@ class _GlobalIgnoresRunner implements GitRunner {
     required String gitDir,
     required String workTree,
   }) => inner.run(_wrap(args), gitDir: gitDir, workTree: workTree);
+
+  @override
+  GitResult runSync(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) => inner.runSync(_wrap(args), gitDir: gitDir, workTree: workTree);
+}
+
+/// `check-ignore` 固定失败的执行器（config 仍可读）：验证解析失败 fail-closed。
+class _FailingCheckIgnoreRunner implements GitRunner {
+  const _FailingCheckIgnoreRunner(this.inner, this.excludesFile);
+
+  final GitRunner inner;
+  final String excludesFile;
+
+  List<String> _wrap(List<String> args) => <String>[
+    '-c',
+    'core.excludesFile=$excludesFile',
+    ...args,
+  ];
+
+  @override
+  Future<bool> available() => inner.available();
+
+  @override
+  Future<GitResult> run(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) {
+    if (args.contains('check-ignore')) {
+      return Future<GitResult>.value(
+        const GitResult(128, '', 'fatal: 模拟 check-ignore 失败'),
+      );
+    }
+    return inner.run(_wrap(args), gitDir: gitDir, workTree: workTree);
+  }
 
   @override
   GitResult runSync(
