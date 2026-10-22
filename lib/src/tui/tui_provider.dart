@@ -14,6 +14,8 @@ class TuiProviderItem {
     this.isAdd = false,
     this.isCustom = false,
     this.isKnown = false,
+    this.apiType = 'openai',
+    this.fallbackModels = const <String>[],
   });
 
   /// 提供商名；[isAdd] 为 true 时是「[ Add New Platform ]」占位项，
@@ -35,6 +37,12 @@ class TuiProviderItem {
 
   /// 是否为「知名第三方 provider」来源入口项（进入后列出全部预设）。
   final bool isKnown;
+
+  /// provider 类型（写回 config.toml 的 `type`）。
+  final String apiType;
+
+  /// models.dev 没有该 provider 时的静态模型候选。
+  final List<String> fallbackModels;
 
   /// 列表展示名。
   String get label {

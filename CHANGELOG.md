@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- **Anthropic prompt caching / thinking 回传**：`cacheable` system 前缀与最后一个
+  工具自动带 `cache_control: ephemeral`；thinking 块的 signature 随会话事件保留并在
+  tool loop 下一轮回传。`/provider add` 新增 `opencode-go-anthropic` 与
+  `opencode-console-anthropic` 预设（含静态模型清单）。
+
 - **Anthropic Messages 支持**：新增 `type = "anthropic"` 与 `AnthropicProvider`
   （`/messages`）——system 抽取、工具调用/结果、图片、SSE 文本与 thinking 增量；
   认证按主机区分（`opencode.ai` Bearer，其它 `x-api-key`），OpenCode 会话头照常生效。

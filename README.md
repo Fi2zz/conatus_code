@@ -413,8 +413,12 @@ type = "anthropic"
 
 - 直连 Anthropic 用 `base_url = "https://api.anthropic.com/v1"`、`type = "anthropic"`；
   nava 会自动按主机选择认证头（`opencode.ai` 用 Bearer，其它主机用 `x-api-key`）。
-- `/provider add` 的预设有 `opencode-go`（Go）与 `opencode-console`（PAYG），
-  目前只写 OpenAI 兼容类型；Anthropic 类型请按上面的 TOML 手写。
+- `/provider add` 的预设有 `opencode-go` / `opencode-console`（OpenAI 兼容）与
+  `opencode-go-anthropic` / `opencode-console-anthropic`（Anthropic Messages）；
+  网关不在 models.dev 里时，预设会写入内置模型清单供选择。
+- Anthropic 的 prompt caching 默认启用：`cacheable` 的 system 前缀与最后一个工具
+  自动带 `cache_control: ephemeral`；thinking 块的 signature 会随会话事件保留，
+  在 tool loop 的下一轮请求里回传。
 
 - 以代码装配：`provideProviders(app, providers: <ProviderProfile>[...],
 currentName: ..., credentials: ...)` 把注册表挂到 `'providers'` 服务，

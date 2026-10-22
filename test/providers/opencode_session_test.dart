@@ -33,5 +33,11 @@ void main() {
       presets['opencode-console']!.baseUrl,
       'https://opencode.ai/inference/openai/v1',
     );
+    expect(presets['opencode-go-anthropic']!.type, 'anthropic');
+    expect(
+      presets['opencode-go-anthropic']!.baseUrl,
+      'https://opencode.ai/inference/go/anthropic/v1',
+    );
+    expect(presets['opencode-go-anthropic']!.models, isNotEmpty);
   });
 }

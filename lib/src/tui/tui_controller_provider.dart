@@ -221,6 +221,8 @@ extension _ProviderCommands on ConatusTuiController {
             name: preset.id,
             baseUrl: preset.baseUrl,
             current: false,
+            apiType: preset.type,
+            fallbackModels: preset.models,
           ),
       ];
 
@@ -323,7 +325,23 @@ extension _ProviderCommands on ConatusTuiController {
     }
     final String apiKey = (values['api_key'] ?? '').trim();
     final List<ModelsDevModel> metas = await _codingModels(source.name);
-    if (metas.isEmpty) {
+    final List<ModelEntry> models = <ModelEntry>[
+      for (final ModelsDevModel meta in metas)
+        ModelEntry(
+          id: meta.id,
+          displayName: meta.name,
+          maxContextSize: meta.contextLength,
+          thinking: meta.reasoning,
+          toolUse: meta.toolCall,
+        ),
+    ];
+    if (models.isEmpty) {
+      // models.dev 没有该 provider（如 OpenCode 网关）时用预设静态清单。
+      models.addAll(<ModelEntry>[
+        for (final String id in source.fallbackModels) ModelEntry(id: id),
+      ]);
+    }
+    if (models.isEmpty) {
       transcript.add(TuiRole.system, '未能从 models.dev 获取 ${source.name} 的模型清单，'
           '已只写入端点与 api_key；请稍后用 /model 或编辑 config.toml 指定模型。');
     }
@@ -332,16 +350,8 @@ extension _ProviderCommands on ConatusTuiController {
       name: source.name,
       baseUrl: source.baseUrl,
       apiKey: apiKey,
-      models: <ModelEntry>[
-        for (final ModelsDevModel meta in metas)
-          ModelEntry(
-            id: meta.id,
-            displayName: meta.name,
-            maxContextSize: meta.contextLength,
-            thinking: meta.reasoning,
-            toolUse: meta.toolCall,
-          ),
-      ],
+      type: source.apiType,
+      models: models,
     );
   }
 
@@ -372,6 +382,7 @@ extension _ProviderCommands on ConatusTuiController {
     required String baseUrl,
     required String apiKey,
     required List<ModelEntry> models,
+    String type = 'openai',
   }) async {
     final String? path = _app.get<String>('configPath');
     if (path != null) {
@@ -380,7 +391,7 @@ extension _ProviderCommands on ConatusTuiController {
         name: name,
         baseUrl: baseUrl,
         apiKey: apiKey,
-        type: 'openai',
+        type: type,
         models: models,
         defaultModel: registry.profiles.isEmpty && models.isNotEmpty
             ? '$name/${models.first.id}'
@@ -391,6 +402,11 @@ extension _ProviderCommands on ConatusTuiController {
       name: name,
       baseUrl: baseUrl,
       apiKey: apiKey,
+      apiStyle: switch (type) {
+        'anthropic' => LlmApiStyle.anthropic,
+        'kimi' => LlmApiStyle.responses,
+        _ => LlmApiStyle.chat,
+      },
       models: <String>[for (final ModelEntry entry in models) entry.id],
     ));
     providerPrompt.refresh(providerItems(registry));

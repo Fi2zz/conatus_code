@@ -75,6 +75,8 @@ class ProviderPreset {
     required this.id,
     required this.name,
     required this.baseUrl,
+    this.type = 'openai',
+    this.models = const <String>[],
   });
 
   /// models.dev 的 provider id（如 `'deepseek'`）。
@@ -83,8 +85,14 @@ class ProviderPreset {
   /// 展示名。
   final String name;
 
-  /// OpenAI 兼容端点根地址（写回 config.toml 的 `base_url`）。
+  /// 端点根地址（写回 config.toml 的 `base_url`）。
   final String baseUrl;
+
+  /// provider 类型（写回 config.toml 的 `type`）：openai / kimi / anthropic。
+  final String type;
+
+  /// models.dev 没有该 provider 时的静态模型候选。
+  final List<String> models;
 }
 
 /// 常见编码提供商的候选清单（`/provider add` 的来源选择）。
@@ -106,6 +114,48 @@ const List<ProviderPreset> kProviderPresets = <ProviderPreset>[
   ProviderPreset(id: 'cerebras', name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1'),
   ProviderPreset(id: 'fireworks-ai', name: 'Fireworks AI', baseUrl: 'https://api.fireworks.ai/inference/v1'),
   ProviderPreset(id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1'),
-  ProviderPreset(id: 'opencode-go', name: 'OpenCode Go', baseUrl: 'https://opencode.ai/inference/go/openai/v1'),
-  ProviderPreset(id: 'opencode-console', name: 'OpenCode Console', baseUrl: 'https://opencode.ai/inference/openai/v1'),
+  ProviderPreset(
+    id: 'opencode-go',
+    name: 'OpenCode Go',
+    baseUrl: 'https://opencode.ai/inference/go/openai/v1',
+    models: <String>[
+      'glm-5.3',
+      'glm-5.3-flash',
+      'kimi-k3',
+      'kimi-k2.7-code',
+      'deepseek-v4.1-flash',
+      'deepseek-v4-pro',
+      'mimo-v2.6-flash',
+      'hy3',
+    ],
+  ),
+  ProviderPreset(
+    id: 'opencode-console',
+    name: 'OpenCode Console',
+    baseUrl: 'https://opencode.ai/inference/openai/v1',
+  ),
+  ProviderPreset(
+    id: 'opencode-go-anthropic',
+    name: 'OpenCode Go (Anthropic)',
+    baseUrl: 'https://opencode.ai/inference/go/anthropic/v1',
+    type: 'anthropic',
+    models: <String>[
+      'claude-haiku-5-5',
+      'minimax-m3',
+      'qwen3.8-max',
+      'qwen3.8-flash',
+      'qwen3.7-plus',
+    ],
+  ),
+  ProviderPreset(
+    id: 'opencode-console-anthropic',
+    name: 'OpenCode Console (Anthropic)',
+    baseUrl: 'https://opencode.ai/inference/anthropic/v1',
+    type: 'anthropic',
+    models: <String>[
+      'claude-sonnet-5-5',
+      'claude-opus-5-5',
+      'claude-haiku-5-5',
+    ],
+  ),
 ];
