@@ -9,9 +9,10 @@ import 'dart:math' as math;
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-import '../checkpoint/checkpoint_changes.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
+import 'revert_compensate.dart';
+import 'revert_confirm.dart';
 import 'revert_prompts.dart';
 import 'revert_stage.dart';
 
@@ -23,13 +24,11 @@ class RevertService {
     Future<bool> Function(String message)? confirm,
   }) : _checkpoint = checkpoint,
        _sessions = sessions,
-       _confirm = confirm;
+       _confirmation = RevertConfirmation(checkpoint: checkpoint, ask: confirm);
 
   final CheckpointManager _checkpoint;
   final SessionStore _sessions;
-
-  /// 覆盖工作区前的确认钩子；`null`（无交互通道）时不询问直接继续。
-  final Future<bool> Function(String message)? _confirm;
+  final RevertConfirmation _confirmation;
 
   /// 撤销 [steps] 轮（缺省 1）：恢复文件 + 对话回到目标切点，并暂存 prompt。
   Future<UndoResult> undo(Session current, int steps) async {
@@ -47,7 +46,7 @@ class RevertService {
     if (!known) {
       throw RevertException('找不到第 $toTurn 轮检查点（可能已被裁剪）。');
     }
-    await _confirmRestore(current.id, toTurn, fromTurn);
+    await _confirmation.confirm(current.id, fromTurn, toTurn);
     final CheckpointRewindResult? restored = await _checkpoint.restoreTo(
       current.id,
       toTurn,
@@ -55,6 +54,11 @@ class RevertService {
     if (restored == null) {
       throw RevertException('恢复第 $toTurn 轮检查点失败，文件未改动。');
     }
+    final String forkId = await _forkAfterRestore(
+      current,
+      restored.lastEventId,
+      fromTurn,
+    );
     final List<String> prompts = revertPromptsAfter(
       current,
       restored.lastEventId,
@@ -62,7 +66,7 @@ class RevertService {
     return UndoResult(
       stage: RevertStage(
         originalSessionId: current.id,
-        forkSessionId: _forkAt(current, restored.lastEventId),
+        forkSessionId: forkId,
         fromTurn: fromTurn,
         toTurn: toTurn,
         prompt: _latest(prompts),
@@ -89,15 +93,23 @@ class RevertService {
   }
 
   /// checkpoint 关闭：只把对话分叉回 [count] 轮之前，文件一律不动。
+  ///
+  /// 没有用户消息时明确报错——否则会「撤销」出一个空会话，让用户以为真撤了。
   Future<UndoResult> _undoConversationOnly(Session current, int count) async {
+    if (revertPromptCount(current) == 0) {
+      throw const RevertException('没有可撤销的对话（当前会话没有用户消息）。');
+    }
     final String? cut = revertCutBefore(current, count);
+    final List<String> undone = revertPromptsAfter(current, cut);
+    final int fromTurn = _boundTurn(current);
+    final int rounds = undone.isEmpty ? 1 : undone.length;
     return UndoResult(
       stage: RevertStage(
         originalSessionId: current.id,
         forkSessionId: _forkAt(current, cut),
-        fromTurn: _boundTurn(current),
-        toTurn: 0,
-        prompt: _latest(revertPromptsAfter(current, cut)),
+        fromTurn: fromTurn,
+        toTurn: math.max(0, fromTurn - rounds),
+        prompt: _latest(undone),
       ),
       restore: const CheckpointRestore(restored: 0, deleted: 0),
     );
@@ -107,25 +119,24 @@ class RevertService {
   int _boundTurn(Session current) =>
       _checkpoint.sessionId == current.id ? _checkpoint.turn : 0;
 
-  /// 工作区在目标区间内有改动时先确认；确认被拒则抛出。
-  Future<void> _confirmRestore(String id, int toTurn, int fromTurn) async {
-    final Future<bool> Function(String message)? confirm = _confirm;
-    if (confirm == null) return;
-    if (!await _changedBetween(id, toTurn, fromTurn)) return;
-    final bool ok = await confirm(
-      '工作区在第 $toTurn—$fromTurn 轮之间有改动，撤销会覆盖这些内容。继续？',
-    );
-    if (!ok) throw const RevertException('已取消撤销：工作区保持原样。');
-  }
-
-  /// 两轮之间是否有文件变化；读不到差异时按「可能有改动」保守处理。
-  Future<bool> _changedBetween(String id, int fromTurn, int toTurn) async {
+  /// 恢复文件后 fork 对话；fork 失败先把工作区补偿回 [fromTurn] 再报错。
+  Future<String> _forkAfterRestore(
+    Session current,
+    String? cut,
+    int fromTurn,
+  ) async {
     try {
-      final List<CheckpointFileChange> changes = await _checkpoint
-          .changesBetween(id, fromTurn, toTurn);
-      return changes.isNotEmpty;
-    } catch (_) {
-      return true;
+      return _forkAt(current, cut);
+    } catch (error) {
+      final String? failed = await compensateRevertWorkspace(
+        _checkpoint,
+        current.id,
+        fromTurn,
+      );
+      final String tail = failed == null
+          ? '工作区已恢复到第 $fromTurn 轮。'
+          : '工作区补偿失败：$failed。';
+      throw RevertException('无法分叉对话（$error）；$tail');
     }
   }
 

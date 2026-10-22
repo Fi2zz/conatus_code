@@ -36,6 +36,11 @@ List<String> revertPromptsAfter(Session session, String? cut) {
   ]..removeWhere((String text) => text.isEmpty);
 }
 
+/// 会话里的用户消息条数（`/undo` 的「还有东西可撤吗」判据）。
+int revertPromptCount(Session session) => session.events
+    .where((SessionEvent event) => event.type == kUserMessageEvent)
+    .length;
+
 String _eventText(SessionEvent event) {
   final Object? data = event.data;
   if (data is Map) {

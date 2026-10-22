@@ -43,7 +43,14 @@ class _Env {
 }
 
 /// 摆两轮：a.txt v0 → v1（第一轮）→ v2（第二轮）。
-Future<_Env> _twoTurns({bool enabled = true, int keep = 5}) async {
+///
+/// [touchesFiles] 为 false 时两轮都不改文件（用于制造「撤销区间内没有文件变化」
+/// 却存在外部改动的情形）。
+Future<_Env> _twoTurns({
+  bool enabled = true,
+  int keep = 5,
+  bool touchesFiles = true,
+}) async {
   final (String root, String projectDir) = _workspace();
   final CheckpointManager manager = CheckpointManager(
     store: ArchiveCheckpointStore(
@@ -58,10 +65,10 @@ Future<_Env> _twoTurns({bool enabled = true, int keep = 5}) async {
   _write(root, 'a.txt', 'v0');
   await manager.bind('s1');
   session.append(kUserMessageEvent, data: <String, Object?>{'text': '第一轮'});
-  _write(root, 'a.txt', 'v1');
+  if (touchesFiles) _write(root, 'a.txt', 'v1');
   await manager.recordTurn(lastEventId: session.lastEventId);
   session.append(kUserMessageEvent, data: <String, Object?>{'text': '第二轮'});
-  _write(root, 'a.txt', 'v2');
+  if (touchesFiles) _write(root, 'a.txt', 'v2');
   await manager.recordTurn(lastEventId: session.lastEventId);
   return _Env(
     root: root,
@@ -116,6 +123,84 @@ void main() {
     final Session fork = env.sessions.get(result.stage.forkSessionId)!;
     expect(_prompts(fork), <String>['第一轮']);
     expect(result.stage.prompt, contains('第二轮'));
+
+    // redo 无从恢复文件：只报告 restored:false，切回原会话由控制器做。
+    final RedoResult redone = await env.service.redo(result.stage);
+    expect(redone.restored, isFalse);
+    expect(_read(env.root, 'a.txt'), 'v2');
+  });
+
+  test('checkpoint 关闭且没有用户消息：报错且不建会话', () async {
+    final (String root, String projectDir) = _workspace();
+    final CheckpointManager manager = CheckpointManager(
+      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
+      config: const CheckpointConfig(enabled: false),
+    );
+    final SessionStore sessions = SessionStore();
+    final Session session = sessions.create(id: 's1');
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+    final RevertService service = RevertService(
+      checkpoint: manager,
+      sessions: sessions,
+    );
+
+    await expectLater(
+      service.undo(session, 1),
+      throwsA(
+        isA<RevertException>().having(
+          (RevertException e) => e.message,
+          'message',
+          contains('没有可撤销'),
+        ),
+      ),
+    );
+    expect(sessions.length, 1, reason: '无历史时不建新会话');
+    expect(_read(root, 'a.txt'), 'v0');
+  });
+
+  test('撤销区间无文件变化也确认：外部改动不被静默覆盖', () async {
+    final _Env env = await _twoTurns(touchesFiles: false);
+    _write(env.root, 'a.txt', 'external');
+    final List<String> asked = <String>[];
+    final RevertService service = RevertService(
+      checkpoint: env.manager,
+      sessions: env.sessions,
+      confirm: (String message) async {
+        asked.add(message);
+        return false;
+      },
+    );
+
+    await expectLater(
+      service.undo(env.session, 1),
+      throwsA(
+        isA<RevertException>().having(
+          (RevertException e) => e.message,
+          'message',
+          contains('已取消'),
+        ),
+      ),
+    );
+
+    expect(asked, hasLength(1), reason: '没有快照差异也必须问一次');
+    expect(asked.single, contains('尚未快照的外部改动'));
+    expect(_read(env.root, 'a.txt'), 'external');
+  });
+
+  test('确认通过后快照状态覆盖外部改动', () async {
+    final _Env env = await _twoTurns(touchesFiles: false);
+    _write(env.root, 'a.txt', 'external');
+    final RevertService service = RevertService(
+      checkpoint: env.manager,
+      sessions: env.sessions,
+      confirm: (String _) async => true,
+    );
+
+    final UndoResult result = await service.undo(env.session, 1);
+
+    expect(result.stage.toTurn, 1);
+    expect(_read(env.root, 'a.txt'), 'v0', reason: 'turn 1 快照里是 v0');
   });
 
   test('没有可撤销的轮次：报错且不改会话与文件', () async {

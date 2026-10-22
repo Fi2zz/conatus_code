@@ -1,6 +1,7 @@
 /// `/undo` `/redo`：按轮撤销（文件 + 对话）、重做、prompt 回填与提交语义。
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
@@ -10,8 +11,10 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:test/test.dart';
 
-/// 固定回复的假 provider。
+/// 固定回复的假 provider；记录收到的用户 prompt（断言「没跑起来」）。
 class _ScriptedProvider implements LlmProvider {
+  final List<String> prompts = <String>[];
+
   @override
   String get name => 'scripted';
 
@@ -20,7 +23,15 @@ class _ScriptedProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) async => const LlmResult(content: 'ok', provider: 'scripted', model: 'm');
+  }) async {
+    for (final LlmMessage message in messages.reversed) {
+      if (message.role == 'user') {
+        prompts.add(message.content);
+        break;
+      }
+    }
+    return const LlmResult(content: 'ok', provider: 'scripted', model: 'm');
+  }
 
   @override
   Stream<LlmStreamEvent> chatStream(
@@ -59,15 +70,22 @@ Future<void> _disposeAfterSettle(
 }
 
 /// 装配带 checkpointManager 的控制器（检查点配置可关 / 可限保留数）。
+///
+/// [autoConfirm] 为 true 时注入「总是确认」，false 时走真实的选项浮层路径。
 Future<(ConatusTuiController, Context, String)> _build({
   bool enabled = true,
   int keep = 5,
+  bool autoConfirm = true,
+  _ScriptedProvider? provider,
   void Function(String root)? beforeStart,
 }) async {
   final (String root, String projectDir) = _workspace();
   final Context app = Context.root();
   provideTools(app);
-  provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
+  provideLlm(
+    app,
+    llm: FallbackLlm(<LlmProvider>[provider ?? _ScriptedProvider()]),
+  );
   final SessionStore sessions = provideSessions(app);
   app.provide(
     'checkpointManager',
@@ -87,11 +105,21 @@ Future<(ConatusTuiController, Context, String)> _build({
     modelLabel: 'mock',
     onExit: () {},
   );
-  controller.confirmRevert = (String _) async => true;
+  if (autoConfirm) {
+    controller.confirmRevert = (String _) async => true;
+  }
   beforeStart?.call(root);
   await controller.start();
   await controller.checkpointSettled;
   return (controller, app, root);
+}
+
+/// 轮询直到 [cond] 成立（超时上限 2s）。
+Future<void> _until(bool Function() cond) async {
+  for (int i = 0; i < 400 && !cond(); i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  expect(cond(), isTrue, reason: '条件未在超时内成立');
 }
 
 /// 跑两轮：v1（第一轮）→ v2（第二轮）。
@@ -154,6 +182,7 @@ void main() {
     expect(controller.sessionId, original);
     expect(_read(root, 'a.txt'), 'v2');
     expect(controller.transcript.messages.last.text, contains('已重做'));
+    expect(controller.takePrefillInput(), isNull, reason: '/redo 清掉待回填内容');
 
     await controller.handleLine('/redo');
     expect(controller.transcript.messages.last.text, contains('没有可重做'));
@@ -272,6 +301,171 @@ void main() {
     expect(_read(root, 'a.txt'), 'v1');
     await controller.handleLine('/redo');
     expect(controller.transcript.messages.last.text, contains('没有可重做'));
+  });
+
+  test('checkpoint 关闭且无历史：/undo 报错且不切换', () async {
+    final (
+      ConatusTuiController controller,
+      Context app,
+      String root,
+    ) = await _build(
+      enabled: false,
+      beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
+    );
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    final String original = controller.sessionId;
+
+    await controller.handleLine('/undo');
+
+    expect(controller.sessionId, original);
+    expect(_read(root, 'a.txt'), 'v0');
+    expect(controller.transcript.messages.last.text, contains('没有可撤销'));
+  });
+
+  test('checkpoint 关闭：/redo 只切回原会话（restored:false）', () async {
+    final (
+      ConatusTuiController controller,
+      Context app,
+      String root,
+    ) = await _build(
+      enabled: false,
+      beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
+    );
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    _write(root, 'a.txt', 'v1');
+    await controller.handleLine('第一轮');
+    final String original = controller.sessionId;
+
+    await controller.handleLine('/undo');
+    expect(controller.sessionId, isNot(original));
+
+    await controller.handleLine('/redo');
+
+    expect(controller.sessionId, original);
+    expect(_read(root, 'a.txt'), 'v1', reason: '关闭检查点时 redo 不动文件');
+    expect(
+      controller.transcript.messages.last.text,
+      contains('checkpoint 已关闭'),
+    );
+  });
+
+  test('默认确认路径：选项浮层弹出并确认后回滚', () async {
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(
+          autoConfirm: false,
+          beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
+        );
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    await _twoTurns(controller, root);
+
+    final Future<void> pending = controller.handleLine('/undo');
+    await _until(() => controller.choice.open);
+
+    expect(
+      controller.choice.request!.title,
+      contains('尚未快照的外部改动'),
+    );
+    controller.choice.confirm();
+    await pending;
+
+    expect(_read(root, 'a.txt'), 'v1');
+    expect(controller.takePrefillInput(), contains('第二轮'));
+  });
+
+  test('撤销进行中：拒绝新 prompt 与并发 /undo，不产生半套状态', () async {
+    final _ScriptedProvider provider = _ScriptedProvider();
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(
+          provider: provider,
+          beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
+        );
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    await _twoTurns(controller, root);
+    final String original = controller.sessionId;
+
+    final Completer<void> started = Completer<void>();
+    final Completer<bool> gate = Completer<bool>();
+    controller.confirmRevert = (String _) {
+      if (!started.isCompleted) started.complete();
+      return gate.future;
+    };
+
+    final Future<void> pending = controller.handleLine('/undo');
+    await _until(() => started.isCompleted);
+
+    // 撤销在飞的整段窗口里：新 prompt 与第二次 /undo 都被拒绝。
+    await controller.handleLine('插队');
+    expect(
+      controller.transcript.messages.last.text,
+      contains('正在撤销/重做'),
+    );
+    await controller.handleLine('/undo');
+    expect(
+      controller.transcript.messages.last.text,
+      contains('正在撤销/重做'),
+    );
+
+    gate.complete(true);
+    await pending;
+
+    expect(_read(root, 'a.txt'), 'v1');
+    expect(controller.sessionId, isNot(original));
+    expect(
+      provider.prompts,
+      isNot(contains('插队')),
+      reason: '撤销期间提交的 prompt 不能跑起来',
+    );
+  });
+
+  test('busy 时 /redo 拒绝，收口后仍可重做', () async {
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    await _twoTurns(controller, root);
+    final String original = controller.sessionId;
+
+    await controller.handleLine('/undo');
+    controller.busy = true;
+    await controller.handleLine('/redo');
+
+    expect(controller.transcript.messages.last.text, contains('有在途轮次'));
+    expect(controller.sessionId, isNot(original));
+    expect(_read(root, 'a.txt'), 'v1');
+
+    controller.busy = false;
+    await controller.handleLine('/redo');
+    expect(controller.sessionId, original);
+    expect(_read(root, 'a.txt'), 'v2');
+  });
+
+  test('/undo 参数非法：给用法提示且不改状态', () async {
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    await _twoTurns(controller, root);
+    final String original = controller.sessionId;
+
+    await controller.handleLine('/undo abc');
+
+    expect(controller.sessionId, original);
+    expect(_read(root, 'a.txt'), 'v2');
+    expect(controller.transcript.messages.last.text, contains('用法：/undo'));
+  });
+
+  test('busy 时 /new 不建幽灵会话', () async {
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    final String original = controller.sessionId;
+    final SessionStore sessions = app.get<SessionStore>('sessions')!;
+    final int before = sessions.length;
+    controller.busy = true;
+
+    await controller.newSession();
+
+    expect(controller.sessionId, original);
+    expect(sessions.length, before, reason: '被拒绝时不能留下空会话');
+    expect(controller.transcript.messages.last.text, contains('有操作进行中'));
   });
 
   test('TUI 消费回填：输入框出现撤回的 prompt', () async {

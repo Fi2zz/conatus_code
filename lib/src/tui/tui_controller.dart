@@ -34,6 +34,7 @@ import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
 import '../permissions/permission_wiring.dart';
+import '../revert/revert_compensate.dart';
 import '../revert/revert_service.dart';
 import '../revert/revert_stage.dart';
 import '../story/story.dart';
@@ -69,6 +70,7 @@ import 'tui_skill_command.dart';
 import 'voice_reporter.dart';
 
 part 'tui_controller_provider.dart';
+part 'tui_controller_redo.dart';
 part 'tui_controller_revert.dart';
 
 /// `/goal` 用法提示。
@@ -324,6 +326,12 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 最近一次 `/undo` 的撤销点；发新 prompt（提交语义）或 `/redo` 后清空。
   RevertStage? _revertStage;
+
+  /// 撤销 / 重做进行中：拒绝新 prompt 与并发撤销命令，内部的换会话放行。
+  ///
+  /// 文件恢复 + 分叉 + 切会话是一串 await；期间若让一轮对话跑起来，工作区会
+  /// 在被回滚的同时被工具改写，切会话也会被 busy 拒绝，留下半套状态。
+  bool _revertInFlight = false;
 
   /// 待回填到输入框的文本（`/undo` 回填被撤回的 prompt）；根组件取走即清空。
   String? _prefill;
@@ -652,6 +660,12 @@ class ConatusTuiController implements TuiUserPromptHost {
     String text, {
     List<TuiAttachment> attachments = const <TuiAttachment>[],
   }) async {
+    if (_revertInFlight) {
+      // 撤销/重做正在改工作区与切会话：此时起一轮会让回滚与工具写入交错。
+      transcript.add(TuiRole.system, '正在撤销/重做，请稍候。');
+      _refresh();
+      return;
+    }
     if (busy) {
       // busy 时排队追问（上限 [kMessageQueueCap]）；未绑定会话不排队。
       if (_agent == null) {
@@ -759,8 +773,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   ///
   /// busy（有在途轮次）时拒绝并返回 `false`：此时释放会话子上下文会把正在
   /// 跑的 Agent Loop 从脚下抽走，`/undo`、`/redo` 这类编排也据此判定未生效。
+  /// 撤销/重做自身（[_revertInFlight]）不受此限——它就是那条编排。
   Future<bool> switchSession(String id, {String? announce}) async {
-    if (busy) {
+    if (busy && !_revertInFlight) {
       transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
       _refresh();
       return false;
@@ -788,11 +803,19 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 开启新会话。
   Future<void> newSession() async {
+    if (busy || _revertInFlight) {
+      showSystemNotice('有操作进行中，请稍候再试。');
+      return;
+    }
     final Session session = _sessions.create();
-    await switchSession(
+    final bool switched = await switchSession(
       session.id,
       announce: '已开启新会话 ${session.id}（上一会话已保存，/sessions 可切回）。',
     );
+    if (switched) return;
+    // 没切过去就别留下没人用的空会话（数据文件与仓库条目都撤掉）。
+    await _sessions.remove(session.id);
+    showSystemNotice('新会话未开启：切换被拒绝。');
   }
 
   Future<void> _handleCommand(String command, String arg) async {
@@ -836,7 +859,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'rewind':
         await _handleRewind(arg);
       case 'undo':
-        await undo(int.tryParse(arg.trim()) ?? 1);
+        await _runUndoArg(arg);
       case 'redo':
         await redo();
       case 'background':
