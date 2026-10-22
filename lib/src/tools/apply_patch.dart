@@ -35,6 +35,7 @@ class ApplyPatchTool extends Tool {
     final List<String> applied = <String>[];
     try {
       for (final DiffFile file in files) {
+        if (file.hunks.isEmpty) continue;
         await _applyFile(file);
         applied.add(file.path);
       }

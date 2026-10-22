@@ -25,8 +25,7 @@ class DiffSource {
   /// 工作区根（绝对路径）。
   final String workdir;
 
-  /// 检查点管理器（只走公开透传：`changesBetween` / `readFile` /
-  /// `loadManifest`）。
+  /// 检查点管理器（只走公开透传）。
   final CheckpointManager checkpoint;
 
   /// 会话 id。
@@ -35,23 +34,34 @@ class DiffSource {
   /// 检查点轮次（`turn` 范围的目标轮）。
   final int turn;
 
+  String? _notice;
+
+  /// 最近一次 `load` 的降级说明（git 命令失败等）；正常为 `null`。
+  String? get notice => _notice;
+
   /// 加载 [scope] 范围内的差异（按路径排序）。
   Future<List<FileDiff>> load(DiffScope scope) async {
     if (scope == DiffScope.turn) return _turnDiff();
-    final List<FileDiff>? working = await WorkingDiff(workdir).load();
-    return working ?? _turnDiff();
+    final WorkingDiff working = WorkingDiff(
+      workdir,
+      acceptsPath: checkpoint.showsDiffPath,
+    );
+    final List<FileDiff>? diffs = await working.load();
+    _notice = working.notice;
+    return diffs ?? _turnDiff();
   }
 
   /// 检查点轮次差异：目标轮 vs 上一轮；turn 0（或更早）与空比较。
+  ///
+  /// 先 `flush()`：`recordTurn` 同步推进轮次、归档稍后落盘，刚结束一轮就
+  /// 打开的 `/diff` 不等它就会撞上 `missing-checkpoint`。
   Future<List<FileDiff>> _turnDiff() async {
+    await checkpoint.flush();
     try {
       final List<FileDiff> diffs = turn <= 0
           ? await _fromEmpty()
           : await _between(turn - 1, turn);
-      return _sorted(<FileDiff>[
-        for (final FileDiff diff in diffs)
-          if (showsDiffPath(diff.path)) diff,
-      ]);
+      return _sorted(diffs);
     } on CheckpointException {
       return const <FileDiff>[];
     }
@@ -65,6 +75,7 @@ class DiffSource {
     );
     final List<FileDiff> diffs = <FileDiff>[];
     for (final CheckpointFileEntry entry in manifest.files) {
+      if (!checkpoint.showsDiffPath(entry.path)) continue;
       final String? after = await _read(target, entry.path);
       if (after == null) continue;
       diffs.addAll(diffLines(entry.path, null, after));
@@ -80,12 +91,15 @@ class DiffSource {
     );
     final List<FileDiff> diffs = <FileDiff>[];
     for (final CheckpointFileChange change in changes) {
+      if (!checkpoint.showsDiffPath(change.path)) continue;
       diffs.addAll(await _changeDiff(change, fromTurn, toTurn));
     }
     return diffs;
   }
 
   /// 两端内容都从检查点读；重命名保留状态词（存储只给新路径）。
+  ///
+  /// 两端都读不出（旧格式检查点）时仍保留一条文件级变化，而不是静默丢掉。
   Future<List<FileDiff>> _changeDiff(
     CheckpointFileChange change,
     int fromTurn,
@@ -93,6 +107,11 @@ class DiffSource {
   ) async {
     final String? before = await _read(fromTurn, change.path);
     final String? after = await _read(toTurn, change.path);
+    if (before == null && after == null) {
+      return <FileDiff>[
+        FileDiff(path: change.path, status: change.status, hunks: const []),
+      ];
+    }
     final List<FileDiff> diffs = diffLines(change.path, before, after);
     if (change.status != 'renamed') return diffs;
     return <FileDiff>[

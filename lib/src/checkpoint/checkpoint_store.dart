@@ -20,7 +20,10 @@
 /// - 单轮快照失败不抛给调用方（编排层转成提示）。
 library;
 
+import 'dart:io';
+
 import 'checkpoint_changes.dart';
+import 'checkpoint_paths.dart';
 import 'checkpoint_types.dart';
 
 /// 工作区快照存储。
@@ -87,4 +90,21 @@ abstract class CheckpointStore {
 
   /// 保留基线 + 最近 `keep - 1` 轮；`keep` 非正不裁剪。
   void prune(String sessionId);
+}
+
+/// 路径可见性：所有存储实现共享同一套 `/diff` 排除面。
+extension CheckpointPathVisibility on CheckpointStore {
+  /// 相对工作区的路径能否作为 `/diff` 的展示 / 读取目标。
+  ///
+  /// 复用快照的排除面（`.opencode` 只读目录、凭据、`build`、项目数据目录
+  /// 等），避免 `/diff` 自己维护第二套策略。读取本身不写盘，但把只读与
+  /// 凭据内容摊到屏上同样是泄漏面。
+  bool readablePath(String path) {
+    final String sep = Platform.pathSeparator;
+    final String rootPrefix = root.endsWith(sep) ? root : '$root$sep';
+    final String projectRel = projectDir.startsWith(rootPrefix)
+        ? projectDir.substring(rootPrefix.length)
+        : projectDir;
+    return checkpointReadablePath(path, projectRel, ignore);
+  }
 }

@@ -6,3 +6,4 @@ library;
 export 'src/diff/diff_model.dart' show DiffScope, FileDiff;
 export 'src/diff/diff_parser.dart' show diffLines, parseUnifiedDiff;
 export 'src/diff/diff_source.dart' show DiffSource;
+export 'src/diff/diff_types.dart' show DiffFile, DiffHunk;

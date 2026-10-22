@@ -108,6 +108,79 @@ void main() {
       expect(diff.hunks, isEmpty);
     });
 
+    test('pathless binary entries are skipped', () {
+      expect(parseUnifiedDiff('Binary files a/x and b/x differ\n'), isEmpty);
+    });
+
+    test('recognises renames from git extended headers', () {
+      final FileDiff diff = parseUnifiedDiff(
+        'diff --git a/old.txt b/new.txt\n'
+        'similarity index 100%\n'
+        'rename from old.txt\n'
+        'rename to new.txt\n',
+      ).single;
+      expect(diff.path, 'new.txt');
+      expect(diff.status, 'renamed');
+      expect(diff.hunks, isEmpty);
+    });
+
+    test('new file mode without /dev/null is still added', () {
+      final FileDiff diff = parseUnifiedDiff(
+        'diff --git a/new.txt b/new.txt\n'
+        'new file mode 100644\n'
+        '--- a/new.txt\n'
+        '+++ b/new.txt\n'
+        '@@ -0,0 +1,1 @@\n'
+        '+hello\n',
+      ).single;
+      expect(diff.path, 'new.txt');
+      expect(diff.status, 'added');
+      expect(diff.additions, 1);
+    });
+
+    test('GIT binary patch is a binary entry', () {
+      final FileDiff diff = parseUnifiedDiff(
+        'diff --git a/x.png b/x.png\n'
+        'GIT binary patch\n'
+        'literal 0\n'
+        'HcmV?d00001\n',
+      ).single;
+      expect(diff.path, 'x.png');
+      expect(diff.status, 'binary');
+      expect(diff.hunks, isEmpty);
+    });
+
+    test('CRLF patches are normalised', () {
+      final FileDiff diff = parseUnifiedDiff(
+        '--- a/x.txt\r\n+++ b/x.txt\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n',
+      ).single;
+      expect(diff.path, 'x.txt');
+      expect(diff.hunks.single.lines, <String>['-a', '+b']);
+    });
+
+    test('quoted paths with spaces are unquoted', () {
+      final FileDiff diff = parseUnifiedDiff(
+        'diff --git "a/sp ace.txt" "b/sp ace.txt"\n'
+        '--- "a/sp ace.txt"\n'
+        '+++ "b/sp ace.txt"\n'
+        '@@ -1 +1 @@\n'
+        '-a\n'
+        '+b\n',
+      ).single;
+      expect(diff.path, 'sp ace.txt');
+      expect(diff.additions, 1);
+    });
+
+    test('hunk headers with omitted counts mean one line', () {
+      final DiffHunk hunk = parseUnifiedDiff(
+        '--- a/x\n+++ b/x\n@@ -3 +7 @@\n-a\n+b\n',
+      ).single.hunks.single;
+      expect(hunk.oldStart, 3);
+      expect(hunk.oldLines, 1);
+      expect(hunk.newStart, 7);
+      expect(hunk.newLines, 1);
+    });
+
     test('NUL content marks the file binary and drops hunks', () {
       final FileDiff diff = parseUnifiedDiff(
         '--- a/a.bin\n+++ b/a.bin\n@@ -1,1 +1,1 @@\n-\u0000\u0001\n+\u0000\u0002\n',
@@ -168,6 +241,49 @@ void main() {
       expect(diff.truncated, isTrue);
       expect(diff.status, 'modified');
       expect(diff.hunks, isEmpty);
+      expect(diff.additions, 0);
+      expect(diff.deletions, 0);
+    });
+
+    test('one-line edits at 2001 and 5000 lines stay minimal', () {
+      for (final int count in <int>[2001, 5000]) {
+        final List<String> lines = <String>[
+          for (int i = 0; i < count; i++) 'line $i',
+        ];
+        final String before = lines.join('\n');
+        lines[count ~/ 2] = 'changed';
+        final FileDiff diff = diffLines(
+          'big.txt',
+          before,
+          lines.join('\n'),
+        ).single;
+        expect(diff.truncated, isFalse, reason: '$count 行不该被截断');
+        expect(diff.additions, 1, reason: '$count 行仍是单行修改');
+        expect(diff.deletions, 1, reason: '$count 行仍是单行修改');
+        expect(diff.hunks, hasLength(1));
+      }
+    });
+
+    test('a 5001-line side is file-level truncated', () {
+      final List<String> lines = <String>[
+        for (int i = 0; i < 5001; i++) 'line $i',
+      ];
+      final FileDiff diff = diffLines(
+        'big.txt',
+        lines.join('\n'),
+        '${lines.join('\n')}\nextra',
+      ).single;
+      expect(diff.truncated, isTrue);
+      expect(diff.additions, 0);
+      expect(diff.deletions, 0);
+      expect(diff.hunks, isEmpty);
+    });
+
+    test('trailing-newline-only changes are reported', () {
+      final FileDiff diff = diffLines('x.txt', 'a\n', 'a').single;
+      expect(diff.status, 'modified');
+      expect(diff.hunks, isEmpty);
+      expect(diff.truncated, isFalse);
     });
   });
 }

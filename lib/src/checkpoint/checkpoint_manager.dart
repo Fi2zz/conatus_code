@@ -141,6 +141,9 @@ class CheckpointManager {
   Future<CheckpointManifest> loadManifest(String sessionId, int turn) =>
       _store.loadManifest(sessionId, turn);
 
+  /// 路径是否可见于 `/diff`（统一走存储的排除面：只读目录 / 凭据 / build）。
+  bool showsDiffPath(String path) => _store.readablePath(path);
+
   /// 读某会话某轮里 [path] 的内容（`/diff` 数据源）；透传给存储。
   Future<List<int>?> readFile(String sessionId, int turn, String path) =>
       _store.readFile(sessionId, turn, path);

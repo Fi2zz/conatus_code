@@ -5,6 +5,7 @@
 library;
 
 import 'diff_model.dart';
+import 'diff_paths.dart';
 import 'diff_types.dart';
 
 final RegExp _hunkHeader = RegExp(
@@ -39,11 +40,8 @@ class UnifiedDiffBuilder {
     } else if (raw.startsWith('rename from ') || raw.startsWith('rename to ')) {
       _renamed = true;
     } else if (raw.startsWith('--- ')) {
-      if (_cursor.hunks.isNotEmpty ||
-          _cursor.binary ||
-          _oldPath != null && !_fromGitHeader) {
-        _flush();
-      }
+      final bool headerPending = _oldPath != null && !_fromGitHeader;
+      if (_cursor.started || headerPending) _flush();
       _oldPath = cleanDiffPath(raw.substring(4));
     } else if (raw.startsWith('+++ ')) {
       _newPath = cleanDiffPath(raw.substring(4));
@@ -65,21 +63,28 @@ class UnifiedDiffBuilder {
   void _startGitHeader(String raw) {
     _flush();
     _fromGitHeader = true;
-    final String rest = raw.substring('diff --git '.length).trim();
-    final int split = rest.indexOf(' b/');
-    if (split < 0) return;
-    _oldPath = cleanDiffPath(rest.substring(0, split));
-    _newPath = cleanDiffPath(rest.substring(split + 1));
+    final List<String> paths = gitDiffPaths(
+      raw.substring('diff --git '.length).trim(),
+    );
+    if (paths.length < 2) return;
+    _oldPath = cleanDiffPath(paths[0]);
+    _newPath = cleanDiffPath(paths[1]);
   }
 
   void _flush() {
-    if (_oldPath == null && _newPath == null && !_cursor.started) {
+    final bool headerless = _oldPath == null && _newPath == null;
+    if (headerless && !_cursor.started) {
+      _reset();
+      return;
+    }
+    final String path = _path();
+    if (path.isEmpty) {
       _reset();
       return;
     }
     _files.add(
       FileDiff(
-        path: _path(),
+        path: path,
         status: _status(),
         hunks: _cursor.result,
         additions: _cursor.additions,
@@ -185,14 +190,4 @@ class _HunkCursor {
     deletions = 0;
     binary = false;
   }
-}
-
-/// 去掉 `a/` / `b/` 前缀与 `diff -u` 的制表符时间戳。
-String cleanDiffPath(String raw) {
-  final int tab = raw.indexOf('\t');
-  final String value = (tab < 0 ? raw : raw.substring(0, tab)).trim();
-  if (value.startsWith('a/') || value.startsWith('b/')) {
-    return value.substring(2);
-  }
-  return value;
 }
