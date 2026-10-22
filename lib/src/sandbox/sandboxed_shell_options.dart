@@ -12,6 +12,7 @@ class SandboxedShellOptions {
     required this.commandPolicy,
     this.allowNetwork = false,
     this.writablePaths = const <String>{},
+    this.protectedWritePaths = const <String>{},
     this.minimalEnv,
     this.maxOutputBytes = 1 << 20,
     this.maxTimeoutMs = 600000,
@@ -33,6 +34,10 @@ class SandboxedShellOptions {
   /// 额外可写路径（已展开 `~`、相对路径基于 root 解析）；与
   /// `defaultWritableCaches` 合并后进 Seatbelt 可写根。
   final Set<String> writablePaths;
+
+  /// 只读洞：即便落在可写面内也拒绝写入的子树（已展开 `~`、相对路径基于
+  /// root 解析）。用于 `.opencode`——nava 只读的 OpenCode 目录。
+  final Set<String> protectedWritePaths;
 
   /// 传给 sandbox-exec 的最小环境；缺省从父进程拷贝常用键。
   final Map<String, String>? minimalEnv;

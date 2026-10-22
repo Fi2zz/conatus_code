@@ -59,10 +59,15 @@ String _expandHome(String raw, String home) {
   return '$home/${raw.substring(2)}';
 }
 
-/// 组装 Seatbelt profile；可写根数量为 [writableCount]（对应 `W0..Wn` 参数）。
+/// 组装 Seatbelt profile；可写根数量为 [writableCount]（对应 `W0..Wn` 参数），
+/// 受保护写路径数量为 [protectedCount]（对应 `P0..Pn`）。
+///
+/// 受保护路径在可写 allow 块**之后**追加 `(deny file-write*)`：Seatbelt 按
+/// 规则顺序裁决，后匹配者生效，故这是「在可写区内挖一个只读洞」。
 String buildSeatbeltProfile({
   required bool networkAllowed,
   required int writableCount,
+  int protectedCount = 0,
 }) {
   final StringBuffer sb = StringBuffer()
     ..writeln('(version 1)')
@@ -81,19 +86,25 @@ String buildSeatbeltProfile({
     ..writeln(_fileMapExecutableRule())
     ..writeln(_charDeviceRule('/dev/null'))
     ..writeln(_charDeviceRule('/dev/zero'))
-    ..writeln(_writableBlock(writableCount))
-    ..writeln(networkAllowed ? '(allow network*)' : '(deny network*)');
+    ..writeln(_writableBlock(writableCount));
+  if (protectedCount > 0) sb.writeln(_protectedBlock(protectedCount));
+  sb.writeln(networkAllowed ? '(allow network*)' : '(deny network*)');
   return sb.toString();
 }
 
-/// 生成 `-D` 参数；每个可写路径先消毒（拒绝引号/括号/反斜杠/glob 元字符）。
+/// 生成 `-D` 参数；每个可写 / 受保护路径先消毒（拒绝引号/括号/反斜杠/
+/// glob 元字符）。
 List<String> buildSandboxParams({
   required String root,
   required List<String> writablePaths,
+  List<String> protectedPaths = const <String>[],
 }) {
   final List<String> params = <String>['-DROOT=${_sanitize(root)}'];
   for (int i = 0; i < writablePaths.length; i++) {
     params.add('-DW$i=${_sanitize(writablePaths[i])}');
+  }
+  for (int i = 0; i < protectedPaths.length; i++) {
+    params.add('-DP$i=${_sanitize(protectedPaths[i])}');
   }
   return params;
 }
@@ -128,5 +139,15 @@ String _writableBlock(int writableCount) {
   }
   sb.write(' (subpath "/private/tmp") (subpath "/tmp")'
       ' (subpath "/private/var/folders") (subpath "/var/tmp"))');
+  return sb.toString();
+}
+
+/// 只读洞：从可写面里扣掉受保护子树（`.opencode` 等）。
+String _protectedBlock(int protectedCount) {
+  final StringBuffer sb = StringBuffer('(deny file-write*');
+  for (int i = 0; i < protectedCount; i++) {
+    sb.write(' (subpath (param "P$i"))');
+  }
+  sb.write(')');
   return sb.toString();
 }

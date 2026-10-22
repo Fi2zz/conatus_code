@@ -3,17 +3,29 @@ library;
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../sandbox/protected_command.dart';
+
 /// 执行命令并映射为工具结果。
 ///
 /// exit 0 → success（content 为 stdout，value 附 stderr/exitCode/timeout）；
 /// 超时 → `TOOL_TIMEOUT`；非零或 null → `COMMAND_FAILED`（content 合并两路）；
 /// 执行器抛异常 → `SHELL_ERROR`。
+///
+/// 命令字面写 `.opencode` 时先拒（`READ_ONLY_PATH`）——沙箱关闭时的兜底，
+/// 见 `protected_command.dart`（best-effort，Seatbelt 才是真边界）。
 Future<ToolResult> runShellCommand(
   ShellExecutor shell,
   String command, {
   String? cwd,
   int? timeoutMs,
 }) async {
+  final String? violation = readOnlyCommandViolation(command);
+  if (violation != null) {
+    return ToolResult.failure(
+      violation,
+      error: ToolError(kReadOnlyCommandCode, violation),
+    );
+  }
   final ShellExecSpec spec = shell.resolve(
     ShellExecRequest(command: command, workdir: cwd, timeoutMs: timeoutMs),
   );

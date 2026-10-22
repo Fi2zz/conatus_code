@@ -158,6 +158,11 @@ export 'src/sandbox/command_policy.dart'
         resolveAllowedExecutables,
         resolveReadAllowedPaths;
 export 'src/sandbox/jailed_file_system.dart' show JailedFileSystem;
+export 'src/sandbox/protected_command.dart'
+    show
+        kReadOnlyCommandCode,
+        kReadOnlyCommandMessage,
+        readOnlyCommandViolation;
 export 'src/sandbox/rejecting_shell.dart'
     show RejectingShellExecutor, kSandboxUnavailable;
 export 'src/sandbox/sandbox_assembly.dart'

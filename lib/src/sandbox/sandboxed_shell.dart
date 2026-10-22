@@ -148,13 +148,19 @@ class SandboxedShellExecutor implements ShellExecutor {
   Future<Process> _spawn(ShellExecSpec spec) {
     final bool networkAllowed = _networkAllowed(spec.command);
     final List<String> writable = _writableRoots();
+    final List<String> protected = _protectedRoots();
     final List<String> args = <String>[
       '-p',
       buildSeatbeltProfile(
         networkAllowed: networkAllowed,
         writableCount: writable.length,
+        protectedCount: protected.length,
       ),
-      ...buildSandboxParams(root: _options.root, writablePaths: writable),
+      ...buildSandboxParams(
+        root: _options.root,
+        writablePaths: writable,
+        protectedPaths: protected,
+      ),
       '--',
       '/bin/sh',
       '-c',
@@ -176,6 +182,15 @@ class SandboxedShellExecutor implements ShellExecutor {
       paths.add(_resolveWritable(raw, home));
     }
     return paths.toList();
+  }
+
+  /// 只读洞：受保护写路径（同样展开 `~`、相对基于 root）。
+  List<String> _protectedRoots() {
+    final String home = Platform.environment['HOME'] ?? '';
+    return <String>{
+      for (final String raw in _options.protectedWritePaths)
+        _resolveWritable(raw, home),
+    }.toList();
   }
 
   String _resolveWritable(String raw, String home) {

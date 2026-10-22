@@ -67,6 +67,35 @@ void main() {
       expect(off, isNot(contains('mDNSResponder')));
       expect(on, contains('com.apple.mDNSResponder'));
     });
+
+    test('受保护写路径在 allow 之后追加 deny file-write*', () {
+      final String profile = buildSeatbeltProfile(
+        networkAllowed: false,
+        writableCount: 1,
+        protectedCount: 2,
+      );
+
+      expect(
+        profile,
+        contains(
+          '(deny file-write* (subpath (param "P0")) '
+          '(subpath (param "P1")))',
+        ),
+      );
+      // 规则顺序：先 allow 后 deny（Seatbelt 后匹配者生效）。
+      expect(
+        profile.indexOf('(deny file-write*'),
+        greaterThan(profile.indexOf('(allow file-write*')),
+      );
+    });
+
+    test('protectedCount = 0 时不产出空 deny 规则', () {
+      final String profile =
+          buildSeatbeltProfile(networkAllowed: false, writableCount: 0);
+
+      expect(profile, isNot(contains('(deny file-write*')));
+      expect(profile, isNot(contains('(param "P0")')));
+    });
   });
 
   group('buildSandboxParams', () {
@@ -93,6 +122,32 @@ void main() {
     test('可写路径含 glob 元字符 → SandboxException', () {
       expect(
         () => buildSandboxParams(root: '/ws', writablePaths: const ['/bad*']),
+        throwsA(isA<SandboxException>()),
+      );
+    });
+
+    test('protectedPaths 生成 -DPn 参数（排在 Wn 之后）', () {
+      final List<String> params = buildSandboxParams(
+        root: '/ws',
+        writablePaths: const <String>['/w'],
+        protectedPaths: const <String>['/ws/.opencode', '/home/u/.config/opencode'],
+      );
+
+      expect(params, <String>[
+        '-DROOT=/ws',
+        '-DW0=/w',
+        '-DP0=/ws/.opencode',
+        '-DP1=/home/u/.config/opencode',
+      ]);
+    });
+
+    test('受保护路径含元字符 → SandboxException', () {
+      expect(
+        () => buildSandboxParams(
+          root: '/ws',
+          writablePaths: const [],
+          protectedPaths: const <String>['/bad"path'],
+        ),
         throwsA(isA<SandboxException>()),
       );
     });

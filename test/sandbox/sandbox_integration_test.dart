@@ -188,4 +188,33 @@ void main() {
     expect(result.exitCode, isNull);
     expect(result.stderr.text, contains('越界'));
   });
+
+  test('装配默认保护：.opencode 下写入被 Seatbelt 拒绝，普通文件仍可写', () async {
+    final SandboxBackend? found = backend;
+    if (found == null) {
+      markTestSkipped('沙箱后端不可用，跳过集成测试');
+      return;
+    }
+    final Directory protectedDir = Directory('$root/.opencode');
+    protectedDir.createSync(recursive: true);
+    final SandboxLayers layers = resolveSandboxLayers(
+      root: root!,
+      settings: const SandboxSettings(),
+      backend: found,
+    );
+    final ShellExecutor shell = layers.shell!;
+
+    final ShellRunResult denied = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'echo x > .opencode/x')));
+
+    expect(denied.exitCode, isNot(0));
+    expect(File('${protectedDir.path}/x').existsSync(), isFalse);
+
+    // 同一 shell 写工作区普通文件不受影响。
+    final ShellRunResult allowed = await shell.run(shell.resolve(
+        const ShellExecRequest(command: 'echo y > plain.txt')));
+
+    expect(allowed.exitCode, 0);
+    expect(File('$root/plain.txt').readAsStringSync().trim(), 'y');
+  });
 }

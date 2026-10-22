@@ -7,6 +7,7 @@ library;
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../sandbox/protected_command.dart';
 import 'background_tasks.dart';
 
 /// 后台启动一条命令（high 风险，走审批）。
@@ -36,6 +37,14 @@ class RunCommandBackgroundTool extends Tool {
   Future<ToolResult> call(ToolContext ctx) async {
     final String command = ctx.str('command');
     final String? cwd = ctx.string('cwd');
+    // `.opencode` 只读：沙箱关闭时后台命令同样走这条兜底检查。
+    final String? violation = readOnlyCommandViolation(command);
+    if (violation != null) {
+      return ToolResult.failure(
+        violation,
+        error: const ToolError(kReadOnlyCommandCode, kReadOnlyCommandMessage),
+      );
+    }
     try {
       final String id = await _service.start(command, cwd: cwd);
       return ToolResult.success('后台任务 $id 已启动：$command\n'

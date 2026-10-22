@@ -55,6 +55,13 @@ SandboxLayers resolveSandboxLayers({
       ),
       allowNetwork: settings.allowNetwork,
       writablePaths: settings.writablePaths.toSet(),
+      // `.opencode` 是用户 OpenCode 自己的目录：nava 只读。项目级在可写根内，
+      // 必须显式挖洞；全局 `~/.config/opencode` 通常不在可写面，仍显式保护以
+      // 覆盖用户把 `~` / `~/.config` 加进 writable_paths 的情形。
+      protectedWritePaths: const <String>{
+        '.opencode',
+        '~/.config/opencode',
+      },
       networkAllowlist: settings.networkAllowlist.toSet(),
       maxOutputBytes: settings.maxOutputBytes,
       maxTimeoutMs: settings.commandTimeoutMs,

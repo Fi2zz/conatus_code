@@ -110,4 +110,44 @@ void main() {
     expect(result.isError, isFalse);
     expect(shell.lastRequest!.command, 'dart test');
   });
+
+  test('写 .opencode 的命令 → READ_ONLY_PATH，命令不下发执行', () async {
+    final FakeShellExecutor shell = FakeShellExecutor(_result(stdout: 'x'));
+    final RunCommandTool tool = RunCommandTool(shell: shell);
+
+    final ToolResult result = await tool.call(_context(
+      'run_command',
+      <String, Object?>{'command': 'echo x > .opencode/x'},
+    ));
+
+    expect(result.isError, isTrue);
+    expect(result.error!.code, 'READ_ONLY_PATH');
+    expect(result.content, contains('READ_ONLY_PATH'));
+    expect(shell.lastRequest, isNull);
+  });
+
+  test('run_tests 里的 .opencode 写入同样被拒', () async {
+    final FakeShellExecutor shell = FakeShellExecutor(_result(stdout: 'x'));
+    final RunTestsTool tool = RunTestsTool(shell: shell);
+
+    final ToolResult result = await tool.call(
+      _context('run_tests', <String, Object?>{'test_cmd': 'rm -rf .opencode'}),
+    );
+
+    expect(result.error!.code, 'READ_ONLY_PATH');
+    expect(shell.lastRequest, isNull);
+  });
+
+  test('只读访问 .opencode 照常执行', () async {
+    final FakeShellExecutor shell = FakeShellExecutor(_result(stdout: 'ok'));
+    final RunCommandTool tool = RunCommandTool(shell: shell);
+
+    final ToolResult result = await tool.call(_context(
+      'run_command',
+      <String, Object?>{'command': 'cat .opencode/commands/x.md'},
+    ));
+
+    expect(result.isError, isFalse);
+    expect(shell.lastRequest!.command, 'cat .opencode/commands/x.md');
+  });
 }
