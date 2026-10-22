@@ -1,6 +1,8 @@
 /// 权限中间件装配：动作映射、拒绝 / 询问 / 放行与零配置兼容。
 library;
 
+import 'dart:io';
+
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -44,9 +46,11 @@ _Rig _assemble({
   _Gate? gate,
   bool interactive = true,
   bool attachApproval = true,
+  String? workdir,
 }) {
   final Context ctx = Context.root();
   addTearDown(ctx.dispose);
+  if (workdir != null) ctx.provide('workdir', workdir);
   final ToolRegistry tools = provideTools(ctx);
   final _Gate resolved = gate ?? _Gate();
   if (attachApproval) {
@@ -75,7 +79,13 @@ _Rig _assemble({
   track('run_command', risk: ToolRisk.high);
   track('run_tests', risk: ToolRisk.high);
   track('read_file', paths: const <String>['path']);
+  track('list_files', paths: const <String>['path']);
+  track('write_file', risk: ToolRisk.medium, paths: const <String>['path']);
+  track('edit_file', risk: ToolRisk.medium, paths: const <String>['path']);
+  track('apply_patch', risk: ToolRisk.high);
+  track('rg');
   track('web_search');
+  track('spawn_agent', risk: ToolRisk.medium);
   track('fs__read_file');
   return _Rig(ctx, tools, slot, resolved, runs);
 }
@@ -207,7 +217,7 @@ void main() {
           askThreshold: ToolRisk.high,
           rules: <PermissionRule>[
             PermissionRule(
-              action: 'read_file',
+              action: 'read',
               resource: '*',
               effect: PermissionEffect.allow,
             ),
@@ -323,6 +333,198 @@ void main() {
       );
       expect(request.action, 'fs_read_file');
       expect(request.resources, <String>['*']);
+    });
+
+    test('read_file / list_files 映射为 read', () async {
+      final ApprovalRequest read = await askFor(
+        'read_file',
+        'read',
+        <String, Object?>{'path': 'src/a.dart'},
+      );
+      expect(read.action, 'read');
+      expect(read.resources, <String>['src/a.dart']);
+      final ApprovalRequest list = await askFor(
+        'list_files',
+        'read',
+        <String, Object?>{'path': 'src'},
+      );
+      expect(list.action, 'read');
+    });
+
+    test('write_file / edit_file / apply_patch 映射为 edit', () async {
+      final ApprovalRequest write = await askFor(
+        'write_file',
+        'edit',
+        <String, Object?>{'path': 'a.txt'},
+      );
+      expect(write.action, 'edit');
+      final ApprovalRequest edit = await askFor(
+        'edit_file',
+        'edit',
+        <String, Object?>{'path': 'a.txt'},
+      );
+      expect(edit.action, 'edit');
+      final ApprovalRequest patch =
+          await askFor('apply_patch', 'edit', <String, Object?>{'patch': '--- a'});
+      expect(patch.action, 'edit');
+    });
+
+    test('rg 映射为 grep', () async {
+      final ApprovalRequest request = await askFor(
+        'rg',
+        'grep',
+        <String, Object?>{'pattern': 'TODO'},
+      );
+      expect(request.action, 'grep');
+    });
+
+    test('spawn_agent 映射为 subagent，资源缺省 default', () async {
+      final ApprovalRequest request = await askFor(
+        'spawn_agent',
+        'subagent',
+        <String, Object?>{'task': '查一下'},
+      );
+      expect(request.action, 'subagent');
+      expect(request.resources, <String>['default']);
+    });
+  });
+
+  group('动作规则', () {
+    test('action=edit + resource=* 拦截三种写工具', () async {
+      final _Rig rig = _assemble(
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'edit',
+              resource: '*',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+
+      for (final String tool in <String>[
+        'write_file',
+        'edit_file',
+        'apply_patch',
+      ]) {
+        final ToolResult result = await rig.tools.call(
+          _call(tool, <String, Object?>{'path': 'a.txt', 'patch': '--- a'}),
+        );
+        expect(result.error!.code, 'PERMISSION_DENIED', reason: tool);
+      }
+      expect(rig.runs, isEmpty);
+    });
+
+    test('action=read 覆盖 read_file / list_files', () async {
+      final _Rig rig = _assemble(
+        scope: const PermissionScope(
+          askThreshold: ToolRisk.high,
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'read',
+              resource: '*',
+              effect: PermissionEffect.allow,
+            ),
+          ],
+        ),
+      );
+
+      await rig.tools.call(
+        _call('read_file', <String, Object?>{'path': '/tmp/a.txt'}),
+      );
+      await rig.tools.call(
+        _call('list_files', <String, Object?>{'path': '/tmp'}),
+      );
+      expect(rig.gate.requests, isEmpty);
+      expect(rig.runs, <String>['read_file', 'list_files']);
+    });
+
+    test('action=grep 命中 rg，action=shell 命中 run_command', () async {
+      final _Rig grepRig = _assemble(
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'grep',
+              resource: '*',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+      final ToolResult grep = await grepRig.tools.call(
+        _call('rg', <String, Object?>{'pattern': 'TODO'}),
+      );
+      expect(grep.error!.code, 'PERMISSION_DENIED');
+
+      final _Rig shellRig = _assemble(
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'shell',
+              resource: '*',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+      final ToolResult shell = await shellRig.tools.call(
+        _call('run_command', <String, Object?>{'command': 'echo hi'}),
+      );
+      expect(shell.error!.code, 'PERMISSION_DENIED');
+    });
+  });
+
+  group('external_directory', () {
+    test('工作区外 read 进入 external_directory 判定并要求确认', () async {
+      final Directory work = Directory.systemTemp.createTempSync('perm-work');
+      final Directory outside =
+          Directory.systemTemp.createTempSync('perm-outside');
+      addTearDown(() => work.deleteSync(recursive: true));
+      addTearDown(() => outside.deleteSync(recursive: true));
+      final String file = '${outside.path}${Platform.pathSeparator}a.txt';
+      final _Rig rig = _assemble(
+        workdir: work.path,
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'external_directory',
+              resource: '*',
+              effect: PermissionEffect.ask,
+            ),
+          ],
+        ),
+      );
+
+      final ToolResult result =
+          await rig.tools.call(_call('read_file', <String, Object?>{'path': file}));
+      expect(result.isError, isFalse);
+      final ApprovalRequest request = rig.gate.requests.single;
+      expect(request.action, 'external_directory');
+      expect(request.resources.single, endsWith('/*'));
+    });
+
+    test('工作区内 read 不触发 external_directory', () async {
+      final Directory work = Directory.systemTemp.createTempSync('perm-work');
+      addTearDown(() => work.deleteSync(recursive: true));
+      final String file = '${work.path}${Platform.pathSeparator}a.txt';
+      final _Rig rig = _assemble(
+        workdir: work.path,
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'external_directory',
+              resource: '*',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+
+      await rig.tools.call(
+        _call('read_file', <String, Object?>{'path': file}),
+      );
+      expect(rig.runs, <String>['read_file']);
     });
   });
 }

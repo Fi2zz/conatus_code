@@ -56,12 +56,12 @@ void main() {
       final PermissionRule rule = permissionRuleFor(
         _request(
           tool: 'read_file',
-          action: 'read_file',
+          action: 'read',
           resources: <String>['/tmp/work/a.txt'],
           pathArgs: <String>['/tmp/work/a.txt'],
         ),
       );
-      expect(rule.action, 'read_file');
+      expect(rule.action, 'read');
       expect(rule.resource, '/tmp/work/*');
       expect(
         permissionPatternMatches(rule.resource, '/tmp/work/b.txt'),
@@ -73,7 +73,7 @@ void main() {
       final PermissionRule rule = permissionRuleFor(
         _request(
           tool: 'write_file',
-          action: 'write_file',
+          action: 'edit',
           pathArgs: <String>['src/deep/a.dart'],
         ),
       );
