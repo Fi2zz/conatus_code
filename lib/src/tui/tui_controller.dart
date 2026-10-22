@@ -1944,7 +1944,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       _refresh();
     });
     _bindTeam(ctx);
-    // 检查点：绑定会话即写 turn 0 初始快照（供回滚到「全部轮次之前」）。
+    // 检查点：绑定会话即接管已有时间线（无历史时写 turn 0 初始快照，供回滚
+    // 到「全部轮次之前」）。同行重开时不抹掉旧轮次——redo / diff 要用。
     // 后台起拍、不挡就绪——大工作区的全量基线可达数十秒，挡在这里会让整个
     // 界面卡在「正在加载会话…」（而会话本身只有几 KB）。真正的门闩在
     // [submit]：第一轮开跑前等基线落定，避免快照飞行中被工具改出撕裂状态。
@@ -1952,14 +1953,15 @@ class ConatusTuiController implements TuiUserPromptHost {
     ready = true;
   }
 
-  /// 后台起拍 turn 0 基线；错误说明补进 transcript（基线未就绪时
-  /// `/rewind` 不可用，属降级不属阻塞）。
+  /// 后台起拍检查点：接管已有时间线（`--session` 恢复不抹历史），无历史时
+  /// 写 turn 0 基线；错误说明补进 transcript（基线未就绪时 `/rewind` 不可用，
+  /// 属降级不属阻塞）。
   Future<void> _startCheckpoint(String id, String? lastEventId) async {
     final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
       'checkpointManager',
     );
     if (checkpoint == null) return;
-    final String? error = await checkpoint.reset(id, lastEventId: lastEventId);
+    final String? error = await checkpoint.bind(id, lastEventId: lastEventId);
     if (error != null && ready) transcript.add(TuiRole.system, error);
   }
 

@@ -18,10 +18,12 @@
 /// 不进快照、恢复前 fail-closed 越界校验、`projectDir` 与 `ignore` 排除。
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import 'checkpoint_changes.dart';
 import 'checkpoint_paths.dart';
 import 'checkpoint_scan.dart';
 import 'checkpoint_store.dart';
@@ -187,6 +189,9 @@ class GitShadowStore implements CheckpointStore {
       throw const CheckpointException('missing-checkpoint', '检查点不存在');
     }
     final List<String> paths = _lsTree(sha);
+    // fail-closed：只读路径绝不能物化回工作区——`read-tree --reset -u` 会把
+    // 旧快照里的 `.opencode` 原样写回（采集侧此前未排除）。
+    _rejectReadOnlyTree(paths);
     // fail-closed：先校验全部路径（目标态 + 将被删除的当前文件），
     // 任何越界都在改动一个文件之前抛。
     ensurePathsRestorable(root, paths);
@@ -228,6 +233,68 @@ class GitShadowStore implements CheckpointStore {
   }
 
   // ---- git 内部操作 ---------------------------------------------------
+
+  /// 目标树含只读路径（`.opencode`）时整体拒绝恢复。
+  ///
+  /// `read-tree --reset -u` 没有「逐条跳过」的形态：要么整棵树写回，要么
+  /// 一个字都不动。因此只能 fail-closed，提示用户该快照不可恢复，而不是
+  /// 静默把只读目录物化出来。
+  void _rejectReadOnlyTree(List<String> paths) {
+    for (final String path in paths) {
+      if (!checkpointReadOnlyPath(path)) continue;
+      throw CheckpointException(
+        'read-only-path',
+        '检查点含只读路径（$path），已拒绝恢复：.opencode 目录只读',
+      );
+    }
+  }
+
+  /// 读 [path] 在 [turn] 轮的内容；不在该树 / 只读 / 越界返回 `null`。
+  ///
+  /// 走 `git show <commit>:<path>`（内容寻址，无需 diff 基线）。二进制内容
+  /// 取 [GitResult.stdoutBytes]——按字符串读会把非法 UTF-8 换成 U+FFFD。
+  @override
+  Future<List<int>?> readFile(String sessionId, int turn, String path) async {
+    if (!checkpointReadablePath(path, projectRel, ignore)) return null;
+    final String? sha = _commitOf(sessionId, turn);
+    if (sha == null) return null;
+    final GitResult result = await _gitObj(<String>['show', '$sha:$path']);
+    if (!result.ok) return null;
+    return result.stdoutBytes ?? const Utf8Encoder().convert(result.stdout);
+  }
+
+  /// [fromTurn] → [toTurn] 的文件级变化（`git diff --name-status -z -M`）。
+  @override
+  Future<List<CheckpointFileChange>> changesBetween(
+    String sessionId,
+    int fromTurn,
+    int toTurn,
+  ) async {
+    final String? from = _commitOf(sessionId, fromTurn);
+    final String? to = _commitOf(sessionId, toTurn);
+    if (from == null || to == null) {
+      throw CheckpointException(
+        'missing-checkpoint',
+        '检查点不存在：会话 $sessionId 的第 $fromTurn / $toTurn 轮',
+      );
+    }
+    if (from == to) return const <CheckpointFileChange>[];
+    final GitResult diff = await _gitObj(<String>[
+      'diff',
+      '--name-status',
+      '-z',
+      '-M',
+      from,
+      to,
+    ]);
+    _expect(diff, '比较检查点');
+    return <CheckpointFileChange>[
+      for (final CheckpointFileChange change in parseCheckpointNameStatus(
+        diff.stdout,
+      ))
+        if (checkpointReadablePath(change.path, projectRel, ignore)) change,
+    ];
+  }
 
   /// 单次 `git add` 传多少路径（argv 长度上限的保守取值）。
   static const int _addBatchSize = 400;

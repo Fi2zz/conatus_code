@@ -4,6 +4,7 @@
 /// 塞 fake 等于把要测的东西测没了）。无 git 环境下整个文件跳过。
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
@@ -387,6 +388,105 @@ void main() {
       reason: '同内容应被复用；增长 $growth 字节说明又存了一份 200KB 内容',
     );
   });
+
+  test('readFile 读该轮内容（含二进制）；缺失/只读路径返回 null', () async {
+    if (!_gitOk) return;
+    _setUp();
+    _write('a.txt', 'v0');
+    final List<int> blob = List<int>.generate(512, (int i) => (i * 37) & 0xff);
+    File('$_root${Platform.pathSeparator}blob.bin').writeAsBytesSync(blob);
+    await _store.snapshot('s1', 0);
+
+    _write('a.txt', 'v1');
+    File(
+      '$_root${Platform.pathSeparator}blob.bin',
+    ).writeAsBytesSync(<int>[0xff, 0x00, 0x01]);
+    await _store.snapshot('s1', 1);
+
+    expect(utf8.decode((await _store.readFile('s1', 0, 'a.txt'))!), 'v0');
+    expect(utf8.decode((await _store.readFile('s1', 1, 'a.txt'))!), 'v1');
+    expect(await _store.readFile('s1', 0, 'blob.bin'), blob);
+    expect(await _store.readFile('s1', 1, 'missing.txt'), isNull);
+    expect(await _store.readFile('s1', 9, 'a.txt'), isNull);
+    expect(await _store.readFile('s1', 0, '.opencode/x'), isNull);
+    expect(await _store.readFile('s1', 0, '../outside.txt'), isNull);
+  });
+
+  test('changesBetween：added/modified/deleted/renamed', () async {
+    if (!_gitOk) return;
+    _setUp();
+    _write('mod.txt', 'm0');
+    _write('del.txt', 'd0');
+    _write('old-name.txt', 'r0');
+    await _store.snapshot('s1', 0);
+
+    _write('mod.txt', 'm1');
+    File('$_root${Platform.pathSeparator}del.txt').deleteSync();
+    File(
+      '$_root${Platform.pathSeparator}old-name.txt',
+    ).renameSync('$_root${Platform.pathSeparator}new-name.txt');
+    _write('add.txt', 'a1');
+    await _store.snapshot('s1', 1);
+
+    final Map<String, String> forward = <String, String>{
+      for (final CheckpointFileChange change in await _store.changesBetween(
+        's1',
+        0,
+        1,
+      ))
+        change.path: change.status,
+    };
+    expect(forward, <String, String>{
+      'mod.txt': 'modified',
+      'del.txt': 'deleted',
+      'new-name.txt': 'renamed',
+      'add.txt': 'added',
+    });
+    expect(await _store.changesBetween('s1', 1, 1), isEmpty);
+    final Map<String, String> backward = <String, String>{
+      for (final CheckpointFileChange change in await _store.changesBetween(
+        's1',
+        1,
+        0,
+      ))
+        change.path: change.status,
+    };
+    expect(backward, <String, String>{
+      'mod.txt': 'modified',
+      'del.txt': 'added',
+      'old-name.txt': 'renamed',
+      'add.txt': 'deleted',
+    });
+  });
+
+  test('恢复拒绝含 .opencode 的旧快照（fail-closed，一个文件都不动）', () async {
+    if (!_gitOk) return;
+    _setUp();
+    _write('a.txt', 'v0');
+    await _store.snapshot('s1', 0);
+
+    // 模拟旧版本采集侧未排除 .opencode：手工提交进影子仓库并改索引指向它。
+    _write('.opencode/README.md', 'mine');
+    _shadowGit(<String>['add', '-f', '.opencode/README.md']);
+    _shadowGit(<String>['commit', '--quiet', '-m', 'legacy']);
+    final String legacy = _shadowGit(<String>['rev-parse', 'HEAD']).trim();
+    _pointIndexAt('s1', 0, legacy);
+
+    _write('a.txt', 'worktree-later');
+    await expectLater(
+      _store.restore('s1', 0),
+      throwsA(
+        isA<CheckpointException>().having(
+          (CheckpointException e) => e.code,
+          'code',
+          'read-only-path',
+        ),
+      ),
+      reason: 'read-tree --reset -u 会把 .opencode 物化回工作区，必须整体拒绝',
+    );
+    expect(_read('a.txt'), 'worktree-later', reason: '拒绝时一个文件都不该动');
+    expect(_read('.opencode/README.md'), 'mine');
+  });
 }
 
 /// 恢复基线并顺手删掉多余文件后，工作区应只剩基线里的东西。
@@ -434,6 +534,43 @@ class _DroppingRunner implements GitRunner {
     ];
     return GitResult(r.exitCode, '${kept.join('\u0000')}\u0000', r.stderr);
   }
+}
+
+/// 在影子仓库里跑一条 git 命令（测试造旧格式提交用），返回 stdout。
+String _shadowGit(List<String> args) {
+  final ProcessResult result = Process.runSync('git', <String>[
+    '--git-dir=${_store.gitDir}',
+    '--work-tree=$_root',
+    '-c',
+    'user.email=nava@localhost',
+    '-c',
+    'user.name=nava',
+    ...args,
+  ]);
+  if (result.exitCode != 0) {
+    throw StateError('git ${args.join(' ')} 失败：${result.stderr}');
+  }
+  return result.stdout is String ? result.stdout! as String : '';
+}
+
+/// 把影子索引里某轮的提交改成 [sha]（模拟「旧版本写入的快照」）。
+void _pointIndexAt(String sessionId, int turn, String sha) {
+  final File index = _store.indexFile(sessionId);
+  final Map<String, Object?> json =
+      jsonDecode(utf8.decode(gzip.decode(index.readAsBytesSync())))
+          as Map<String, Object?>;
+  final List<Map<String, Object?>> turns = <Map<String, Object?>>[
+    for (final Object? item
+        in (json['turns'] as List<Object?>?) ?? const <Object?>[])
+      if (item is Map)
+        <String, Object?>{
+          ...item.cast<String, Object?>(),
+          if (item['turn'] == turn) 'commit': sha,
+        },
+  ];
+  index.writeAsBytesSync(
+    gzip.encode(utf8.encode(jsonEncode(<String, Object?>{'turns': turns}))),
+  );
 }
 
 /// 某轮提交树里的文件路径。

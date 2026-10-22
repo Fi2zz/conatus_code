@@ -18,7 +18,9 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:crypto/crypto.dart';
 
 import 'checkpoint_archive.dart';
+import 'checkpoint_changes.dart';
 import 'checkpoint_hashes.dart';
+import 'checkpoint_lookup.dart';
 import 'checkpoint_paths.dart';
 import 'checkpoint_restore.dart';
 import 'checkpoint_scan.dart';
@@ -323,6 +325,19 @@ class ArchiveCheckpointStore implements CheckpointStore {
   @override
   Future<CheckpointRestore> restore(String sessionId, int turn) =>
       restoreArchiveCheckpoint(this, sessionId, turn);
+
+  /// 读 [path] 在 [turn] 轮的内容（base 铺底 + 差量覆盖）；见 [readArchiveFile]。
+  @override
+  Future<List<int>?> readFile(String sessionId, int turn, String path) =>
+      readArchiveFile(this, sessionId, turn, path);
+
+  /// [fromTurn] → [toTurn] 的文件级变化；见 [archiveChangesBetween]。
+  @override
+  Future<List<CheckpointFileChange>> changesBetween(
+    String sessionId,
+    int fromTurn,
+    int toTurn,
+  ) => archiveChangesBetween(this, sessionId, fromTurn, toTurn);
 
   /// 现有检查点的摘要（turn 升序 + 有效文件数；索引缺失时按目录重建）。
   @override

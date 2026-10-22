@@ -186,4 +186,111 @@ void main() {
     await emptyStore.snapshot('s2', 0);
     expect(emptyStore.manifestOf('s2', 0).files, isEmpty);
   });
+
+  test('readFile 读 base 与差量内容；删除/缺失/只读路径返回 null', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
+    _write(root, 'a.txt', 'v0');
+    _write(root, 'b.txt', 'b0');
+    await store.snapshot('s1', 0);
+
+    _write(root, 'a.txt', 'v1');
+    _write(root, 'c.txt', 'c1');
+    File('$root${Platform.pathSeparator}b.txt').deleteSync();
+    await store.snapshot('s1', 1);
+
+    expect(utf8.decode((await store.readFile('s1', 0, 'a.txt'))!), 'v0');
+    expect(utf8.decode((await store.readFile('s1', 1, 'a.txt'))!), 'v1');
+    // 差量里没变的文件要回落到 base（diff 的两侧都得有内容）。
+    expect(utf8.decode((await store.readFile('s1', 1, 'c.txt'))!), 'c1');
+    // 该轮已删除 / 从未存在 / 轮次不存在：null。
+    expect(await store.readFile('s1', 1, 'b.txt'), isNull);
+    expect(await store.readFile('s1', 0, 'c.txt'), isNull);
+    expect(await store.readFile('s1', 9, 'a.txt'), isNull);
+    // 只读 / 越界路径一律 null。
+    _write(root, '.opencode/config.json', '{}');
+    expect(await store.readFile('s1', 1, '.opencode/config.json'), isNull);
+    expect(await store.readFile('s1', 1, '.OPENCODE/config.json'), isNull);
+    expect(await store.readFile('s1', 1, '../outside.txt'), isNull);
+  });
+
+  test('changesBetween：added/modified/deleted；同轮为空；反向对称', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
+    _write(root, 'mod.txt', 'm0');
+    _write(root, 'del.txt', 'd0');
+    _write(root, 'same.txt', 's0');
+    await store.snapshot('s1', 0);
+
+    _write(root, 'mod.txt', 'm1');
+    File('$root${Platform.pathSeparator}del.txt').deleteSync();
+    _write(root, 'add.txt', 'a1');
+    await store.snapshot('s1', 1);
+
+    final Map<String, String> forward = _summary(
+      await store.changesBetween('s1', 0, 1),
+    );
+    expect(forward, <String, String>{
+      'mod.txt': 'modified',
+      'del.txt': 'deleted',
+      'add.txt': 'added',
+    });
+    expect(await store.changesBetween('s1', 1, 1), isEmpty);
+    expect(_summary(await store.changesBetween('s1', 1, 0)), <String, String>{
+      'mod.txt': 'modified',
+      'del.txt': 'added',
+      'add.txt': 'deleted',
+    });
+  });
+
+  test('changesBetween 跨多轮：只报真正变化的文件（内容比对兜底）', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
+    _write(root, 'mod.txt', 'm0');
+    await store.snapshot('s1', 0);
+    _write(root, 'mod.txt', 'm1');
+    _write(root, 'add.txt', 'a1'); // 两轮之间不变
+    await store.snapshot('s1', 1);
+    _write(root, 'mod.txt', 'm2');
+    await store.snapshot('s1', 2);
+
+    final Map<String, String> changes = _summary(
+      await store.changesBetween('s1', 1, 2),
+    );
+    expect(changes, <String, String>{
+      'mod.txt': 'modified',
+    }, reason: 'add.txt 在两轮里都相对 base 变化，但轮间内容相同，不算变化');
+  });
+
+  test('changesBetween 过滤只读路径', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
+    _write(root, 'a.txt', 'v0');
+    await store.snapshot('s1', 0);
+    // 手工造一个含 .opencode 的旧归档：采集侧现在会排除它，故直接写归档；
+    // 删掉索引让 list() 按归档头部重建。
+    await writeCheckpointArchive(
+      store.archiveFile('s1', 2),
+      const CheckpointManifest(
+        kind: 'delta',
+        turn: 2,
+        changed: <String>['a.txt', '.opencode/x'],
+      ),
+      <CheckpointArchiveEntry>[
+        ('a.txt', utf8.encode('v2')),
+        ('.opencode/x', utf8.encode('x')),
+      ],
+    );
+    store.indexFile('s1').deleteSync();
+
+    final List<CheckpointFileChange> changes = await store.changesBetween(
+      's1',
+      0,
+      2,
+    );
+    expect(changes.map((CheckpointFileChange c) => c.path), <String>['a.txt']);
+  });
 }
+
+/// `path → status` 摘要（断言用）。
+Map<String, String> _summary(
+  List<CheckpointFileChange> changes,
+) => <String, String>{
+  for (final CheckpointFileChange change in changes) change.path: change.status,
+};

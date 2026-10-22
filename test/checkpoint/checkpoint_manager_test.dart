@@ -1,21 +1,28 @@
 /// CheckpointManager：轮次计数、turn 0 初始快照、rewind 编排与钳制。
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
 import 'package:test/test.dart';
+
+/// 建临时「工作区 + 项目数据目录」，返回 (root, projectDir)。
+(String, String) _workspace() {
+  final Directory dir = Directory.systemTemp.createTempSync('nava-cp-mgr');
+  addTearDown(() => dir.deleteSync(recursive: true));
+  final String root = dir.path;
+  final String projectDir = '$root${Platform.pathSeparator}.conatus';
+  Directory(projectDir).createSync();
+  return (root, projectDir);
+}
 
 /// 建 manager；[enabled] / [keep] 可配，返回 (manager, root, projectDir)。
 (CheckpointManager, String, String) _manager({
   bool enabled = true,
   int keep = 5,
 }) {
-  final Directory dir = Directory.systemTemp.createTempSync('nava-cp-mgr');
-  addTearDown(() => dir.deleteSync(recursive: true));
-  final String root = dir.path;
-  final String projectDir = '$root${Platform.pathSeparator}.conatus';
-  Directory(projectDir).createSync();
+  final (String root, String projectDir) = _workspace();
   final CheckpointManager manager = CheckpointManager(
     store: ArchiveCheckpointStore(
       root: root,
@@ -188,4 +195,205 @@ void main() {
     // 不现实，改为验证 turn 0 存在即可（快照失败分支由 store 测试覆盖）。
     expect(manager.list(), hasLength(1));
   });
+
+  test('bind 接管已有检查点，不清空历史（--session 恢复）', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1', lastEventId: 'ev-0');
+    _write(root, 'a.txt', 'v1');
+    await manager.recordTurn(lastEventId: 'ev-1'); // turn 1
+    manager.detach();
+
+    // 模拟重开同一会话：接管既有时间线，turn 直接落在最大轮次上。
+    expect(await manager.bind('s1', lastEventId: 'ev-1'), isNull);
+    expect(manager.sessionId, 's1');
+    expect(manager.turn, 1);
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1]);
+
+    // 接续的下一轮是 turn 2（旧差量还在，redo 才有回得去的点）。
+    _write(root, 'a.txt', 'v2');
+    expect(await manager.recordTurn(), isNull);
+    expect(manager.turn, 2);
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1, 2]);
+  });
+
+  test('bind 无历史时写 turn 0 基线', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+
+    expect(await manager.bind('s1', lastEventId: 'ev-0'), isNull);
+    expect(manager.sessionId, 's1');
+    expect(manager.turn, 0);
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0]);
+  });
+
+  test('flush 等待在途 recordTurn 落盘', () async {
+    final (String root, String projectDir) = _workspace();
+    final _GatedStore store = _GatedStore(root: root, projectDir: projectDir);
+    addTearDown(() {
+      if (!store.gate.isCompleted) store.gate.complete();
+    });
+    final CheckpointManager manager = CheckpointManager(
+      store: store,
+      config: const CheckpointConfig(),
+    );
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+    _write(root, 'a.txt', 'v1');
+
+    final Future<String?> round = manager.recordTurn();
+    bool flushed = false;
+    final Future<void> pendingFlush = manager.flush().then((_) {
+      flushed = true;
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(flushed, isFalse, reason: '在途快照未完成时 flush 不得返回');
+
+    store.gate.complete();
+    expect(await round, isNull);
+    await pendingFlush;
+    expect(flushed, isTrue);
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1]);
+  });
+
+  test('bind 等在途快照落定后再定轮次（不吃掉刚写完的一轮）', () async {
+    final (String root, String projectDir) = _workspace();
+    final _GatedStore store = _GatedStore(root: root, projectDir: projectDir);
+    addTearDown(() {
+      if (!store.gate.isCompleted) store.gate.complete();
+    });
+    final CheckpointManager manager = CheckpointManager(
+      store: store,
+      config: const CheckpointConfig(),
+    );
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+
+    // turn 1 的快照卡在闸上；期间切走再切回同一会话。
+    _write(root, 'a.txt', 'v1');
+    final Future<String?> round = manager.recordTurn();
+    await Future<void>.delayed(Duration.zero); // 让快照真正开始、卡在闸上
+    manager.detach();
+    final Future<String?> rebound = manager.bind('s1');
+
+    store.gate.complete();
+    expect(await round, isNull);
+    expect(await rebound, isNull);
+    expect(manager.turn, 1, reason: '必须算上刚落盘的那一轮，否则会覆盖它');
+    expect(manager.list().map((CheckpointInfo i) => i.turn), <int>[0, 1]);
+  });
+
+  test('restoreTo 按会话/轮次恢复；绑定会话同步 turn，别的不动', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+    _write(root, 'a.txt', 'v1');
+    await manager.recordTurn(); // s1 turn 1
+    _write(root, 'a.txt', 'v2');
+    await manager.recordTurn(); // s1 turn 2
+
+    final CheckpointRewindResult? back = await manager.restoreTo('s1', 1);
+    expect(back, isNotNull);
+    expect(back!.turn, 1);
+    expect(manager.turn, 1, reason: '绑定的就是 s1：轮次跟着目标走');
+    expect(
+      File('$root${Platform.pathSeparator}a.txt').readAsStringSync(),
+      'v1',
+    );
+
+    // 换绑 s2 后恢复 s1：文件回 s1 的基线，但 s2 的轮次不该被改。
+    await manager.bind('s2'); // s2 基线
+    await manager.recordTurn(); // s2 turn 1
+    expect(manager.turn, 1);
+    final CheckpointRewindResult? other = await manager.restoreTo('s1', 0);
+    expect(other!.turn, 0);
+    expect(manager.sessionId, 's2');
+    expect(manager.turn, 1, reason: '非绑定会话的恢复不得改当前轮次');
+    expect(
+      File('$root${Platform.pathSeparator}a.txt').readAsStringSync(),
+      'v0',
+    );
+  });
+
+  test('restoreTo 对不存在的会话/轮次返回 null', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+
+    expect(await manager.restoreTo('nope', 0), isNull);
+    expect(await manager.restoreTo('s1', 9), isNull);
+
+    final (CheckpointManager off, _, _) = _manager(enabled: false);
+    expect(await off.restoreTo('s1', 0), isNull);
+  });
+
+  test('clearSession 幂等：重复调用不抛，历史清空', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+    await manager.recordTurn();
+    expect(manager.list(), hasLength(2));
+
+    await manager.clearSession('s1');
+    await manager.clearSession('s1');
+    expect(manager.list(), isEmpty);
+    expect(manager.turn, 0);
+  });
+
+  test('串行链错误安全：单个动作抛错不毒化后续', () async {
+    final (String root, String projectDir) = _workspace();
+    final _FlakyClearStore store = _FlakyClearStore(
+      root: root,
+      projectDir: projectDir,
+    );
+    final CheckpointManager manager = CheckpointManager(
+      store: store,
+      config: const CheckpointConfig(),
+    );
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+
+    await expectLater(
+      manager.clearSession('s1'),
+      throwsA(isA<CheckpointException>()),
+    );
+    // 链没被那次异常毒化：flush 立刻收敛，后续动作照常执行。
+    await manager.flush();
+    await manager.clearSession('s1');
+    expect(manager.list(), isEmpty);
+  });
+}
+
+/// 闸住 turn 1 快照的存储：用来验证 `flush` 真的等到在途写入。
+class _GatedStore extends ArchiveCheckpointStore {
+  _GatedStore({required super.root, required super.projectDir});
+
+  /// 放行 turn 1 的快照。
+  final Completer<void> gate = Completer<void>();
+
+  @override
+  Future<void> snapshot(
+    String sessionId,
+    int turn, {
+    String? lastEventId,
+  }) async {
+    if (turn == 1) await gate.future;
+    await super.snapshot(sessionId, turn, lastEventId: lastEventId);
+  }
+}
+
+/// 首次清空即失败的存储：验证串行链不被单个异常毒化。
+class _FlakyClearStore extends ArchiveCheckpointStore {
+  _FlakyClearStore({required super.root, required super.projectDir});
+
+  bool _fail = true;
+
+  @override
+  Future<void> clearSession(String sessionId) async {
+    if (_fail) {
+      _fail = false;
+      throw const CheckpointException('clear-failed', '模拟清空失败');
+    }
+    await super.clearSession(sessionId);
+  }
 }

@@ -20,6 +20,7 @@
 /// - 单轮快照失败不抛给调用方（编排层转成提示）。
 library;
 
+import 'checkpoint_changes.dart';
 import 'checkpoint_types.dart';
 
 /// 工作区快照存储。
@@ -65,6 +66,21 @@ abstract class CheckpointStore {
   ///
   /// 实现须在改动任何文件之前完成全部越界校验（fail-closed）。
   Future<CheckpointRestore> restore(String sessionId, int turn);
+
+  /// 读 [path] 在 [turn] 轮的内容；不在该轮 / 只读 / 越界 / 轮次不存在
+  /// 返回 `null`。
+  ///
+  /// 「内容」是该轮的文件状态，不限于该轮自己的差量：未变化的文件回落到
+  /// 基线（`/diff` 的两侧都要取到内容）。
+  Future<List<int>?> readFile(String sessionId, int turn, String path);
+
+  /// [fromTurn] → [toTurn] 的文件级变化（`added` / `modified` / `deleted` /
+  /// `renamed`，路径升序）。两轮相同返回空列表。
+  Future<List<CheckpointFileChange>> changesBetween(
+    String sessionId,
+    int fromTurn,
+    int toTurn,
+  );
 
   /// 保留基线 + 最近 `keep - 1` 轮；`keep` 非正不裁剪。
   void prune(String sessionId);

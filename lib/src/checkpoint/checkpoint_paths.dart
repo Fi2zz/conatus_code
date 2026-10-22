@@ -7,6 +7,7 @@ library;
 
 import 'dart:io';
 
+import '../read_only_paths.dart';
 import 'checkpoint_types.dart';
 
 /// 实体相对 [root] 的相对路径（分隔符规范化）。
@@ -149,6 +150,37 @@ bool checkpointSensitive(String rel) {
   }
   return false;
 }
+
+/// 相对路径是否落在项目级 OpenCode 只读目录（顶层 `.opencode`）下。
+///
+/// 大小写不敏感：macOS / Windows 的文件系统如此；大小写敏感卷上略微多拒，
+/// 与 `underReadOnlyRoot` 的取舍一致。git 树里的路径恒用 `/`。
+bool checkpointReadOnlyPath(String rel) {
+  final List<String> segments = rel.split(RegExp(r'[/\\]'));
+  return segments.isNotEmpty &&
+      segments.first.toLowerCase() == kOpenCodeDirName;
+}
+
+/// 路径能否作为「按文件读取」的目标：必须是工作区内的相对路径（非绝对、
+/// 无 `..`），且不在排除面里（`.opencode` / 凭据 / `build` / `projectDir` …）。
+///
+/// 读取本身不写盘，但把只读与凭据内容经 `/diff` 摊到屏上同样是泄漏面；
+/// 判定与采集 / 恢复同源（[checkpointExcluded]）。
+bool checkpointReadablePath(
+  String rel,
+  String projectRel,
+  List<String> ignore,
+) {
+  if (rel.isEmpty || _absolutePath(rel)) return false;
+  if (rel.split(RegExp(r'[/\\]')).contains('..')) return false;
+  return !checkpointExcluded(rel, projectRel, ignore);
+}
+
+/// 是否绝对路径（POSIX `/`、Windows 盘符、UNC 的 `\\`）。
+bool _absolutePath(String path) =>
+    path.startsWith('/') ||
+    path.startsWith(r'\') ||
+    RegExp(r'^[A-Za-z]:[/\\]').hasMatch(path);
 
 /// 路径的任一段是否等于 [segment]。
 bool _hasSegment(String rel, String segment) {

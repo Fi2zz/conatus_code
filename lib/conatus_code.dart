@@ -37,6 +37,7 @@ export 'src/checkpoint/checkpoint_archive.dart'
         readCheckpointManifest,
         writeCheckpointArchive;
 export 'src/checkpoint/checkpoint_backend.dart' show openCheckpointStore;
+export 'src/checkpoint/checkpoint_changes.dart' show CheckpointFileChange;
 export 'src/checkpoint/checkpoint_hashes.dart'
     show
         checkpointHashesFile,

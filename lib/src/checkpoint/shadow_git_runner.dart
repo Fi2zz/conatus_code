@@ -18,7 +18,7 @@ import 'dart:io';
 
 /// 一条 git 命令的执行结果。
 class GitResult {
-  const GitResult(this.exitCode, this.stdout, this.stderr);
+  const GitResult(this.exitCode, this.stdout, this.stderr, {this.stdoutBytes});
 
   /// 进程退出码。
   final int exitCode;
@@ -28,6 +28,12 @@ class GitResult {
 
   /// 标准错误。
   final String stderr;
+
+  /// 标准输出的**原始字节**（`git show` 读二进制内容用）。
+  ///
+  /// [stdout] 会把非法 UTF-8 替换成 U+FFFD，二进制文件经它读出来就毁了；
+  /// 需要字节级内容时读这个。测试里的假执行器可能不填（为 `null`）。
+  final List<int>? stdoutBytes;
 
   /// 是否成功。
   bool get ok => exitCode == 0;
@@ -88,23 +94,29 @@ class ProcessGitRunner implements GitRunner {
     required String gitDir,
     required String workTree,
   }) async {
-    final ProcessResult result = await Process.run('git', <String>[
-      '--git-dir=$gitDir',
-      '--work-tree=$workTree',
-      // 身份固定：宿主的 user.name/user.email 缺失不该让快照失败。
-      '-c', 'user.email=nava@localhost',
-      '-c', 'user.name=nava',
-      // 不跑宿主配置的 hook / 签名：快照必须无外部依赖地成功。
-      '-c', 'commit.gpgsign=false',
-      '-c', 'core.hooksPath=/dev/null',
-      '-c', 'gc.auto=0',
-      '-c', 'advice.detachedHead=false',
-      ...args,
-    ], workingDirectory: workTree).timeout(defaultTimeout);
+    final ProcessResult result = await Process.run(
+      'git',
+      <String>[
+        '--git-dir=$gitDir',
+        '--work-tree=$workTree',
+        // 身份固定：宿主的 user.name/user.email 缺失不该让快照失败。
+        '-c', 'user.email=nava@localhost',
+        '-c', 'user.name=nava',
+        // 不跑宿主配置的 hook / 签名：快照必须无外部依赖地成功。
+        '-c', 'commit.gpgsign=false',
+        '-c', 'core.hooksPath=/dev/null',
+        '-c', 'gc.auto=0',
+        '-c', 'advice.detachedHead=false',
+        ...args,
+      ],
+      workingDirectory: workTree,
+      stdoutEncoding: null,
+    ).timeout(defaultTimeout);
     return GitResult(
       result.exitCode,
       _text(result.stdout),
       _text(result.stderr),
+      stdoutBytes: _bytes(result.stdout),
     );
   }
 
@@ -116,27 +128,33 @@ class ProcessGitRunner implements GitRunner {
     required String gitDir,
     required String workTree,
   }) {
-    final ProcessResult result = Process.runSync('git', <String>[
-      '--git-dir=$gitDir',
-      '--work-tree=$workTree',
-      '-c',
-      'user.email=nava@localhost',
-      '-c',
-      'user.name=nava',
-      '-c',
-      'commit.gpgsign=false',
-      '-c',
-      'core.hooksPath=/dev/null',
-      '-c',
-      'gc.auto=0',
-      '-c',
-      'advice.detachedHead=false',
-      ...args,
-    ], workingDirectory: workTree);
+    final ProcessResult result = Process.runSync(
+      'git',
+      <String>[
+        '--git-dir=$gitDir',
+        '--work-tree=$workTree',
+        '-c',
+        'user.email=nava@localhost',
+        '-c',
+        'user.name=nava',
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        'core.hooksPath=/dev/null',
+        '-c',
+        'gc.auto=0',
+        '-c',
+        'advice.detachedHead=false',
+        ...args,
+      ],
+      workingDirectory: workTree,
+      stdoutEncoding: null,
+    );
     return GitResult(
       result.exitCode,
       _text(result.stdout),
       _text(result.stderr),
+      stdoutBytes: _bytes(result.stdout),
     );
   }
 
@@ -150,6 +168,13 @@ class ProcessGitRunner implements GitRunner {
     if (raw is String) return raw;
     if (raw is! List<int>) return '';
     return const Utf8Decoder(allowMalformed: true).convert(raw);
+  }
+
+  /// stdout 的原始字节；已是字符串（系统编码）时退回 UTF-8 编码。
+  static List<int> _bytes(Object? raw) {
+    if (raw is List<int>) return raw;
+    if (raw is String) return const Utf8Encoder().convert(raw);
+    return const <int>[];
   }
 }
 
