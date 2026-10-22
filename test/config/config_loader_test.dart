@@ -287,7 +287,7 @@ default_model = "arkcli-agent-plan/doubao-seed-2-0-lite-260215"
       () => loadConfigFromToml('''
 [providers.x]
 base_url = "https://x"
-type = "anthropic"
+type = "bogus"
 '''),
       throwsA(isA<ConfigException>()),
     );

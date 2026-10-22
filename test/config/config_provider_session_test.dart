@@ -29,6 +29,16 @@ base_url = "https://opencode.ai/inference/go/openai/v1"
     expect(config.providers.single.userAgent, '');
   });
 
+  test('type = "anthropic" 被识别', () {
+    final ConatusCodeConfig config = _load('''
+[providers.anthropic]
+base_url = "https://api.anthropic.com/v1"
+type = "anthropic"
+''');
+
+    expect(config.providers.single.type, ProviderType.anthropic);
+  });
+
   test('session_header / user_agent 被读取', () {
     final ConatusCodeConfig config = _load('''
 [providers.opencode-go]

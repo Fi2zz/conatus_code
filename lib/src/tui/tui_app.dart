@@ -332,9 +332,11 @@ class ConatusTuiRuntime {
               baseUrl: config.baseUrl,
               apiKey: config.apiKey,
               credentialKey: config.credentialKey,
-              apiStyle: config.type == ProviderType.kimi
-                  ? LlmApiStyle.responses
-                  : LlmApiStyle.chat,
+              apiStyle: switch (config.type) {
+                ProviderType.kimi => LlmApiStyle.responses,
+                ProviderType.anthropic => LlmApiStyle.anthropic,
+                ProviderType.openai => LlmApiStyle.chat,
+              },
               models: modelsByProvider[config.name] ?? const <String>[],
               sessionHeader: config.sessionHeader,
               userAgent: config.userAgent,

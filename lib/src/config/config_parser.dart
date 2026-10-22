@@ -112,6 +112,7 @@ class ConfigParser extends ConfigValues {
     return switch (value) {
       'openai' => ProviderType.openai,
       'kimi' => ProviderType.kimi,
+      'anthropic' => ProviderType.anthropic,
       _ => throw ConfigException(
         '$source：providers.$name.type 取值 "$value" 不合法。',
       ),

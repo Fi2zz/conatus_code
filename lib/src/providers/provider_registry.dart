@@ -96,6 +96,27 @@ class ProviderRegistry {
     final String userAgent = profile.userAgent.isNotEmpty
         ? profile.userAgent
         : (openCode ? kOpenCodeDefaultUserAgent : kDefaultLlmUserAgent);
+    Map<String, String> Function()? headersProvider;
+    if (sessionHeader.isNotEmpty) {
+      headersProvider = () {
+        final String? id = sessionId;
+        if (id == null || id.isEmpty) return const <String, String>{};
+        return <String, String>{sessionHeader: openCodeSessionId(id)};
+      };
+    }
+    if (profile.apiStyle == LlmApiStyle.anthropic) {
+      return AnthropicProvider(
+        name: profile.name,
+        baseUrl: profile.baseUrl,
+        model: resolvedModel,
+        credentialKey: profile.credentialKey,
+        userAgent: userAgent,
+        apiKey: profile.apiKey.isEmpty ? null : profile.apiKey,
+        credentials: _credentials,
+        client: _client,
+        headersProvider: headersProvider,
+      );
+    }
     return OpenAiCompatibleProvider(
       name: profile.name,
       baseUrl: profile.baseUrl,
@@ -106,15 +127,7 @@ class ProviderRegistry {
       apiKey: profile.apiKey.isEmpty ? null : profile.apiKey,
       credentials: _credentials,
       client: _client,
-      headersProvider: sessionHeader.isEmpty
-          ? null
-          : () {
-              final String? id = sessionId;
-              if (id == null || id.isEmpty) return const <String, String>{};
-              return <String, String>{
-                sessionHeader: openCodeSessionId(id),
-              };
-            },
+      headersProvider: headersProvider,
     );
   }
 

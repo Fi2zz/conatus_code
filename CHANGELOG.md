@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **Anthropic Messages 支持**：新增 `type = "anthropic"` 与 `AnthropicProvider`
+  （`/messages`）——system 抽取、工具调用/结果、图片、SSE 文本与 thinking 增量；
+  认证按主机区分（`opencode.ai` Bearer，其它 `x-api-key`），OpenCode 会话头照常生效。
+
 - **OpenCode 网关接入**：新增 `x-opencode-session` 会话头（`session_<uuid>` →
   `ses_<uuid>`，绑定会话后自动发送）、`[providers.*]` 的 `session_header` /
   `user_agent` 配置；修正 `opencode-go` 端点并新增 `opencode-console` 预设；

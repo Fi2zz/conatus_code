@@ -36,8 +36,11 @@ class ProviderProfile {
             in (json['models'] as List<Object?>?) ?? const <Object?>[])
           if (model is String) model,
       ],
-      apiStyle:
-          json['apiStyle'] == 'responses' ? LlmApiStyle.responses : LlmApiStyle.chat,
+      apiStyle: switch (json['apiStyle']) {
+        'responses' => LlmApiStyle.responses,
+        'anthropic' => LlmApiStyle.anthropic,
+        _ => LlmApiStyle.chat,
+      },
       description: json['description'] as String? ?? '',
       userAgent: json['userAgent'] as String? ?? '',
       apiKey: json['apiKey'] as String? ?? '',

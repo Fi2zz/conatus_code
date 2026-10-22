@@ -368,7 +368,8 @@ type = "openai"         # openai→chat/completions；kimi→responses（缺省 
 # key = "oauth-key-name"
 ```
 
-- `type` 决定请求形态：`openai` 走 `chat/completions`，`kimi` 走 `responses`。
+- `type` 决定请求形态：`openai` 走 `chat/completions`，`kimi` 走 `responses`，
+  `anthropic` 走 Anthropic Messages（`/messages`）。
 - `oauth` 子表：字段保留（`key`）但**不实现** OAuth 调用；配了 `oauth.key` 且
   未配 `api_key` 的提供商启动时提示不可用，其余照常。
 
@@ -399,9 +400,21 @@ type = "openai"              # GPT 系模型用 kimi（responses）
 
 - 端点必须带 `/openai/v1` 后缀（chat 走 `/chat/completions`，responses 走
   `/responses`）；旧的 `opencode.ai/zen/go/v1` 已不可用。
-- nava 目前只支持 chat / responses 两种 wire；Go 里仅提供 Anthropic Messages
-  的模型（Claude Haiku、MiniMax M3、Qwen3.8 等）暂不可用。
-- `/provider add` 的预设有 `opencode-go`（Go）与 `opencode-console`（PAYG）。
+- Go 里走 Anthropic Messages 的模型（Claude Haiku、MiniMax M3、Qwen3.8 等）
+  用 `type = "anthropic"` 接入：
+
+```toml
+[providers.opencode-go-anthropic]
+api_key = "oc_sk_..."
+base_url = "https://opencode.ai/inference/go/anthropic/v1"
+type = "anthropic"
+# session_header / user_agent 同上，可省略
+```
+
+- 直连 Anthropic 用 `base_url = "https://api.anthropic.com/v1"`、`type = "anthropic"`；
+  nava 会自动按主机选择认证头（`opencode.ai` 用 Bearer，其它主机用 `x-api-key`）。
+- `/provider add` 的预设有 `opencode-go`（Go）与 `opencode-console`（PAYG），
+  目前只写 OpenAI 兼容类型；Anthropic 类型请按上面的 TOML 手写。
 
 - 以代码装配：`provideProviders(app, providers: <ProviderProfile>[...],
 currentName: ..., credentials: ...)` 把注册表挂到 `'providers'` 服务，

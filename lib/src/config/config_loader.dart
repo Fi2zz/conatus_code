@@ -31,6 +31,12 @@ const String kDefaultConfigToml = '''
 # type = "openai"
 # session_header = "x-opencode-session"
 # user_agent = "nava/0.1.0"
+#
+# Anthropic Messages（Go 的 Claude / MiniMax / Qwen 等模型）：
+# [providers.opencode-go-anthropic]
+# api_key = "oc_sk_..."
+# base_url = "https://opencode.ai/inference/go/anthropic/v1"
+# type = "anthropic"
 
 # 韧性：单个提供商内先退避重试，仍失败再按 fallback_models 换下一个。
 # [llm]

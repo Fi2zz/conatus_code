@@ -54,13 +54,16 @@ class RetrySettings {
       );
 }
 
-/// provider 类型：决定请求形态（都走 OpenAI 兼容客户端）。
+/// provider 类型：决定请求形态。
 enum ProviderType {
-  /// `chat/completions` 形态。
+  /// OpenAI `chat/completions` 形态。
   openai,
 
-  /// `responses` 形态。
+  /// OpenAI `responses` 形态。
   kimi,
+
+  /// Anthropic Messages 形态（`/messages`）。
+  anthropic,
 }
 
 /// 一个模型提供商的配置（对应 `[providers.<name>]` 表）。
