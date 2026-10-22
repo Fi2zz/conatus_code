@@ -11,6 +11,7 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_doc/conatus_doc.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import 'story_blocks.dart';
 import 'story_conflict.dart';
 import 'story_sync.dart';
 
@@ -19,9 +20,9 @@ import 'story_sync.dart';
 List<PatchOp> tryCompileOps(String text) {
   try {
     return compileOpsBlock(text);
-  } on FormatException {
-    return const <PatchOp>[];
-  } on ArgumentError {
+  } on Object {
+    // 模型产出不可信：缺字段 / 非对象 / 未知 kind 都按「没有提议」处理，
+    // 绝不让一条畸形回复炸掉会话。
     return const <PatchOp>[];
   }
 }
@@ -48,7 +49,11 @@ class StoryPending {
   Future<void> feed(String text, {FileSystem? fs}) async {
     final List<PatchOp> ops = tryCompileOps(text);
     if (ops.isEmpty) return;
-    await feedOps(ops, fs: fs);
+    try {
+      await feedOps(ops, fs: fs);
+    } on Object {
+      // ops 指向工作区外 / 读基底失败：放弃这条提议，不登记半成品。
+    }
   }
 
   /// 直接登记一组 ops 为一个待应用补丁，返回其序号（1 起）。
@@ -58,11 +63,14 @@ class StoryPending {
     String source = 'ops',
     FileSystem? fs,
   }) async {
+    // 先读基底再登记：读失败时列表保持原样，不留下「没有基底」的补丁
+    // （那会让 apply 的冲突检测静默失效）。
+    final Map<String, String?> bases = await readPendingBases(fs, ops);
     _seq += 1;
     final String id = 'pending-${DateTime.now().microsecondsSinceEpoch}-$_seq';
     _patches.add(DocPatch(id: id, author: PatchAuthor.ai, ops: ops));
     _sources[id] = source;
-    _bases[id] = await readPendingBases(fs, ops);
+    _bases[id] = bases;
     return _patches.length;
   }
 
@@ -154,13 +162,21 @@ String renderStoryPending(
   if (patches.isEmpty) return '没有待定补丁。';
   final StringBuffer buffer = StringBuffer('待定补丁（${patches.length}）：');
   for (final (int index, DocPatch patch) in patches.indexed) {
-    final String ops = patch.ops
-        .map((PatchOp op) => '${op.runtimeType}(${op.blockId})')
-        .join(', ');
+    final String ops = patch.ops.map(_opSummary).join('；');
     final String source = sources[patch.id] ?? 'ops';
     buffer.write('\n  ${index + 1}. [$source] $ops');
   }
   return buffer.toString();
+}
+
+/// 单个 op 的可读摘要：动作 + 文件 + 拟议文本（截断）。
+String _opSummary(PatchOp op) {
+  final String path = pathOfBlock(op.blockId);
+  final String? text = opTextOf(op);
+  if (text == null) return '${op.runtimeType}($path)';
+  final String flat = text.replaceAll('\n', '⏎');
+  final String preview = flat.length > 60 ? '${flat.substring(0, 60)}…' : flat;
+  return '$path：$preview';
 }
 
 /// 订阅会话的助手消息事件，把含 ops 块的回复喂进 [pending]。

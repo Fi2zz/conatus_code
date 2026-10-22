@@ -523,7 +523,7 @@ class ConatusTuiRuntime {
             '执行中每完成一步用 update_plan 标记进度；工具失败时反思原因并重试或调整方案。',
       ),
     );
-    if (storyEnabled) {
+    if (storyEnabled && interactive) {
       prompt.section(
         PromptSection(
           name: 'story-ops',

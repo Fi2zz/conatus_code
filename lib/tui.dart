@@ -32,6 +32,7 @@ export 'src/tui/trace_renderer.dart';
 export 'src/tui/transcript.dart';
 export 'src/tui/tui.dart';
 export 'src/tui/tui_app.dart';
+export 'src/tui/tui_attachment.dart' show TuiAttachment;
 export 'src/tui/tui_choice.dart';
 export 'src/tui/tui_choice_view.dart';
 export 'src/tui/tui_chrome.dart';

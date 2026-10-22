@@ -49,6 +49,38 @@ void main() {
       expect(engine.state.blocks.single.text, '第一章');
     });
 
+    test('人改 .py 源码 → 记 human 补丁（编码仓库常见扩展名）', () async {
+      final (Context app, DocEngine engine, Directory dir) = await _build();
+      addTearDown(() => _cleanup(app, dir));
+      final StoryWatcher watcher = StoryWatcher(engine: engine, dir: dir.path);
+      await watcher.scanOnce();
+
+      File('${dir.path}/main.py').writeAsStringSync('print("hi")\n');
+
+      await watcher.scanOnce();
+      expect(engine.log.patches.single.author, PatchAuthor.human);
+      expect(engine.state.blocks.single.id, startsWith('main.py#'));
+    });
+
+    test('rewind 写回工作区：记一次 human 补丁，重复扫描不重复记', () async {
+      final (Context app, DocEngine engine, Directory dir) = await _build();
+      addTearDown(() => _cleanup(app, dir));
+      final StoryWatcher watcher = StoryWatcher(engine: engine, dir: dir.path);
+      File('${dir.path}/draft.md').writeAsStringSync('原稿\n');
+      await watcher.scanOnce(); // 基线
+
+      File('${dir.path}/draft.md').writeAsStringSync('改过的稿\n');
+      await watcher.scanOnce();
+      expect(engine.log.length, 1);
+
+      // 模拟 /rewind 把文件恢复成基线内容：watcher 只应记一条新补丁。
+      File('${dir.path}/draft.md').writeAsStringSync('原稿\n');
+      await watcher.scanOnce();
+      await watcher.scanOnce();
+      expect(engine.log.length, 2);
+      expect(engine.log.patches.last.author, PatchAuthor.human);
+    });
+
     test('AI 经工具写入不触发 human 补丁（内容与引擎一致）', () async {
       final (Context app, DocEngine engine, Directory dir) = await _build();
       addTearDown(() => _cleanup(app, dir));

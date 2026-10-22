@@ -1197,7 +1197,12 @@ class ConatusTuiController implements TuiUserPromptHost {
     final int space = arg.indexOf(' ');
     final String sub = space < 0 ? arg.trim() : arg.substring(0, space).trim();
     final String rest = space < 0 ? '' : arg.substring(space + 1).trim();
-    await _runStorySub(engine, sub, rest);
+    try {
+      await _runStorySub(engine, sub, rest);
+    } on Object catch (error) {
+      // 文件 / 会话日志 IO 失败不能变成未处理的异步异常。
+      transcript.add(TuiRole.system, '故事操作失败：$error');
+    }
   }
 
   Future<void> _runStorySub(DocEngine engine, String sub, String rest) async {
@@ -1989,11 +1994,18 @@ class ConatusTuiController implements TuiUserPromptHost {
     final List<String> notices =
         _sessionCtx?.get<StoryNotices>('storyNotices')?.drain() ??
             const <String>[];
+    // 只注入队首连续的纯文本消息：带附件的消息留给轮末 drain 原样投递，
+    // 否则 steering 会把附件静默丢掉（附件不在注入通道的契约里）。
+    int take = 0;
+    while (take < _queue.length && _queue[take].$2.isEmpty) {
+      take++;
+    }
     final List<String> texts = <String>[
-      for (final (String, List<TuiAttachment>) entry in _queue) entry.$1,
+      for (final (String, List<TuiAttachment>) entry in _queue.take(take))
+        entry.$1,
     ];
     if (notices.isEmpty && texts.isEmpty) return const <String>[];
-    _queue.clear();
+    _queue.removeRange(0, take);
     _refresh();
     return <String>[...notices, ...texts];
   }

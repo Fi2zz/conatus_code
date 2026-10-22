@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
@@ -14,6 +15,8 @@ class _GateProvider implements LlmProvider {
   final Completer<void> gate = Completer<void>();
   final List<String> prompts = <String>[];
   final List<List<String>> batches = <List<String>>[];
+  final List<List<LlmMessage>> messagesSeen = <List<LlmMessage>>[];
+  bool toolCallOnFirst = false;
   int calls = 0;
 
   @override
@@ -27,8 +30,19 @@ class _GateProvider implements LlmProvider {
   }) async {
     prompts.add(messages.last.content);
     batches.add(messages.map((LlmMessage m) => m.content).toList());
+    messagesSeen.add(List<LlmMessage>.of(messages));
     calls++;
-    if (calls == 1) await gate.future;
+    if (calls == 1) {
+      await gate.future;
+      if (toolCallOnFirst) {
+        return const LlmResult(
+          content: '',
+          provider: 'gated',
+          model: 'm',
+          toolCalls: <LlmToolCall>[LlmToolCall(id: 't1', name: 'echo')],
+        );
+      }
+    }
     return LlmResult(content: 'reply-$calls', provider: 'gated', model: 'm');
   }
 
@@ -49,6 +63,11 @@ Future<(ConatusTuiController, Context, _GateProvider)> _build() async {
   provideTools(app);
   final _GateProvider provider = _GateProvider();
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[provider]));
+  app.tools.fn(
+    'echo',
+    description: '回显',
+    handler: (ToolContext ctx) async => ToolResult.success('ok'),
+  );
   final SessionStore sessions = provideSessions(app);
   final ConatusTuiController controller = ConatusTuiController(
     app: app,
@@ -94,6 +113,41 @@ void main() {
     // 注入，因此第二轮一次带上两条，模型只被调用两次。
     expect(provider.calls, 2);
     expect(provider.batches[1], containsAll(<String>['第二条', '第三条']));
+  });
+
+  test('排队消息的附件不被 steering 吞掉（轮末兜底原样投递）', () async {
+    final (ConatusTuiController controller, Context app, _GateProvider provider) =
+        await _build();
+    provider.toolCallOnFirst = true;
+    addTearDown(app.dispose);
+    final Directory dir =
+        Directory.systemTemp.createTempSync('nava-queue-attach-');
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+    final File image = File('${dir.path}/img.png')
+      ..writeAsBytesSync(<int>[0x89, 0x50, 0x4e, 0x47]);
+
+    final Future<void> first = controller.handleLine('第一条');
+    await _until(() => controller.busy);
+    await controller.handleLine(
+      '带图',
+      attachments: <TuiAttachment>[
+        TuiAttachment(path: image.path, mimeType: 'image/png'),
+      ],
+    );
+    expect(controller.queuedCount, 1);
+
+    provider.gate.complete();
+    await first;
+    await _until(() => provider.calls >= 3);
+
+    final bool carried = provider.messagesSeen.any(
+      (List<LlmMessage> batch) => batch.any(
+        (LlmMessage m) => m.role == 'user' && m.images.isNotEmpty,
+      ),
+    );
+    expect(carried, isTrue);
   });
 
   test('队列满（20 条）拒绝新输入', () async {

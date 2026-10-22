@@ -7,6 +7,7 @@ import 'dart:io';
 const Set<String> kStorySkipDirs = <String>{
   '.git',
   '.nava',
+  '.conatus',
   'node_modules',
   '.dart_tool',
   'build',
@@ -14,14 +15,16 @@ const Set<String> kStorySkipDirs = <String>{
 
 /// 只跟踪这些文本扩展名（读回时再容错一次，双保险）。
 const Set<String> kStoryTextExtensions = <String>{
-  '.md',
-  '.txt',
-  '.dart',
-  '.json',
-  '.yaml',
-  '.yml',
-  '.toml',
-  '.csv',
+  // 文档 / 配置
+  '.md', '.txt', '.rst', '.adoc', '.csv',
+  '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.env',
+  // 常见源码（编码智能体的主场景）
+  '.dart', '.py', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
+  '.go', '.rs', '.java', '.kt', '.kts', '.scala', '.rb', '.php',
+  '.cs', '.c', '.h', '.cc', '.cpp', '.hpp', '.swift', '.m', '.mm',
+  '.sh', '.bash', '.zsh', '.ps1',
+  '.html', '.htm', '.css', '.scss', '.less', '.vue', '.svelte',
+  '.sql', '.xml', '.gradle',
 };
 
 /// 当前快照：相对路径（`/` 分隔）→ (mtime, 长度)。等长同毫秒的连续

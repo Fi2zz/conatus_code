@@ -44,7 +44,14 @@ class StoryReviewGate {
     if (!kStoryToolNames.contains(call.name)) return next();
     final List<PatchOp>? ops = await previewEditedOps(fs, call);
     if (ops == null) return next();
-    final int n = await pending.feedOps(ops, source: call.name, fs: fs);
+    final int n;
+    try {
+      n = await pending.feedOps(ops, source: call.name, fs: fs);
+    } on Object {
+      // 基底读不出来（越界 / 权限）时交给真实工具报错，而不是拦成半成品。
+      return next();
+    }
+    if (n < 1) return next();
     return ToolResult.success(
       '编辑已登记为待定补丁 #$n（${ops.length} 个文件），待人审阅生效；'
       '无需重试，可继续其它工作。',

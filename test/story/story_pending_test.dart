@@ -25,6 +25,29 @@ void main() {
       expect(pending.patches, isEmpty);
     });
 
+    test('畸形 ops（缺字段 / 非对象）静默跳过', () {
+      expect(
+        tryCompileOps('```ops\n[{"kind":"insert","text":"x"}]\n```'),
+        isEmpty,
+      );
+      expect(tryCompileOps('```ops\n["oops"]\n```'), isEmpty);
+    });
+
+    test('越界 blockId 不抛异常、不登记待定补丁', () async {
+      final Directory dir =
+          Directory.systemTemp.createTempSync('nava-pending-jail-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final FileSystem fs = JailedFileSystem(root: dir.path);
+      final StoryPending pending = StoryPending();
+
+      await pending.feed(
+        '```ops\n[{"kind":"replace","blockId":"../escape.md","text":"x"}]\n```',
+        fs: fs,
+      );
+
+      expect(pending.patches, isEmpty);
+    });
+
     test('ops 块编译为待应用补丁（author ai）', () async {
       final StoryPending pending = StoryPending();
       await pending.feed('我建议这样改：\n$_opsBlock');
@@ -32,6 +55,28 @@ void main() {
       expect(pending.patches.single.author, PatchAuthor.ai);
       expect(pending.patches.single.ops.single, isA<InsertBlockOp>());
       expect(renderStoryPending(pending.patches), contains('ch1.md'));
+    });
+
+    test('renderStoryPending 展示拟议内容与文件', () {
+      const DocPatch patch = DocPatch(
+        id: 'p1',
+        author: PatchAuthor.ai,
+        ops: <PatchOp>[
+          InsertBlockOp(blockId: 'ch1.md', text: '新的第一段'),
+        ],
+      );
+      final String text = renderStoryPending(const <DocPatch>[patch]);
+      expect(text, contains('ch1.md'));
+      expect(text, contains('新的第一段'));
+    });
+
+    test('不传 session 时不装配待定通道（headless 路径）', () async {
+      final Context app = Context.root();
+      addTearDown(app.dispose);
+      provideTools(app);
+      provideSessionLog(app, log: InMemorySessionLog());
+      await provideStory(app, sessionId: 's1');
+      expect(app.get<StoryPending>('storyPending'), isNull);
     });
 
     test('bindStoryPending 订阅助手消息事件', () async {

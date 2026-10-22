@@ -61,7 +61,8 @@ Future<HeadlessResult> runHeadless(
   // 故事层：异步（要从 sessionLog 重建），故在插件回调外 await。
   // headless 没有人审阅，review 保持 false（直写）；仅在配置开启时装配。
   if (runtime.storyEnabled) {
-    await provideStory(ctx, sessionId: session.id, session: session);
+    // 不传 session：headless 没有审阅人，不需要待定通道与 ops 提议。
+    await provideStory(ctx, sessionId: session.id);
   }
   try {
     final AgentTurn turn = await ctx.agentLoop.run(prompt);

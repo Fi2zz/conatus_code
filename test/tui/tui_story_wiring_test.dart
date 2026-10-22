@@ -39,7 +39,9 @@ Future<(ConatusTuiController, Context, Directory)> _buildController({
 }) async {
   final Directory dir =
       Directory.systemTemp.createTempSync('nava-story-wiring-');
-  addTearDown(() => dir.deleteSync(recursive: true));
+  addTearDown(() {
+    if (dir.existsSync()) dir.deleteSync(recursive: true);
+  });
   final Context app = Context.root();
   provideTools(app);
   final FileSystem fs = provideFileSystemLocal(
@@ -99,6 +101,32 @@ void main() {
     expect(File('${dir.path}/a.txt').readAsStringSync(), 'hello');
   });
 
+  test('/story apply 的 IO 失败给出系统提示，不抛未处理异常', () async {
+    final (ConatusTuiController controller, Context app, Directory dir) =
+        await _buildController(storyEnabled: true);
+    File('${dir.path}/a.txt').writeAsStringSync('old');
+    await app.tools.call(
+      const ToolCall(
+        name: 'write_file',
+        arguments: <String, Object?>{
+          'path': 'a.txt',
+          'content': 'hello',
+          'mode': 'overwrite',
+        },
+      ),
+    );
+    // 目录只读：apply 的原子写必然失败，用于验证命令层兜住 IO 异常。
+    await Process.run('chmod', <String>['500', dir.path]);
+
+    await controller.handleLine('/story apply 1');
+    await Process.run('chmod', <String>['700', dir.path]);
+
+    expect(
+      controller.transcript.messages.last.text,
+      contains('故事操作失败'),
+    );
+  });
+
   test('审阅门先于审批门：写工具不触发审批', () async {
     final Directory dir =
         Directory.systemTemp.createTempSync('nava-story-gate-');
@@ -132,6 +160,38 @@ void main() {
     expect(approval.requests, 0);
     expect(result.isError, isFalse);
     expect(result.content, contains('待定补丁'));
+  });
+
+  test('headless（interactive=false）不注入交互式故事 prompt', () async {
+    final Directory dir =
+        Directory.systemTemp.createTempSync('nava-story-prompt-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    Future<ConatusTuiRuntime> build(bool interactive) =>
+        ConatusTuiRuntime.create(
+          baseDir: dir.path,
+          webTools: false,
+          skills: false,
+          interactive: interactive,
+          llm: FallbackLlm(<LlmProvider>[_StubProvider()]),
+          story: const StoryConfig(enabled: true),
+        );
+
+    final ConatusTuiRuntime headless = await build(false);
+    addTearDown(headless.dispose);
+    final SystemPrompt headlessPrompt =
+        headless.app.get<SystemPrompt>('systemPrompt')!;
+    expect(
+      headlessPrompt.sections.map((PromptSection s) => s.name),
+      isNot(contains('story-ops')),
+    );
+
+    final ConatusTuiRuntime tui = await build(true);
+    addTearDown(tui.dispose);
+    final SystemPrompt tuiPrompt = tui.app.get<SystemPrompt>('systemPrompt')!;
+    expect(
+      tuiPrompt.sections.map((PromptSection s) => s.name),
+      contains('story-ops'),
+    );
   });
 
   test('运行时按开关装配 story-log 服务', () async {
