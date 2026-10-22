@@ -35,12 +35,15 @@ void main() {
 +line3
 ''';
 
-      final ToolResult result =
-          await tool.call(_context(<String, Object?>{'patch': patch}));
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
 
       expect(result.isError, isFalse);
-      expect(File('${dir.path}/a.txt').readAsStringSync(),
-          'line1\nline2 changed\nline3\n');
+      expect(
+        File('${dir.path}/a.txt').readAsStringSync(),
+        'line1\nline2 changed\nline3\n',
+      );
       final Map<String, Object?> value = result.value! as Map<String, Object?>;
       expect(value['files'], <String>['a.txt']);
       expect(value['diff'], patch);
@@ -65,16 +68,20 @@ void main() {
 +b1.5
 ''';
 
-      final ToolResult result =
-          await tool.call(_context(<String, Object?>{'patch': patch}));
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
 
       expect(result.isError, isFalse);
-      expect(File('${dir.path}/a.txt').readAsStringSync(), 'x1\nl2\nl3\nl4\nx5\n');
-      expect(File('${dir.path}/b.txt').readAsStringSync(), 'b1\nb1.5\nb2\n');
       expect(
-        (result.value! as Map<String, Object?>)['files'],
-        <String>['a.txt', 'b.txt'],
+        File('${dir.path}/a.txt').readAsStringSync(),
+        'x1\nl2\nl3\nl4\nx5\n',
       );
+      expect(File('${dir.path}/b.txt').readAsStringSync(), 'b1\nb1.5\nb2\n');
+      expect((result.value! as Map<String, Object?>)['files'], <String>[
+        'a.txt',
+        'b.txt',
+      ]);
     });
 
     test('上下文不匹配 → PATCH_CONTEXT', () async {
@@ -87,8 +94,9 @@ void main() {
 +zzz
 ''';
 
-      final ToolResult result =
-          await tool.call(_context(<String, Object?>{'patch': patch}));
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
 
       expect(result.isError, isTrue);
       expect(result.error!.code, 'PATCH_CONTEXT');
@@ -97,7 +105,8 @@ void main() {
 
     test('无法解析 → PATCH_INVALID', () async {
       final ToolResult result = await tool.call(
-          _context(<String, Object?>{'patch': '这不是 diff 文本'}));
+        _context(<String, Object?>{'patch': '这不是 diff 文本'}),
+      );
 
       expect(result.isError, isTrue);
       expect(result.error!.code, 'PATCH_INVALID');
@@ -112,11 +121,53 @@ void main() {
 +
 ''';
 
-      final ToolResult result =
-          await tool.call(_context(<String, Object?>{'patch': patch}));
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
 
       expect(result.isError, isFalse);
-      expect(File('${dir.path}/new.dart').readAsStringSync(), 'void main() {}\n');
+      expect(
+        File('${dir.path}/new.dart').readAsStringSync(),
+        'void main() {}\n',
+      );
+    });
+
+    test('空文件新增（无 hunk）仍创建文件', () async {
+      const String patch = '--- /dev/null\n+++ b/empty.txt\n';
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
+
+      expect(result.isError, isFalse);
+      expect(File('${dir.path}/empty.txt').existsSync(), isTrue);
+      expect(File('${dir.path}/empty.txt').readAsStringSync(), '');
+    });
+
+    test('CRLF 内容 patch 可应用（保留 \\r）', () async {
+      File('${dir.path}/x.txt').writeAsStringSync('a\r\n');
+      const String patch =
+          '--- a/x.txt\r\n+++ b/x.txt\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n';
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
+
+      expect(result.isError, isFalse);
+      expect(File('${dir.path}/x.txt').readAsStringSync(), 'b\r\n');
+    });
+
+    test('仅二进制 patch 返回 PATCH_UNSUPPORTED', () async {
+      const String patch =
+          'diff --git a/x.png b/x.png\n'
+          'Binary files a/x.png and b/x.png differ\n';
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
+
+      expect(result.isError, isTrue);
+      expect(result.error!.code, 'PATCH_UNSUPPORTED');
     });
   });
 }

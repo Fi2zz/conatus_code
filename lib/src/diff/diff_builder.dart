@@ -26,29 +26,34 @@ class UnifiedDiffBuilder {
   bool _renamed = false;
   bool _fromGitHeader = false;
 
-  /// 喂入一行（不含 `\n`）。
+  /// 喂入一行（不含 `\n`）。结构行容忍尾随 `\r`；hunk 内容行**保留**
+  /// `\r`——CRLF 文件的内容就带它，剥掉会让 `apply_patch` 的上下文失配。
   // REASON: 逐行状态机解析是既定实现，else-if 链即解析分支本身。
   void add(String raw) {
+    final String line = raw.endsWith('\r')
+        ? raw.substring(0, raw.length - 1)
+        : raw;
     if (_cursor.active) {
       _cursor.add(raw);
-    } else if (raw.startsWith('diff --git ')) {
-      _startGitHeader(raw);
-    } else if (raw.startsWith('new file mode ')) {
+    } else if (line.startsWith('diff --git ')) {
+      _startGitHeader(line);
+    } else if (line.startsWith('new file mode ')) {
       _newFile = true;
-    } else if (raw.startsWith('deleted file mode ')) {
+    } else if (line.startsWith('deleted file mode ')) {
       _deletedFile = true;
-    } else if (raw.startsWith('rename from ') || raw.startsWith('rename to ')) {
+    } else if (line.startsWith('rename from ') ||
+        line.startsWith('rename to ')) {
       _renamed = true;
-    } else if (raw.startsWith('--- ')) {
+    } else if (line.startsWith('--- ')) {
       final bool headerPending = _oldPath != null && !_fromGitHeader;
       if (_cursor.started || headerPending) _flush();
-      _oldPath = cleanDiffPath(raw.substring(4));
-    } else if (raw.startsWith('+++ ')) {
-      _newPath = cleanDiffPath(raw.substring(4));
-    } else if (_binaryHint.hasMatch(raw)) {
+      _oldPath = cleanDiffPath(line.substring(4));
+    } else if (line.startsWith('+++ ')) {
+      _newPath = cleanDiffPath(line.substring(4));
+    } else if (_binaryHint.hasMatch(line)) {
       _cursor.markBinary();
-    } else if (raw.startsWith('@@ ')) {
-      _cursor.start(raw);
+    } else if (line.startsWith('@@ ')) {
+      _cursor.start(line);
     } else {
       _cursor.add(raw);
     }

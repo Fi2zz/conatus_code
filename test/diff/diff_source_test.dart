@@ -231,7 +231,96 @@ void main() {
 
     expect(diffs, isEmpty);
     expect(source.notice, contains('git diff 失败'));
+
+    // 之后的 turn 读取不得沿用上一次 working 的 notice。
+    final List<FileDiff> turnDiffs = await source.load(DiffScope.turn);
+    expect(turnDiffs.single.path, 'a.txt');
+    expect(source.notice, isNull);
   });
+
+  test('bare repositories surface a notice instead of falling back', () async {
+    final (CheckpointManager manager, _) = _workspace();
+    final Directory bare = Directory.systemTemp.createTempSync('nava-bare');
+    addTearDown(() => bare.deleteSync(recursive: true));
+    await _git(bare.path, <String>['init', '--bare', '-q']);
+
+    final DiffSource source = DiffSource(
+      workdir: bare.path,
+      checkpoint: manager,
+      sessionId: 's1',
+      turn: 0,
+    );
+    final List<FileDiff> diffs = await source.load(DiffScope.working);
+
+    expect(diffs, isEmpty);
+    expect(source.notice, contains('裸仓库'));
+  });
+
+  test('unusable workdir surfaces a git-unavailable notice', () async {
+    final (CheckpointManager manager, String root) = _workspace();
+    final DiffSource source = DiffSource(
+      workdir: '$root${Platform.pathSeparator}missing',
+      checkpoint: manager,
+      sessionId: 's1',
+      turn: 0,
+    );
+
+    final List<FileDiff> diffs = await source.load(DiffScope.working);
+
+    expect(diffs, isEmpty);
+    expect(source.notice, contains('git 不可用'));
+  });
+
+  test('credentials and build paths are hidden in both scopes', () async {
+    final (CheckpointManager manager, String root) = _workspace();
+    await _initRepo(root);
+    _write(root, '.env', 'v0\n');
+    _write(root, 'build/out.txt', 'v0\n');
+    _write(root, 'a.txt', 'v0\n');
+    await _commitAll(root, 'init');
+    await manager.bind('s1');
+    _write(root, '.env', 'v1\n');
+    _write(root, 'build/out.txt', 'v1\n');
+    _write(root, 'a.txt', 'v1\n');
+    await manager.recordTurn();
+
+    final DiffSource source = DiffSource(
+      workdir: root,
+      checkpoint: manager,
+      sessionId: 's1',
+      turn: 1,
+    );
+    final List<FileDiff> working = await source.load(DiffScope.working);
+    final List<FileDiff> turn = await source.load(DiffScope.turn);
+
+    expect(working.map((FileDiff d) => d.path), <String>['a.txt']);
+    expect(turn.map((FileDiff d) => d.path), <String>['a.txt']);
+  });
+
+  test(
+    'a change whose both sides are unreadable keeps a file-level entry',
+    () async {
+      final (CheckpointManager _, String root) = _workspace();
+      final CheckpointManager manager = _NullReadManager(
+        store: ArchiveCheckpointStore(
+          root: root,
+          projectDir: '$root${Platform.pathSeparator}.conatus',
+        ),
+        config: const CheckpointConfig(),
+      );
+
+      final List<FileDiff> diffs = await DiffSource(
+        workdir: root,
+        checkpoint: manager,
+        sessionId: 's1',
+        turn: 1,
+      ).load(DiffScope.turn);
+
+      expect(diffs.single.path, 'old.txt');
+      expect(diffs.single.status, 'modified');
+      expect(diffs.single.hunks, isEmpty);
+    },
+  );
 
   test('working marks deleted tracked files', () async {
     final (CheckpointManager manager, String root) = _workspace();
@@ -318,4 +407,22 @@ void main() {
       reason: 'big.bin 占掉一个预算名额；其余未读的只给文件级截断条目',
     );
   });
+}
+
+/// 两轮内容都读不出的管理器：验证旧格式检查点仍保留文件级变化。
+class _NullReadManager extends CheckpointManager {
+  _NullReadManager({required super.store, required super.config});
+
+  @override
+  Future<List<CheckpointFileChange>> changesBetween(
+    String sessionId,
+    int fromTurn,
+    int toTurn,
+  ) async => const <CheckpointFileChange>[
+    CheckpointFileChange(path: 'old.txt', status: 'modified'),
+  ];
+
+  @override
+  Future<List<int>?> readFile(String sessionId, int turn, String path) async =>
+      null;
 }

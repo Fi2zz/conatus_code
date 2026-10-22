@@ -1,6 +1,7 @@
 import 'package:conatus_foundation/conatus_foundation.dart';
 
 import '../diff/apply.dart';
+import '../diff/diff_model.dart';
 import '../diff/diff_parse.dart';
 import '../diff/diff_types.dart';
 
@@ -25,7 +26,7 @@ class ApplyPatchTool extends Tool {
   @override
   Future<ToolResult> call(ToolContext ctx) async {
     final String patch = ctx.str('patch');
-    final List<DiffFile> files = parseUnifiedDiff(patch);
+    final List<FileDiff> files = parseUnifiedDiff(patch);
     if (files.isEmpty) {
       return ToolResult.failure(
         '无法解析 patch',
@@ -34,20 +35,40 @@ class ApplyPatchTool extends Tool {
     }
     final List<String> applied = <String>[];
     try {
-      for (final DiffFile file in files) {
-        if (file.hunks.isEmpty) continue;
+      for (final FileDiff file in files) {
+        if (!_applicable(file)) continue;
         await _applyFile(file);
         applied.add(file.path);
       }
     } on FsError catch (e) {
-      return ToolResult.failure(e.message, error: ToolError(e.code.code, e.message));
+      return ToolResult.failure(
+        e.message,
+        error: ToolError(e.code.code, e.message),
+      );
     } on PatchContextException catch (e) {
-      return ToolResult.failure(e.message, error: ToolError('PATCH_CONTEXT', e.message));
+      return ToolResult.failure(
+        e.message,
+        error: ToolError('PATCH_CONTEXT', e.message),
+      );
+    }
+    if (applied.isEmpty) {
+      const String message = '补丁仅含二进制或文件元数据变更，无法应用';
+      return ToolResult.failure(
+        message,
+        error: const ToolError('PATCH_UNSUPPORTED', message),
+      );
     }
     return ToolResult.success(
       '已应用 ${applied.length} 个文件：${applied.join(', ')}',
       value: <String, Object?>{'files': applied, 'diff': patch},
     );
+  }
+
+  /// 二进制 / 仅元数据变更没有可应用的 hunk；空文件新增（added + 无 hunk）
+  /// 仍要物化，故不能一律跳过。
+  bool _applicable(FileDiff file) {
+    if (file.status == 'binary') return false;
+    return file.hunks.isNotEmpty || file.status == 'added';
   }
 
   /// 应用单个文件（目标不存在视为空文件）；应用语义见 diff/apply.dart。

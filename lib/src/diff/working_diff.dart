@@ -62,7 +62,10 @@ class WorkingDiff {
         '--is-inside-work-tree',
       ], workingDirectory: workdir);
       if (result.exitCode != 0) return _RepoProbe.notRepo;
-      if (result.stdout.toString().trim() != 'true') return _RepoProbe.failed;
+      if (result.stdout.toString().trim() != 'true') {
+        notice = 'git rev-parse 未返回工作区（裸仓库或受保护仓库）';
+        return _RepoProbe.failed;
+      }
       return _RepoProbe.repo;
     } on ProcessException catch (e) {
       notice = 'git 不可用：${e.message}';

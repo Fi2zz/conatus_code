@@ -41,6 +41,7 @@ class DiffSource {
 
   /// 加载 [scope] 范围内的差异（按路径排序）。
   Future<List<FileDiff>> load(DiffScope scope) async {
+    _notice = null;
     if (scope == DiffScope.turn) return _turnDiff();
     final WorkingDiff working = WorkingDiff(
       workdir,

@@ -14,8 +14,9 @@ void main() {
   });
 
   test('applyDiffFile：上下文失配抛 PatchContextException', () {
-    final List<DiffFile> files =
-        parseUnifiedDiff('--- a/x\n+++ b/x\n@@ -1,1 +1,1 @@\n-old\n+new\n');
+    final List<DiffFile> files = parseUnifiedDiff(
+      '--- a/x\n+++ b/x\n@@ -1,1 +1,1 @@\n-old\n+new\n',
+    );
     expect(
       () => applyDiffFile('other\n', files.single),
       throwsA(isA<PatchContextException>()),
@@ -23,8 +24,16 @@ void main() {
   });
 
   test('applyDiffFile：替换保留尾随换行', () {
-    final List<DiffFile> files =
-        parseUnifiedDiff('--- a/x\n+++ b/x\n@@ -1,1 +1,1 @@\n-old\n+new\n');
+    final List<DiffFile> files = parseUnifiedDiff(
+      '--- a/x\n+++ b/x\n@@ -1,1 +1,1 @@\n-old\n+new\n',
+    );
     expect(applyDiffFile('old\n', files.single), 'new\n');
+  });
+
+  test('applyDiffFile：CRLF 内容与 hunk 行逐字匹配', () {
+    final List<DiffFile> files = parseUnifiedDiff(
+      '--- a/x.txt\r\n+++ b/x.txt\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n',
+    );
+    expect(applyDiffFile('a\r\n', files.single), 'b\r\n');
   });
 }

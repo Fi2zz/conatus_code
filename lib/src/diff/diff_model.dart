@@ -24,6 +24,7 @@ class FileDiff extends DiffFile {
     this.additions = 0,
     this.deletions = 0,
     this.truncated = false,
+    this.coarse = false,
   });
 
   /// `added` / `modified` / `deleted` / `renamed` / `binary`。
@@ -38,19 +39,19 @@ class FileDiff extends DiffFile {
   /// 文件过大、只给文件级结论（无 hunk）。
   final bool truncated;
 
-  /// 复制并覆盖给定字段；其余保持不变。
-  FileDiff copyWith({
-    String? status,
-    List<DiffHunk>? hunks,
-    int? additions,
-    int? deletions,
-    bool? truncated,
-  }) => FileDiff(
+  /// 行差异因 LCS 预算退化为整段删/增：内容完整但**非最小** hunk，
+  /// 增删计数是整段的，不是精确编辑数。
+  final bool coarse;
+
+  /// 复制并替换状态词；把 checkpoint 的状态（如 `renamed`）盖到内容比对
+  /// 得出的状态上。
+  FileDiff copyWith({String? status}) => FileDiff(
     path: path,
     status: status ?? this.status,
-    hunks: hunks ?? this.hunks,
-    additions: additions ?? this.additions,
-    deletions: deletions ?? this.deletions,
-    truncated: truncated ?? this.truncated,
+    hunks: hunks,
+    additions: additions,
+    deletions: deletions,
+    truncated: truncated,
+    coarse: coarse,
   );
 }

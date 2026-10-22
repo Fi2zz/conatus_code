@@ -9,6 +9,7 @@ library;
 import 'diff_builder.dart';
 import 'diff_model.dart';
 import 'diff_types.dart';
+import 'line_ops.dart';
 import 'unified_diff.dart' as unified;
 
 /// 解析统一格式 diff 文本，返回文件级变更（按出现顺序）。
@@ -16,7 +17,7 @@ import 'unified_diff.dart' as unified;
 /// 解析不出任何文件时返回空列表。
 List<FileDiff> parseUnifiedDiff(String text) {
   final UnifiedDiffBuilder builder = UnifiedDiffBuilder();
-  for (final String line in text.replaceAll('\r\n', '\n').split('\n')) {
+  for (final String line in text.split('\n')) {
     builder.add(line);
   }
   return builder.finish();
@@ -48,9 +49,21 @@ List<FileDiff> diffLines(
     lcsLimit: maxLines,
   );
   if (patch.isNotEmpty) {
+    final bool coarse = lineDiffCoarse(
+      sides.oldLines,
+      sides.newLines,
+      maxLines,
+    );
     return <FileDiff>[
       for (final FileDiff diff in parseUnifiedDiff(patch))
-        diff.copyWith(status: status),
+        FileDiff(
+          path: diff.path,
+          status: status,
+          hunks: diff.hunks,
+          additions: diff.additions,
+          deletions: diff.deletions,
+          coarse: coarse,
+        ),
     ];
   }
   // 空文件的新增 / 删除没有 hunk，但仍是一条文件级变化。
@@ -85,19 +98,13 @@ FileDiff? _degraded(String path, String status, _Sides sides, int maxLines) {
 }
 
 /// 文件级条目（无 hunk）；超限 / 二进制时增删计数为 0，不编造统计。
-FileDiff _file(
-  String path,
-  String status, {
-  ({int additions, int deletions}) counts = (additions: 0, deletions: 0),
-  bool truncated = false,
-}) => FileDiff(
-  path: path,
-  status: status,
-  hunks: const <DiffHunk>[],
-  additions: counts.additions,
-  deletions: counts.deletions,
-  truncated: truncated,
-);
+FileDiff _file(String path, String status, {bool truncated = false}) =>
+    FileDiff(
+      path: path,
+      status: status,
+      hunks: const <DiffHunk>[],
+      truncated: truncated,
+    );
 
 /// 两侧文本的切行结果（只算一次，供降级判定与 LCS 共用）。
 class _Sides {

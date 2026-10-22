@@ -150,12 +150,12 @@ void main() {
       expect(diff.hunks, isEmpty);
     });
 
-    test('CRLF patches are normalised', () {
+    test('CRLF patches keep content CR and normalise structural lines', () {
       final FileDiff diff = parseUnifiedDiff(
         '--- a/x.txt\r\n+++ b/x.txt\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n',
       ).single;
       expect(diff.path, 'x.txt');
-      expect(diff.hunks.single.lines, <String>['-a', '+b']);
+      expect(diff.hunks.single.lines, <String>['-a\r', '+b\r']);
     });
 
     test('quoted paths with spaces are unquoted', () {
@@ -169,6 +169,20 @@ void main() {
       ).single;
       expect(diff.path, 'sp ace.txt');
       expect(diff.additions, 1);
+    });
+
+    test('quoted octal paths decode as UTF-8', () {
+      const String quoted = r'"a/\346\226\207.txt"';
+      const String target = r'"b/\346\226\207.txt"';
+      final FileDiff diff = parseUnifiedDiff(
+        'diff --git $quoted $target\n'
+        '--- $quoted\n'
+        '+++ $target\n'
+        '@@ -1 +1 @@\n'
+        '-a\n'
+        '+b\n',
+      ).single;
+      expect(diff.path, '文.txt');
     });
 
     test('hunk headers with omitted counts mean one line', () {
@@ -284,6 +298,24 @@ void main() {
       expect(diff.status, 'modified');
       expect(diff.hunks, isEmpty);
       expect(diff.truncated, isFalse);
+    });
+
+    test('LCS budget fallback is marked coarse', () {
+      final List<String> lines = <String>[
+        for (int i = 0; i < 2001; i++) 'line $i',
+      ];
+      final String before = lines.join('\n');
+      lines[0] = 'changed first';
+      lines[2000] = 'changed last';
+      final FileDiff diff = diffLines(
+        'sparse.txt',
+        before,
+        lines.join('\n'),
+      ).single;
+      expect(diff.coarse, isTrue);
+      expect(diff.truncated, isFalse);
+      expect(diff.additions, 2001, reason: '整段替换的退化计数');
+      expect(diff.deletions, 2001);
     });
   });
 }

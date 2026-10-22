@@ -28,6 +28,17 @@ List<DiffOp> lineDiffOps(List<String> a, List<String> b, int lcsLimit) {
   ];
 }
 
+/// 行差异是否因中段超限 / 超预算而退化成整段删增（非最小 diff）。
+///
+/// 调用方据此标记 [FileDiff.coarse]；退化本身是正确 diff，只是计数不精确。
+bool lineDiffCoarse(List<String> a, List<String> b, int lcsLimit) {
+  final int prefix = _commonPrefix(a, b);
+  final int suffix = _commonSuffix(a, b, prefix);
+  final int n = a.length - prefix - suffix;
+  final int m = b.length - prefix - suffix;
+  return n > lcsLimit || m > lcsLimit || n * m > _kMaxLcsCells;
+}
+
 int _commonPrefix(List<String> a, List<String> b) {
   final int limit = a.length < b.length ? a.length : b.length;
   int index = 0;
