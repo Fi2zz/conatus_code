@@ -119,7 +119,9 @@ export 'src/config/project_data_dir.dart' show resolveProjectDataDir;
 export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;
 export 'src/diff/apply.dart'
     show PatchContextException, applyDiffFile, applyEditText;
+export 'src/diff/diff_model.dart' show DiffScope, FileDiff;
 export 'src/diff/diff_parse.dart' show parseUnifiedDiff;
+export 'src/diff/diff_source.dart' show DiffSource;
 export 'src/diff/diff_types.dart' show DiffFile, DiffHunk, DiffOp, DiffOpKind;
 export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
 export 'src/diff/unified_diff.dart'

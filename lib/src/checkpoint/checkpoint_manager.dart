@@ -137,6 +137,10 @@ class CheckpointManager {
     });
   }
 
+  /// 读某会话某轮的清单（`/diff` 的 turn 0 需要枚举文件）；透传给存储。
+  Future<CheckpointManifest> loadManifest(String sessionId, int turn) =>
+      _store.loadManifest(sessionId, turn);
+
   /// 读某会话某轮里 [path] 的内容（`/diff` 数据源）；透传给存储。
   Future<List<int>?> readFile(String sessionId, int turn, String path) =>
       _store.readFile(sessionId, turn, path);
