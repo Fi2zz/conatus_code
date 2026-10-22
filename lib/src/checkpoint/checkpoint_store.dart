@@ -67,15 +67,18 @@ abstract class CheckpointStore {
   /// 实现须在改动任何文件之前完成全部越界校验（fail-closed）。
   Future<CheckpointRestore> restore(String sessionId, int turn);
 
-  /// 读 [path] 在 [turn] 轮的内容；不在该轮 / 只读 / 越界 / 轮次不存在
-  /// 返回 `null`。
+  /// 读 [path] 在 [turn] 轮的内容；不在该轮 / 只读 / 越界 / 轮次不存在 /
+  /// 归档缺失返回 `null`（读取不抛）。
   ///
   /// 「内容」是该轮的文件状态，不限于该轮自己的差量：未变化的文件回落到
   /// 基线（`/diff` 的两侧都要取到内容）。
   Future<List<int>?> readFile(String sessionId, int turn, String path);
 
   /// [fromTurn] → [toTurn] 的文件级变化（`added` / `modified` / `deleted` /
-  /// `renamed`，路径升序）。两轮相同返回空列表。
+  /// `renamed`，路径升序）。
+  ///
+  /// 任一轮次不存在抛 [CheckpointException]（`missing-checkpoint`）；两轮
+  /// 相同返回空列表。两个实现同码，调用方只需认这一个错误。
   Future<List<CheckpointFileChange>> changesBetween(
     String sessionId,
     int fromTurn,

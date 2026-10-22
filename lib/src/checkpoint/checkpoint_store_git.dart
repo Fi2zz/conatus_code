@@ -195,6 +195,10 @@ class GitShadowStore implements CheckpointStore {
     // fail-closed：先校验全部路径（目标态 + 将被删除的当前文件），
     // 任何越界都在改动一个文件之前抛。
     ensurePathsRestorable(root, paths);
+    // 全局 gitignore 的排除集只有 snapshot 会算。接管已有时间线（bind 不拍
+    // 快照）后首次恢复直接走到这里，不重算就会把它命中的文件当成「目标态
+    // 没有的多余文件」删掉——不可恢复。恢复是显式低频动作，多两遍 walk 值得。
+    await _resolveGlobalIgnores(await _walkPaths());
     final Set<String> target = paths.toSet();
     final int removed = await _deleteExtras(target);
     // `read-tree --reset -u` 把工作区精确重置到该提交（含删除之后新增的
@@ -288,12 +292,17 @@ class GitShadowStore implements CheckpointStore {
       to,
     ]);
     _expect(diff, '比较检查点');
-    return <CheckpointFileChange>[
-      for (final CheckpointFileChange change in parseCheckpointNameStatus(
-        diff.stdout,
-      ))
-        if (checkpointReadablePath(change.path, projectRel, ignore)) change,
-    ];
+    final List<CheckpointFileChange> changes =
+        <CheckpointFileChange>[
+          for (final CheckpointFileChange change in parseCheckpointNameStatus(
+            diff.stdout,
+          ))
+            if (checkpointReadablePath(change.path, projectRel, ignore)) change,
+        ]..sort(
+          (CheckpointFileChange a, CheckpointFileChange b) =>
+              a.path.compareTo(b.path),
+        );
+    return changes;
   }
 
   /// 单次 `git add` 传多少路径（argv 长度上限的保守取值）。

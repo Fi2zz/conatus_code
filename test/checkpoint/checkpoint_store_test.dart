@@ -259,7 +259,7 @@ void main() {
     }, reason: 'add.txt 在两轮里都相对 base 变化，但轮间内容相同，不算变化');
   });
 
-  test('changesBetween 过滤只读路径', () async {
+  test('changesBetween / readFile 过滤只读路径（大小写不敏感）', () async {
     final (ArchiveCheckpointStore store, String root, _) = _setup();
     _write(root, 'a.txt', 'v0');
     await store.snapshot('s1', 0);
@@ -270,11 +270,12 @@ void main() {
       const CheckpointManifest(
         kind: 'delta',
         turn: 2,
-        changed: <String>['a.txt', '.opencode/x'],
+        changed: <String>['a.txt', '.opencode/x', '.OPENCODE/y'],
       ),
       <CheckpointArchiveEntry>[
         ('a.txt', utf8.encode('v2')),
         ('.opencode/x', utf8.encode('x')),
+        ('.OPENCODE/y', utf8.encode('y')),
       ],
     );
     store.indexFile('s1').deleteSync();
@@ -285,6 +286,53 @@ void main() {
       2,
     );
     expect(changes.map((CheckpointFileChange c) => c.path), <String>['a.txt']);
+    // 归档里**确实有**这两个条目，仍须一律读不到（不是「碰巧不存在」）。
+    expect(await store.readFile('s1', 2, '.opencode/x'), isNull);
+    expect(
+      await store.readFile('s1', 2, '.OPENCODE/y'),
+      isNull,
+      reason: 'APFS / NTFS 上 .OPENCODE 就是 .opencode',
+    );
+  });
+
+  test('changesBetween 轮次不存在抛 missing-checkpoint（与 git 后端同码）', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
+    _write(root, 'a.txt', 'v0');
+    await store.snapshot('s1', 0);
+
+    await expectLater(
+      store.changesBetween('s1', 0, 7),
+      throwsA(
+        isA<CheckpointException>().having(
+          (CheckpointException e) => e.code,
+          'code',
+          'missing-checkpoint',
+        ),
+      ),
+    );
+  });
+
+  test('turn 的归档缺失：readFile 返回 null，changesBetween 报错', () async {
+    final (ArchiveCheckpointStore store, String root, _) = _setup();
+    _write(root, 'a.txt', 'v0');
+    await store.snapshot('s1', 0);
+    _write(root, 'a.txt', 'v1');
+    await store.snapshot('s1', 1);
+    // 索引还记着 turn 1，但归档被删（磁盘损坏 / 手工清理）。
+    store.archiveFile('s1', 1).deleteSync();
+
+    expect(await store.readFile('s1', 1, 'a.txt'), isNull);
+    await expectLater(
+      store.changesBetween('s1', 0, 1),
+      throwsA(
+        isA<CheckpointException>().having(
+          (CheckpointException e) => e.code,
+          'code',
+          'missing-checkpoint',
+        ),
+      ),
+      reason: '不能退回 base 内容把「差量丢了」伪装成「文件没变」',
+    );
   });
 }
 

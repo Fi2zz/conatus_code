@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
@@ -139,6 +140,7 @@ void main() {
 
     expect(await manager.reset('s1'), isNull);
     expect(await manager.recordTurn(), isNull);
+    expect(await manager.bind('s2'), isNull);
     expect(manager.enabled, isFalse);
     expect(manager.list(), isEmpty);
     expect(await manager.rewind(1), isNull);
@@ -362,13 +364,82 @@ void main() {
     await manager.clearSession('s1');
     expect(manager.list(), isEmpty);
   });
+
+  test('bind 读取检查点失败时返回错误说明（不抛出）', () async {
+    final (String root, String projectDir) = _workspace();
+    final CheckpointManager manager = CheckpointManager(
+      store: _BrokenTurnsStore(root: root, projectDir: projectDir),
+      config: const CheckpointConfig(),
+    );
+
+    expect(await manager.bind('s1'), contains('检查点读取失败'));
+    expect(manager.turn, 0, reason: '同步读失败按 0，UI 不该拿到上一条时间线的轮次');
+  });
+
+  test('排队中的 restoreTo 在切走会话后放弃（不写工作区）', () async {
+    final (String root, String projectDir) = _workspace();
+    final _GatedStore store = _GatedStore(
+      root: root,
+      projectDir: projectDir,
+      gateTurn: 2,
+    );
+    addTearDown(() {
+      if (!store.gate.isCompleted) store.gate.complete();
+    });
+    final CheckpointManager manager = CheckpointManager(
+      store: store,
+      config: const CheckpointConfig(),
+    );
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+    _write(root, 'a.txt', 'v1');
+    await manager.recordTurn(); // turn 1
+    _write(root, 'a.txt', 'v2');
+    final Future<String?> inFlight = manager.recordTurn(); // turn 2 卡在闸上
+    await Future<void>.delayed(Duration.zero);
+
+    final Future<CheckpointRewindResult?> pending = manager.restoreTo('s1', 0);
+    manager.detach(); // 模拟切会话
+    store.gate.complete();
+    await inFlight;
+    expect(await pending, isNull, reason: '切走后排队中的恢复必须放弃');
+    expect(
+      File('$root${Platform.pathSeparator}a.txt').readAsStringSync(),
+      'v2',
+      reason: '放弃的恢复不得写工作区',
+    );
+  });
+
+  test('readFile / changesBetween 透传给存储（/diff 数据源）', () async {
+    final (CheckpointManager manager, String root, _) = _manager();
+    _write(root, 'a.txt', 'v0');
+    await manager.bind('s1');
+    _write(root, 'a.txt', 'v1');
+    await manager.recordTurn();
+
+    expect(utf8.decode((await manager.readFile('s1', 0, 'a.txt'))!), 'v0');
+    final List<CheckpointFileChange> changes = await manager.changesBetween(
+      's1',
+      0,
+      1,
+    );
+    expect(changes.single.path, 'a.txt');
+    expect(changes.single.status, 'modified');
+  });
 }
 
-/// 闸住 turn 1 快照的存储：用来验证 `flush` 真的等到在途写入。
+/// 闸住某轮快照的存储：用来验证 `flush` / 排队语义。
 class _GatedStore extends ArchiveCheckpointStore {
-  _GatedStore({required super.root, required super.projectDir});
+  _GatedStore({
+    required super.root,
+    required super.projectDir,
+    this.gateTurn = 1,
+  });
 
-  /// 放行 turn 1 的快照。
+  /// 被闸住的轮次。
+  final int gateTurn;
+
+  /// 放行被闸住的快照。
   final Completer<void> gate = Completer<void>();
 
   @override
@@ -377,7 +448,7 @@ class _GatedStore extends ArchiveCheckpointStore {
     int turn, {
     String? lastEventId,
   }) async {
-    if (turn == 1) await gate.future;
+    if (turn == gateTurn) await gate.future;
     await super.snapshot(sessionId, turn, lastEventId: lastEventId);
   }
 }
@@ -396,4 +467,13 @@ class _FlakyClearStore extends ArchiveCheckpointStore {
     }
     await super.clearSession(sessionId);
   }
+}
+
+/// `turnsOf` 直接失败的存储：验证 bind 的错误说明契约。
+class _BrokenTurnsStore extends ArchiveCheckpointStore {
+  _BrokenTurnsStore({required super.root, required super.projectDir});
+
+  @override
+  List<int> turnsOf(String sessionId) =>
+      throw const CheckpointException('broken-index', '索引损坏');
 }

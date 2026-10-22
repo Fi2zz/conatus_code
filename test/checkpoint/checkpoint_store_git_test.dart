@@ -442,6 +442,16 @@ void main() {
       'new-name.txt': 'renamed',
       'add.txt': 'added',
     });
+    // 路径升序（与归档实现一致）。
+    final List<String> ordered = <String>[
+      for (final CheckpointFileChange change in await _store.changesBetween(
+        's1',
+        0,
+        1,
+      ))
+        change.path,
+    ];
+    expect(ordered, <String>['add.txt', 'del.txt', 'mod.txt', 'new-name.txt']);
     expect(await _store.changesBetween('s1', 1, 1), isEmpty);
     final Map<String, String> backward = <String, String>{
       for (final CheckpointFileChange change in await _store.changesBetween(
@@ -457,6 +467,50 @@ void main() {
       'old-name.txt': 'renamed',
       'add.txt': 'deleted',
     });
+  });
+
+  test('接管已有时间线后首次恢复：全局 gitignore 命中的文件不被当多余文件删掉', () async {
+    if (!_gitOk) return;
+    _setUp();
+    final Directory home = Directory.systemTemp.createTempSync(
+      'nava-shadow-home',
+    );
+    addTearDown(() => home.deleteSync(recursive: true));
+    final File globalIgnore = File(
+      '${home.path}${Platform.pathSeparator}ignore',
+    )..writeAsStringSync('*.log\n');
+    final GitRunner runner = _GlobalIgnoresRunner(
+      const ProcessGitRunner(),
+      globalIgnore.path,
+    );
+
+    // 带全局 ignore 拍基线：debug.log 被排除，不在快照里。
+    final GitShadowStore writer = GitShadowStore(
+      root: _root,
+      projectDir: _projectDir,
+      git: runner,
+    );
+    _write('a.txt', 'v0');
+    _write('debug.log', 'noise');
+    await writer.snapshot('s1', 0);
+
+    // 模拟 `--session` 重开：新 store 实例（bind 接管、不拍快照）直接恢复。
+    // 若恢复侧不重算全局 ignore，debug.log 会被当成「目标态没有的多余文件」
+    // 删掉且不可恢复。
+    final GitShadowStore resumed = GitShadowStore(
+      root: _root,
+      projectDir: _projectDir,
+      git: runner,
+    );
+    _write('a.txt', 'v1');
+    await resumed.restore('s1', 0);
+
+    expect(_read('a.txt'), 'v0');
+    expect(
+      File('$_root${Platform.pathSeparator}debug.log').existsSync(),
+      isTrue,
+      reason: '全局 gitignore 命中的文件不该被恢复删除',
+    );
   });
 
   test('恢复拒绝含 .opencode 的旧快照（fail-closed，一个文件都不动）', () async {
@@ -545,12 +599,48 @@ String _shadowGit(List<String> args) {
     'user.email=nava@localhost',
     '-c',
     'user.name=nava',
+    // 与生产执行器一致：不依赖宿主 git 配置（签名 / hook / identity）。
+    '-c',
+    'commit.gpgsign=false',
+    '-c',
+    'core.hooksPath=/dev/null',
     ...args,
   ]);
   if (result.exitCode != 0) {
     throw StateError('git ${args.join(' ')} 失败：${result.stderr}');
   }
   return result.stdout is String ? result.stdout! as String : '';
+}
+
+/// 给执行器套一个固定的 `core.excludesFile`，模拟用户的全局 git 配置。
+class _GlobalIgnoresRunner implements GitRunner {
+  const _GlobalIgnoresRunner(this.inner, this.excludesFile);
+
+  final GitRunner inner;
+  final String excludesFile;
+
+  List<String> _wrap(List<String> args) => <String>[
+    '-c',
+    'core.excludesFile=$excludesFile',
+    ...args,
+  ];
+
+  @override
+  Future<bool> available() => inner.available();
+
+  @override
+  Future<GitResult> run(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) => inner.run(_wrap(args), gitDir: gitDir, workTree: workTree);
+
+  @override
+  GitResult runSync(
+    List<String> args, {
+    required String gitDir,
+    required String workTree,
+  }) => inner.runSync(_wrap(args), gitDir: gitDir, workTree: workTree);
 }
 
 /// 把影子索引里某轮的提交改成 [sha]（模拟「旧版本写入的快照」）。

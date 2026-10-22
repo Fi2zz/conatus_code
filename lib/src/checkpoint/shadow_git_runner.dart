@@ -13,8 +13,9 @@
 /// 确定的降级路径，测试也需要能塞进 fake。
 library;
 
-import 'dart:convert';
 import 'dart:io';
+
+import 'git_process_output.dart';
 
 /// 一条 git 命令的执行结果。
 class GitResult {
@@ -114,9 +115,9 @@ class ProcessGitRunner implements GitRunner {
     ).timeout(defaultTimeout);
     return GitResult(
       result.exitCode,
-      _text(result.stdout),
-      _text(result.stderr),
-      stdoutBytes: _bytes(result.stdout),
+      gitOutputText(result.stdout),
+      gitOutputText(result.stderr),
+      stdoutBytes: gitOutputBytes(result.stdout),
     );
   }
 
@@ -152,29 +153,10 @@ class ProcessGitRunner implements GitRunner {
     );
     return GitResult(
       result.exitCode,
-      _text(result.stdout),
-      _text(result.stderr),
-      stdoutBytes: _bytes(result.stdout),
+      gitOutputText(result.stdout),
+      gitOutputText(result.stderr),
+      stdoutBytes: gitOutputBytes(result.stdout),
     );
-  }
-
-  /// 取子进程输出为字符串。
-  ///
-  /// `Process.run` / `runSync` 默认把 stdout/stderr 收集成 `String`
-  /// （`stdoutEncoding` 为系统编码）；只有显式指定了 `stdoutEncoding` 才是
-  /// `List<int>`。两种都要认——早先只认 `List<int>`，导致
-  /// `rev-parse HEAD` 的输出被当成空串，快照随即以「提交树读取失败」告终。
-  static String _text(Object? raw) {
-    if (raw is String) return raw;
-    if (raw is! List<int>) return '';
-    return const Utf8Decoder(allowMalformed: true).convert(raw);
-  }
-
-  /// stdout 的原始字节；已是字符串（系统编码）时退回 UTF-8 编码。
-  static List<int> _bytes(Object? raw) {
-    if (raw is List<int>) return raw;
-    if (raw is String) return const Utf8Encoder().convert(raw);
-    return const <int>[];
   }
 }
 

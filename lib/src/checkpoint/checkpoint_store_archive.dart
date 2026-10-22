@@ -25,6 +25,7 @@ import 'checkpoint_paths.dart';
 import 'checkpoint_restore.dart';
 import 'checkpoint_scan.dart';
 import 'checkpoint_store.dart';
+import 'checkpoint_turn_diff.dart';
 import 'checkpoint_types.dart';
 
 /// 归档式快照存储（[CheckpointStore] 的自研 gzip 归档实现）。

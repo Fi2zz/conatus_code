@@ -118,6 +118,9 @@ bool checkpointExcluded(
 ]) {
   if (extra.contains(rel)) return true;
   if (_hasSegment(rel, kCheckpointVcsDir)) return true;
+  // 只读目录按段级、大小写不敏感判定（`.OPENCODE` 在 APFS / NTFS 上就是同一
+  // 个目录；大小写敏感卷上略微多拒，与 `underReadOnlyRoot` 的取舍一致）。
+  if (checkpointReadOnlyPath(rel)) return true;
   if (checkpointSensitive(rel)) return true;
   for (final String prefix in kCheckpointDefaultIgnores) {
     if (_under(rel, prefix)) return true;

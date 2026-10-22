@@ -20,16 +20,14 @@ class _ScriptedProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) async =>
-      const LlmResult(content: 'ok', provider: 'scripted', model: 'm');
+  }) async => const LlmResult(content: 'ok', provider: 'scripted', model: 'm');
 
   @override
   Stream<LlmStreamEvent> chatStream(
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}
@@ -112,9 +110,7 @@ Future<(ConatusTuiController, Context, String)> _build({
 void main() {
   test('新会话回滚到 turn 0：文件恢复 + 切到全新空会话', () async {
     final (ConatusTuiController controller, Context app, String root) =
-        await _build(
-      beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
-    );
+        await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
     addTearDown(() => _disposeAfterSettle(app, controller));
     final String original = controller.sessionId;
     _write(root, 'a.txt', 'v1-broken');
@@ -132,8 +128,11 @@ void main() {
 
   test('重开会话回滚到 turn 0：fork 保留既有历史（对话回滚）', () async {
     const String seededId = 'session_11111111-2222-3333-4444-555555555555';
-    final (ConatusTuiController controller, Context app, String root) =
-        await _build(
+    final (
+      ConatusTuiController controller,
+      Context app,
+      String root,
+    ) = await _build(
       initialSessionId: seededId,
       beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
     );
@@ -151,6 +150,83 @@ void main() {
         .toList();
     expect(texts.any((String t) => t.contains('历史问题')), isTrue);
     expect(texts.any((String t) => t.contains('改坏 a.txt')), isFalse);
+  });
+
+  test('重开同一会话：/rewind 认领既有轮次并恢复文件（bind 不清空）', () async {
+    const String seededId = 'session_22222222-3333-4444-5555-666666666666';
+    final (String root, String projectDir) = _workspace();
+    final Directory storeDir = Directory.systemTemp.createTempSync(
+      'nava-resume-sessions',
+    );
+    addTearDown(() => storeDir.deleteSync(recursive: true));
+
+    // 第一次运行：建会话并跑一轮（turn 1）。
+    final Context app1 = Context.root();
+    provideTools(app1);
+    provideLlm(app1, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
+    final SessionStore sessions1 = provideSessions(
+      app1,
+      persistence: JsonlSessionPersistence(dir: storeDir.path),
+    );
+    final Session seeded = sessions1.create(id: seededId);
+    seeded.append('user/message', data: <String, Object?>{'text': '历史问题'});
+    app1.provide(
+      'checkpointManager',
+      CheckpointManager(
+        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
+        config: const CheckpointConfig(),
+      ),
+    );
+    final ConatusTuiController first = ConatusTuiController(
+      app: app1,
+      sessions: sessions1,
+      name: 'test',
+      modelLabel: 'mock',
+      initialSession: seededId,
+      onExit: () {},
+    );
+    _write(root, 'a.txt', 'v0');
+    await first.start();
+    await first.checkpointSettled;
+    _write(root, 'a.txt', 'v1');
+    await first.handleLine('改坏 a.txt'); // turn 1
+    await first.checkpointSettled;
+    expect(app1.get<CheckpointManager>('checkpointManager')!.turn, 1);
+    await sessions1.flush();
+    first.dispose();
+    app1.dispose();
+
+    // 第二次运行（新进程语义）：同一会话文件 + 同一检查点目录。
+    final Context app2 = Context.root();
+    provideTools(app2);
+    provideLlm(app2, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
+    final SessionStore sessions2 = provideSessions(
+      app2,
+      persistence: JsonlSessionPersistence(dir: storeDir.path),
+    );
+    final CheckpointManager checkpoint = CheckpointManager(
+      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
+      config: const CheckpointConfig(),
+    );
+    app2.provide('checkpointManager', checkpoint);
+    final ConatusTuiController resumed = ConatusTuiController(
+      app: app2,
+      sessions: sessions2,
+      name: 'test',
+      modelLabel: 'mock',
+      initialSession: seededId,
+      onExit: () {},
+    );
+    addTearDown(() => _disposeAfterSettle(app2, resumed));
+    await resumed.start();
+    await resumed.checkpointSettled;
+    expect(checkpoint.turn, 1, reason: 'bind 接管既有轮次，不清空');
+
+    await resumed.handleLine('/rewind 1');
+
+    expect(_read(root, 'a.txt'), 'v0', reason: '接管后的时间线仍能回滚到 turn 0');
+    expect(resumed.sessionId, isNot(seededId));
+    expect(resumed.transcript.messages.last.text, contains('已回滚到第 0 轮'));
   });
 
   test('enabled=false 时 /rewind 提示不可用', () async {
