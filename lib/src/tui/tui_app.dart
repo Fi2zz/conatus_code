@@ -61,19 +61,20 @@ String _canonicalize(String path) {
 }
 
 /// 持久化「总是允许」规则；失败时把原因作为系统提示上屏。
-Future<void> _rememberPermissionRule(
+Future<void> _rememberPermissionRules(
   Context app,
   PermissionWiring wiring,
-  PermissionRule rule,
+  List<PermissionRule> rules,
+  List<String> resources,
 ) async {
   final ConatusTuiController? controller =
       app.get<ConatusTuiController>('tuiController');
   if (controller != null) {
-    await controller.rememberPermissionRule(rule);
+    await controller.rememberPermissionRules(rules, resources);
     return;
   }
   // 没有控制器（库用法）时仍然落盘，只是没有屏上提示。
-  await wiring.remember(rule);
+  await wiring.remember(rules, resources);
 }
 
 class ConatusTuiRuntime {
@@ -240,6 +241,8 @@ class ConatusTuiRuntime {
     );
     app.provide('permissionWiring', permissionWiring);
     app.provide(kPermissionScopeService, permissionWiring.slot);
+    // 工作区边界判定用规范化路径：相对 `--workdir` 也能正确比较绝对目标。
+    app.provide('permissionWorkdir', canonicalWorkdir);
     instrumentPermission(app, interactive: interactive);
 
     provideTelemetry(app);
@@ -298,12 +301,14 @@ class ConatusTuiRuntime {
     // run_command / run_tests / apply_patch）。同样跟随上面的 fs / shell 接缝。
     provideCodeTools(app);
 
-    // ── 交互：选项浮层 + 工具审批（headless 不装）────────────────
+    // ── 交互：选项浮层 + 审批端口（headless 不装）────────────────
     // 浮层状态挂在根上下文：控制器构造时接上重绘回调，审批与 `ask_user`
-    // 共用同一条提问通道。审批中间件不在这里装——它随权限模式在控制器里
-    // 挂载 / 卸载（见 ConatusTuiController._syncPermissionMode）。
+    // 共用同一条提问通道。权限中间件已在上面根上下文最外层挂好（见
+    // `instrumentPermission`）；这里只提供 `Approval` 端口，控制器绑定会话时
+    // 只更新作用域槽位，不再重挂中间件。
     // `interactive: false`（headless）跳过全部人机交互件：无浮层、无审批
-    // 服务、无 ask_user 工具——高危工具直接执行（沙箱仍是安全底线）。
+    // 服务、无 ask_user 工具——需要询问的调用由权限中间件按
+    // `PERMISSION_ASK_UNATTENDED` 拒绝（沙箱仍是执行层底线）。
     if (interactive) {
       final TuiChoicePrompt choice = TuiChoicePrompt();
       app.provide('tuiChoice', choice);
@@ -311,15 +316,18 @@ class ConatusTuiRuntime {
         choice: choice,
         fs: app.get<FileSystem>('fs'),
         // 「总是允许」落盘到项目 permissions.json；失败只提示，不撤销本次放行。
-        rememberRule: (PermissionRule rule) {
-          unawaited(_rememberPermissionRule(app, permissionWiring, rule));
+        rememberRules: (List<PermissionRule> rules, List<String> resources) {
+          unawaited(
+            _rememberPermissionRules(app, permissionWiring, rules, resources),
+          );
         },
       );
       provideApproval(
         app,
         approval: gate,
-        // 拦截阈值随权限模式变化，由控制器按需挂载 / 卸载
-        // （见 ConatusTuiController._syncPermissionMode），这里只提供服务。
+        // 权限中间件只用这里的 `Approval` 端口处理 ask；阈值由控制器写入
+        // 作用域槽位（见 ConatusTuiController._syncPermissionMode），不再
+        // 挂第二层审批中间件。
         instrument: false,
       );
       // 沙箱 REVIEW → 同一选项浮层征询人工复核；headless 不接线（按拒绝，

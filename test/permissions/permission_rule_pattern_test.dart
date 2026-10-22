@@ -1,4 +1,4 @@
-/// 「总是允许」的规则推导：shell 命令前缀、路径目录 glob、其余通配。
+/// 「总是允许」的规则推导：只保存具体资源，绝不落盘通配 allow。
 library;
 
 import 'package:conatus_agent/conatus_agent.dart';
@@ -23,9 +23,9 @@ ApprovalRequest _request({
 );
 
 void main() {
-  group('permissionRuleFor', () {
+  group('permissionRulesFor', () {
     test('shell 取命令前缀 + " *"', () {
-      final PermissionRule rule = permissionRuleFor(
+      final List<PermissionRule> rules = permissionRulesFor(
         _request(
           tool: 'run_command',
           action: 'shell',
@@ -33,71 +33,90 @@ void main() {
         ),
       );
 
-      expect(rule.action, 'shell');
-      expect(rule.resource, 'git *');
-      expect(rule.effect, PermissionEffect.allow);
-      expect(rule.source, 'project');
-      expect(permissionPatternMatches(rule.resource, 'git status'), isTrue);
+      expect(rules.single.action, 'shell');
+      expect(rules.single.resource, 'git *');
+      expect(rules.single.effect, PermissionEffect.allow);
+      expect(rules.single.source, 'project');
+      expect(permissionPatternMatches(rules.single.resource, 'git status'), isTrue);
     });
 
-    test('无参数命令退化为精确命令 + " *"', () {
-      final PermissionRule rule = permissionRuleFor(
-        _request(
-          tool: 'run_command',
-          action: 'shell',
-          resources: <String>['ls'],
-        ),
-      );
-      expect(rule.resource, 'ls *');
-      expect(permissionPatternMatches(rule.resource, 'ls'), isTrue);
-    });
-
-    test('路径工具取父目录 + "/*"', () {
-      final PermissionRule rule = permissionRuleFor(
+    test('路径工具保存具体路径（不放大到目录）', () {
+      final List<PermissionRule> rules = permissionRulesFor(
         _request(
           tool: 'read_file',
           action: 'read',
           resources: <String>['/tmp/work/a.txt'],
-          pathArgs: <String>['/tmp/work/a.txt'],
         ),
       );
-      expect(rule.action, 'read');
-      expect(rule.resource, '/tmp/work/*');
+      expect(rules.single.action, 'read');
+      expect(rules.single.resource, '/tmp/work/a.txt');
       expect(
-        permissionPatternMatches(rule.resource, '/tmp/work/b.txt'),
-        isTrue,
+        permissionPatternMatches(rules.single.resource, '/tmp/work/b.txt'),
+        isFalse,
       );
     });
 
-    test('相对路径取所在目录', () {
-      final PermissionRule rule = permissionRuleFor(
+    test('多路径（apply_patch）每条资源一条规则', () {
+      final List<PermissionRule> rules = permissionRulesFor(
+        _request(
+          tool: 'apply_patch',
+          action: 'edit',
+          resources: <String>['config/.env', 'src/a.dart'],
+        ),
+      );
+      expect(rules.map((PermissionRule r) => r.resource),
+          <String>['config/.env', 'src/a.dart']);
+    });
+
+    test('相对路径 / ~ 规范化后再保存', () {
+      final List<PermissionRule> dot = permissionRulesFor(
         _request(
           tool: 'write_file',
           action: 'edit',
-          pathArgs: <String>['src/deep/a.dart'],
+          resources: <String>['./src/deep/../a.dart'],
         ),
       );
-      expect(rule.resource, 'src/deep/*');
+      expect(dot.single.resource, 'src/a.dart');
+
+      final List<PermissionRule> home = permissionRulesFor(
+        _request(
+          tool: 'write_file',
+          action: 'edit',
+          resources: <String>['~/secret.txt'],
+        ),
+      );
+      final String expected = normalizePermissionPath('~/secret.txt');
+      expect(home.single.resource, expected);
+      expect(permissionPatternMatches(home.single.resource, expected), isTrue);
     });
 
-    test('MCP / 其他工具取动作 + 通配资源', () {
-      final PermissionRule rule = permissionRuleFor(
-        _request(
-          tool: 'fs__read_file',
-          action: 'fs_read_file',
-          resources: <String>['*'],
+    test('没有具体资源时不生成规则（MCP / question / 通配）', () {
+      for (final String action in <String>[
+        'fs_read_file',
+        'question',
+        'shell',
+      ]) {
+        expect(
+          permissionRulesFor(
+            _request(tool: 'x', action: action, resources: <String>['*']),
+          ),
+          isEmpty,
+        );
+      }
+      expect(
+        permissionRulesFor(
+          _request(tool: 'read_file', action: 'read', resources: <String>['*']),
         ),
+        isEmpty,
       );
-      expect(rule.action, 'fs_read_file');
-      expect(rule.resource, '*');
     });
 
     test('请求未带 action 时按工具名映射', () {
-      final PermissionRule rule = permissionRuleFor(
+      final List<PermissionRule> rules = permissionRulesFor(
         _request(tool: 'run_tests', resources: <String>['dart test']),
       );
-      expect(rule.action, 'shell');
-      expect(rule.resource, 'dart *');
+      expect(rules.single.action, 'shell');
+      expect(rules.single.resource, 'dart *');
     });
   });
 
@@ -124,30 +143,90 @@ void main() {
       await pending;
     });
 
-    test('总是允许回调收到推导出的规则并保留会话内放行', () async {
+    test('总是允许展示并回调精确 pattern，同时保留会话放行', () async {
       final TuiChoicePrompt choice = TuiChoicePrompt();
       final List<PermissionRule> remembered = <PermissionRule>[];
+      final List<String> resources = <String>[];
       final TuiPermissionGate gate = TuiPermissionGate(
         choice: choice,
-        rememberRule: remembered.add,
+        rememberRules: (List<PermissionRule> rules, List<String> approved) {
+          remembered.addAll(rules);
+          resources.addAll(approved);
+        },
       );
 
       final Future<bool> first = gate.request(
         _request(
-          tool: 'run_command',
-          action: 'shell',
-          resources: <String>['git status'],
+          tool: 'read_file',
+          action: 'read',
+          resources: <String>['/tmp/a.txt'],
         ),
       );
+      final String description =
+          choice.request!.choices[1].description;
+      expect(description, contains('read /tmp/a.txt'));
+
       choice
         ..move(1)
         ..confirm();
       expect(await first, isTrue);
 
-      expect(remembered.single.resource, 'git *');
-      expect(gate.alwaysAllowed, contains('run_command'));
-      expect(await gate.request(_request(tool: 'run_command')), isTrue);
+      expect(remembered.single.resource, '/tmp/a.txt');
+      expect(resources, <String>['/tmp/a.txt']);
+      expect(gate.alwaysAllowed, contains('read_file'));
+      expect(await gate.request(_request(tool: 'read_file')), isTrue);
       expect(choice.open, isFalse);
+    });
+
+    test('apply_patch 总是允许保存每个目标路径', () async {
+      final TuiChoicePrompt choice = TuiChoicePrompt();
+      final List<PermissionRule> remembered = <PermissionRule>[];
+      final TuiPermissionGate gate = TuiPermissionGate(
+        choice: choice,
+        rememberRules: (List<PermissionRule> rules, List<String> resources) {
+          remembered.addAll(rules);
+        },
+      );
+
+      final Future<bool> pending = gate.request(
+        _request(
+          tool: 'apply_patch',
+          action: 'edit',
+          resources: <String>['config/.env', 'src/a.dart'],
+        ),
+      );
+      await pumpEventQueue();
+      choice
+        ..move(1)
+        ..confirm();
+      expect(await pending, isTrue);
+
+      expect(
+        remembered.map((PermissionRule r) => r.resource),
+        <String>['config/.env', 'src/a.dart'],
+      );
+    });
+
+    test('没有具体资源时说明仅会话有效且不回调', () async {
+      final TuiChoicePrompt choice = TuiChoicePrompt();
+      var called = false;
+      final TuiPermissionGate gate = TuiPermissionGate(
+        choice: choice,
+        rememberRules: (List<PermissionRule> rules, List<String> resources) {
+          called = true;
+        },
+      );
+
+      final Future<bool> pending = gate.request(
+        _request(tool: 'fs__read_file', action: 'fs_read_file', resources: <String>['*']),
+      );
+      expect(choice.request!.choices[1].description, contains('仅本次会话'));
+
+      choice
+        ..move(1)
+        ..confirm();
+      expect(await pending, isTrue);
+      expect(called, isFalse);
     });
   });
 }

@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
+import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:test/test.dart';
@@ -88,13 +89,16 @@ void main() {
     );
     await controller.start();
 
-    await controller.rememberPermissionRule(
-      const PermissionRule(
-        action: 'shell',
-        resource: 'git *',
-        effect: PermissionEffect.allow,
-        source: 'project',
-      ),
+    await controller.rememberPermissionRules(
+      const <PermissionRule>[
+        PermissionRule(
+          action: 'shell',
+          resource: 'git *',
+          effect: PermissionEffect.allow,
+          source: 'project',
+        ),
+      ],
+      <String>['git status'],
     );
 
     expect(controller.transcript.messages.last.text, contains('权限规则未保存'));
@@ -109,5 +113,38 @@ void main() {
       File('${dir.path}${sep}permissions.json').readAsStringSync(),
       '{broken',
     );
+  });
+
+  test('绑定会话时清空会话规则层（config → project → session）', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('perm-flow');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String sep = Platform.pathSeparator;
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+    );
+    addTearDown(runtime.dispose);
+    final PermissionWiring wiring =
+        runtime.app.require<PermissionWiring>('permissionWiring');
+    wiring.setSessionRules(const <PermissionRule>[
+      PermissionRule(
+        action: 'shell',
+        resource: 'old *',
+        effect: PermissionEffect.deny,
+        source: 'session',
+      ),
+    ]);
+    expect(wiring.slot.current.rules, hasLength(1));
+
+    final ConatusTuiController controller = runtime.createController(
+      onExit: () {},
+    );
+    await controller.start();
+
+    expect(wiring.slot.current.rules, isEmpty);
   });
 }

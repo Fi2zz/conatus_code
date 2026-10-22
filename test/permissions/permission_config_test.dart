@@ -53,6 +53,16 @@ effect = "allow"
     expect(config.permissions.rules.last.effect, PermissionEffect.allow);
   });
 
+  test('路径动作的规则资源会规范化（./ 折叠）', () {
+    final ConatusCodeConfig config = _load('''
+[[permissions]]
+action = "edit"
+resource = "./src/../src/*.env"
+effect = "deny"
+''');
+    expect(config.permissions.rules.single.resource, 'src/*.env');
+  });
+
   test('缺省没有任何规则', () {
     expect(_load('').permissions.rules, isEmpty);
   });

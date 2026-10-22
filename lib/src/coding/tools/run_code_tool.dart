@@ -1,7 +1,7 @@
 /// run_code 工具：`codeRuntime` 服务的面向模型封装，治理集成挂在工具上。
 ///
-/// 审批靠 [ToolRisk.high] 自动挂载（`instrumentApproval` 拦截），工具内不
-/// 手动调 approval；taskCenter / sessionLog / telemetry 缺省时降级，不阻塞
+/// 审批靠 [ToolRisk.high] 由根上下文的权限中间件拦截（`instrumentPermission`），
+/// 工具内不手动调 approval；taskCenter / sessionLog / telemetry 缺省时降级，不阻塞
 /// 执行。失败是结果字段：代码执行的失败转为 `ToolResult.error`，不抛异常
 /// （异常只在治理本身失败时上抛，由注册表收敛）。
 library;

@@ -338,7 +338,9 @@ void main() {
       final List<PermissionRule> rules = <PermissionRule>[];
       final TuiPermissionGate gate = TuiPermissionGate(
         choice: choice,
-        rememberRule: rules.add,
+        rememberRules: (List<PermissionRule> saved, List<String> resources) {
+          rules.addAll(saved);
+        },
       );
       final ApprovalRequest request = ApprovalRequest(
         id: 'r5',

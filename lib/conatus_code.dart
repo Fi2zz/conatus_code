@@ -152,7 +152,7 @@ export 'src/lint/linter.dart'
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
 export 'src/permissions/permission_rule_pattern.dart'
-    show kRememberedRuleSource, permissionRuleFor;
+    show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;
 export 'src/sandbox/command_policy.dart'
     show

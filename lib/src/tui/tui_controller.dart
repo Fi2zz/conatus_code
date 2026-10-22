@@ -363,15 +363,18 @@ class ConatusTuiController implements TuiUserPromptHost {
     _refresh();
   }
 
-  /// 把一条「总是允许」规则写入项目 `permissions.json` 并更新根作用域。
+  /// 把「总是允许」规则写入项目 `permissions.json` 并更新根作用域。
   ///
-  /// 写入失败时保留会话内临时放行（调用方已加白名单），只把原因上屏：权限
-  /// 文件损坏时拒绝覆盖是 `PermissionStore` 的既定契约，不能静默吞掉。
-  Future<void> rememberPermissionRule(PermissionRule rule) async {
+  /// [resources] 是本次批准的具体资源，用于阻止 allow 覆盖已有 deny。
+  /// 拒绝/失败时保留会话内临时放行（调用方已加白名单），只把原因上屏。
+  Future<void> rememberPermissionRules(
+    List<PermissionRule> rules,
+    List<String> resources,
+  ) async {
     final PermissionWiring? wiring =
         _app.get<PermissionWiring>('permissionWiring');
     if (wiring == null) return;
-    final String? warning = await wiring.remember(rule);
+    final String? warning = await wiring.remember(rules, resources);
     if (warning != null) showSystemNotice('权限规则未保存：$warning');
   }
 
@@ -1891,6 +1894,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 同时清空审批门的「总是允许」清单（它也是会话级状态）。
     _gate?.resetAlwaysAllowed();
     _permissionMode = restorePermissionMode(session, fallback: initialPermissionMode);
+    // 会话规则初始为空；保留独立层以便后续按会话扩展（config → project →
+    // session，后者覆盖前者）。
+    _app
+        .get<PermissionWiring>('permissionWiring')
+        ?.setSessionRules(const <PermissionRule>[]);
     _syncPermissionMode();
     transcript.rebuildFrom(session);
     _eventSub = session.onEvent((SessionEvent event) {

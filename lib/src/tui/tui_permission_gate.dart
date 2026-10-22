@@ -36,17 +36,17 @@ class TuiPermissionGate implements Approval {
     required this.choice,
     FileSystem? fs,
     this.mode = TuiPermissionMode.askWhenNeeded,
-    this.rememberRule,
+    this.rememberRules,
   }) : _fs = fs;
 
   /// 选项浮层。
   final TuiChoicePrompt choice;
 
-  /// 「总是允许」时把推导出的规则交给宿主持久化（如写入项目 `permissions.json`）。
+  /// 「总是允许」时把推导出的规则与本次批准的具体资源交给宿主持久化。
   ///
-  /// 回调失败不应影响本次放行：会话内白名单照常生效，宿主可自行提示保存失败。
-  /// 未提供时只保留会话级白名单（旧行为）。
-  final void Function(PermissionRule)? rememberRule;
+  /// 没有具体资源时不会回调（保持会话级放行）；回调失败不影响本次放行。
+  final void Function(List<PermissionRule> rules, List<String> resources)?
+      rememberRules;
 
   /// 文件系统能力缝；用于把「信任此文件夹」判定为目录包含关系。
   /// 未提供时该选项不出现（退化为「总是允许该工具」）。
@@ -111,7 +111,8 @@ class TuiPermissionGate implements Approval {
     }
     if (picked == kApprovalAllowAlways) {
       _alwaysAllowed.add(request.toolName);
-      rememberRule?.call(permissionRuleFor(request));
+      final List<PermissionRule> rules = permissionRulesFor(request);
+      if (rules.isNotEmpty) rememberRules?.call(rules, request.resources);
       return true;
     }
     return picked == kApprovalAllowOnce;
@@ -234,10 +235,10 @@ class TuiPermissionGate implements Approval {
           label: '信任此文件夹',
           description: '本次会话内，$folder 下的访问不再询问。',
         ),
-      const TuiChoice(
+      TuiChoice(
         id: kApprovalAllowAlways,
         label: '总是允许该工具',
-        description: '本次会话内不再询问这个工具（不限路径）。',
+        description: _rememberDescription(request),
       ),
       const TuiChoice(
         id: kApprovalDeny,
@@ -245,6 +246,18 @@ class TuiPermissionGate implements Approval {
         description: '不执行，把拒绝结果回给模型。',
       ),
     ];
+  }
+
+  /// 「总是允许」的落盘说明：列出将写入的精确 pattern，或说明仅会话有效。
+  String _rememberDescription(ApprovalRequest request) {
+    final List<PermissionRule> rules = permissionRulesFor(request);
+    if (rules.isEmpty) {
+      return '仅本次会话有效：该调用没有可持久化的具体资源。';
+    }
+    final String patterns = rules
+        .map((PermissionRule rule) => '${rule.action} ${rule.resource}')
+        .join('、');
+    return '写入项目权限：$patterns（本次会话内也不再询问该工具）。';
   }
 
   /// 仅用于展示的父目录文本（真实目录判定走 fs）。
