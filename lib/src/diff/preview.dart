@@ -3,6 +3,7 @@ library;
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import 'apply.dart';
 import 'unified_diff.dart';
 
 /// 预览长度上限（字符）。
@@ -57,7 +58,7 @@ Future<String?> _previewEdit(
   final FileSystem? resolved = fs;
   if (resolved == null) return null;
   final String oldText = await _readTextOrEmpty(resolved, path);
-  final String? next = _applyEdit(oldText, oldString, newString, replaceAll);
+  final String? next = applyEditText(oldText, oldString, newString, replaceAll);
   if (next == null) return null;
   return _previewDiff(oldText, next, path);
 }
@@ -66,23 +67,6 @@ Future<String?> _previewEdit(
 String? _previewDiff(String oldText, String newText, String path) {
   final String diff = buildUnifiedDiff(oldText: oldText, newText: newText, path: path);
   return diff.isEmpty ? '（无实际改动）' : _truncate(diff);
-}
-
-/// 与 EditFileTool 相同的字面替换语义；old_string 不存在或语义无法确定时
-/// 返回 `null`（old_string 与 new_string 相同视为无意义编辑）。
-String? _applyEdit(
-  String text,
-  String oldString,
-  String newString,
-  bool replaceAll,
-) {
-  if (oldString == newString) return null;
-  final int matches = oldString.allMatches(text).length;
-  if (matches == 0) return null;
-  if (matches > 1 && !replaceAll) return null;
-  return replaceAll
-      ? text.replaceAll(oldString, newString)
-      : text.replaceFirst(oldString, newString);
 }
 
 /// 超出 [kPreviewMaxChars] 时截断并追加省略提示。
