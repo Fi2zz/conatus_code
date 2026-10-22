@@ -63,6 +63,30 @@ effect = "deny"
     expect(config.permissions.rules.single.resource, 'src/*.env');
   });
 
+  test('已知工具名归一为规范 action（run_command/read_file/rg）', () {
+    final ConatusCodeConfig config = _load('''
+[[permissions]]
+action = "run_command"
+resource = "git status"
+effect = "allow"
+
+[[permissions]]
+action = "read_file"
+resource = "/tmp/*"
+effect = "deny"
+
+[[permissions]]
+action = "rg"
+resource = "*.env"
+effect = "deny"
+''');
+
+    expect(
+      config.permissions.rules.map((PermissionRule r) => r.action),
+      <String>['shell', 'read', 'grep'],
+    );
+  });
+
   test('缺省没有任何规则', () {
     expect(_load('').permissions.rules, isEmpty);
   });

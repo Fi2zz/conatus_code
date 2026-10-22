@@ -6,6 +6,7 @@ import 'package:conatus_agent/conatus_agent.dart'
         PermissionEffect,
         PermissionRule,
         normalizePermissionPath,
+        permissionActionFor,
         permissionActionUsesPath;
 
 import 'config_schema.dart';
@@ -181,7 +182,9 @@ class ConfigParser extends ConfigValues {
   }
 
   PermissionRule _readPermission(Map<String, dynamic> table) {
-    final String action = _requiredPermissionField(table, 'action');
+    final String action = permissionActionFor(
+      _requiredPermissionField(table, 'action'),
+    );
     final String resource = _requiredPermissionField(table, 'resource');
     return PermissionRule(
       action: action,

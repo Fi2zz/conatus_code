@@ -88,10 +88,33 @@ workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
 # subagent_permission = "inherit"  # 子代理默认权限：inherit/readonly/ask/auto（模型只能收紧）
 # project_dir = ".conatus"    # 项目数据目录（会话/记忆/数据库/检查点）；缺省不放工作区，
                               # 落 ~/.nava/projects/<编码工作区路径>；显式设置才
-                              # 相对工作目录（旧行为，工作区会出现该目录）
+                              # 相对工作目录（旧行为，工作区会出现该目录）。
+                              # 不允许指向 .opencode / ~/.config/opencode（只读），
+                              # 否则回落到缺省目录并在 stderr 提示
 
 [approval]
 mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
+
+# 权限规则：最外层工具中间件（先于审批 / hooks / lint / story）。按 action +
+# resource 通配匹配，后出现的规则优先，任一条 deny 即拒绝。省略则只有兜底阈值。
+# 动作：read / edit / glob / grep / shell / websearch / webfetch / subagent /
+# skill / question / external_directory，也可直接写工具名（装配时归一，
+# run_command→shell、read_file→read、rg→grep）。
+# 路径动作的资源按工作目录解析，符号链接按真实路径比较。
+# [[permissions]]
+# action = "shell"
+# resource = "git push *"
+# effect = "deny"
+#
+# [[permissions]]
+# action = "external_directory"
+# resource = "~/shared/*"
+# effect = "ask"
+
+# [formatter]
+# command = "dart format"     # 覆盖自动探测；$FILE 占位符可选
+# extensions = [".dart"]
+# timeout_ms = 10000
 
 [story]
 # enabled = false             # 人机双写故事层（可选）：开启后写工具先成待定补丁，
@@ -155,6 +178,9 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 - 变化检测：相对 base 的 mtime+size + SHA-256 哈希（stat 相同也兜底）。
 - 对话切点：`lastEventId` 为 null（全新会话的 turn 0）时切到全新空会话。
 - 关闭：`[checkpoint] enabled = false`（/rewind 提示不可用）。
+- 接管已有会话（`--continue` / `--session`）时，nava 关闭期间在外部做的编辑
+  不在任何快照里；`/rewind` 只回滚到已记录的轮次，执行前请确认工作区状态
+  （撤销前会弹确认，但确认文案只能统计快照之间记录到的改动）。
 
 ### 按轮撤销与重做（`/undo` / `/redo`）
 
@@ -164,11 +190,63 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 里，`/redo` 恢复撤销前的文件并切回原会话；发下一条 prompt 即视为提交，撤销点
 作废。与 `/rewind` 的差别：`/rewind` 是一次性回滚、不能重做。
 
-- 工作区在目标区间有改动时先弹确认（拒绝则文件与会话都不动）。
+- `/undo` 与 `/redo` **都会先确认**：恢复是 rsync 语义，撤销后新建 / 修改的
+  文件在重做时会被删除或覆盖，所以在动工作区之前弹一次确认。
+- 撤销点只在撤销后切过去的会话里有效：显式切会话（`/session`、会话面板、
+  `/new`）或 `/rewind` 会清掉它；在别的会话里 `/redo` 会被拒绝并要求先切回。
 - `[checkpoint] enabled = false`：只回滚对话（按 user/message 事件推算轮次边界），
   文件不动，并提示「checkpoint 已关闭」。
-- 轮次不够或目标轮次已被 `keep` 裁剪：明确报错，不做任何改动。
+- 轮次不够（`/undo N` 超过当前轮次或 prompt 数）或目标轮次已被 `keep` 裁剪：
+  明确报错，不做任何改动（不静默夹到第 0 轮）。
 - 有在途轮次时 `/undo`、`/redo` 与切会话一律拒绝。
+
+## 差异查看（`/diff`）
+
+`/diff [working|turn]`（缺省 `working`）打开只读的交互式差异视图：
+
+- `working`：工作区 git 差异 + 未跟踪文件（不在 git 仓库时回落到本轮检查点）；
+  工作目录取 `[agent] workdir`，不是进程 cwd。
+- `turn`：本轮检查点 vs 上一轮；两侧内容各批量读一次（归档只解压 base /
+  差量各一遍）。第 0 轮没有「上一轮」，显示「还没有可比较的轮次」而不是把
+  整个基线当成新增文件。
+- 视图内 `m` 标记已读、`d` 切换范围、`j/k` 滚动、`q` 关闭；不写工作区、
+  不动检查点。`.opencode` / 凭据 / `build` 等排除面与检查点同源。
+
+## 权限规则（`[[permissions]]`）
+
+权限中间件挂在根上下文**最外层**：hooks、结果驱逐、lint、story 审阅只能看到
+被放行的调用。规则来源按 `config → project → session` 拼接（后者覆盖前者），
+任意一条 `deny` 即拒绝，`ask` 走审批浮层，`allow` 直接执行。
+
+- **动作归一**：`read_file`→`read`、`write_file`/`edit_file`/`apply_patch`→
+  `edit`、`run_command`/`run_tests`/`run_code` 与四个 git 写工具
+  （`git_add`/`git_commit`/`git_branch`/`git_stash`）→`shell`、`rg`→`grep`。
+  git 写工具的资源由实际 argv 派生（`git add ...`），所以 `action = "shell"`,
+  `resource = "git *"` 能拦住它们；`runGit` 另有一道 `.opencode` 写保护。
+- **路径匹配**：规则资源与调用路径都按工作目录解析，并补真实路径拼写
+  （符号链接按目标身份比较）。`edit "src/*"` 能拦住
+  `write_file("/abs/work/src/x")`，工作区里指向 `/etc/hosts` 的链接也逃不过
+  `deny read "/etc/*"`。
+- **工作区外**：路径落到 workdir 外时追加 `external_directory` 判定；`rg` 的
+  `path` 参数也参与边界检查（但不会把每次 rg 变成路径信任提示）。
+- **持久化**：交互里「总是允许」写进项目数据目录的 `permissions.json`；若会
+  覆盖已有 deny（含「更具体的 deny」如 `git push origin *` 对上 `git push *`）
+  则拒绝落盘，仅本次会话放行。
+- **损坏文件**：沿用 fail-open（Agent 仍能启动），但载入错误会写进系统提示与
+  `/doctor`；单条坏规则被跳过并计数上报。
+
+## `.opencode` 只读
+
+`.opencode/**`（项目级）与 `~/.config/opencode/**`（全局）是用户自己 OpenCode
+的安装：nava 只做兼容读取，**绝不创建 / 写入 / 删除 / 改权限**。
+
+- fs 工具（`write_file` / `edit_file` / `apply_patch` / story 写回）经 `'fs'`
+  接缝上的只读闸门拦截；删除工作区的祖先目录也会被拒（否则会连带删掉
+  `.opencode`）。
+- 检查点默认排除 `.opencode` 与 `.config/opencode`，恢复不会把它们写回。
+- 命令侧（`run_command` / git 写工具）有字面识别兜底：**best-effort**，不是
+  安全边界；变量拼接、`sh -c`、读脚本再执行都能绕过。真正的边界是 Seatbelt
+  （`deny file-write*`），sandbox 关闭时请自行确认风险。
 
 ## 人机双写故事层（可选）
 
@@ -331,7 +409,8 @@ OS Error: Path does not exist, path = 'lib/…/nope.dart'
   linter；探测 pubspec→`dart format`、go.mod→`gofmt -w`、Cargo.toml→`rustfmt`、
   package.json 含 prettier→`prettier --write`、pyproject 含 `[tool.ruff]`→
   `ruff format`。表缺失时完全不启用；失败 / 超时 / 沙箱白名单拒绝只追加
-  `[Formatter] skipped` 提示，不影响工具成功。
+  `[Formatter] skipped` 提示，不影响工具成功。一次编辑涉及超过 20 个文件时只
+  格式化前 20 个，其余在提示里报数量（整批跳过会让大补丁带来的文件全不格式化）。
 
 ## Hooks（`[hooks]`）
 
@@ -588,14 +667,21 @@ token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn
 `nava -p <任务>` 跑**无人值守的单轮**：装配完整运行时（工具 / 沙箱 / MCP /
 预算）但不启动 TUI，输出回复即退出（`--output-format text|json`）。
 
-**为什么不装审批链**：审批需要一个能应答的人——`AskUserApproval` 依赖 TUI
-浮层，headless 里没有任何东西能回答它，超时还会一律判拒（fail-closed），
-等于把每个 high 调用都卡死。所以 headless 干脆不挂审批中间件，模型调用
-`high` 工具直接执行。这带来一个必须写明的推论：
+**权限在 headless 下仍然生效**：权限中间件照常挂在最外层，只是没有审批人。
+`[approval] mode` 直接落到兜底阈值：
 
-> **headless 的安全兜底只剩 OS 沙箱（Layer 2）。** `[approval]` 整段配置
-> （包括显式加严的 `always_ask`）在 `-p` 下都不生效——启动时会在 stderr
-> 提示，而不是静默丢弃。
+- `ask_when_needed`（缺省）：阈值 `high`——`run_command` / `apply_patch` /
+  `git_commit` 这类工具需要确认，于是返回 `PERMISSION_ASK_UNATTENDED` **拒绝**
+  （不是静默执行）；显式 `[[permissions]] allow` 仍然放行。
+- `always_ask`：阈值更低，更多工具被拒；启动时 stderr 说明。
+- `never_ask`：`askThreshold: null`，没有规则命中时全部放行——无人值守场景的
+  **显式 opt-in**，只在沙箱照常时使用。
+
+> **headless 的安全兜底是「权限规则 + OS 沙箱（Layer 2）」两层。** 需要
+> 无人值守执行的工具请写 `[[permissions]] allow`（最小面），或明确接受风险后
+> 设 `[approval] mode = "never_ask"`。默认 `ask_when_needed` 下被拒是设计
+> 行为；启动时 stderr 会有一行提示，避免「模型说它要跑命令，然后什么也没
+> 发生」。
 
 因此启动期设了一道闸门（`validateHeadlessSafety`）：
 

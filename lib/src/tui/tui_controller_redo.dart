@@ -23,8 +23,23 @@ extension _RedoCommands on ConatusTuiController {
       showSystemNotice('有在途轮次，请稍候再试。');
       return;
     }
+    if (_sessionId != stage.forkSessionId) {
+      showSystemNotice(
+        '重做只能在撤销后的会话里执行：请先 /session ${stage.forkSessionId} '
+        '（切会话会丢弃本次撤销点）。',
+      );
+      return;
+    }
     _revertInFlight = true;
     try {
+      if (checkpoint.enabled &&
+          !await _confirmRevert(
+            '重做会把工作区恢复到第 ${stage.fromTurn} 轮：撤销后新建 / 修改的文件'
+            '会被删除或覆盖，继续？',
+          )) {
+        showSystemNotice('已取消重做：工作区保持原样。');
+        return;
+      }
       await _applyRedo(stage, checkpoint);
     } on RevertException catch (error) {
       showSystemNotice('重做失败：${error.message}');

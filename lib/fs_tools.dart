@@ -19,4 +19,6 @@ export 'src/read_only_paths.dart'
         kGlobalOpenCodePath,
         kOpenCodeDirName,
         kReadOnlyPathCode,
-        kReadOnlyPathMessage;
+        kReadOnlyPathMessage,
+        normalizeReadOnlyPath,
+        readOnlyRelativePath;

@@ -231,6 +231,7 @@ class ConatusTuiRuntime {
     // （见 ConatusTuiController._syncPermissionMode），这里挂一次即可。
     final PermissionWiring permissionWiring = PermissionWiring(
       store: PermissionStore('$resolvedBaseDir${sep}permissions.json'),
+      workdir: canonicalWorkdir,
       configRules: permissions?.rules ?? const <PermissionRule>[],
     );
     await permissionWiring.load();
@@ -594,6 +595,19 @@ class ConatusTuiRuntime {
 
     // ── system prompt / 记忆 / 压缩 / 技能 ──────────────────────
     final SystemPrompt prompt = provideSystemPrompt(app);
+    // permissions.json 载入失败时 deny 规则会静默消失：把这件事写进系统提示
+    // （模型与用户都会看到），并在 `/doctor` 里再报一次。
+    final String? permissionLoadError = permissionWiring.loadError;
+    if (permissionLoadError != null) {
+      prompt.section(
+        PromptSection(
+          name: 'permission-warning',
+          text: () =>
+              '权限规则未载入：$permissionLoadError。'
+              '当前只有 config 规则与兜底阈值生效，不要假设项目级 deny 仍在。',
+        ),
+      );
+    }
     prompt.section(
       PromptSection(
         name: 'persona',

@@ -11,6 +11,7 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_doc/conatus_doc.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../read_only_paths.dart';
 import 'story_blocks.dart';
 import 'story_conflict.dart';
 import 'story_sync.dart';
@@ -63,6 +64,13 @@ class StoryPending {
     String source = 'ops',
     FileSystem? fs,
   }) async {
+    // `.opencode` 只读：登记为待定补丁会在 apply 时写回去，必须在登记时就拒绝
+    // （调用方按「拦不下」处理，真实工具随后被只读闸门拒绝）。
+    for (final PatchOp op in ops) {
+      if (readOnlyRelativePath(op.blockId)) {
+        throw StateError(kReadOnlyPathMessage);
+      }
+    }
     // 先读基底再登记：读失败时列表保持原样，不留下「没有基底」的补丁
     // （那会让 apply 的冲突检测静默失效）。
     final Map<String, String?> bases = await readPendingBases(fs, ops);

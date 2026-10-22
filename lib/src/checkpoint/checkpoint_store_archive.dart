@@ -332,6 +332,27 @@ class ArchiveCheckpointStore implements CheckpointStore {
   Future<List<int>?> readFile(String sessionId, int turn, String path) =>
       readArchiveFile(this, sessionId, turn, path);
 
+  /// 批量读：base / 差量各只解压一遍（见 `readArchiveFiles`）。
+  @override
+  Future<Map<String, List<int>>> readFiles(
+    String sessionId,
+    int turn,
+    Iterable<String> paths,
+  ) async {
+    final Set<String> readable = <String>{
+      for (final String path in paths)
+        if (checkpointReadablePath(path, projectRel, ignore)) path,
+    };
+    if (readable.isEmpty || !turnsOf(sessionId).contains(turn)) {
+      return <String, List<int>>{};
+    }
+    try {
+      return await readArchiveFiles(this, sessionId, turn, readable);
+    } on CheckpointException {
+      return <String, List<int>>{};
+    }
+  }
+
   /// [fromTurn] → [toTurn] 的文件级变化；见 [archiveChangesBetween]。
   @override
   Future<List<CheckpointFileChange>> changesBetween(

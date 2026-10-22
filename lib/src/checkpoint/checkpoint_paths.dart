@@ -37,6 +37,9 @@ const List<String> kCheckpointDefaultIgnores = <String>[
   '.dart_tool',
   'node_modules',
   '.opencode',
+  // 工作区就是 `$HOME` 时，全局 OpenCode 目录位于快照树内（相对
+  // `.config/opencode`）；它同样只读，不能进快照，否则恢复会往里写。
+  '.config/opencode',
 ];
 
 /// 版本库元数据目录名。**任意层级都排除**（不是顶层匹配）。

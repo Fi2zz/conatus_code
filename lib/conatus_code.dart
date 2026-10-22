@@ -116,7 +116,8 @@ export 'src/config/config_writer.dart'
         deriveProviderName,
         upsertDefaultModel,
         writeConfigFile;
-export 'src/config/project_data_dir.dart' show resolveProjectDataDir;
+export 'src/config/project_data_dir.dart'
+    show defaultProjectDataDir, projectDirProtected, resolveProjectDataDir;
 export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;
 export 'src/diff/apply.dart'
     show PatchContextException, applyDiffFile, applyEditText;
@@ -142,6 +143,7 @@ export 'src/fs_tools/spill_dir.dart'
 export 'src/headless/headless_guard.dart'
     show
         approvalModeIgnoredNotice,
+        headlessAskNotice,
         sandboxDisabledReason,
         validateHeadlessSafety;
 export 'src/headless/headless_runner.dart'
@@ -181,6 +183,7 @@ export 'src/sandbox/command_policy.dart'
 export 'src/sandbox/jailed_file_system.dart' show JailedFileSystem;
 export 'src/sandbox/protected_command.dart'
     show
+        gitWriteViolation,
         kReadOnlyCommandCode,
         kReadOnlyCommandMessage,
         readOnlyCommandViolation;

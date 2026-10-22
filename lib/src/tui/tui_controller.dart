@@ -611,10 +611,10 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     final DiffSource source = DiffSource(
-      workdir: diffWorkdir ?? Directory.current.path,
+      workdir:
+          diffWorkdir ?? _app.get<String>('workdir') ?? Directory.current.path,
       checkpoint: checkpoint,
       sessionId: _sessionId,
-      turn: checkpoint.turn,
     );
     List<FileDiff> diffs = const <FileDiff>[];
     String? notice;
@@ -906,6 +906,11 @@ class ConatusTuiController implements TuiUserPromptHost {
       _refresh();
       return false;
     }
+    // 显式切会话即放弃撤销点：`RevertStage` 跨会话存活会让用户在别的会话里
+    // `/redo`，用另一个会话的快照覆盖当前工作区（撤销后新建的文件会被删）。
+    // `/undo` / `/redo` 自身在切换后重新设置 / 清空它，不受影响。
+    _revertStage = null;
+    _prefill = null;
     _unbind();
     _sessionId = id;
     await _bind(id);
@@ -1266,6 +1271,10 @@ class ConatusTuiController implements TuiUserPromptHost {
       transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
       return;
     }
+    // `/rewind` 是一次性回滚：旧的 `/undo` 撤销点已不再描述工作区，留着只会
+    // 让 `/redo` 把文件恢复到一个从未存在过的混合状态。
+    _revertStage = null;
+    _prefill = null;
     // 基线还在写：此时回滚没有可回滚的锚点，等它落盘（与首轮同一道门闩）。
     await _checkpointBase;
     final String command = arg.trim();

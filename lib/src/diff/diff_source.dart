@@ -13,13 +13,16 @@ import 'diff_model.dart';
 import 'diff_parser.dart';
 import 'working_diff.dart';
 
+/// 「还没有可比较的轮次」的说明（turn 0 只表示基线，没有上一轮可比）。
+const String kDiffNoTurnNotice = '还没有可比较的轮次（第 1 轮收口后才有 diff）。';
+
 /// 按范围加载文件级差异。
 class DiffSource {
   DiffSource({
     required this.workdir,
     required this.checkpoint,
     required this.sessionId,
-    required this.turn,
+    this.turn,
   });
 
   /// 工作区根（绝对路径）。
@@ -31,8 +34,9 @@ class DiffSource {
   /// 会话 id。
   final String sessionId;
 
-  /// 检查点轮次（`turn` 范围的目标轮）。
-  final int turn;
+  /// 目标轮次；`null` 表示先 `flush()` 再取管理器当时的轮次（`/diff turn`
+  /// 的缺省语义：刚收口的一轮才算「本轮」）。
+  final int? turn;
 
   String? _notice;
 
@@ -49,65 +53,101 @@ class DiffSource {
     );
     final List<FileDiff>? diffs = await working.load();
     _notice = working.notice;
-    return diffs ?? _turnDiff();
+    return diffs ?? _turnDiff(fromWorking: true);
   }
 
-  /// 检查点轮次差异：目标轮 vs 上一轮；turn 0（或更早）与空比较。
+  /// 检查点轮次差异：目标轮 vs 上一轮。
   ///
   /// 先 `flush()`：`recordTurn` 同步推进轮次、归档稍后落盘，刚结束一轮就
-  /// 打开的 `/diff` 不等它就会撞上 `missing-checkpoint`。
-  Future<List<FileDiff>> _turnDiff() async {
+  /// 打开的 `/diff` 不等它就会撞上 `missing-checkpoint`。轮次为 0 时没有
+  /// 「上一轮」——`/diff turn` 返回空列表并给出说明，而不是把整个基线当成
+  /// 新增文件；`working` 在无 git 时回落，此时基线就是唯一可看的东西。
+  Future<List<FileDiff>> _turnDiff({bool fromWorking = false}) async {
     await checkpoint.flush();
+    final int target = turn ?? checkpoint.turn;
+    if (target <= 0) {
+      if (!fromWorking) {
+        _notice = kDiffNoTurnNotice;
+        return const <FileDiff>[];
+      }
+      try {
+        return _sorted(await _fromEmpty());
+      } on CheckpointException {
+        return const <FileDiff>[];
+      }
+    }
     try {
-      final List<FileDiff> diffs = turn <= 0
-          ? await _fromEmpty()
-          : await _between(turn - 1, turn);
-      return _sorted(diffs);
+      return _sorted(await _between(target - 1, target));
     } on CheckpointException {
       return const <FileDiff>[];
     }
   }
 
+  /// 基线（turn 0）相对空内容的差异：工作区回落时展示初始文件清单。
   Future<List<FileDiff>> _fromEmpty() async {
-    final int target = turn < 0 ? 0 : turn;
     final CheckpointManifest manifest = await checkpoint.loadManifest(
       sessionId,
-      target,
+      0,
     );
-    final List<FileDiff> diffs = <FileDiff>[];
-    for (final CheckpointFileEntry entry in manifest.files) {
-      if (!checkpoint.showsDiffPath(entry.path)) continue;
-      final String? after = await _read(target, entry.path);
-      if (after == null) continue;
-      diffs.addAll(diffLines(entry.path, null, after));
-    }
-    return diffs;
+    final List<String> paths = <String>[
+      for (final CheckpointFileEntry entry in manifest.files)
+        if (checkpoint.showsDiffPath(entry.path)) entry.path,
+    ];
+    final Map<String, List<int>> contents = await checkpoint.readFiles(
+      sessionId,
+      0,
+      paths,
+    );
+    return <FileDiff>[
+      for (final String path in paths)
+        for (final FileDiff diff in diffLines(
+          path,
+          null,
+          _text(contents[path]),
+        ))
+          diff,
+    ];
   }
 
+  /// 两侧内容各批量读一次（归档实现只解压 base / 差量各一遍）。
   Future<List<FileDiff>> _between(int fromTurn, int toTurn) async {
-    final List<CheckpointFileChange> changes = await checkpoint.changesBetween(
+    final List<CheckpointFileChange> changes =
+        (await checkpoint.changesBetween(sessionId, fromTurn, toTurn))
+            .where(
+              (CheckpointFileChange change) =>
+                  checkpoint.showsDiffPath(change.path),
+            )
+            .toList(growable: false);
+    final Set<String> paths = <String>{
+      for (final CheckpointFileChange change in changes) change.path,
+    };
+    final Map<String, List<int>> before = await checkpoint.readFiles(
       sessionId,
       fromTurn,
-      toTurn,
+      paths,
     );
-    final List<FileDiff> diffs = <FileDiff>[];
-    for (final CheckpointFileChange change in changes) {
-      if (!checkpoint.showsDiffPath(change.path)) continue;
-      diffs.addAll(await _changeDiff(change, fromTurn, toTurn));
-    }
-    return diffs;
+    final Map<String, List<int>> after = await checkpoint.readFiles(
+      sessionId,
+      toTurn,
+      paths,
+    );
+    return <FileDiff>[
+      for (final CheckpointFileChange change in changes)
+        ..._changeDiff(
+          change,
+          _text(before[change.path]),
+          _text(after[change.path]),
+        ),
+    ];
   }
 
-  /// 两端内容都从检查点读；重命名保留状态词（存储只给新路径）。
-  ///
-  /// 两端都读不出（旧格式检查点）时仍保留一条文件级变化，而不是静默丢掉。
-  Future<List<FileDiff>> _changeDiff(
+  /// 两端内容都读不出（旧格式检查点）时仍保留一条文件级变化，而不是静默丢掉。
+  /// 重命名保留状态词（存储只给新路径）。
+  List<FileDiff> _changeDiff(
     CheckpointFileChange change,
-    int fromTurn,
-    int toTurn,
-  ) async {
-    final String? before = await _read(fromTurn, change.path);
-    final String? after = await _read(toTurn, change.path);
+    String? before,
+    String? after,
+  ) {
     if (before == null && after == null) {
       return <FileDiff>[
         FileDiff(path: change.path, status: change.status, hunks: const []),
@@ -120,11 +160,8 @@ class DiffSource {
     ];
   }
 
-  Future<String?> _read(int atTurn, String path) async {
-    final List<int>? bytes = await checkpoint.readFile(sessionId, atTurn, path);
-    if (bytes == null) return null;
-    return utf8.decode(bytes, allowMalformed: true);
-  }
+  String? _text(List<int>? bytes) =>
+      bytes == null ? null : utf8.decode(bytes, allowMalformed: true);
 
   List<FileDiff> _sorted(List<FileDiff> diffs) =>
       diffs..sort((FileDiff a, FileDiff b) => a.path.compareTo(b.path));

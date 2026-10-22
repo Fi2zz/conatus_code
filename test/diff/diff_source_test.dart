@@ -97,20 +97,21 @@ void main() {
     expect(diffs.single.additions, 1);
   });
 
-  test('negative turn clamps to the initial snapshot', () async {
+  test('negative turn yields no comparable turn', () async {
     final (CheckpointManager manager, String root) = _workspace();
     _write(root, 'a.txt', 'v0\n');
     await manager.bind('s1');
 
-    final List<FileDiff> diffs = await DiffSource(
+    final DiffSource source = DiffSource(
       workdir: root,
       checkpoint: manager,
       sessionId: 's1',
       turn: -1,
-    ).load(DiffScope.turn);
+    );
+    final List<FileDiff> diffs = await source.load(DiffScope.turn);
 
-    expect(diffs.single.path, 'a.txt');
-    expect(diffs.single.status, 'added');
+    expect(diffs, isEmpty);
+    expect(source.notice, contains('还没有可比较的轮次'));
   });
 
   test('missing checkpoints yield an empty diff', () async {
@@ -126,21 +127,39 @@ void main() {
     expect(diffs, isEmpty);
   });
 
-  test('turn 0 compares the snapshot against empty', () async {
+  test('turn omits explicit target: uses the turn after flush', () async {
     final (CheckpointManager manager, String root) = _workspace();
-    _write(root, 'a.txt', 'hello\n');
+    _write(root, 'a.txt', 'v0\n');
     await manager.bind('s1');
+    _write(root, 'a.txt', 'v1\n');
+    final Future<String?> turn = manager.recordTurn(); // 不 await：刚收口
 
     final List<FileDiff> diffs = await DiffSource(
       workdir: root,
       checkpoint: manager,
       sessionId: 's1',
-      turn: 0,
     ).load(DiffScope.turn);
+    await turn;
 
     expect(diffs.single.path, 'a.txt');
-    expect(diffs.single.status, 'added');
-    expect(diffs.single.hunks, isNotEmpty);
+    expect(diffs.single.status, 'modified');
+  });
+
+  test('turn 0 has no comparable turn', () async {
+    final (CheckpointManager manager, String root) = _workspace();
+    _write(root, 'a.txt', 'hello\n');
+    await manager.bind('s1');
+
+    final DiffSource source = DiffSource(
+      workdir: root,
+      checkpoint: manager,
+      sessionId: 's1',
+      turn: 0,
+    );
+    final List<FileDiff> diffs = await source.load(DiffScope.turn);
+
+    expect(diffs, isEmpty);
+    expect(source.notice, contains('还没有可比较的轮次'));
   });
 
   test('turn excludes .opencode paths captured by the filter', () async {

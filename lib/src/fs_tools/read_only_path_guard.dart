@@ -88,6 +88,7 @@ class ReadOnlyPathGuard implements FileSystem {
   @override
   Future<void> remove(FsTarget target) {
     _denyIfProtected(target);
+    _denyIfContainsProtected(target);
     return inner.remove(target);
   }
 
@@ -95,6 +96,20 @@ class ReadOnlyPathGuard implements FileSystem {
   void _denyIfProtected(FsTarget target) {
     for (final String path in _spellings(target)) {
       if (_hitsAnyRoot(path)) _throwDenied();
+    }
+  }
+
+  /// 删除目标是否**包含**受保护根（删工作区 / 删 `$HOME` 会连带删 `.opencode`）。
+  ///
+  /// 只对 `remove` 生效：写入一个受保护根的祖先目录是合法操作，删除不是。
+  void _denyIfContainsProtected(FsTarget target) {
+    for (final String path in _spellings(target)) {
+      final String ancestor = normalizeReadOnlyPath(path);
+      for (final String root in protectedRoots) {
+        for (final String form in _rootForms(root)) {
+          if (underReadOnlyRoot(form, ancestor)) _throwDenied();
+        }
+      }
     }
   }
 

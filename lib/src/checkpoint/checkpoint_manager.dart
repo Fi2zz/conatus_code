@@ -148,6 +148,13 @@ class CheckpointManager {
   Future<List<int>?> readFile(String sessionId, int turn, String path) =>
       _store.readFile(sessionId, turn, path);
 
+  /// 批量读某会话某轮里若干路径的内容（`/diff` 数据源）；透传给存储。
+  Future<Map<String, List<int>>> readFiles(
+    String sessionId,
+    int turn,
+    Iterable<String> paths,
+  ) => _store.readFiles(sessionId, turn, paths);
+
   /// 两轮之间的文件变化（`/diff` 数据源）；透传给存储。
   Future<List<CheckpointFileChange>> changesBetween(
     String sessionId,

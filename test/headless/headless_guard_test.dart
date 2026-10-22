@@ -86,6 +86,33 @@ void main() {
     });
   });
 
+  group('headlessAskNotice', () {
+    test('headless + 缺省 ask_when_needed → 提示高风险工具会被拒', () {
+      final String? notice = headlessAskNotice(
+        headless: true,
+        approval: const ApprovalConfig(),
+      );
+
+      expect(notice, isNotNull);
+      expect(notice, contains('PERMISSION_ASK_UNATTENDED'));
+      expect(notice, contains('never_ask'));
+    });
+
+    test('never_ask / TUI → 不提示', () {
+      expect(
+        headlessAskNotice(
+          headless: true,
+          approval: const ApprovalConfig(mode: ApprovalMode.neverAsk),
+        ),
+        isNull,
+      );
+      expect(
+        headlessAskNotice(headless: false, approval: const ApprovalConfig()),
+        isNull,
+      );
+    });
+  });
+
   group('approvalModeIgnoredNotice', () {
     test('headless + always_ask → 提示会直接拒绝需要确认的工具', () {
       final String? notice = approvalModeIgnoredNotice(

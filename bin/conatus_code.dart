@@ -50,7 +50,15 @@ Future<void> main(List<String> args) async {
     headless: headless,
     approval: config.approval,
   );
-  if (notice != null) stderr.writeln(notice);
+  if (notice != null) {
+    stderr.writeln(notice);
+  } else {
+    final String? askNotice = headlessAskNotice(
+      headless: headless,
+      approval: config.approval,
+    );
+    if (askNotice != null) stderr.writeln(askNotice);
+  }
 
   final String workdir = config.agent.workdir ?? Directory.current.path;
   final String sep = Platform.pathSeparator;
@@ -61,6 +69,14 @@ Future<void> main(List<String> args) async {
     workdir: workdir,
     projectDir: config.agent.projectDir,
   );
+  final String? configuredProjectDir = config.agent.projectDir;
+  if (configuredProjectDir != null &&
+      projectDirProtected(workdir, configuredProjectDir)) {
+    stderr.writeln(
+      '配置提示：[agent] project_dir 不能落在 .opencode（只读目录），'
+      '已改用缺省数据目录 $projectDataDir。',
+    );
+  }
 
   // `--continue`：恢复最近一次会话（`--session` 优先；无历史则新建并提示）。
   String? initialSession = options.session;

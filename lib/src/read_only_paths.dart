@@ -45,8 +45,7 @@ List<String> defaultReadOnlyRoots(String workdir, {String? home}) {
   ];
 }
 
-/// 段级「相同或子孙」判定：`.opencode-backup` 不算 `.opencode`。
-///
+/// 段级「相同或子孙」判定：`.opencode-backup` 不算 `.opencode`。///
 /// macOS / Windows 默认文件系统大小写不敏感，统一按小写比较——
 /// `.OPENCODE/x` 在 APFS 上就是 `.opencode/x`，不能放过。代价是
 /// 大小写敏感卷上会略微多拒（`.OPENCODE` 也会被当成受保护），可接受。
@@ -59,6 +58,26 @@ bool underReadOnlyRoot(String path, String root) {
       ? base
       : '$base${Platform.pathSeparator}';
   return candidate.startsWith(prefix);
+}
+
+/// 相对路径是否指向 OpenCode 目录（`.opencode` 或 `.config/opencode` 段）。
+///
+/// 用于「登记时就拒绝」的场景（story 待定补丁、`/init` 目标）：这些路径按
+/// 工作区相对写，无法用绝对根比较。任意层级的 `.opencode` 都算（保守）。
+bool readOnlyRelativePath(String path) {
+  final List<String> segments = path
+      .replaceAll('\\', '/')
+      .toLowerCase()
+      .split('/');
+  for (int index = 0; index < segments.length; index++) {
+    if (segments[index] == kOpenCodeDirName) return true;
+    if (segments[index] == '.config' &&
+        index + 1 < segments.length &&
+        segments[index + 1] == 'opencode') {
+      return true;
+    }
+  }
+  return false;
 }
 
 /// 取 [path] 的真实路径：存在则直接解析；否则解析**最近的已存在祖先**
@@ -84,12 +103,20 @@ String? realPathViaAncestor(String path) {
 }
 
 /// 去掉冗余的 `.` / `..` 与末尾分隔符（不解析符号链接）。
+///
+/// Windows 盘符单独保留：`C:\foo` 不能变成 `\C:\foo`（多了前缀分隔符后
+/// 既不像绝对路径，也不再与 `Directory(path).absolute.path` 的拼写一致）。
 String normalizeReadOnlyPath(String path) {
   final RegExp separators = RegExp(r'[/\\]');
-  final bool absolute =
-      path.startsWith('/') || RegExp(r'^[A-Za-z]:[/\\]').hasMatch(path);
+  final String value = path.trim().replaceAll('\\', '/');
+  final RegExpMatch? drive = RegExp(r'^([A-Za-z]:)').firstMatch(value);
+  final String drivePrefix = drive?.group(1) ?? '';
+  final String rest = drivePrefix.isEmpty
+      ? value
+      : value.substring(drivePrefix.length);
+  final bool absolute = rest.startsWith('/');
   final List<String> parts = <String>[];
-  for (final String part in path.split(separators)) {
+  for (final String part in rest.split(separators)) {
     if (part.isEmpty || part == '.') continue;
     if (part == '..' && parts.isNotEmpty && parts.last != '..') {
       parts.removeLast();
@@ -98,6 +125,10 @@ String normalizeReadOnlyPath(String path) {
     }
   }
   final String joined = parts.join(Platform.pathSeparator);
+  if (drivePrefix.isNotEmpty) {
+    final String separator = Platform.pathSeparator;
+    return absolute ? '$drivePrefix$separator$joined' : '$drivePrefix$joined';
+  }
   return absolute ? '${Platform.pathSeparator}$joined' : joined;
 }
 

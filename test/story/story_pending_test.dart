@@ -34,8 +34,9 @@ void main() {
     });
 
     test('越界 blockId 不抛异常、不登记待定补丁', () async {
-      final Directory dir =
-          Directory.systemTemp.createTempSync('nava-pending-jail-');
+      final Directory dir = Directory.systemTemp.createTempSync(
+        'nava-pending-jail-',
+      );
       addTearDown(() => dir.deleteSync(recursive: true));
       final FileSystem fs = JailedFileSystem(root: dir.path);
       final StoryPending pending = StoryPending();
@@ -46,6 +47,28 @@ void main() {
       );
 
       expect(pending.patches, isEmpty);
+    });
+
+    test('.opencode 目标在登记时就被拒绝', () async {
+      final Directory dir = Directory.systemTemp.createTempSync(
+        'nava-pending-opencode-',
+      );
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final FileSystem fs = LocalFileSystem(cwd: dir.path);
+      final StoryPending pending = StoryPending();
+
+      await pending.feed(
+        '```ops\n[{"kind":"insert","blockId":".opencode/x.md","text":"x"}]\n```',
+        fs: fs,
+      );
+
+      expect(pending.patches, isEmpty);
+      expect(
+        () => pending.feedOps(const <PatchOp>[
+          InsertBlockOp(blockId: '.opencode/x.md', text: 'x'),
+        ], fs: fs),
+        throwsStateError,
+      );
     });
 
     test('ops 块编译为待应用补丁（author ai）', () async {
@@ -61,9 +84,7 @@ void main() {
       const DocPatch patch = DocPatch(
         id: 'p1',
         author: PatchAuthor.ai,
-        ops: <PatchOp>[
-          InsertBlockOp(blockId: 'ch1.md', text: '新的第一段'),
-        ],
+        ops: <PatchOp>[InsertBlockOp(blockId: 'ch1.md', text: '新的第一段')],
       );
       final String text = renderStoryPending(const <DocPatch>[patch]);
       expect(text, contains('ch1.md'));

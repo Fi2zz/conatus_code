@@ -110,7 +110,29 @@ max_steps = 8
                                     # （模型可在 spawn_agent 里收紧，不能放宽）
 
 [approval]
-mode = "ask_when_needed"
+mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
+
+# 权限规则（最外层工具中间件，先于审批 / hooks / lint / story 生效）：
+# 按 action + resource 通配匹配，后出现的规则优先；任一条 deny 即拒绝。
+# 动作：read / edit / glob / grep / shell / websearch / webfetch / subagent /
+# skill / question / external_directory，也可直接写工具名。
+# 路径动作的资源按工作区解析，符号链接按真实路径比较。
+# [[permissions]]
+# action = "shell"
+# resource = "git push *"
+# effect = "deny"
+#
+# [[permissions]]
+# action = "edit"
+# resource = "src/**"
+# effect = "allow"
+
+# 编辑后自动格式化（默认关闭；表存在即启用）。命令经 shell 缝执行，
+# 沙箱拒绝时只提示、不失败工具。
+# [formatter]
+# command = "dart format"
+# extensions = [".dart"]
+# timeout_ms = 10000
 
 [sandbox]
 enabled = true

@@ -42,6 +42,49 @@ void main() {
     });
   });
 
+  group('.opencode 写保护', () {
+    test('git add .opencode 被拒绝且不执行命令', () async {
+      final FakeShellExecutor shell = FakeShellExecutor(_run());
+      final ToolResult result = await GitAddTool(shell: shell).call(
+        _context('git_add', <String, Object?>{
+          'paths': <Object?>['.opencode/commands/x.md'],
+        }),
+      );
+
+      expect(result.error?.code, kReadOnlyCommandCode);
+      expect(shell.lastRequest, isNull, reason: '拒绝时不能起 git 进程');
+    });
+
+    test('git branch .opencode 也被拒绝', () async {
+      final FakeShellExecutor shell = FakeShellExecutor(_run());
+      final ToolResult result = await GitBranchTool(
+        shell: shell,
+      ).call(_context('git_branch', <String, Object?>{'name': '.opencode'}));
+
+      expect(result.error?.code, kReadOnlyCommandCode);
+      expect(shell.lastRequest, isNull);
+    });
+
+    test('commit 消息里提到 .opencode 不算写路径', () async {
+      final FakeShellExecutor shell = FakeShellExecutor(_run());
+      final ToolResult result = await GitCommitTool(shell: shell).call(
+        _context('git_commit', <String, Object?>{
+          'message': 'fix: 保护 .opencode',
+        }),
+      );
+
+      expect(result.isError, isFalse);
+      expect(shell.lastRequest, isNotNull);
+    });
+
+    test('gitWriteViolation 直接判定 argv', () {
+      expect(gitWriteViolation("add -- '.opencode/x'"), isNotNull);
+      expect(gitWriteViolation('checkout .opencode/x'), isNotNull);
+      expect(gitWriteViolation("stash push -m 'fix .opencode'"), isNull);
+      expect(gitWriteViolation('status --porcelain'), isNull);
+    });
+  });
+
   group('GitAddTool', () {
     test('列路径时只暂存这些路径', () async {
       final FakeShellExecutor shell = FakeShellExecutor(_run());

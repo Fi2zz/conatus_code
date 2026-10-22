@@ -4,6 +4,31 @@
 
 ## [未发布]
 
+- **权限规则落地**：`[[permissions]]` 规则表、最外层 `instrumentPermission`
+  中间件、项目级 `permissions.json` 持久化与 `/doctor` 覆盖。动作归一
+  （`run_command`→`shell`、`read_file`→`read`、`rg`→`grep`，四个 git 写工具
+  →`shell` 且资源由实际 argv 派生）；路径同时按工作目录与真实路径匹配，
+  `edit "src/*"` 不再被绝对路径绕过、符号链接不再逃过 `external_directory`。
+  `apply_patch` 路径去引号 / 还原八进制文件名；`rg` 的 `path` 参与外部边界
+  检查；损坏的 `permissions.json` 仍然 fail-open 但会写进系统提示与 `/doctor`。
+- **`/undo` / `/redo` 加固**：`/redo` 增加确认（rsync 语义会删除撤销后新建
+  的文件）、显式切会话或 `/rewind` 清掉撤销点、跨会话重做被拒绝；`/undo N`
+  超出轮次 / prompt 数改为报错，不再静默夹到第 0 轮。
+- **`/diff`**：只读交互式差异视图（`working` / `turn`），工作目录取配置
+  `workdir`；`turn` 两侧内容批量读取一次，第 0 轮提示「还没有可比较的轮次」。
+- **format-on-edit**：`[formatter]` 配置表；超过 20 个文件时格式化前 20 个
+  并提示剩余数量，不再整批跳过。
+- **`.opencode` 只读**：fs 闸门拒绝删除受保护根的祖先；检查点排除
+  `.config/opencode`（workdir 为 `$HOME` 时）；story 待定补丁在登记时拒绝；
+  git 写工具经 `runGit` 增加 `.opencode` 写保护。命令侧仍是 best-effort，
+  Seatbelt 才是真边界。
+- **headless 审批姿态澄清**：`ask_when_needed` 下 high 风险工具按
+  `PERMISSION_ASK_UNATTENDED` 拒绝（不再声称「不挂审批」），启动 stderr
+  提示；`never_ask` 为显式 opt-in。README 与默认 config 模板同步补齐
+  `[[permissions]]` / `[formatter]` 示例。
+- **子代理权限**：`ask` 档不再继承父级 `allow`（只继承 deny / ask），修复
+  注释与实际行为不一致；`PermissionStore.save` 落盘后 best-effort `sync`。
+
 - **Anthropic prompt caching / thinking 回传**：`cacheable` system 前缀与最后一个
   工具自动带 `cache_control: ephemeral`；thinking 块的 signature 随会话事件保留并在
   tool loop 下一轮回传。`/provider add` 新增 `opencode-go-anthropic` 与

@@ -70,6 +70,29 @@ void main() {
     expect(File('${dir.path}/.opencode/commands/x.md').existsSync(), isTrue);
   });
 
+  test('remove of an ancestor containing .opencode is denied', () async {
+    final FsTarget workspace = await guard.resolve(dir.path);
+
+    expect(() => guard.remove(workspace), throwsA(isA<FsError>()));
+    expect(
+      File('${dir.path}/.opencode/commands/x.md').existsSync(),
+      isTrue,
+      reason: '删除工作区不能连带删掉受保护的 .opencode',
+    );
+
+    // 不含受保护根的同级目录照常可删。
+    final Directory spare = Directory('${dir.path}/spare')..createSync();
+    final FsTarget spareTarget = await guard.resolve(spare.path);
+    await guard.remove(spareTarget);
+    expect(spare.existsSync(), isFalse);
+  });
+
+  test('normalizeReadOnlyPath 不改变盘符绝对路径的形状', () {
+    final String sep = Platform.pathSeparator;
+    expect(normalizeReadOnlyPath(r'C:\foo\bar'), 'C:${sep}foo${sep}bar');
+    expect(normalizeReadOnlyPath('C:rel'), 'C:rel');
+  });
+
   test('reads pass through untouched', () async {
     final FsTarget target = await guard.resolve(
       '${dir.path}/.opencode/commands/x.md',
@@ -187,13 +210,12 @@ void main() {
     );
 
     expect(() => homeGuard.writeText(target, 'x'), throwsA(isA<FsError>()));
-    expect(
-      File('${home.path}/.config/opencode/x.md').existsSync(),
-      isFalse,
-    );
+    expect(File('${home.path}/.config/opencode/x.md').existsSync(), isFalse);
   });
 
   test('大小写变体 .OPENCODE 也算受保护（APFS 大小写不敏感）', () async {
+    // 大小写折叠只在 macOS / Windows 生效（Linux 上是两个不同目录）。
+    if (Platform.isLinux) return;
     final Directory fresh = Directory('${dir.path}/fresh')..createSync();
     final ReadOnlyPathGuard freshGuard = ReadOnlyPathGuard(
       inner: LocalFileSystem(),

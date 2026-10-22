@@ -49,14 +49,26 @@ class FormatterService {
   ///
   /// 成功返回 `null`（不制造噪声）；失败 / 超时 / 沙箱拒绝返回
   /// `[Formatter] skipped: <原因>`。调用方负责保证工具本身仍算成功。
+  /// 超过 [kFormatterMaxFiles] 时只格式化前 N 个，并在提示里说明剩余数量
+  /// （整批跳过会让一次大补丁带来的所有文件都不格式化）。
   Future<String?> runIfNeeded(List<String> files) async {
     if (!_config.enabled) return null;
     final List<String> targets = _targets(files);
-    if (targets.isEmpty || targets.length > kFormatterMaxFiles) return null;
+    if (targets.isEmpty) return null;
+    final List<String> selected = targets.length > kFormatterMaxFiles
+        ? targets.sublist(0, kFormatterMaxFiles)
+        : targets;
     final List<String> failures = <String>[];
-    for (final String target in targets) {
+    for (final String target in selected) {
       final String? failure = await _formatOne(target);
       if (failure != null) failures.add(failure);
+    }
+    final int skipped = targets.length - selected.length;
+    if (skipped > 0) {
+      failures.add(
+        '[Formatter] skipped: 单次最多格式化 $kFormatterMaxFiles 个文件，'
+        '另有 $skipped 个未处理。',
+      );
     }
     return failures.isEmpty ? null : failures.join('\n');
   }

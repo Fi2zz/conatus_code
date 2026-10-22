@@ -50,7 +50,7 @@ void main() {
     expect(shell.commands, isEmpty);
   });
 
-  test('超过 20 个文件时整体跳过', () async {
+  test('超过 20 个文件时只格式化前 20 个并提示剩余', () async {
     final Directory dir = createProject('svc-cap', <String, String>{
       'pubspec.yaml': 'name: x\n',
     });
@@ -65,8 +65,10 @@ void main() {
         bootFormatter(dir.path);
     addTearDown(app.dispose);
 
-    expect(await service.runIfNeeded(files), isNull);
-    expect(shell.commands, isEmpty);
+    final String? notice = await service.runIfNeeded(files);
+    expect(notice, isNotNull);
+    expect(notice, contains('另有 1 个未处理'));
+    expect(shell.commands, hasLength(kFormatterMaxFiles));
   });
 
   test('无探针（无项目标记）→ 静默跳过', () async {

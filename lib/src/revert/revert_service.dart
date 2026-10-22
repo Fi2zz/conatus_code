@@ -36,7 +36,10 @@ class RevertService {
     if (!_checkpoint.enabled) return _undoConversationOnly(current, count);
     await _checkpoint.flush();
     final int fromTurn = _checkpoint.turn;
-    final int toTurn = math.max(0, fromTurn - count);
+    if (count > fromTurn) {
+      throw RevertException('没有可撤销的 $count 轮（当前第 $fromTurn 轮）。');
+    }
+    final int toTurn = fromTurn - count;
     if (toTurn >= fromTurn) {
       throw RevertException('没有可撤销的轮次（当前第 $fromTurn 轮）。');
     }
@@ -96,8 +99,12 @@ class RevertService {
   ///
   /// 没有用户消息时明确报错——否则会「撤销」出一个空会话，让用户以为真撤了。
   Future<UndoResult> _undoConversationOnly(Session current, int count) async {
-    if (revertPromptCount(current) == 0) {
+    final int prompts = revertPromptCount(current);
+    if (prompts == 0) {
       throw const RevertException('没有可撤销的对话（当前会话没有用户消息）。');
+    }
+    if (count > prompts) {
+      throw RevertException('没有可撤销的 $count 轮（当前会话只有 $prompts 条用户消息）。');
     }
     final String? cut = revertCutBefore(current, count);
     final List<String> undone = revertPromptsAfter(current, cut);

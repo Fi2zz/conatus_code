@@ -261,4 +261,42 @@ void main() {
     final Session fork = env.sessions.get(result.stage.forkSessionId)!;
     expect(_prompts(fork), isEmpty);
   });
+
+  test('undo N 超过轮次：报错且不改状态（checkpoint 开启）', () async {
+    final _Env env = await _twoTurns();
+
+    await expectLater(
+      env.service.undo(env.session, 3),
+      throwsA(
+        isA<RevertException>().having(
+          (RevertException e) => e.message,
+          'message',
+          contains('没有可撤销的 3 轮'),
+        ),
+      ),
+    );
+
+    expect(env.manager.turn, 2);
+    expect(env.manager.sessionId, 's1');
+    expect(_read(env.root, 'a.txt'), 'v2');
+    expect(env.sessions.length, 1, reason: '失败时不新建会话');
+  });
+
+  test('undo N 超过 prompt 数：报错且不切会话（checkpoint 关闭）', () async {
+    final _Env env = await _twoTurns(enabled: false);
+
+    await expectLater(
+      env.service.undo(env.session, 3),
+      throwsA(
+        isA<RevertException>().having(
+          (RevertException e) => e.message,
+          'message',
+          contains('只有 2 条用户消息'),
+        ),
+      ),
+    );
+
+    expect(env.sessions.length, 1);
+    expect(_read(env.root, 'a.txt'), 'v2');
+  });
 }

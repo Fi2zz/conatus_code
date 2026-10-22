@@ -359,10 +359,8 @@ void main() {
 
     expect(controller.diffOpen, isTrue);
     expect(controller.diffScope, DiffScope.turn);
-    expect(
-      controller.diffFiles.map((FileDiff diff) => diff.path),
-      contains('a.txt'),
-    );
+    expect(controller.diffFiles, isEmpty, reason: 'turn 0 没有上一轮可比');
+    expect(controller.diffNotice, contains('还没有可比较的轮次'));
   });
 
   test('/diff 参数非法：给用法提示且不打开视图', () async {
@@ -383,6 +381,65 @@ void main() {
 
     expect(controller.diffOpen, isFalse);
     expect(controller.transcript.messages.last.text, contains('用法：/diff'));
+  });
+
+  test('/diff working 用配置 workdir（不是进程 cwd）', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('nava-diff-wd');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String root = dir.path;
+    final String projectDir = '$root${Platform.pathSeparator}.conatus';
+    Directory(projectDir).createSync();
+    Process.runSync('git', <String>['init', '-q'], workingDirectory: root);
+    Process.runSync('git', <String>[
+      'config',
+      'user.email',
+      't@example.com',
+    ], workingDirectory: root);
+    Process.runSync('git', <String>[
+      'config',
+      'user.name',
+      'T',
+    ], workingDirectory: root);
+    _write(root, 'tracked.txt', 'one\n');
+    Process.runSync('git', <String>['add', '.'], workingDirectory: root);
+    Process.runSync('git', <String>[
+      'commit',
+      '-qm',
+      'init',
+    ], workingDirectory: root);
+    _write(root, 'tracked.txt', 'two\n');
+
+    final Context app = Context.root();
+    addTearDown(app.dispose);
+    provideTools(app);
+    provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
+    final SessionStore sessions = provideSessions(app);
+    app.provide('workdir', root);
+    app.provide(
+      'checkpointManager',
+      CheckpointManager(
+        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
+        config: const CheckpointConfig(),
+      ),
+    );
+    final ConatusTuiController controller = ConatusTuiController(
+      app: app,
+      sessions: sessions,
+      name: 'test',
+      modelLabel: 'mock',
+      onExit: () {},
+    );
+    addTearDown(controller.dispose);
+    await controller.start();
+    await controller.checkpointSettled;
+
+    await controller.handleLine('/diff');
+
+    expect(
+      controller.diffFiles.map((FileDiff diff) => diff.path),
+      contains('tracked.txt'),
+      reason: 'working 差异必须取自配置 workdir',
+    );
   });
 
   test('TUI 里 /diff 上屏，m 标记、d 切源、q 关闭且不改文件', () async {
@@ -416,8 +473,13 @@ void main() {
         const KeyboardEvent(logicalKey: LogicalKey.keyD),
       );
       expect(controller.diffScope, DiffScope.turn);
-      await _until(() => controller.diffFiles.isNotEmpty);
+      await _until(() => controller.diffNotice != null);
       await tester.pump();
+      expect(
+        controller.diffNotice,
+        contains('还没有可比较的轮次'),
+        reason: 'turn 0 没有上一轮可比',
+      );
 
       await tester.sendKeyEvent(
         const KeyboardEvent(logicalKey: LogicalKey.keyQ),

@@ -334,6 +334,26 @@ void main() {
       reason: '不能退回 base 内容把「差量丢了」伪装成「文件没变」',
     );
   });
+
+  test('workdir 为 \$HOME 时全局 .config/opencode 不进快照', () async {
+    final String sep = Platform.pathSeparator;
+    expect(
+      checkpointExcluded(
+        '.config${sep}opencode${sep}config.json',
+        '.conatus',
+        const <String>[],
+      ),
+      isTrue,
+    );
+    expect(
+      checkpointExcluded(
+        '.config${sep}other${sep}x.json',
+        '.conatus',
+        const <String>[],
+      ),
+      isFalse,
+    );
+  });
 }
 
 /// `path → status` 摘要（断言用）。

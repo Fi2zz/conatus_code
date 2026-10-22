@@ -57,3 +57,71 @@ final RegExp _writeOps = RegExp(
 );
 
 bool _looksWrite(String command) => _writeOps.hasMatch(command);
+
+/// git 写子命令对 `.opencode` 的兜底拒绝（`runGit` 用）。
+///
+/// git 写工具（`git_add` / `git_commit` / `git_branch` / `git_stash`）经
+/// `runGit` 直接拼 argv，不经过 `run_command` 的命令检查；`git checkout
+/// .opencode/x` 之类的操作会真的写用户只读目录。这里按「子命令 + 非选项操作数
+/// 里的受保护路径段」判定，跳过 `-m` 的消息文本（`git commit -m "fix
+/// .opencode"` 不该被误拒）。
+String? gitWriteViolation(String args) {
+  final List<String> tokens = _commandTokens(args);
+  if (tokens.isEmpty || !_gitWriteSubcommands.contains(tokens.first)) {
+    return null;
+  }
+  for (int index = 1; index < tokens.length; index++) {
+    final String token = tokens[index];
+    if (token == '-m' || token == '--message') {
+      index++; // 消息正文不是路径
+      continue;
+    }
+    if (token.startsWith('-')) continue;
+    if (_mentionsProtectedSegment(token)) return kReadOnlyPathMessage;
+  }
+  return null;
+}
+
+/// 会改写工作区 / 索引的 git 子命令（`commit` 的路径参数只影响提交内容，
+/// 不改受保护目录，故不列入）。
+const Set<String> _gitWriteSubcommands = <String>{
+  'add',
+  'rm',
+  'mv',
+  'checkout',
+  'restore',
+  'reset',
+  'clean',
+  'stash',
+  'apply',
+  'am',
+  'merge',
+  'rebase',
+  'cherry-pick',
+  'revert',
+  'pull',
+};
+
+/// 按单引号 / 双引号切分命令行（不处理嵌套引号；git 工具只用单引号）。
+List<String> _commandTokens(String args) {
+  final List<String> out = <String>[];
+  final StringBuffer current = StringBuffer();
+  bool quoted = false;
+  for (int index = 0; index < args.length; index++) {
+    final String char = args[index];
+    if (char == "'" || char == '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (char == ' ' && !quoted) {
+      if (current.isNotEmpty) {
+        out.add(current.toString());
+        current.clear();
+      }
+      continue;
+    }
+    current.write(char);
+  }
+  if (current.isNotEmpty) out.add(current.toString());
+  return out;
+}

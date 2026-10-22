@@ -17,6 +17,12 @@ const int kMaxUntrackedFiles = 200;
 /// 单个未跟踪文件的读取预算（字节）；超过只给文件级截断条目。
 const int kMaxUntrackedBytes = 1024 * 1024;
 
+/// git 子进程环境：只读采集不抢索引锁（`git diff` 会在某些仓库上顺带写
+/// `index.lock`，与用户同时操作会互相阻塞）。
+const Map<String, String> _gitEnvironment = <String, String>{
+  'GIT_OPTIONAL_LOCKS': '0',
+};
+
 /// 工作区差异采集器。
 class WorkingDiff {
   WorkingDiff(this.workdir, {this.acceptsPath});
@@ -35,13 +41,18 @@ class WorkingDiff {
     final _RepoProbe probe = await _probe();
     if (probe == _RepoProbe.notRepo) return null;
     if (probe == _RepoProbe.failed) return const <FileDiff>[];
-    final ProcessResult result = await Process.run('git', <String>[
-      'diff',
-      '--no-ext-diff',
-      '--no-color',
-      '--no-textconv',
-      '--unified=3',
-    ], workingDirectory: workdir);
+    final ProcessResult result = await Process.run(
+      'git',
+      <String>[
+        'diff',
+        '--no-ext-diff',
+        '--no-color',
+        '--no-textconv',
+        '--unified=3',
+      ],
+      workingDirectory: workdir,
+      environment: _gitEnvironment,
+    );
     if (result.exitCode != 0) {
       notice = 'git diff 失败：${result.stderr.toString().trim()}';
       return const <FileDiff>[];
@@ -57,10 +68,12 @@ class WorkingDiff {
 
   Future<_RepoProbe> _probe() async {
     try {
-      final ProcessResult result = await Process.run('git', <String>[
-        'rev-parse',
-        '--is-inside-work-tree',
-      ], workingDirectory: workdir);
+      final ProcessResult result = await Process.run(
+        'git',
+        <String>['rev-parse', '--is-inside-work-tree'],
+        workingDirectory: workdir,
+        environment: _gitEnvironment,
+      );
       if (result.exitCode != 0) return _RepoProbe.notRepo;
       if (result.stdout.toString().trim() != 'true') {
         notice = 'git rev-parse 未返回工作区（裸仓库或受保护仓库）';
@@ -75,12 +88,12 @@ class WorkingDiff {
 
   /// 未跟踪文件按新增处理（`--exclude-standard` 尊重 `.gitignore`）。
   Future<List<FileDiff>> _untrackedDiffs() async {
-    final ProcessResult result = await Process.run('git', <String>[
-      'ls-files',
-      '--others',
-      '--exclude-standard',
-      '-z',
-    ], workingDirectory: workdir);
+    final ProcessResult result = await Process.run(
+      'git',
+      <String>['ls-files', '--others', '--exclude-standard', '-z'],
+      workingDirectory: workdir,
+      environment: _gitEnvironment,
+    );
     if (result.exitCode != 0) {
       notice = 'git ls-files 失败：${result.stderr.toString().trim()}';
       return const <FileDiff>[];

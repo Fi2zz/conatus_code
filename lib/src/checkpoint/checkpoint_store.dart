@@ -77,6 +77,16 @@ abstract class CheckpointStore {
   /// 基线（`/diff` 的两侧都要取到内容）。
   Future<List<int>?> readFile(String sessionId, int turn, String path);
 
+  /// 批量读若干路径在 [turn] 轮的内容（`/diff` 用）。
+  ///
+  /// 归档实现只解压 base / 差量各一遍；缺失的路径不出现在返回的 map 里。
+  /// 读不出的路径（只读 / 越界 / 轮次不存在）一律跳过，不抛。
+  Future<Map<String, List<int>>> readFiles(
+    String sessionId,
+    int turn,
+    Iterable<String> paths,
+  );
+
   /// [fromTurn] → [toTurn] 的文件级变化（`added` / `modified` / `deleted` /
   /// `renamed`，路径升序）。
   ///

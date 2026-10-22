@@ -30,6 +30,25 @@ Map<String, String> _snapshot(String root) {
   return out;
 }
 
+/// 记录 `.opencode` 整树的内容 + 元数据：路径 → 字节 / mtime / 权限位。
+///
+/// 只读承诺不止「字节没变」：遍历、读取、检查点扫描都不该改 mtime 或权限位。
+Map<String, String> _stats(String root) {
+  final Directory dir = Directory(root);
+  if (!dir.existsSync()) return <String, String>{};
+  final Map<String, String> out = <String, String>{};
+  for (final FileSystemEntity entity in dir.listSync(
+    recursive: true,
+    followLinks: false,
+  )) {
+    final FileStat stat = FileStat.statSync(entity.path);
+    out[entity.path] =
+        '${stat.modified.millisecondsSinceEpoch}:'
+        '${stat.mode & 0xFFF}';
+  }
+  return out;
+}
+
 class _ScriptedProvider implements LlmProvider {
   _ScriptedProvider(this._replies);
 
@@ -50,8 +69,7 @@ class _ScriptedProvider implements LlmProvider {
   }) async {
     // 反思调用（`provideReflection` 的 onError 策略）也走同一 provider：
     // 直接回「继续」，不消耗脚本回复，保证会话步数与脚本一一对应。
-    if (messages.length == 1 &&
-        messages.single.content.contains('任务执行监督者')) {
+    if (messages.length == 1 && messages.single.content.contains('任务执行监督者')) {
       return const LlmResult(
         content: '{"decision":"continue","reason":"只读约束"}',
         provider: 's',
@@ -132,12 +150,18 @@ void main() {
     File('${dir.path}/.opencode/commands/x.md').writeAsStringSync('before');
     File('${dir.path}/.opencode/agents/a.md').writeAsStringSync('agent');
     final Map<String, String> before = _snapshot('${dir.path}/.opencode');
+    final Map<String, String> beforeStats = _stats('${dir.path}/.opencode');
 
     final (HeadlessResult result, List<List<LlmMessage>> calls) =
         await _runSessionWithEdits(dir.path, base.path);
 
     expect(result.exitCode, 0);
     expect(_snapshot('${dir.path}/.opencode'), before);
+    expect(
+      _stats('${dir.path}/.opencode'),
+      beforeStats,
+      reason: '只读目录的 mtime / 权限位也不能被改动',
+    );
     // 两次 `.opencode` 写入都被拒绝，且拒绝原因是 READ_ONLY_PATH（不是
     // 「文件已存在」等其它错误）。
     final Iterable<LlmMessage> toolMessages = calls.last.where(

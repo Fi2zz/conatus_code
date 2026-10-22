@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
@@ -237,6 +238,120 @@ void main() {
       expect(warning, contains(file.path));
       expect(wiring.slot.current.rules, isEmpty);
       expect(file.readAsStringSync(), before);
+    });
+
+    test('更具体的 deny 阻止宽泛 shell allow 落盘', () async {
+      final Directory dir = Directory.systemTemp.createTempSync('perm-wiring');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final PermissionWiring wiring = wiringFor(
+        dir.path,
+        configRules: const <PermissionRule>[
+          PermissionRule(
+            action: 'shell',
+            resource: 'git push origin *',
+            effect: PermissionEffect.deny,
+            source: 'config',
+          ),
+        ],
+      );
+      await wiring.load();
+
+      final String? warning = await wiring.remember(
+        const <PermissionRule>[
+          PermissionRule(
+            action: 'shell',
+            resource: 'git push *',
+            effect: PermissionEffect.allow,
+            source: 'project',
+          ),
+        ],
+        const <String>['git push --tags'],
+      );
+
+      expect(warning, isNotNull);
+      expect(warning, contains('git push origin *'));
+      expect(
+        File(
+          '${dir.path}${Platform.pathSeparator}permissions.json',
+        ).existsSync(),
+        isFalse,
+        reason: '拒绝时不能落盘',
+      );
+    });
+
+    test('配置 workdir 后规则解析为绝对路径', () async {
+      final Directory dir = Directory.systemTemp.createTempSync('perm-wiring');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final PermissionWiring wiring = PermissionWiring(
+        store: PermissionStore(
+          '${dir.path}${Platform.pathSeparator}permissions.json',
+        ),
+        workdir: dir.path,
+        configRules: const <PermissionRule>[
+          PermissionRule(
+            action: 'edit',
+            resource: 'src/*',
+            effect: PermissionEffect.deny,
+          ),
+        ],
+      );
+
+      expect(
+        wiring.configRules.single.resource,
+        '${dir.path}${Platform.pathSeparator}src/*'.replaceAll(
+          Platform.pathSeparator,
+          '/',
+        ),
+      );
+    });
+
+    test('损坏文件记录 loadError，/doctor 给出警告', () async {
+      final Directory dir = Directory.systemTemp.createTempSync('perm-wiring');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      File(
+        '${dir.path}${Platform.pathSeparator}permissions.json',
+      ).writeAsStringSync('{broken');
+      final PermissionWiring wiring = wiringFor(dir.path);
+      await wiring.load();
+
+      expect(wiring.loadError, contains('不是合法 JSON'));
+
+      final Context app = Context.root();
+      addTearDown(app.dispose);
+      app.provide('permissionWiring', wiring);
+      final DoctorCheck check = doctorChecks(
+        app,
+      ).firstWhere((DoctorCheck c) => c.name == '权限规则');
+      expect(check.ok, isFalse);
+      expect(check.warning, isTrue);
+      expect(check.hint, contains('权限文件'));
+    });
+
+    test('/doctor 报告被跳过的单条坏规则', () async {
+      final Directory dir = Directory.systemTemp.createTempSync('perm-wiring');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      File(
+        '${dir.path}${Platform.pathSeparator}permissions.json',
+      ).writeAsStringSync(
+        '{"version":1,"rules":['
+        '{"action":"shell","resource":"*","effect":"deny"},'
+        '{"action":"shell","resource":"*","effect":"bogus"}]}',
+      );
+      final PermissionWiring wiring = wiringFor(dir.path);
+      await wiring.load();
+
+      expect(wiring.loadError, isNull);
+      expect(wiring.skippedRules, 1);
+      expect(wiring.rules, hasLength(1));
+
+      final Context app = Context.root();
+      addTearDown(app.dispose);
+      app.provide('permissionWiring', wiring);
+      final DoctorCheck check = doctorChecks(
+        app,
+      ).firstWhere((DoctorCheck c) => c.name == '权限规则');
+      expect(check.warning, isTrue);
+      expect(check.hint, contains('1 条规则非法'));
     });
   });
 }

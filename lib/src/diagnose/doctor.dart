@@ -10,6 +10,7 @@ import 'package:conatus_mcp/conatus_mcp.dart';
 
 import '../../providers.dart';
 import '../budget/cost_tracker.dart';
+import '../permissions/permission_wiring.dart';
 import '../sandbox/jailed_file_system.dart';
 import '../sandbox/rejecting_shell.dart';
 import '../sandbox/sandboxed_shell.dart';
@@ -38,28 +39,25 @@ class DoctorCheck {
 
 /// 聚合体检项（全部只读）。
 List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
-      DoctorCheck(
-        name: '配置文件',
-        ok: app.has('configPath'),
-        hint: '未定位到 config.toml（--config 未指定）',
-      ),
-      _providerCheck(app),
-      _llmChainCheck(app),
-      _modelProfileCheck(app),
-      _mcpCheck(app),
-      DoctorCheck(
-        name: '工具表',
-        ok: (app.get<ToolRegistry>('tools')?.names.isNotEmpty) ?? false,
-        hint: '工具未装配',
-      ),
-      _shellCheck(app),
-      _fsCheck(app),
-      DoctorCheck(
-        name: 'rg',
-        ok: _rgAvailable(),
-        hint: 'PATH 里没有 rg（搜索工具会降级/报错）',
-      ),
-    ];
+  DoctorCheck(
+    name: '配置文件',
+    ok: app.has('configPath'),
+    hint: '未定位到 config.toml（--config 未指定）',
+  ),
+  _providerCheck(app),
+  _llmChainCheck(app),
+  _modelProfileCheck(app),
+  _mcpCheck(app),
+  DoctorCheck(
+    name: '工具表',
+    ok: (app.get<ToolRegistry>('tools')?.names.isNotEmpty) ?? false,
+    hint: '工具未装配',
+  ),
+  _shellCheck(app),
+  _fsCheck(app),
+  _permissionCheck(app),
+  DoctorCheck(name: 'rg', ok: _rgAvailable(), hint: 'PATH 里没有 rg（搜索工具会降级/报错）'),
+];
 
 DoctorCheck _providerCheck(Context app) {
   final ProviderRegistry? registry = app.get<ProviderRegistry>('providers');
@@ -99,15 +97,18 @@ DoctorCheck _llmChainCheck(Context app) {
 }
 
 String _chainHint(LlmChain chain, LlmNotices? notices) {
-  final StringBuffer buffer =
-      StringBuffer('${chain.entries.length} 个候选：${chain.entries.join(' → ')}');
+  final StringBuffer buffer = StringBuffer(
+    '${chain.entries.length} 个候选：${chain.entries.join(' → ')}',
+  );
   final LlmFallbackEvent? last = notices?.lastFallback;
   if (last != null) {
     buffer.write('；最近回退 ${last.fromProvider} → ${last.toProvider}');
   }
   if (chain.skipped.isNotEmpty) {
-    buffer.write('；已跳过 ${chain.skipped.length} 条无效回退'
-        '（${chain.skipped.keys.join('、')}）');
+    buffer.write(
+      '；已跳过 ${chain.skipped.length} 条无效回退'
+      '（${chain.skipped.keys.join('、')}）',
+    );
   }
   return buffer.toString();
 }
@@ -147,7 +148,8 @@ DoctorCheck _modelProfileCheck(Context app) {
       name: '模型窗口 / 费率',
       ok: false,
       warning: true,
-      hint: '${tracker.provider}/${tracker.model}：models.dev 无此记录'
+      hint:
+          '${tracker.provider}/${tracker.model}：models.dev 无此记录'
           '（上下文未知、费率按 0 计）',
     );
   }
@@ -155,7 +157,8 @@ DoctorCheck _modelProfileCheck(Context app) {
     name: '模型窗口 / 费率',
     ok: true,
     warning: !profile.hasContext || !profile.hasPricing,
-    hint: '窗口 ${profile.hasContext ? '${profile.contextLength ~/ 1000}k' : '未知'}'
+    hint:
+        '窗口 ${profile.hasContext ? '${profile.contextLength ~/ 1000}k' : '未知'}'
         ' · ${profile.rateSummary}',
   );
 }
@@ -188,6 +191,34 @@ DoctorCheck _fsCheck(Context app) {
     ok: true,
     warning: !jailed,
     hint: jailed ? '生效' : '未启用（fs_jail=false）',
+  );
+}
+
+/// 权限规则载入状态：`permissions.json` 坏掉时 deny 会静默失效，必须让
+/// `/doctor` 说出来（启动系统提示另有一份，见 `tui_app.dart`）。
+DoctorCheck _permissionCheck(Context app) {
+  final PermissionWiring? wiring = app.get<PermissionWiring>(
+    'permissionWiring',
+  );
+  if (wiring == null) {
+    return const DoctorCheck(name: '权限规则', ok: true, hint: '未装配');
+  }
+  final String? error = wiring.loadError;
+  if (error != null) {
+    return DoctorCheck(name: '权限规则', ok: false, warning: true, hint: error);
+  }
+  if (wiring.skippedRules > 0) {
+    return DoctorCheck(
+      name: '权限规则',
+      ok: false,
+      warning: true,
+      hint: '${wiring.skippedRules} 条规则非法已跳过（permissions.json）',
+    );
+  }
+  return DoctorCheck(
+    name: '权限规则',
+    ok: true,
+    hint: '${wiring.rules.length} 条生效',
   );
 }
 

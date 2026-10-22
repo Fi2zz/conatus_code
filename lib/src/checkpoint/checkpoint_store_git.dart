@@ -269,6 +269,22 @@ class GitShadowStore implements CheckpointStore {
     return result.stdoutBytes ?? const Utf8Encoder().convert(result.stdout);
   }
 
+  /// 批量读：逐路径 `git show`（影子仓库没有可比归档更快的批式接口，
+  /// 但内容寻址让单次读取足够便宜；缺失路径直接跳过）。
+  @override
+  Future<Map<String, List<int>>> readFiles(
+    String sessionId,
+    int turn,
+    Iterable<String> paths,
+  ) async {
+    final Map<String, List<int>> found = <String, List<int>>{};
+    for (final String path in paths) {
+      final List<int>? bytes = await readFile(sessionId, turn, path);
+      if (bytes != null) found[path] = bytes;
+    }
+    return found;
+  }
+
   /// [fromTurn] → [toTurn] 的文件级变化（`git diff --name-status -z -M`）。
   @override
   Future<List<CheckpointFileChange>> changesBetween(

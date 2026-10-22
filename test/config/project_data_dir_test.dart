@@ -60,4 +60,41 @@ void main() {
 
     expect(a, b);
   });
+
+  test('project_dir 指向 .opencode：拒绝并回落缺省目录', () {
+    final String dir = resolveProjectDataDir(
+      workdir: work.path,
+      projectDir: '.opencode/state',
+      env: env(),
+    );
+
+    expect(
+      projectDirProtected(work.path, '.opencode/state', env: env()),
+      isTrue,
+    );
+    expect(dir, isNot(contains('.opencode')));
+    expect(dir, startsWith('${home.path}/.nava/projects/'));
+  });
+
+  test('project_dir 指向全局 opencode：同样拒绝', () {
+    final String global = '${home.path}/.config/opencode/state';
+
+    expect(projectDirProtected(work.path, global, env: env()), isTrue);
+    expect(
+      resolveProjectDataDir(workdir: work.path, projectDir: global, env: env()),
+      startsWith('${home.path}/.nava/projects/'),
+    );
+  });
+
+  test('project_dir 的符号链接指向 .opencode：按真实路径拒绝', () {
+    if (Platform.isWindows) return;
+    final Directory opencode = Directory(
+      '${work.path}${Platform.pathSeparator}.opencode',
+    )..createSync();
+    Link(
+      '${work.path}${Platform.pathSeparator}state',
+    ).createSync(opencode.path);
+
+    expect(projectDirProtected(work.path, 'state', env: env()), isTrue);
+  });
 }

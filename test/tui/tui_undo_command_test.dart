@@ -350,21 +350,21 @@ void main() {
   });
 
   test('默认确认路径：选项浮层弹出并确认后回滚', () async {
-    final (ConatusTuiController controller, Context app, String root) =
-        await _build(
-          autoConfirm: false,
-          beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
-        );
+    final (
+      ConatusTuiController controller,
+      Context app,
+      String root,
+    ) = await _build(
+      autoConfirm: false,
+      beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
+    );
     addTearDown(() => _disposeAfterSettle(app, controller));
     await _twoTurns(controller, root);
 
     final Future<void> pending = controller.handleLine('/undo');
     await _until(() => controller.choice.open);
 
-    expect(
-      controller.choice.request!.title,
-      contains('尚未快照的外部改动'),
-    );
+    expect(controller.choice.request!.title, contains('尚未快照的外部改动'));
     controller.choice.confirm();
     await pending;
 
@@ -374,11 +374,14 @@ void main() {
 
   test('撤销进行中：拒绝新 prompt 与并发 /undo，不产生半套状态', () async {
     final _ScriptedProvider provider = _ScriptedProvider();
-    final (ConatusTuiController controller, Context app, String root) =
-        await _build(
-          provider: provider,
-          beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
-        );
+    final (
+      ConatusTuiController controller,
+      Context app,
+      String root,
+    ) = await _build(
+      provider: provider,
+      beforeStart: (String root) => _write(root, 'a.txt', 'v0'),
+    );
     addTearDown(() => _disposeAfterSettle(app, controller));
     await _twoTurns(controller, root);
     final String original = controller.sessionId;
@@ -395,15 +398,9 @@ void main() {
 
     // 撤销在飞的整段窗口里：新 prompt 与第二次 /undo 都被拒绝。
     await controller.handleLine('插队');
-    expect(
-      controller.transcript.messages.last.text,
-      contains('正在撤销/重做'),
-    );
+    expect(controller.transcript.messages.last.text, contains('正在撤销/重做'));
     await controller.handleLine('/undo');
-    expect(
-      controller.transcript.messages.last.text,
-      contains('正在撤销/重做'),
-    );
+    expect(controller.transcript.messages.last.text, contains('正在撤销/重做'));
 
     gate.complete(true);
     await pending;
@@ -497,5 +494,48 @@ void main() {
       controller.dispose();
       app.dispose();
     }
+  });
+
+  test('撤销后新建文件：取消重做时保留文件，确认后才覆盖', () async {
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    await _twoTurns(controller, root);
+
+    await controller.handleLine('/undo');
+    _write(root, 'notes.txt', '撤销后新建');
+    controller.confirmRevert = (String _) async => false;
+
+    await controller.handleLine('/redo');
+
+    expect(_texts(controller).last, contains('已取消重做'));
+    expect(_read(root, 'notes.txt'), '撤销后新建', reason: '取消时不能删新文件');
+    expect(_read(root, 'a.txt'), 'v1', reason: '取消时不能恢复文件');
+
+    controller.confirmRevert = (String _) async => true;
+    await controller.handleLine('/redo');
+
+    expect(_read(root, 'a.txt'), 'v2');
+    expect(
+      File('$root${Platform.pathSeparator}notes.txt').existsSync(),
+      isFalse,
+      reason: '确认后按 rsync 语义删除撤销后新建的文件',
+    );
+  });
+
+  test('切会话清掉撤销点：/redo 不可用且不动文件', () async {
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    await _twoTurns(controller, root);
+
+    await controller.handleLine('/undo');
+    expect(_read(root, 'a.txt'), 'v1');
+
+    await controller.newSession();
+    await controller.handleLine('/redo');
+
+    expect(_texts(controller).last, contains('没有可重做'));
+    expect(_read(root, 'a.txt'), 'v1', reason: '别的会话里不能覆盖当前工作区');
   });
 }

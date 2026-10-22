@@ -1,5 +1,7 @@
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../sandbox/protected_command.dart';
+
 /// 单次只读 git 命令的输出上限（字节）。
 const int _maxOutputBytes = 1024 * 1024;
 
@@ -21,23 +23,46 @@ class GitRun {
 /// 执行只读 git 命令：禁用分页器、限时、限输出，非零退出转成失败结果。
 ///
 /// 走 `shell` 接缝，因此与 rg 受同一套命令策略约束（M3 起同受沙箱约束）。
-Future<GitRun> runGit(ShellExecutor shell, String args, Duration timeout) async {
-  final ShellExecSpec spec = shell.resolve(ShellExecRequest(
-    command: 'git --no-pager $args',
-    timeoutMs: timeout.inMilliseconds,
-    stdoutMaxBytes: _maxOutputBytes,
-  ));
+/// 另外在构造 argv 后先过 `.opencode` 写保护：git 写工具不经过
+/// `run_command` 的命令检查，`git checkout .opencode/x` 会真的改写只读目录。
+Future<GitRun> runGit(
+  ShellExecutor shell,
+  String args,
+  Duration timeout,
+) async {
+  final String? blocked = gitWriteViolation(args);
+  if (blocked != null) {
+    return GitRun.failure(
+      ToolResult.failure(
+        blocked,
+        error: const ToolError(kReadOnlyCommandCode, 'read-only path'),
+      ),
+    );
+  }
+  final ShellExecSpec spec = shell.resolve(
+    ShellExecRequest(
+      command: 'git --no-pager $args',
+      timeoutMs: timeout.inMilliseconds,
+      stdoutMaxBytes: _maxOutputBytes,
+    ),
+  );
   final ShellRunResult result = await shell.run(spec);
   if (result.timedOut) {
-    return GitRun.failure(ToolResult.failure('git 执行超时',
-        error: const ToolError('GIT_TIMEOUT', 'timeout')));
+    return GitRun.failure(
+      ToolResult.failure(
+        'git 执行超时',
+        error: const ToolError('GIT_TIMEOUT', 'timeout'),
+      ),
+    );
   }
   if (result.exitCode != 0) {
     final String message = result.stderr.text.trim();
-    return GitRun.failure(ToolResult.failure(
-      message.isEmpty ? 'git 退出码 ${result.exitCode}' : message,
-      error: ToolError('GIT_ERROR', message),
-    ));
+    return GitRun.failure(
+      ToolResult.failure(
+        message.isEmpty ? 'git 退出码 ${result.exitCode}' : message,
+        error: ToolError('GIT_ERROR', message),
+      ),
+    );
   }
   return GitRun.text(result.stdout.text);
 }
@@ -65,22 +90,31 @@ class GitStatusTool extends Tool {
 
   @override
   Future<ToolResult> call(ToolContext ctx) async {
-    final GitRun run = await runGit(_shell, 'status --porcelain --branch', timeout!);
+    final GitRun run = await runGit(
+      _shell,
+      'status --porcelain --branch',
+      timeout!,
+    );
     final ToolResult? failure = run.failure;
     if (failure != null) return failure;
     final List<String> lines = _lines(run.text);
     final int changed = lines.where((String l) => !l.startsWith('##')).length;
     if (changed == 0) {
-      return ToolResult.success('工作区干净', value: <String, Object?>{'clean': true});
+      return ToolResult.success(
+        '工作区干净',
+        value: <String, Object?>{'clean': true},
+      );
     }
-    return ToolResult.success(lines.join('\n'),
-        value: <String, Object?>{'clean': false, 'changed': changed});
+    return ToolResult.success(
+      lines.join('\n'),
+      value: <String, Object?>{'clean': false, 'changed': changed},
+    );
   }
 
   List<String> _lines(String text) => <String>[
-        for (final String line in text.split('\n'))
-          if (line.trimRight().isNotEmpty) line.trimRight(),
-      ];
+    for (final String line in text.split('\n'))
+      if (line.trimRight().isNotEmpty) line.trimRight(),
+  ];
 }
 
 /// 查看未提交差异（`git diff`）。只读。
@@ -107,10 +141,10 @@ class GitDiffTool extends Tool {
 
   @override
   List<ParamSpec> get params => <ParamSpec>[
-        ParamSpec.string('path', description: '限定路径'),
-        ParamSpec.boolean('staged', description: '只看已暂存（--staged）'),
-        ParamSpec.integer('context', description: '上下文行数，默认 3'),
-      ];
+    ParamSpec.string('path', description: '限定路径'),
+    ParamSpec.boolean('staged', description: '只看已暂存（--staged）'),
+    ParamSpec.integer('context', description: '上下文行数，默认 3'),
+  ];
 
   @override
   Future<ToolResult> call(ToolContext ctx) async {
@@ -121,16 +155,21 @@ class GitDiffTool extends Tool {
     if (text.isEmpty) {
       return ToolResult.success('无差异', value: <String, Object?>{'empty': true});
     }
-    return ToolResult.success(text, value: <String, Object?>{
-      'empty': false,
-      'lines': text.split('\n').length,
-    });
+    return ToolResult.success(
+      text,
+      value: <String, Object?>{
+        'empty': false,
+        'lines': text.split('\n').length,
+      },
+    );
   }
 
   String _args(ToolContext ctx) {
     final List<String> parts = <String>['diff'];
     if (ctx.optional<bool>('staged') ?? false) parts.add('--staged');
-    if (ctx.has('context')) parts.addAll(<String>['-U', '${ctx.integer('context')}']);
+    if (ctx.has('context')) {
+      parts.addAll(<String>['-U', '${ctx.integer('context')}']);
+    }
     parts.add('--');
     if (ctx.has('path')) parts.add(gitQuote(ctx.str('path')));
     return parts.join(' ');
@@ -167,13 +206,13 @@ class GitCommitTool extends Tool {
 
   @override
   List<ParamSpec> get params => <ParamSpec>[
-        ParamSpec.string(
-          'message',
-          required: true,
-          description: '提交信息（如 feat(code): 新增 /commit 命令）',
-        ),
-        ParamSpec.string('body', description: '补充正文（可选）'),
-      ];
+    ParamSpec.string(
+      'message',
+      required: true,
+      description: '提交信息（如 feat(code): 新增 /commit 命令）',
+    ),
+    ParamSpec.string('body', description: '补充正文（可选）'),
+  ];
 
   @override
   Future<ToolResult> call(ToolContext ctx) async {
