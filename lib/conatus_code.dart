@@ -173,6 +173,47 @@ export 'src/sandbox/seatbelt_profile.dart'
         buildSeatbeltProfile,
         defaultWritableCaches,
         seatbeltMachAllowlist;
+export 'src/story/story.dart' show StoryRecorder, kStoryToolNames, provideStory;
+export 'src/story/story_blocks.dart'
+    show
+        blockBelongsTo,
+        blocksOfFile,
+        normalizeParagraphText,
+        opTextOf,
+        paragraphBlockId,
+        pathOfBlock,
+        renderFileText,
+        splitParagraphs;
+export 'src/story/story_commands.dart'
+    show
+        StoryDiscardResult,
+        discardStoryPatch,
+        renderStoryDiscard,
+        renderStoryPreview;
+export 'src/story/story_conflict.dart'
+    show
+        applyPendingOp,
+        conflictClose,
+        kConflictOpen,
+        kConflictSplit,
+        mergeConflictVersions,
+        readPendingBases;
+export 'src/story/story_notices.dart'
+    show StoryNotices, StoryFileChange, diffLines, renderEditNotice;
+export 'src/story/story_pending.dart'
+    show StoryPending, bindStoryPending, renderStoryPending, tryCompileOps;
+export 'src/story/story_render.dart'
+    show renderStoryTimeline, storyEditedPaths, storyOpLabel, storyPatchTime;
+export 'src/story/story_review.dart' show StoryReviewGate, previewEditedOps;
+export 'src/story/story_scan.dart' show kStorySkipDirs, kStoryTextExtensions;
+export 'src/story/story_sync.dart'
+    show
+        anchorForNewFile,
+        buildSyncOps,
+        kParagraphLimit,
+        syncFileOps,
+        wholeFileOps;
+export 'src/story/story_watcher.dart' show StoryWatcher;
 export 'src/subagent/subagent_progress.dart'
     show SubAgentLine, SubAgentProgressStore;
 export 'src/subagent/swarm_member.dart'
