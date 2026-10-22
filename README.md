@@ -18,6 +18,7 @@
 - 🗺️ 计划闭环（plan_write 建计划、update_plan 执行中推进、计划面板实时渲染）
 - 🩹 失败自愈（工具失败自动反思重试，可按需重规划）
 - ⏱️ 预算护栏（每轮墙钟 + 上下文 token 估算 + 成本跟踪）
+- 📜 故事层（可选，默认关闭）：编辑即补丁、事前审阅、`/story` 时间轴与分叉
 
 ## 快速开始
 
@@ -92,6 +93,10 @@ workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
 [approval]
 mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
 
+[story]
+# enabled = false             # 人机双写故事层（可选）：开启后写工具先成待定补丁，
+                              # /story 查看时间轴并 apply/reject；见 docs/story.md
+
 [sandbox]
 enabled = true                # Layer 2：OS 级沙箱（命令执行）；默认开启
 fs_jail = true                # Layer 1：应用层文件 jail（防误操作）；默认开启
@@ -150,6 +155,18 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 - 变化检测：相对 base 的 mtime+size + SHA-256 哈希（stat 相同也兜底）。
 - 对话切点：`lastEventId` 为 null（全新会话的 turn 0）时切到全新空会话。
 - 关闭：`[checkpoint] enabled = false`（/rewind 提示不可用）。
+
+## 人机双写故事层（可选）
+
+`[story] enabled = true` 时，`write_file` / `edit_file` / `apply_patch` 不再直接
+落盘：先登记为**待定补丁**，用 `/story pending` 查看、`/story apply <i>` 接受、
+`/story reject <i>` 丢弃。人的直接编辑也会被登记为补丁，AI 在下一轮请求前收到
+「改了哪些文件」的摘要通报。`/story` 是补丁时间轴，支持 `preview` / `discard` /
+`fork`。
+
+默认关闭，关闭时行为与普通编码会话完全一致。数据落在
+`~/.nava/projects/<编码工作区路径>/story-log/`。完整语义、冲突处理与已知边界见
+[docs/story.md](docs/story.md)。
 
 ## 后台任务（`/background`）
 
