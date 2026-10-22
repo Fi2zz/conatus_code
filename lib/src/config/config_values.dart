@@ -129,7 +129,10 @@ class ConfigValues {
   ///
   /// [path] 只用于出错信息（[key] 是查找键，二者在嵌套表里不同名）。
   Map<String, String> readStringMap(
-      Map<String, dynamic> table, String key, String path) {
+    Map<String, dynamic> table,
+    String key,
+    String path,
+  ) {
     final Object? value = table[key];
     if (value == null) return const <String, String>{};
     if (value is! Map) throw ConfigException('$source：$path 必须是表。');

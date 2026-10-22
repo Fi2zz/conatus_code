@@ -37,7 +37,10 @@ void main() {
       expect(rules.single.resource, 'git *');
       expect(rules.single.effect, PermissionEffect.allow);
       expect(rules.single.source, 'project');
-      expect(permissionPatternMatches(rules.single.resource, 'git status'), isTrue);
+      expect(
+        permissionPatternMatches(rules.single.resource, 'git status'),
+        isTrue,
+      );
     });
 
     test('路径工具保存具体路径（不放大到目录）', () {
@@ -64,8 +67,10 @@ void main() {
           resources: <String>['config/.env', 'src/a.dart'],
         ),
       );
-      expect(rules.map((PermissionRule r) => r.resource),
-          <String>['config/.env', 'src/a.dart']);
+      expect(rules.map((PermissionRule r) => r.resource), <String>[
+        'config/.env',
+        'src/a.dart',
+      ]);
     });
 
     test('相对路径 / ~ 规范化后再保存', () {
@@ -162,8 +167,7 @@ void main() {
           resources: <String>['/tmp/a.txt'],
         ),
       );
-      final String description =
-          choice.request!.choices[1].description;
+      final String description = choice.request!.choices[1].description;
       expect(description, contains('read /tmp/a.txt'));
 
       choice
@@ -201,10 +205,10 @@ void main() {
         ..confirm();
       expect(await pending, isTrue);
 
-      expect(
-        remembered.map((PermissionRule r) => r.resource),
-        <String>['config/.env', 'src/a.dart'],
-      );
+      expect(remembered.map((PermissionRule r) => r.resource), <String>[
+        'config/.env',
+        'src/a.dart',
+      ]);
     });
 
     test('没有具体资源时说明仅会话有效且不回调', () async {
@@ -218,7 +222,11 @@ void main() {
       );
 
       final Future<bool> pending = gate.request(
-        _request(tool: 'fs__read_file', action: 'fs_read_file', resources: <String>['*']),
+        _request(
+          tool: 'fs__read_file',
+          action: 'fs_read_file',
+          resources: <String>['*'],
+        ),
       );
       expect(choice.request!.choices[1].description, contains('仅本次会话'));
 

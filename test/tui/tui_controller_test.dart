@@ -36,8 +36,7 @@ class _HangingProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}
@@ -58,16 +57,14 @@ class _ScriptedProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) async =>
-      _replies[_index++];
+  }) async => _replies[_index++];
 
   @override
   Stream<LlmStreamEvent> chatStream(
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}
@@ -98,8 +95,7 @@ class _MemoryCronStorage implements CronStorage {
   List<Map<String, Object?>> loadHistory() => _history;
 
   @override
-  void saveHistory(List<Map<String, Object?>> records) =>
-      _history = records;
+  void saveHistory(List<Map<String, Object?>> records) => _history = records;
 }
 
 Future<(ConatusTuiController, Context)> _build(
@@ -112,11 +108,13 @@ Future<(ConatusTuiController, Context)> _build(
 }) async {
   final Context app = Context.root();
   provideTools(app);
-  app.effect(() => app.tools.fn(
-        'get_time',
-        description: '返回时间',
-        handler: (ToolContext ctx) async => ToolResult.success('12:00'),
-      ));
+  app.effect(
+    () => app.tools.fn(
+      'get_time',
+      description: '返回时间',
+      handler: (ToolContext ctx) async => ToolResult.success('12:00'),
+    ),
+  );
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider(replies)]));
   provideMemory(app);
   if (withCron) {
@@ -159,37 +157,39 @@ void main() {
 
     await controller.handleLine('在吗');
 
-    final List<TuiRole> roles =
-        controller.transcript.messages.map((TuiMessage m) => m.role).toList();
+    final List<TuiRole> roles = controller.transcript.messages
+        .map((TuiMessage m) => m.role)
+        .toList();
     expect(roles, <TuiRole>[TuiRole.user, TuiRole.assistant]);
     expect(controller.transcript.messages.last.text, '你好呀');
     app.dispose();
   });
 
   test('工具调用轮：回显工具调用与结果，再收口', () async {
-    final (ConatusTuiController controller, Context app) = await _build(
-      <LlmResult>[
-        const LlmResult(
-          content: '',
-          provider: 'scripted',
-          model: 'm',
-          toolCalls: <LlmToolCall>[
-            LlmToolCall(id: '1', name: 'get_time'),
-          ],
-        ),
-        const LlmResult(
-            content: '现在是 12:00。', provider: 'scripted', model: 'm'),
-      ],
-    );
+    final (
+      ConatusTuiController controller,
+      Context app,
+    ) = await _build(<LlmResult>[
+      const LlmResult(
+        content: '',
+        provider: 'scripted',
+        model: 'm',
+        toolCalls: <LlmToolCall>[LlmToolCall(id: '1', name: 'get_time')],
+      ),
+      const LlmResult(content: '现在是 12:00。', provider: 'scripted', model: 'm'),
+    ]);
 
     await controller.handleLine('几点？');
 
-    final List<TuiRole> roles =
-        controller.transcript.messages.map((TuiMessage m) => m.role).toList();
-    expect(
-      roles,
-      <TuiRole>[TuiRole.user, TuiRole.stage, TuiRole.tool, TuiRole.assistant],
-    );
+    final List<TuiRole> roles = controller.transcript.messages
+        .map((TuiMessage m) => m.role)
+        .toList();
+    expect(roles, <TuiRole>[
+      TuiRole.user,
+      TuiRole.stage,
+      TuiRole.tool,
+      TuiRole.assistant,
+    ]);
     expect(
       controller.transcript.messages
           .firstWhere((TuiMessage m) => m.role == TuiRole.stage)
@@ -221,8 +221,9 @@ void main() {
 
     await controller.handleLine('几点？');
 
-    final TuiMessage tool = controller.transcript.messages
-        .firstWhere((TuiMessage m) => m.role == TuiRole.tool);
+    final TuiMessage tool = controller.transcript.messages.firstWhere(
+      (TuiMessage m) => m.role == TuiRole.tool,
+    );
     expect(tool.expanded, isFalse);
 
     controller.toggleToolExpanded();
@@ -237,17 +238,19 @@ void main() {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
     );
-    controller.transcript.apply(SessionEvent(
-      seq: 0,
-      type: kPlanEvent,
-      time: DateTime.fromMillisecondsSinceEpoch(0),
-      data: <String, Object?>{
-        'goal': '修 bug',
-        'steps': <Map<String, Object?>>[
-          <String, Object?>{'id': 's1', 'text': '复现', 'done': false},
-        ],
-      },
-    ));
+    controller.transcript.apply(
+      SessionEvent(
+        seq: 0,
+        type: kPlanEvent,
+        time: DateTime.fromMillisecondsSinceEpoch(0),
+        data: <String, Object?>{
+          'goal': '修 bug',
+          'steps': <Map<String, Object?>>[
+            <String, Object?>{'id': 's1', 'text': '复现', 'done': false},
+          ],
+        },
+      ),
+    );
 
     final TuiMessage plan = controller.transcript.planMessage!;
     expect(plan.expanded, isTrue);
@@ -296,7 +299,9 @@ void main() {
     expect(controller.planPrompt.active, isTrue);
     expect(controller.transcript.messages.last.text, contains('已进入 Plan Mode'));
     expect(
-        controller.transcript.messages.last.text, contains('exit_plan_mode'));
+      controller.transcript.messages.last.text,
+      contains('exit_plan_mode'),
+    );
 
     await controller.confirmPlanPanel();
     expect(controller.planPrompt.active, isFalse);
@@ -308,12 +313,14 @@ void main() {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
     );
-    app.effect(() => app.tools.fn(
-          'danger',
-          description: '有副作用的操作',
-          riskLevel: ToolRisk.medium,
-          handler: (ToolContext ctx) async => ToolResult.success('done'),
-        ));
+    app.effect(
+      () => app.tools.fn(
+        'danger',
+        description: '有副作用的操作',
+        riskLevel: ToolRisk.medium,
+        handler: (ToolContext ctx) async => ToolResult.success('done'),
+      ),
+    );
     Future<ToolResult> callDanger() =>
         app.tools.call(const ToolCall(name: 'danger'));
 
@@ -370,10 +377,7 @@ void main() {
     await controller.handleLine('/goal set A');
     await controller.handleLine('/goal set B');
 
-    expect(
-      controller.transcript.messages.last.text,
-      contains('目标操作失败'),
-    );
+    expect(controller.transcript.messages.last.text, contains('目标操作失败'));
     app.dispose();
   });
 
@@ -473,10 +477,7 @@ void main() {
     await controller.handleLine('/session work');
 
     expect(controller.sessionId, 'work');
-    expect(
-      controller.transcript.messages.last.text,
-      contains('已切换到会话 work'),
-    );
+    expect(controller.transcript.messages.last.text, contains('已切换到会话 work'));
     app.dispose();
   });
 
@@ -488,8 +489,10 @@ void main() {
 
     expect(
       controller.sessionId,
-      matches(r'^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-'
-          r'[0-9a-f]{12}$'),
+      matches(
+        r'^session_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-'
+        r'[0-9a-f]{12}$',
+      ),
     );
     app.dispose();
   });
@@ -541,7 +544,10 @@ void main() {
       controller.permissionPrompt.current,
       TuiPermissionMode.askWhenNeeded,
     );
-    expect(controller.permissionPrompt.selected, TuiPermissionMode.askWhenNeeded);
+    expect(
+      controller.permissionPrompt.selected,
+      TuiPermissionMode.askWhenNeeded,
+    );
     controller.permissionPrompt.cancel();
     await line;
     app.dispose();
@@ -579,10 +585,7 @@ void main() {
     await line;
 
     expect(controller.permissionMode, TuiPermissionMode.askWhenNeeded);
-    expect(
-      controller.transcript.messages.single.text,
-      contains('已取消权限模式切换'),
-    );
+    expect(controller.transcript.messages.single.text, contains('已取消权限模式切换'));
     app.dispose();
   });
 
@@ -826,8 +829,7 @@ void main() {
     final CronService cron = app.require<CronService>('cron');
 
     await controller.handleLine('/cron history');
-    expect(
-        controller.transcript.messages.last.text, contains('尚无定时任务运行记录'));
+    expect(controller.transcript.messages.last.text, contains('尚无定时任务运行记录'));
 
     cron.addDynamicTask(<String, Object?>{
       'id': 't1',
@@ -852,12 +854,14 @@ void main() {
       const <LlmResult>[],
       withApproval: true,
     );
-    app.effect(() => app.tools.fn(
-          'risky',
-          description: '有副作用的操作',
-          riskLevel: ToolRisk.medium,
-          handler: (ToolContext ctx) async => ToolResult.success('done'),
-        ));
+    app.effect(
+      () => app.tools.fn(
+        'risky',
+        description: '有副作用的操作',
+        riskLevel: ToolRisk.medium,
+        handler: (ToolContext ctx) async => ToolResult.success('done'),
+      ),
+    );
 
     // 缺省 Ask When Needed（阈值 high）：medium 工具放行。
     expect(controller.permissionMode, TuiPermissionMode.askWhenNeeded);
@@ -874,8 +878,9 @@ void main() {
     );
 
     // Always Ask（阈值 medium）：medium 工具被拦，浮层等待选择。
-    final Future<ToolResult> blocked =
-        app.tools.call(const ToolCall(name: 'risky'));
+    final Future<ToolResult> blocked = app.tools.call(
+      const ToolCall(name: 'risky'),
+    );
     expect(controller.choice.open, isTrue);
     controller.choice
       ..move(2)
@@ -909,19 +914,22 @@ void main() {
       const <LlmResult>[],
       withApproval: true,
     );
-    app.effect(() => app.tools.fn(
-          'risky',
-          description: '有副作用的操作',
-          riskLevel: ToolRisk.medium,
-          handler: (ToolContext ctx) async => ToolResult.success('done'),
-        ));
+    app.effect(
+      () => app.tools.fn(
+        'risky',
+        description: '有副作用的操作',
+        riskLevel: ToolRisk.medium,
+        handler: (ToolContext ctx) async => ToolResult.success('done'),
+      ),
+    );
     controller.applyPermissionMode(TuiPermissionMode.alwaysAsk);
 
     controller.dispose();
 
     // 权限中间件属于根上下文，不随控制器销毁；会话切换也不重挂。
-    final Future<ToolResult> blocked =
-        app.tools.call(const ToolCall(name: 'risky'));
+    final Future<ToolResult> blocked = app.tools.call(
+      const ToolCall(name: 'risky'),
+    );
     expect(controller.choice.open, isTrue);
     controller.choice.cancel();
     expect((await blocked).error!.code, 'APPROVAL_DENIED');
@@ -935,10 +943,12 @@ void main() {
     int calls = 0;
     controller.onChanged = () => calls++;
 
-    final Future<String?> pending = controller.choice.ask(const TuiChoiceRequest(
-      title: '选一个',
-      choices: <TuiChoice>[TuiChoice(id: 'a', label: '甲')],
-    ));
+    final Future<String?> pending = controller.choice.ask(
+      const TuiChoiceRequest(
+        title: '选一个',
+        choices: <TuiChoice>[TuiChoice(id: 'a', label: '甲')],
+      ),
+    );
     controller.choice.confirm();
     await pending;
 
@@ -999,17 +1009,20 @@ void main() {
       withApproval: true,
     );
     final TuiPermissionGate gate = app.require<TuiPermissionGate>('approval');
-    app.effect(() => app.tools.fn(
-          'risky',
-          description: '有副作用的操作',
-          riskLevel: ToolRisk.medium,
-          handler: (ToolContext ctx) async => ToolResult.success('done'),
-        ));
+    app.effect(
+      () => app.tools.fn(
+        'risky',
+        description: '有副作用的操作',
+        riskLevel: ToolRisk.medium,
+        handler: (ToolContext ctx) async => ToolResult.success('done'),
+      ),
+    );
     controller.applyPermissionMode(TuiPermissionMode.alwaysAsk);
 
     // 选「总是允许」把它加进白名单。
-    final Future<ToolResult> first =
-        app.tools.call(const ToolCall(name: 'risky'));
+    final Future<ToolResult> first = app.tools.call(
+      const ToolCall(name: 'risky'),
+    );
     controller.choice
       ..move(1)
       ..confirm();
@@ -1026,20 +1039,23 @@ void main() {
       const <LlmResult>[],
       withApproval: true,
     );
-    app.effect(() => app.tools.fn(
-          'risky',
-          description: '有副作用的操作',
-          riskLevel: ToolRisk.medium,
-          handler: (ToolContext ctx) async => ToolResult.success('done'),
-        ));
+    app.effect(
+      () => app.tools.fn(
+        'risky',
+        description: '有副作用的操作',
+        riskLevel: ToolRisk.medium,
+        handler: (ToolContext ctx) async => ToolResult.success('done'),
+      ),
+    );
     controller.applyPermissionMode(TuiPermissionMode.alwaysAsk);
 
     await controller.switchSession('s2');
     await controller.switchSession('s1');
     expect(controller.permissionMode, TuiPermissionMode.alwaysAsk);
 
-    final Future<ToolResult> blocked =
-        app.tools.call(const ToolCall(name: 'risky'));
+    final Future<ToolResult> blocked = app.tools.call(
+      const ToolCall(name: 'risky'),
+    );
     expect(controller.choice.open, isTrue);
     controller.choice.cancel();
     expect((await blocked).error!.code, 'APPROVAL_DENIED');

@@ -46,7 +46,7 @@ class TuiPermissionGate implements Approval {
   ///
   /// 没有具体资源时不会回调（保持会话级放行）；回调失败不影响本次放行。
   final void Function(List<PermissionRule> rules, List<String> resources)?
-      rememberRules;
+  rememberRules;
 
   /// 文件系统能力缝；用于把「信任此文件夹」判定为目录包含关系。
   /// 未提供时该选项不出现（退化为「总是允许该工具」）。
@@ -65,9 +65,9 @@ class TuiPermissionGate implements Approval {
 
   /// 本会话内已授权的「工具 + 目录」。
   List<String> get trustedFolders => <String>[
-        for (final _TrustedFolder trust in _trustedFolders)
-          '${trust.toolName} → ${trust.folder}',
-      ];
+    for (final _TrustedFolder trust in _trustedFolders)
+      '${trust.toolName} → ${trust.folder}',
+  ];
 
   /// 清空所有信任记录（切会话时调用：信任是会话级状态）。
   void resetAlwaysAllowed() {
@@ -155,8 +155,11 @@ class TuiPermissionGate implements Approval {
 
   /// 用差异预览替换请求的静态描述；预览不可得时原样返回。
   Future<ApprovalRequest> _withPreview(ApprovalRequest request) async {
-    final String? preview =
-        await buildApprovalPreview(_fs, request.toolName, request.arguments);
+    final String? preview = await buildApprovalPreview(
+      _fs,
+      request.toolName,
+      request.arguments,
+    );
     if (preview == null) return request;
     return ApprovalRequest(
       id: request.id,

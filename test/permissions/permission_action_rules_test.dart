@@ -88,8 +88,11 @@ void main() {
         <String, Object?>{'path': 'a.txt'},
       );
       expect(edit.action, 'edit');
-      final ApprovalRequest patch =
-          await askFor('apply_patch', 'edit', <String, Object?>{'patch': '--- a'});
+      final ApprovalRequest patch = await askFor(
+        'apply_patch',
+        'edit',
+        <String, Object?>{'patch': '--- a'},
+      );
       expect(patch.action, 'edit');
     });
 
@@ -163,7 +166,10 @@ void main() {
         'apply_patch',
       ]) {
         final ToolResult result = await rig.tools.call(
-          permissionCall(tool, <String, Object?>{'path': 'a.txt', 'patch': '--- a'}),
+          permissionCall(tool, <String, Object?>{
+            'path': 'a.txt',
+            'patch': '--- a',
+          }),
         );
         expect(result.error!.code, 'PERMISSION_DENIED', reason: tool);
       }
@@ -280,7 +286,8 @@ void main() {
 
       final ToolResult moved = await rig.tools.call(
         permissionCall('apply_patch', <String, Object?>{
-          'patch': '*** Update File: src/a.dart\n'
+          'patch':
+              '*** Update File: src/a.dart\n'
               '*** Move to: secret/b.dart\n',
         }),
       );
@@ -330,5 +337,4 @@ void main() {
       expect(rig.runs, isEmpty);
     });
   });
-
 }

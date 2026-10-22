@@ -26,8 +26,8 @@ class RunCodeTool extends Tool {
     this.sessionLog,
     this.telemetry,
     this.maxProgramBytes = 100000,
-  })  : _runtime = runtime,
-        _tools = tools;
+  }) : _runtime = runtime,
+       _tools = tools;
 
   final CodeRuntime _runtime;
   final ToolRegistry _tools;
@@ -48,17 +48,15 @@ class RunCodeTool extends Tool {
   String get name => 'run_code';
 
   @override
-  String get description => '执行一段程序。程序内可调用 tools.* 命名空间下的工具。'
+  String get description =>
+      '执行一段程序。程序内可调用 tools.* 命名空间下的工具。'
       '失败是结果字段，不是异常。';
 
   @override
   List<ParamSpec> get params => <ParamSpec>[
-        ParamSpec.string('program', required: true, description: '程序源码'),
-        ParamSpec.boolean(
-          'expose_tools',
-          description: '是否暴露工具绑定，默认 true',
-        ),
-      ];
+    ParamSpec.string('program', required: true, description: '程序源码'),
+    ParamSpec.boolean('expose_tools', description: '是否暴露工具绑定，默认 true'),
+  ];
 
   @override
   ToolRisk get riskLevel => ToolRisk.high;
@@ -79,14 +77,24 @@ class RunCodeTool extends Tool {
     final TaskCenter? center = taskCenter;
     final String? taskId = await _createTask(program);
     final Stopwatch stopwatch = Stopwatch()..start();
-    telemetry?.emit(TelemetryEvent('code.run.started', data: <String, Object?>{
-      'language': _runtime.language,
-      'isolation': _runtime.isolation,
-    }));
-    unawaited(sessionLog?.record('code/run', data: <String, Object?>{
-      'language': _runtime.language,
-      'program': program,
-    }));
+    telemetry?.emit(
+      TelemetryEvent(
+        'code.run.started',
+        data: <String, Object?>{
+          'language': _runtime.language,
+          'isolation': _runtime.isolation,
+        },
+      ),
+    );
+    unawaited(
+      sessionLog?.record(
+        'code/run',
+        data: <String, Object?>{
+          'language': _runtime.language,
+          'program': program,
+        },
+      ),
+    );
     try {
       if (center != null) {
         final String id = taskId!;
@@ -97,10 +105,9 @@ class RunCodeTool extends Tool {
       final List<CodeBindingNamespace> bindings = exposeTools
           ? toolsAsBindings(_tools)
           : const <CodeBindingNamespace>[];
-      final CodeRunResult result = await _runtime.run(CodeRunRequest(
-        program: program,
-        bindings: bindings,
-      ));
+      final CodeRunResult result = await _runtime.run(
+        CodeRunRequest(program: program, bindings: bindings),
+      );
       return _finish(result, taskId, stopwatch);
     } catch (error) {
       await _fail(error, taskId);
@@ -141,17 +148,27 @@ class RunCodeTool extends Tool {
         // 任务已被取消（终态）：状态更新让位给取消结果。
       }
     }
-    telemetry?.emit(TelemetryEvent('code.run.finished', data: <String, Object?>{
-      'language': _runtime.language,
-      'durationMs': stopwatch.elapsedMilliseconds,
-      'success': result.isSuccess,
-      'failureKind': result.error?.kind.name,
-    }));
-    unawaited(sessionLog?.record('code/result', data: <String, Object?>{
-      'success': result.isSuccess,
-      'error': result.error?.message,
-      'logs': result.logs,
-    }));
+    telemetry?.emit(
+      TelemetryEvent(
+        'code.run.finished',
+        data: <String, Object?>{
+          'language': _runtime.language,
+          'durationMs': stopwatch.elapsedMilliseconds,
+          'success': result.isSuccess,
+          'failureKind': result.error?.kind.name,
+        },
+      ),
+    );
+    unawaited(
+      sessionLog?.record(
+        'code/result',
+        data: <String, Object?>{
+          'success': result.isSuccess,
+          'error': result.error?.message,
+          'logs': result.logs,
+        },
+      ),
+    );
     if (!result.isSuccess) {
       final String message = result.error!.message;
       return ToolResult.failure(
@@ -164,10 +181,7 @@ class RunCodeTool extends Tool {
     }
     return ToolResult.success(
       result.value?.toString() ?? '',
-      value: <String, Object?>{
-        'value': result.value,
-        'logs': result.logs,
-      },
+      value: <String, Object?>{'value': result.value, 'logs': result.logs},
     );
   }
 
@@ -180,8 +194,11 @@ class RunCodeTool extends Tool {
         // 任务已被取消（终态）：状态更新让位给取消结果。
       }
     }
-    telemetry?.emit(TelemetryEvent('code.run.failed', data: <String, Object?>{
-      'error': '$error',
-    }));
+    telemetry?.emit(
+      TelemetryEvent(
+        'code.run.failed',
+        data: <String, Object?>{'error': '$error'},
+      ),
+    );
   }
 }

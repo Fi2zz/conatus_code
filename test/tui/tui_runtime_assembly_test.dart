@@ -263,8 +263,9 @@ void main() {
         handler: (ToolContext ctx) async => ToolResult.success('danger'),
       ),
     );
-    final ToolResult denied =
-        await runtime.tools.call(const ToolCall(name: 'danger'));
+    final ToolResult denied = await runtime.tools.call(
+      const ToolCall(name: 'danger'),
+    );
     expect(denied.isError, isTrue);
     expect(denied.error!.code, 'PERMISSION_ASK_UNATTENDED');
 

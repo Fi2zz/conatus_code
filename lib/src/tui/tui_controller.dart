@@ -79,14 +79,14 @@ const String kStoryUsage =
     ' reject <i>（丢弃）';
 
 /// `/cron` 用法提示。
-const String kCronUsage = '用法：/cron [list|add <内容> <at|every|daily|cron> <规则>|'
+const String kCronUsage =
+    '用法：/cron [list|add <内容> <at|every|daily|cron> <规则>|'
     'remove <id>|enable <id>|disable <id>|history [条数]]\n'
     '规则：at=ISO 时刻；every=秒或 10分钟/1小时；daily/每天=HH:MM；'
     '每周X=HH:MM；cron=5 段表达式';
 
 /// `/team` 用法提示。
-const String kTeamUsage =
-    '用法：/team（进入团队视图）[status|interrupt <成员 id>]';
+const String kTeamUsage = '用法：/team（进入团队视图）[status|interrupt <成员 id>]';
 
 /// `/task` 用法提示。
 const String kTaskUsage = '用法：/task [claim <任务 id>|release <任务 id>]';
@@ -121,11 +121,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.storyEnabled = false,
     List<String> fallbackModels = const <String>[],
     RetryPolicy retryPolicy = const RetryPolicy(),
-  })  : _app = app,
-        _sessions = sessions,
-        _sessionId = initialSession ?? '',
-        _fallbackModels = fallbackModels,
-        _retryPolicy = retryPolicy {
+  }) : _app = app,
+       _sessions = sessions,
+       _sessionId = initialSession ?? '',
+       _fallbackModels = fallbackModels,
+       _retryPolicy = retryPolicy {
     picker = TuiSessionPicker(sessions, onChanged: _refresh);
     _app.provide('tuiController', this);
     final TuiPermissionGate? gate = app.get<TuiPermissionGate>('approval');
@@ -153,8 +153,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 子 Agent 一次能跑几十秒，期间主链路在 `await` 里完全静止。看不到它调了
   /// 什么工具，用户既判断不了它有没有跑偏，也不敢中途打断。
   void _watchSubagent() {
-    final SubAgentProgressStore? store =
-        _app.get<SubAgentProgressStore>('subagentProgress');
+    final SubAgentProgressStore? store = _app.get<SubAgentProgressStore>(
+      'subagentProgress',
+    );
     if (store == null) return;
     _subagentSub = store.lines.listen((SubAgentLine line) {
       transcript.add(TuiRole.stage, line.text);
@@ -225,9 +226,8 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// 上下文用量是估算还是实测（状态栏据此决定加不加 `~`）。
-  bool get contextTokensEstimated => !(_app.get<CostTrackerImpl>('costTracker')
-          ?.hasRealUsage ??
-      false);
+  bool get contextTokensEstimated =>
+      !(_app.get<CostTrackerImpl>('costTracker')?.hasRealUsage ?? false);
 
   /// Agent Loop 单轮最大步数。
   final int maxSteps;
@@ -273,15 +273,17 @@ class ConatusTuiController implements TuiUserPromptHost {
   void Function()? onOpenTeamView;
 
   /// provider 管理浮层（`/provider`，只读展示）。
-  late final TuiProviderPrompt providerPrompt =
-      TuiProviderPrompt(onChanged: _refresh);
+  late final TuiProviderPrompt providerPrompt = TuiProviderPrompt(
+    onChanged: _refresh,
+  );
 
   /// 模型选择浮层（`/model` 打开；搜索过滤，Enter 切换）。
   late final TuiModelPrompt modelPrompt = TuiModelPrompt(onChanged: _refresh);
 
   /// 权限模式选择浮层（`/permission` 打开；↑↓ 选择，Enter 切换）。
-  late final TuiPermissionPrompt permissionPrompt =
-      TuiPermissionPrompt(onChanged: _refresh);
+  late final TuiPermissionPrompt permissionPrompt = TuiPermissionPrompt(
+    onChanged: _refresh,
+  );
 
   /// Plan Mode 面板浮层（`/plan`）。
   late final TuiPlanPrompt planPrompt = TuiPlanPrompt(onChanged: _refresh);
@@ -371,8 +373,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     List<PermissionRule> rules,
     List<String> resources,
   ) async {
-    final PermissionWiring? wiring =
-        _app.get<PermissionWiring>('permissionWiring');
+    final PermissionWiring? wiring = _app.get<PermissionWiring>(
+      'permissionWiring',
+    );
     if (wiring == null) return;
     final String? warning = await wiring.remember(rules, resources);
     if (warning != null) showSystemNotice('权限规则未保存：$warning');
@@ -394,9 +397,15 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     _permissionMode = mode;
-    session.append(kPermissionModeEvent, data: <String, Object?>{'mode': mode.name});
+    session.append(
+      kPermissionModeEvent,
+      data: <String, Object?>{'mode': mode.name},
+    );
     _syncPermissionMode();
-    transcript.add(TuiRole.system, '权限模式已切换为「${mode.label}」：${mode.description}');
+    transcript.add(
+      TuiRole.system,
+      '权限模式已切换为「${mode.label}」：${mode.description}',
+    );
     _refresh();
   }
 
@@ -406,18 +415,19 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 重挂任何中间件：换会话 / 换模式只改槽位里的 `askThreshold`。
   void _syncPermissionMode() {
     final ToolRisk? threshold = _permissionMode.threshold;
-    final PermissionWiring? wiring =
-        _app.get<PermissionWiring>('permissionWiring');
+    final PermissionWiring? wiring = _app.get<PermissionWiring>(
+      'permissionWiring',
+    );
     if (wiring != null) {
       wiring.applyMode(askThreshold: threshold, agentId: 'build');
       return;
     }
-    final PermissionScopeSlot? slot =
-        _app.get<PermissionScopeSlot>(kPermissionScopeService);
-    slot?.set(PermissionScope(
-      rules: slot.current.rules,
-      askThreshold: threshold,
-    ));
+    final PermissionScopeSlot? slot = _app.get<PermissionScopeSlot>(
+      kPermissionScopeService,
+    );
+    slot?.set(
+      PermissionScope(rules: slot.current.rules, askThreshold: threshold),
+    );
   }
 
   /// 绑定初始会话；未配置 provider 时自动打开引导面板。
@@ -524,8 +534,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   String _bangCommand(String line) {
     final String raw = line.substring(1).trim();
     if (raw.isEmpty) {
-      transcript.add(TuiRole.system,
-          '用法：!<命令> 直接执行（如 !git status）；!! 重跑上一条。');
+      transcript.add(TuiRole.system, '用法：!<命令> 直接执行（如 !git status）；!! 重跑上一条。');
       return '';
     }
     if (raw != '!') return raw;
@@ -542,7 +551,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _runShellForUser(String command) async {
     final ShellExecutor? shell =
         _app.get<ShellExecutor>('shellInteractive') ??
-            _app.get<ShellExecutor>('shell');
+        _app.get<ShellExecutor>('shell');
     if (shell == null) {
       transcript.add(TuiRole.system, 'shell 不可用。');
       return;
@@ -551,10 +560,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     _refresh(); // 命令回显先上屏，长命令执行期间也有反馈。
     final ShellRunResult result;
     try {
-      result = await shell.run(shell.resolve(ShellExecRequest(
-        command: command,
-        timeoutMs: kShellBangTimeoutMs,
-      )));
+      result = await shell.run(
+        shell.resolve(
+          ShellExecRequest(command: command, timeoutMs: kShellBangTimeoutMs),
+        ),
+      );
     } catch (error) {
       transcript.add(TuiRole.system, '命令执行失败：$error');
       return;
@@ -617,10 +627,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         return;
       }
       if (_queue.length >= kMessageQueueCap) {
-        transcript.add(
-          TuiRole.system,
-          '排队已满（$kMessageQueueCap 条），请稍后再试。',
-        );
+        transcript.add(TuiRole.system, '排队已满（$kMessageQueueCap 条），请稍后再试。');
         _refresh();
         return;
       }
@@ -641,8 +648,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     List<LlmImage> images = const <LlmImage>[];
     String messageText = text;
     if (attachments.isNotEmpty) {
-      final AttachmentMaterialization? payload =
-          await _materializeAttachments(attachments);
+      final AttachmentMaterialization? payload = await _materializeAttachments(
+        attachments,
+      );
       if (payload == null) return;
       images = payload.images;
       messageText = payload.inlineText + text;
@@ -658,8 +666,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     bool turnOk = true;
     String reply = '';
     try {
-      final AgentTurn turn =
-          await agent.run(messageText, cancel: cancel, images: images);
+      final AgentTurn turn = await agent.run(
+        messageText,
+        cancel: cancel,
+        images: images,
+      );
       reply = turn.reply;
     } on AgentCancelled {
       turnOk = false;
@@ -808,15 +819,17 @@ class ConatusTuiController implements TuiUserPromptHost {
       default:
         // 静态命令都不匹配时，把命令词当作技能名试一次。
         if (!await _runSkill(command, arg)) {
-          transcript.add(
-              TuiRole.system, '未知命令：/$command（/help 查看可用命令）');
+          transcript.add(TuiRole.system, '未知命令：/$command（/help 查看可用命令）');
         }
     }
     _refresh();
   }
 
   /// 当前可用的斜杠命令：静态表 + 技能注册表投影出的技能命令。
-  List<TuiCommand> get commands => <TuiCommand>[...tuiCommands, ..._skillCommands];
+  List<TuiCommand> get commands => <TuiCommand>[
+    ...tuiCommands,
+    ..._skillCommands,
+  ];
 
   List<TuiCommand> get _skillCommands =>
       skillTuiCommands(_app.get<SkillRegistry>('skillRegistry'));
@@ -864,8 +877,9 @@ class ConatusTuiController implements TuiUserPromptHost {
       );
       return;
     }
-    final StringBuffer buffer =
-        StringBuffer('已接入 MCP server（${registry.servers.length}）：');
+    final StringBuffer buffer = StringBuffer(
+      '已接入 MCP server（${registry.servers.length}）：',
+    );
     for (final String name in registry.servers) {
       final McpClient? client = registry.clientOf(name);
       final String state = client == null || !client.ready ? '未就绪' : '就绪';
@@ -900,7 +914,9 @@ class ConatusTuiController implements TuiUserPromptHost {
         ? '计划经 exit_plan_mode 提交后等待审批。'
         : '计划经 exit_plan_mode 提交后即获批执行（未配置审批端口）。';
     transcript.add(
-        TuiRole.system, '已进入 Plan Mode：有副作用的工具被拦截，模型先规划再执行。$reviewNote');
+      TuiRole.system,
+      '已进入 Plan Mode：有副作用的工具被拦截，模型先规划再执行。$reviewNote',
+    );
   }
 
   /// `/compact`：手动压缩当前会话，把早期历史折叠成滚动摘要。
@@ -908,7 +924,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 复用 Agent Loop 同款 LLM 汇总器（`summarizeEvents`），`keepRecent` 取
   /// [kManualCompactKeepRecent]（20 条）强制折叠；历史太短返回 `null` 不报错。
   Future<void> _handleCompact() async {
-    final CompactionEngine? compactor = _app.get<CompactionEngine>('compaction');
+    final CompactionEngine? compactor = _app.get<CompactionEngine>(
+      'compaction',
+    );
     final Session? session = _session;
     final LlmProvider? llm = _app.get<LlmProvider>('llm');
     if (compactor == null || session == null || llm == null) {
@@ -1026,7 +1044,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     } else {
       buffer.write('尚无用量记录（跑一轮后才有数）');
     }
-    buffer.write('\n输入 ${tracker.promptTokens} / 输出 ${tracker.completionTokens}');
+    buffer.write(
+      '\n输入 ${tracker.promptTokens} / 输出 ${tracker.completionTokens}',
+    );
     if (tracker.cachedTokens > 0) {
       buffer.write('（其中 ${tracker.cachedTokens} 命中缓存）');
     }
@@ -1042,8 +1062,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// `/rewind list` 列出本会话可用检查点。对话回滚用 `Session.fork`（append-only
   /// 不变式，非破坏派生）+ `SessionStore.adopt` 注册，再切到 fork 会话。
   Future<void> _handleRewind(String arg) async {
-    final CheckpointManager? checkpoint =
-        _app.get<CheckpointManager>('checkpointManager');
+    final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
+      'checkpointManager',
+    );
     if (checkpoint == null || !checkpoint.enabled) {
       transcript.add(
         TuiRole.system,
@@ -1070,13 +1091,11 @@ class ConatusTuiController implements TuiUserPromptHost {
         transcript.add(TuiRole.system, '没有可回滚的检查点。');
         return;
       }
-      final String counts = '恢复 ${result.restore.restored}、'
+      final String counts =
+          '恢复 ${result.restore.restored}、'
           '删除 ${result.restore.deleted} 个文件';
       if (session == null) {
-        transcript.add(
-          TuiRole.system,
-          '已回滚工作区到第 ${result.turn} 轮（$counts）。',
-        );
+        transcript.add(TuiRole.system, '已回滚工作区到第 ${result.turn} 轮（$counts）。');
         return;
       }
       await _switchToRewind(result, session, counts);
@@ -1109,7 +1128,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     await switchSession(
       forkId,
-      announce: '已回滚到第 ${result.turn} 轮（$counts，对话已回到该轮），'
+      announce:
+          '已回滚到第 ${result.turn} 轮（$counts，对话已回到该轮），'
           '新会话 $forkId。',
     );
   }
@@ -1129,8 +1149,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/background [list|output <id>|kill <id>]`：后台任务管理（不经模型）。
   Future<void> _handleBackground(String arg) async {
-    final BackgroundTaskService? service =
-        _app.get<BackgroundTaskService>('backgroundTasks');
+    final BackgroundTaskService? service = _app.get<BackgroundTaskService>(
+      'backgroundTasks',
+    );
     if (service == null) {
       transcript.add(TuiRole.system, '后台任务不可用：未装配。');
       return;
@@ -1179,8 +1200,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     final StringBuffer buffer = StringBuffer('后台任务（${tasks.length}）：');
     for (final BackgroundTaskView task in tasks) {
-      buffer.write('\n  ${task.id} [${task.status.name}] ${task.command}'
-          '（${task.elapsedMs}ms，输出 ${task.outputBytes}B）');
+      buffer.write(
+        '\n  ${task.id} [${task.status.name}] ${task.command}'
+        '（${task.elapsedMs}ms，输出 ${task.outputBytes}B）',
+      );
     }
     transcript.add(TuiRole.system, buffer.toString());
   }
@@ -1255,7 +1278,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
   }
 
-  StoryPending? _storyPending() => _sessionCtx?.get<StoryPending>('storyPending');
+  StoryPending? _storyPending() =>
+      _sessionCtx?.get<StoryPending>('storyPending');
 
   /// `/story preview <n>`：预览前 n 个补丁时刻的文档状态。
   void _previewStory(DocEngine engine, String rest) {
@@ -1271,8 +1295,11 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _discardStory(DocEngine engine, String rest) async {
     final int? n = int.tryParse(rest);
     try {
-      final StoryDiscardResult result =
-          await discardStoryPatch(engine, _app.get<FileSystem>('fs'), n ?? -1);
+      final StoryDiscardResult result = await discardStoryPatch(
+        engine,
+        _app.get<FileSystem>('fs'),
+        n ?? -1,
+      );
       transcript.add(TuiRole.system, renderStoryDiscard(result));
     } on ArgumentError catch (error) {
       transcript.add(TuiRole.system, '${error.message}');
@@ -1294,10 +1321,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     final String forkId = 'session_${newUuidV4()}';
     await engine.forkAt(n, newSessionId: forkId);
-    await switchSession(
-      forkId,
-      announce: '已从前 $n 个补丁分叉新故事线，新会话 $forkId。',
-    );
+    await switchSession(forkId, announce: '已从前 $n 个补丁分叉新故事线，新会话 $forkId。');
   }
 
   /// `/story apply <i>`：应用第 i 个待应用补丁（经 fs 缝写文件后入故事）。
@@ -1307,8 +1331,11 @@ class ConatusTuiController implements TuiUserPromptHost {
       transcript.add(TuiRole.system, '待应用通道不可用：会话未装配。');
       return;
     }
-    final String text =
-        await pending.apply(int.tryParse(rest) ?? -1, engine, _app.get<FileSystem>('fs'));
+    final String text = await pending.apply(
+      int.tryParse(rest) ?? -1,
+      engine,
+      _app.get<FileSystem>('fs'),
+    );
     transcript.add(TuiRole.system, text);
   }
 
@@ -1371,8 +1398,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 「诊断与自检命令」是刻意加的一节：把校验命令写进项目指令，让模型**交付前**
   /// 主动跑一遍。与 [LinterService] 的编辑后自动 lint 不重复——那管「刚改完有没有
   /// 弄坏」，这管「整体过不过得去」，两者时间尺度不同。
-  static const String kInitSections =
-      '项目概述、构建与测试命令、代码风格约定、诊断与自检命令、边界与注意事项';
+  static const String kInitSections = '项目概述、构建与测试命令、代码风格约定、诊断与自检命令、边界与注意事项';
 
   /// 诊断一节的写法约束：命令要来自仓库自身，别让模型凭空编。
   static const String kInitDiagnosticsHint =
@@ -1382,7 +1408,8 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   Future<void> _handleInit() async {
     final String? workdir = _app.get<String>('workdir');
-    final bool exists = workdir != null &&
+    final bool exists =
+        workdir != null &&
         File('$workdir${Platform.pathSeparator}AGENTS.md').existsSync();
     if (exists) {
       transcript.add(TuiRole.system, 'AGENTS.md 已存在，将让模型先读取再更新。');
@@ -1487,8 +1514,10 @@ class ConatusTuiController implements TuiUserPromptHost {
       transcript.add(TuiRole.system, kCronUsage);
       return;
     }
-    final CronTaskView view =
-        cron.addDynamicTask(input, callerSessionId: _sessionId);
+    final CronTaskView view = cron.addDynamicTask(
+      input,
+      callerSessionId: _sessionId,
+    );
     transcript.add(TuiRole.system, '已添加定时任务 ${view.id}。');
   }
 
@@ -1512,7 +1541,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     // `every 10 分钟`：数字与单位分空格，合并尾部两 token。
     if (parts.length >= 4 && _isEvery(parts[parts.length - 3])) {
       final num? seconds = _parseInterval(
-          '${parts[parts.length - 2]} ${parts[parts.length - 1]}');
+        '${parts[parts.length - 2]} ${parts[parts.length - 1]}',
+      );
       if (seconds != null) {
         return <String, Object?>{
           'prompt': parts.sublist(0, parts.length - 3).join(' '),
@@ -1532,8 +1562,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     return switch (kind) {
       'at' => <String, Object?>{'prompt': prompt, 'at': value},
-      'daily' || '每天' || '每日' =>
-        <String, Object?>{'prompt': prompt, 'daily': value},
+      'daily' ||
+      '每天' ||
+      '每日' => <String, Object?>{'prompt': prompt, 'daily': value},
       'every' || '每隔' => _parseEvery(prompt, value),
       _ => null,
     };
@@ -1568,8 +1599,7 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `每周X` → cron 星期数（'1'-'6' 周一~六，'0' 周日）；非每周X 返回 null。
   String? _weeklyWeekday(String kind) {
-    final RegExpMatch? match =
-        RegExp(r'^每周([一二三四五六日天])$').firstMatch(kind);
+    final RegExpMatch? match = RegExp(r'^每周([一二三四五六日天])$').firstMatch(kind);
     if (match == null) return null;
     return switch (match.group(1)!) {
       '一' => '1',
@@ -1616,11 +1646,13 @@ class ConatusTuiController implements TuiUserPromptHost {
     final StringBuffer buffer = StringBuffer('定时任务（${tasks.length}）：');
     for (final CronTaskView view in tasks) {
       buffer
-        ..write('\n  ${view.id} [${view.enabled ? '启用' : '停用'}] '
-            '${_cronScheduleText(view)}')
-        ..write(view.nextRunAt == null
-            ? ''
-            : ' 下次=${_formatLocal(view.nextRunAt!)}')
+        ..write(
+          '\n  ${view.id} [${view.enabled ? '启用' : '停用'}] '
+          '${_cronScheduleText(view)}',
+        )
+        ..write(
+          view.nextRunAt == null ? '' : ' 下次=${_formatLocal(view.nextRunAt!)}',
+        )
         ..write(' 内容=${view.prompt}');
     }
     transcript.add(TuiRole.system, buffer.toString());
@@ -1647,19 +1679,21 @@ class ConatusTuiController implements TuiUserPromptHost {
     final StringBuffer buffer = StringBuffer('运行记录（最新在前）：');
     for (final CronRunRecord record in records) {
       buffer
-        ..write('\n  #${record.seq} ${record.taskId} '
-            '${_cronStatusText(record.status)} 排期=${_formatLocal(record.scheduledFor)}')
+        ..write(
+          '\n  #${record.seq} ${record.taskId} '
+          '${_cronStatusText(record.status)} 排期=${_formatLocal(record.scheduledFor)}',
+        )
         ..write(record.excerpt == null ? '' : ' 结果=${record.excerpt}');
     }
     transcript.add(TuiRole.system, buffer.toString());
   }
 
   String _cronStatusText(String status) => switch (status) {
-        CronRunStatus.completed => '完成',
-        CronRunStatus.failed => '失败',
-        CronRunStatus.delivered => '已交付',
-        _ => status,
-      };
+    CronRunStatus.completed => '完成',
+    CronRunStatus.failed => '失败',
+    CronRunStatus.delivered => '已交付',
+    _ => status,
+  };
 
   /// 本地时区的 `yyyy-MM-dd HH:mm` 展示。
   String _formatLocal(DateTime instant) {
@@ -1801,8 +1835,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   ///
   /// 选中后经 [applyPermissionMode] 持久化到会话并更新作用域阈值；取消不切换。
   Future<void> _handlePermission() async {
-    final TuiPermissionMode? mode =
-        await permissionPrompt.choose(_permissionMode);
+    final TuiPermissionMode? mode = await permissionPrompt.choose(
+      _permissionMode,
+    );
     if (mode == null) {
       transcript.add(TuiRole.system, '已取消权限模式切换。');
       return;
@@ -1893,7 +1928,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 权限模式按会话恢复：每个会话折叠自己的 permission/mode 后缀，
     // 同时清空审批门的「总是允许」清单（它也是会话级状态）。
     _gate?.resetAlwaysAllowed();
-    _permissionMode = restorePermissionMode(session, fallback: initialPermissionMode);
+    _permissionMode = restorePermissionMode(
+      session,
+      fallback: initialPermissionMode,
+    );
     // 会话规则初始为空；保留独立层以便后续按会话扩展（config → project →
     // session，后者覆盖前者）。
     _app
@@ -1917,8 +1955,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 后台起拍 turn 0 基线；错误说明补进 transcript（基线未就绪时
   /// `/rewind` 不可用，属降级不属阻塞）。
   Future<void> _startCheckpoint(String id, String? lastEventId) async {
-    final CheckpointManager? checkpoint =
-        _app.get<CheckpointManager>('checkpointManager');
+    final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
+      'checkpointManager',
+    );
     if (checkpoint == null) return;
     final String? error = await checkpoint.reset(id, lastEventId: lastEventId);
     if (error != null && ready) transcript.add(TuiRole.system, error);
@@ -1938,13 +1977,14 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 子 Agent 泳道：子 Agent 不在 AgentTeam 里，但视图层统一，故把它的活动
     // 直接写进同一张泳道表。名字由投影器维护。
     final SwarmProjection? swarm = _app.get<SwarmProjection>('swarmProjection');
-    swarm?.sink.attach((String laneId, String line, bool failed) =>
-        _teamSub?.addSwarmLine(
-          laneId,
-          line,
-          failed: failed,
-          label: swarm.labels[laneId] ?? '子 Agent',
-        ));
+    swarm?.sink.attach(
+      (String laneId, String line, bool failed) => _teamSub?.addSwarmLine(
+        laneId,
+        line,
+        failed: failed,
+        label: swarm.labels[laneId] ?? '子 Agent',
+      ),
+    );
     final TtsService? tts = this.tts;
     if (tts != null) {
       _voice = VoiceReporter(team: team, tts: tts, sink: ttsSink);
@@ -1987,8 +2027,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 轮次结束即空闲：让到期的提醒立刻交付，而不必等到下一次定时唤醒。
     _sessionCtx?.get<ScheduleRuntime>('scheduleRuntime')?.requestDrive();
     // 检查点：收口后快照本轮工作区（失败只提示不打断）。
-    final CheckpointManager? checkpoint =
-        _app.get<CheckpointManager>('checkpointManager');
+    final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
+      'checkpointManager',
+    );
     if (checkpoint != null) {
       final String? error = await checkpoint.recordTurn(
         lastEventId: _session?.lastEventId,
@@ -2013,7 +2054,6 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
   }
 
-
   /// SteeringSource：合并两个来源——先 storyNotices（人的编辑通报，先感知
   /// 世界变化），后排队消息文本；取走即清空。Agent Loop 在组下一次模型
   /// 请求前调用（轮内注入，不等轮末）。取出后刷新 UI（「已排队 n 条」
@@ -2021,7 +2061,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<List<String>> _takeQueuedForSteering() async {
     final List<String> notices =
         _sessionCtx?.get<StoryNotices>('storyNotices')?.drain() ??
-            const <String>[];
+        const <String>[];
     // 只注入队首连续的纯文本消息：带附件的消息留给轮末 drain 原样投递，
     // 否则 steering 会把附件静默丢掉（附件不在注入通道的契约里）。
     int take = 0;
@@ -2067,8 +2107,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     final CronRuntime? runtime = _app.get<CronRuntime>('cronRuntime');
     final String excerpt = reply.trim();
     for (final String recordId in _cronRuns.toList()) {
-      runtime?.finishRun(recordId,
-          ok: ok, excerpt: excerpt.isEmpty ? null : excerpt);
+      runtime?.finishRun(
+        recordId,
+        ok: ok,
+        excerpt: excerpt.isEmpty ? null : excerpt,
+      );
     }
     _cronRuns.clear();
   }

@@ -67,8 +67,9 @@ Future<void> _rememberPermissionRules(
   List<PermissionRule> rules,
   List<String> resources,
 ) async {
-  final ConatusTuiController? controller =
-      app.get<ConatusTuiController>('tuiController');
+  final ConatusTuiController? controller = app.get<ConatusTuiController>(
+    'tuiController',
+  );
   if (controller != null) {
     await controller.rememberPermissionRules(rules, resources);
     return;
@@ -235,8 +236,9 @@ class ConatusTuiRuntime {
     // 控制器的库用法（只建 runtime 直接调工具）与旧行为一致——不弹审批。
     // headless 没有绑定时机，配置里的 `[approval] mode` 直接落到这里。
     permissionWiring.applyMode(
-      askThreshold:
-          interactive ? null : toTuiPermissionMode(approvalMode).threshold,
+      askThreshold: interactive
+          ? null
+          : toTuiPermissionMode(approvalMode).threshold,
       agentId: 'build',
     );
     app.provide('permissionWiring', permissionWiring);

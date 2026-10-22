@@ -16,8 +16,8 @@ class PermissionWiring {
   /// 创建装配；[store] 指向项目数据目录下的 `permissions.json`。
   PermissionWiring({
     required this.store,
-    this.configRules = const <PermissionRule>[],
-  });
+    List<PermissionRule> configRules = const <PermissionRule>[],
+  }) : configRules = _normalizeRules(configRules);
 
   /// 项目级持久化存储（`~/.nava/projects/<hash>/permissions.json`）。
   final PermissionStore store;
@@ -35,8 +35,8 @@ class PermissionWiring {
 
   /// 当前合成后的规则（config → project → session）。
   List<PermissionRule> get rules => List<PermissionRule>.unmodifiable(
-        <PermissionRule>[...configRules, ..._projectRules, ..._sessionRules],
-      );
+    <PermissionRule>[...configRules, ..._projectRules, ..._sessionRules],
+  );
 
   /// 载入项目规则；文件缺失 / 损坏时按空规则处理（不阻塞启动）。
   Future<void> load() async {
@@ -101,6 +101,10 @@ class PermissionWiring {
       for (final PermissionRule current in existing) {
         if (current.action != rule.action) continue;
         if (current.effect != PermissionEffect.deny) continue;
+        if (rule.action == 'shell' &&
+            permissionPatternMatches(rule.resource, current.resource)) {
+          return current;
+        }
         for (final String resource in resources) {
           if (permissionPatternMatches(current.resource, resource)) {
             return current;
@@ -112,15 +116,17 @@ class PermissionWiring {
   }
 
   void _publish() {
-    slot.set(PermissionScope(
-      rules: rules,
-      askThreshold: _askThreshold,
-      agentId: _agentId,
-    ));
+    slot.set(
+      PermissionScope(
+        rules: rules,
+        askThreshold: _askThreshold,
+        agentId: _agentId,
+      ),
+    );
   }
 
   /// 路径动作的规则资源也规范化（兼容手写 `~` / `./`）。
-  List<PermissionRule> _normalizeRules(List<PermissionRule> rules) =>
+  static List<PermissionRule> _normalizeRules(List<PermissionRule> rules) =>
       <PermissionRule>[
         for (final PermissionRule rule in rules)
           permissionActionUsesPath(rule.action)

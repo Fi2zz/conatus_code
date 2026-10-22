@@ -49,7 +49,8 @@ void main() {
   });
 
   test('parsePermissionMode 识别枚举名，其余返回 null', () {
-    expect(parsePermissionMode('alwaysAsk'), TuiPermissionMode.alwaysAsk);    expect(parsePermissionMode(' NEVERASK '), TuiPermissionMode.neverAsk);
+    expect(parsePermissionMode('alwaysAsk'), TuiPermissionMode.alwaysAsk);
+    expect(parsePermissionMode(' NEVERASK '), TuiPermissionMode.neverAsk);
     expect(parsePermissionMode('nope'), isNull);
   });
 
@@ -82,20 +83,20 @@ void main() {
     final TuiPermissionGate gate = fixture.gate;
     const String patch = '--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n';
 
-    final Future<bool> apply = gate.request(ApprovalRequest(
-      id: 'r3',
-      toolName: 'apply_patch',
-      description: '原始说明',
-      arguments: <String, Object?>{'patch': patch},
-    ));
+    final Future<bool> apply = gate.request(
+      ApprovalRequest(
+        id: 'r3',
+        toolName: 'apply_patch',
+        description: '原始说明',
+        arguments: <String, Object?>{'patch': patch},
+      ),
+    );
     await pumpEventQueue(); // 等预览计算完成、浮层弹出
     expect(choice.request!.choices.first.description, patch);
 
-    final Future<bool> unknown = gate.request(ApprovalRequest(
-      id: 'r4',
-      toolName: 'unknown_tool',
-      description: '原始说明',
-    ));
+    final Future<bool> unknown = gate.request(
+      ApprovalRequest(id: 'r4', toolName: 'unknown_tool', description: '原始说明'),
+    );
     expect(choice.request!.choices.first.description, '原始说明');
 
     choice.cancel();
@@ -199,8 +200,9 @@ void main() {
       final String file = '${root.path}${Platform.pathSeparator}a.txt';
 
       final Future<bool> pending = gate.request(_pathTool(file));
-      final List<String> labels =
-          choice.request!.choices.map((TuiChoice c) => c.label).toList();
+      final List<String> labels = choice.request!.choices
+          .map((TuiChoice c) => c.label)
+          .toList();
       expect(labels, contains('信任此文件夹'));
       expect(labels, contains('允许一次'));
 
@@ -213,8 +215,9 @@ void main() {
       final TuiChoicePrompt choice = fixture.choice;
 
       final Future<bool> pending = fixture.gate.request(_tool('cron_add'));
-      final List<String> labels =
-          choice.request!.choices.map((TuiChoice c) => c.label).toList();
+      final List<String> labels = choice.request!.choices
+          .map((TuiChoice c) => c.label)
+          .toList();
       expect(labels, isNot(contains('信任此文件夹')));
 
       choice.cancel();
@@ -226,8 +229,9 @@ void main() {
       final TuiPermissionGate gate = TuiPermissionGate(choice: choice);
 
       final Future<bool> pending = gate.request(_pathTool('/tmp/a.txt'));
-      final List<String> labels =
-          choice.request!.choices.map((TuiChoice c) => c.label).toList();
+      final List<String> labels = choice.request!.choices
+          .map((TuiChoice c) => c.label)
+          .toList();
       expect(labels, isNot(contains('信任此文件夹')));
       expect(labels, contains('总是允许该工具'));
 
@@ -275,10 +279,7 @@ void main() {
       await pending;
 
       expect(await gate.preapproved(_pathTool(file)), isTrue);
-      expect(
-        await gate.preapproved(_pathTool(file, 'write_file')),
-        isFalse,
-      );
+      expect(await gate.preapproved(_pathTool(file, 'write_file')), isFalse);
     });
 
     test('信任目录取路径所在目录，而非文件本身', () async {
@@ -333,7 +334,7 @@ void main() {
   });
 
   group('总是允许持久化', () {
-    test('选择后把推导出的规则交给 rememberRule，并保留会话内放行', () async {
+    test('选择后把推导出的规则交给 rememberRules，并保留会话内放行', () async {
       final TuiChoicePrompt choice = TuiChoicePrompt();
       final List<PermissionRule> rules = <PermissionRule>[];
       final TuiPermissionGate gate = TuiPermissionGate(
@@ -361,7 +362,8 @@ void main() {
     });
   });
 
-  group('restorePermissionMode', () {    test('无记录时为默认档', () {
+  group('restorePermissionMode', () {
+    test('无记录时为默认档', () {
       final Session session = Session(id: 's');
       expect(restorePermissionMode(session), TuiPermissionMode.askWhenNeeded);
     });
@@ -370,19 +372,25 @@ void main() {
       final Session session = Session(id: 's');
       expect(restorePermissionMode(session), TuiPermissionMode.askWhenNeeded);
 
-      session.append(kPermissionModeEvent,
-          data: <String, Object?>{'mode': 'alwaysAsk'});
+      session.append(
+        kPermissionModeEvent,
+        data: <String, Object?>{'mode': 'alwaysAsk'},
+      );
       expect(restorePermissionMode(session), TuiPermissionMode.alwaysAsk);
 
-      session.append(kPermissionModeEvent,
-          data: <String, Object?>{'mode': 'neverAsk'});
+      session.append(
+        kPermissionModeEvent,
+        data: <String, Object?>{'mode': 'neverAsk'},
+      );
       expect(restorePermissionMode(session), TuiPermissionMode.neverAsk);
     });
 
     test('事件数据非法时回落到默认档', () {
       final Session session = Session(id: 's');
-      session.append(kPermissionModeEvent,
-          data: <String, Object?>{'mode': 'nope'});
+      session.append(
+        kPermissionModeEvent,
+        data: <String, Object?>{'mode': 'nope'},
+      );
       expect(restorePermissionMode(session), TuiPermissionMode.askWhenNeeded);
 
       session.append(kPermissionModeEvent);
@@ -396,15 +404,19 @@ void main() {
         TuiPermissionMode.neverAsk,
       );
 
-      session.append(kPermissionModeEvent,
-          data: <String, Object?>{'mode': 'nope'});
+      session.append(
+        kPermissionModeEvent,
+        data: <String, Object?>{'mode': 'nope'},
+      );
       expect(
         restorePermissionMode(session, fallback: TuiPermissionMode.neverAsk),
         TuiPermissionMode.neverAsk,
       );
 
-      session.append(kPermissionModeEvent,
-          data: <String, Object?>{'mode': 'alwaysAsk'});
+      session.append(
+        kPermissionModeEvent,
+        data: <String, Object?>{'mode': 'alwaysAsk'},
+      );
       expect(
         restorePermissionMode(session, fallback: TuiPermissionMode.neverAsk),
         TuiPermissionMode.alwaysAsk,

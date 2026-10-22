@@ -69,8 +69,10 @@ void main() {
         effect: PermissionEffect.deny,
         source: 'config',
       );
-      final PermissionWiring wiring =
-          wiringFor(dir.path, configRules: <PermissionRule>[deny]);
+      final PermissionWiring wiring = wiringFor(
+        dir.path,
+        configRules: <PermissionRule>[deny],
+      );
       await wiring.load();
       wiring.applyMode(askThreshold: null, agentId: 'build');
 
@@ -89,9 +91,63 @@ void main() {
       expect(warning, contains('deny'));
       expect(wiring.slot.current.rules, hasLength(1));
       expect(
-        File('${dir.path}${Platform.pathSeparator}permissions.json').existsSync(),
+        File(
+          '${dir.path}${Platform.pathSeparator}permissions.json',
+        ).existsSync(),
         isFalse,
       );
+    });
+
+    test('shell 前缀 allow 覆盖已有 deny 时拒绝落盘', () async {
+      final Directory dir = Directory.systemTemp.createTempSync('perm-wiring');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final PermissionWiring wiring = wiringFor(
+        dir.path,
+        configRules: const <PermissionRule>[
+          PermissionRule(
+            action: 'shell',
+            resource: 'git push *',
+            effect: PermissionEffect.deny,
+          ),
+        ],
+      );
+      await wiring.load();
+
+      final String? warning = await wiring.remember(
+        const <PermissionRule>[
+          PermissionRule(
+            action: 'shell',
+            resource: 'git *',
+            effect: PermissionEffect.allow,
+          ),
+        ],
+        <String>['git status'],
+      );
+
+      expect(warning, isNotNull);
+      expect(warning, contains('git push *'));
+      expect(
+        File(
+          '${dir.path}${Platform.pathSeparator}permissions.json',
+        ).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('直接传入的 configRules 也会规范化', () async {
+      final Directory dir = Directory.systemTemp.createTempSync('perm-wiring');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final PermissionWiring wiring = wiringFor(
+        dir.path,
+        configRules: const <PermissionRule>[
+          PermissionRule(
+            action: 'edit',
+            resource: './src/../src/*.env',
+            effect: PermissionEffect.deny,
+          ),
+        ],
+      );
+      expect(wiring.configRules.single.resource, 'src/*.env');
     });
 
     test('会话规则参与合成：config → project → session', () async {

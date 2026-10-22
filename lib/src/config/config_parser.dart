@@ -75,10 +75,10 @@ class ConfigParser extends ConfigValues {
 
   /// `[llm]` 表里的退避重试参数；缺省即框架侧默认值。
   RetrySettings _readRetry(Map<String, dynamic> table) => RetrySettings(
-        maxAttempts: readNonNegativeInt(table, 'max_attempts', 4),
-        baseDelayMs: readNonNegativeInt(table, 'retry_base_ms', 500),
-        maxDelayMs: readNonNegativeInt(table, 'retry_max_ms', 30000),
-      );
+    maxAttempts: readNonNegativeInt(table, 'max_attempts', 4),
+    baseDelayMs: readNonNegativeInt(table, 'retry_base_ms', 500),
+    maxDelayMs: readNonNegativeInt(table, 'retry_max_ms', 30000),
+  );
 
   bool _validDefaultModel(String value) {
     final int slash = value.indexOf('/');
@@ -146,8 +146,9 @@ class ConfigParser extends ConfigValues {
       maxSteps: readPositiveInt(table, 'max_steps', 8),
       workdir: readString(table, 'workdir'),
       projectDir: readString(table, 'project_dir'),
-      subagentPermission:
-          _subagentPermission(readString(table, 'subagent_permission')),
+      subagentPermission: _subagentPermission(
+        readString(table, 'subagent_permission'),
+      ),
     );
   }
 
@@ -157,7 +158,8 @@ class ConfigParser extends ConfigValues {
     const Set<String> known = <String>{'inherit', 'readonly', 'ask', 'auto'};
     if (known.contains(value)) return value;
     throw ConfigException(
-        '$source：subagent_permission "$value" 不合法（inherit/readonly/ask/auto）。');
+      '$source：subagent_permission "$value" 不合法（inherit/readonly/ask/auto）。',
+    );
   }
 
   ApprovalConfig _readApproval() {

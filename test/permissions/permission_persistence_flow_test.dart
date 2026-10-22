@@ -128,8 +128,9 @@ void main() {
       llm: FallbackLlm(const <LlmProvider>[]),
     );
     addTearDown(runtime.dispose);
-    final PermissionWiring wiring =
-        runtime.app.require<PermissionWiring>('permissionWiring');
+    final PermissionWiring wiring = runtime.app.require<PermissionWiring>(
+      'permissionWiring',
+    );
     wiring.setSessionRules(const <PermissionRule>[
       PermissionRule(
         action: 'shell',

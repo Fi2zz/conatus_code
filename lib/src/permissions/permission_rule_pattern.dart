@@ -38,11 +38,11 @@ PermissionRule? permissionRuleFor(ApprovalRequest request) {
 }
 
 PermissionRule _rule(String action, String resource) => PermissionRule(
-      action: action,
-      resource: resource,
-      effect: PermissionEffect.allow,
-      source: kRememberedRuleSource,
-    );
+  action: action,
+  resource: resource,
+  effect: PermissionEffect.allow,
+  source: kRememberedRuleSource,
+);
 
 /// 过滤掉通配与空值；路径动作先规范化。
 List<String> _concreteResources(List<String> resources, String action) {

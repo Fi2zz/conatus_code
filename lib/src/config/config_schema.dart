@@ -49,10 +49,10 @@ class RetrySettings {
 
   /// 转成框架侧的策略对象。
   RetryPolicy toPolicy() => RetryPolicy(
-        maxAttempts: maxAttempts,
-        baseDelay: Duration(milliseconds: baseDelayMs),
-        maxDelay: Duration(milliseconds: maxDelayMs),
-      );
+    maxAttempts: maxAttempts,
+    baseDelay: Duration(milliseconds: baseDelayMs),
+    maxDelay: Duration(milliseconds: maxDelayMs),
+  );
 }
 
 /// provider 类型：决定请求形态。

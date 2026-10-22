@@ -13,8 +13,9 @@ void main() {
   group('external_directory', () {
     test('工作区外 read 进入 external_directory 判定并要求确认', () async {
       final Directory work = Directory.systemTemp.createTempSync('perm-work');
-      final Directory outside =
-          Directory.systemTemp.createTempSync('perm-outside');
+      final Directory outside = Directory.systemTemp.createTempSync(
+        'perm-outside',
+      );
       addTearDown(() => work.deleteSync(recursive: true));
       addTearDown(() => outside.deleteSync(recursive: true));
       final String file = '${outside.path}${Platform.pathSeparator}a.txt';
@@ -31,8 +32,9 @@ void main() {
         ),
       );
 
-      final ToolResult result =
-          await rig.tools.call(permissionCall('read_file', <String, Object?>{'path': file}));
+      final ToolResult result = await rig.tools.call(
+        permissionCall('read_file', <String, Object?>{'path': file}),
+      );
       expect(result.isError, isFalse);
       final ApprovalRequest request = rig.gate.requests.single;
       expect(request.action, 'external_directory');
@@ -79,7 +81,9 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': '../../etc/passwd'}),
+        permissionCall('read_file', <String, Object?>{
+          'path': '../../etc/passwd',
+        }),
       );
       expect(rig.gate.requests.single.action, 'external_directory');
 
@@ -125,7 +129,8 @@ void main() {
       );
       await externalRig.tools.call(
         permissionCall('apply_patch', <String, Object?>{
-          'patch': '--- a/../outside/old.txt\n+++ b/../outside/new.txt\n'
+          'patch':
+              '--- a/../outside/old.txt\n+++ b/../outside/new.txt\n'
               '@@ -1 +1 @@\n-a\n+b',
         }),
       );
