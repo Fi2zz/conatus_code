@@ -473,6 +473,31 @@ class LintConfig {
   final int debounceSeconds;
 }
 
+/// format-on-edit 配置；对应 `[formatter]` 表。
+///
+/// 表缺失时 [enabled] 为 `false`（零行为变化）；表存在但未写 `enabled` 时
+/// 默认开启。
+class FormatterConfig {
+  const FormatterConfig({
+    this.enabled = false,
+    this.command,
+    this.timeoutMs = 10000,
+    this.extensions = const <String>[],
+  });
+
+  /// 是否在模型编辑文件后自动格式化。
+  final bool enabled;
+
+  /// 覆盖探测出的格式化命令；支持 `$FILE` 占位符，缺失时把路径追加在末尾。
+  final String? command;
+
+  /// 单次格式化命令超时（毫秒）。
+  final int timeoutMs;
+
+  /// 额外的扩展名限制（含点）；为空表示沿用探针的扩展名集合。
+  final List<String> extensions;
+}
+
 /// 故事层（人机双写）配置；对应 `[story]` 表。
 class StoryConfig {
   const StoryConfig({this.enabled = false});
@@ -532,6 +557,7 @@ class ConatusCodeConfig {
     this.xerj = const XerjConfig(),
     this.hooks = const HooksConfig(),
     this.lint = const LintConfig(),
+    this.formatter = const FormatterConfig(),
     this.story = const StoryConfig(),
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
@@ -581,6 +607,9 @@ class ConatusCodeConfig {
 
   /// `[lint]` 表。
   final LintConfig lint;
+
+  /// `[formatter]` 表。
+  final FormatterConfig formatter;
 
   /// `[story]` 表。
   final StoryConfig story;

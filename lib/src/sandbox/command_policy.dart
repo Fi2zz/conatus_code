@@ -170,6 +170,10 @@ Set<String> resolveReadAllowedPaths(Iterable<String> userProvided) => <String>{
 const Set<String> _defaultExecutables = <String>{
   'dart',
   'flutter',
+  'gofmt',
+  'rustfmt',
+  'prettier',
+  'ruff',
   'git',
   'rg',
   'ls',

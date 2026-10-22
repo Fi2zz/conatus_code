@@ -88,6 +88,7 @@ export 'src/config/config_schema.dart'
         BudgetConfig,
         CheckpointConfig,
         ConatusCodeConfig,
+        FormatterConfig,
         HooksConfig,
         LintConfig,
         LlmConfig,
@@ -126,6 +127,16 @@ export 'src/diff/diff_types.dart' show DiffFile, DiffHunk, DiffOp, DiffOpKind;
 export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
 export 'src/diff/unified_diff.dart'
     show buildUnifiedDiff, kMaxDiffLines, splitLines;
+export 'src/format/formatter_path.dart'
+    show formatterExtension, resolveFormatterTarget;
+export 'src/format/formatter_probe.dart' show FormatterProbe, detectFormatter;
+export 'src/format/formatter_service.dart'
+    show
+        FormatterService,
+        kFormatterMaxFiles,
+        kFormatterReasonChars,
+        kFormatterToolNames,
+        provideFormatter;
 export 'src/fs_tools/spill_dir.dart'
     show kNavaProjectDirName, toolResultSpillDir;
 export 'src/headless/headless_guard.dart'

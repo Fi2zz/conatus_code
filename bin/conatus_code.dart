@@ -129,6 +129,7 @@ Future<void> main(List<String> args) async {
     background: config.background,
     hooks: config.hooks,
     lint: config.lint,
+    formatter: config.formatter,
     story: config.story,
     permissions: config.permissions,
     approvalMode: config.approval.mode,

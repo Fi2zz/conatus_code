@@ -326,6 +326,12 @@ OS Error: Path does not exist, path = 'lib/…/nope.dart'
   `enabled` / `command` 覆盖 / `debounce_seconds`），告警追加进工具结果
   当场闭环；按项目类型自动探测（pubspec→`dart analyze`、package.json→
   `eslint .`、go.mod→`go vet ./...`、Cargo.toml→`cargo check`）。
+- format-on-edit：`[formatter]` 表存在时启用（`enabled` 缺省 true；
+  `command` / `timeout_ms` / `extensions` 可覆盖），编辑成功后先格式化再交给
+  linter；探测 pubspec→`dart format`、go.mod→`gofmt -w`、Cargo.toml→`rustfmt`、
+  package.json 含 prettier→`prettier --write`、pyproject 含 `[tool.ruff]`→
+  `ruff format`。表缺失时完全不启用；失败 / 超时 / 沙箱白名单拒绝只追加
+  `[Formatter] skipped` 提示，不影响工具成功。
 
 ## Hooks（`[hooks]`）
 

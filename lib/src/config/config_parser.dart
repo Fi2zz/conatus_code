@@ -33,6 +33,7 @@ class ConfigParser extends ConfigValues {
     xerj: _readXerj(),
     hooks: _readHooks(),
     lint: _readLint(),
+    formatter: _readFormatter(),
     story: _readStory(),
     background: _readBackground(),
     loopControl: _readLoopControl(),
@@ -413,6 +414,25 @@ class ConfigParser extends ConfigValues {
       command: readString(table, 'command'),
       debounceSeconds: readNonNegativeInt(table, 'debounce_seconds', 10),
     );
+  }
+
+  FormatterConfig _readFormatter() {
+    final Map<String, dynamic> table = readTable('formatter');
+    return FormatterConfig(
+      // 表存在即视为用户显式启用；表缺失时 enabled 保持 false。
+      enabled: readBool(table, 'enabled', raw.containsKey('formatter')),
+      command: readString(table, 'command'),
+      timeoutMs: readPositiveInt(table, 'timeout_ms', 10000),
+      extensions: <String>[
+        for (final String extension in readStringList(table, 'extensions'))
+          if (extension.trim().isNotEmpty) _formatterExtension(extension),
+      ],
+    );
+  }
+
+  String _formatterExtension(String value) {
+    final String trimmed = value.trim().toLowerCase();
+    return trimmed.startsWith('.') ? trimmed : '.$trimmed';
   }
 
   StoryConfig _readStory() {

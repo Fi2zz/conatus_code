@@ -30,6 +30,7 @@ import '../checkpoint/checkpoint_manager.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
 import '../config/project_data_dir.dart';
+import '../format/formatter_service.dart';
 import '../hooks/hooks.dart';
 import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
@@ -185,6 +186,7 @@ class ConatusTuiRuntime {
     BackgroundConfig? background,
     HooksConfig? hooks,
     LintConfig? lint,
+    FormatterConfig? formatter,
     StoryConfig? story,
     PermissionConfig? permissions,
     ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
@@ -567,6 +569,10 @@ class ConatusTuiRuntime {
     // ── lint-on-edit：模型编辑后自动跑 linter 并闭环 ──
     if (lint != null) {
       provideLinter(app, config: lint, workdir: resolvedWorkdir);
+    }
+    // ── format-on-edit：在 linter 之后挂（更内层），先格式化再交给 linter ──
+    if (formatter != null) {
+      provideFormatter(app, config: formatter, workdir: resolvedWorkdir);
     }
     // ── 会话持久化（JSONL）+ 会话仓库 ────────────────────────────
     provideSessionPersistence(
