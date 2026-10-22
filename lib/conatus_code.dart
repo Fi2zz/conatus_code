@@ -155,6 +155,9 @@ export 'src/mcp/mcp_assembly.dart'
 export 'src/permissions/permission_rule_pattern.dart'
     show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;
+export 'src/revert/revert_service.dart' show RevertService;
+export 'src/revert/revert_stage.dart'
+    show RedoResult, RevertException, RevertStage, UndoResult;
 export 'src/sandbox/command_policy.dart'
     show
         CommandDecision,

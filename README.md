@@ -156,6 +156,20 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 - 对话切点：`lastEventId` 为 null（全新会话的 turn 0）时切到全新空会话。
 - 关闭：`[checkpoint] enabled = false`（/rewind 提示不可用）。
 
+### 按轮撤销与重做（`/undo` / `/redo`）
+
+`/undo [N]`（缺省 1 轮）撤销工作区**和**对话：先恢复文件到该轮检查点，再按
+`lastEventId` fork 会话切过去，并把被撤回的最新一条用户 prompt 回填到输入框
+（`/undo 2` 这类多轮撤销另有系统行说明其余 prompt 未回填）。撤销点留在内存
+里，`/redo` 恢复撤销前的文件并切回原会话；发下一条 prompt 即视为提交，撤销点
+作废。与 `/rewind` 的差别：`/rewind` 是一次性回滚、不能重做。
+
+- 工作区在目标区间有改动时先弹确认（拒绝则文件与会话都不动）。
+- `[checkpoint] enabled = false`：只回滚对话（按 user/message 事件推算轮次边界），
+  文件不动，并提示「checkpoint 已关闭」。
+- 轮次不够或目标轮次已被 `keep` 裁剪：明确报错，不做任何改动。
+- 有在途轮次时 `/undo`、`/redo` 与切会话一律拒绝。
+
 ## 人机双写故事层（可选）
 
 `[story] enabled = true` 时，`write_file` / `edit_file` / `apply_patch` 不再直接

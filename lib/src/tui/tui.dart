@@ -147,9 +147,22 @@ class _AgentTuiState extends State<AgentTui> {
   }
 
   void _refresh() {
+    _takePrefill();
     if (mounted) {
       setState(() {});
     }
+  }
+
+  /// 取走控制器待回填的文本（`/undo` 回填被撤回的 prompt）并写入输入框。
+  ///
+  /// 只在首次取到值时改输入框；写入会触发输入监听（菜单/补全同步），
+  /// 此时 prefill 已清空，不会递归。
+  void _takePrefill() {
+    final String? text = _controller.takePrefillInput();
+    if (text == null || !mounted) return;
+    _input.text = text;
+    _input.selection = TextSelection.collapsed(offset: text.length);
+    _atMenu.close();
   }
 
   void _exit() {

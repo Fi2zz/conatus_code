@@ -34,6 +34,8 @@ import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
 import '../permissions/permission_wiring.dart';
+import '../revert/revert_service.dart';
+import '../revert/revert_stage.dart';
 import '../story/story.dart';
 import '../story/story_commands.dart';
 import '../story/story_notices.dart';
@@ -67,6 +69,7 @@ import 'tui_skill_command.dart';
 import 'voice_reporter.dart';
 
 part 'tui_controller_provider.dart';
+part 'tui_controller_revert.dart';
 
 /// `/goal` 用法提示。
 const String kGoalUsage =
@@ -269,6 +272,11 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// `/model` 打开浮层时，当前提供商没有配置模型清单（`[models.*]`）时兜底拉取。
   Future<Map<String, List<ModelsDevModel>>> Function()? modelsDevLoader;
 
+  /// `/undo` 覆盖工作区前的确认钩子（返回 `false` 取消）。
+  ///
+  /// 缺省走选项浮层；测试 / 无界面运行时注入桩，避免弹窗等不到人。
+  Future<bool> Function(String message)? confirmRevert;
+
   /// `/team`（无参）进入团队视图的宿主回调；由根组件注入切换视图。
   void Function()? onOpenTeamView;
 
@@ -313,6 +321,12 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 非空表示有一轮基线在飞（会话刚绑定）。解除绑定时置 `null`，免得旧门闩
   /// 拖住下一个会话的首轮。
   Future<void>? _checkpointBase;
+
+  /// 最近一次 `/undo` 的撤销点；发新 prompt（提交语义）或 `/redo` 后清空。
+  RevertStage? _revertStage;
+
+  /// 待回填到输入框的文本（`/undo` 回填被撤回的 prompt）；根组件取走即清空。
+  String? _prefill;
 
   /// 在飞轮次的取消句柄（Esc / 打断）；null = 无在飞轮次。
   AgentCancel? _cancel;
@@ -508,6 +522,25 @@ class ConatusTuiController implements TuiUserPromptHost {
     );
   }
 
+  /// `/undo [N]`：按轮撤销工作区文件与对话，留下可 `/redo` 的撤销点。
+  Future<void> undo(int steps) => _runUndo(steps);
+
+  /// `/redo`：回到最近一次 `/undo` 之前（恢复文件并切回原会话）。
+  Future<void> redo() => _runRedo();
+
+  /// 回填输入框：由根组件在下一次重绘时取走（`/undo` 回填被撤回的 prompt）。
+  void prefillInput(String text) {
+    _prefill = text;
+    _refresh();
+  }
+
+  /// 取走待回填文本；没有待回填内容时返回 `null`（只返回一次）。
+  String? takePrefillInput() {
+    final String? text = _prefill;
+    _prefill = null;
+    return text;
+  }
+
   /// 上一条 `!` 命令（`!!` 重跑用）。
   String? _lastBangCommand;
 
@@ -657,6 +690,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     final AgentCancel cancel = AgentCancel();
     _cancel = cancel;
+    // 新 prompt 即提交：撤销点与待回填内容作废（/redo 不再可用）。
+    _revertStage = null;
+    _prefill = null;
     busy = true;
     _refresh();
     // 等 turn 0 基线落盘再开跑：快照边写边读工作区，飞行中被工具改动会
@@ -720,16 +756,24 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// 切换会话：不存在则懒建（各自文件与历史）；非法 id 只提示不切换。
-  Future<void> switchSession(String id, {String? announce}) async {
+  ///
+  /// busy（有在途轮次）时拒绝并返回 `false`：此时释放会话子上下文会把正在
+  /// 跑的 Agent Loop 从脚下抽走，`/undo`、`/redo` 这类编排也据此判定未生效。
+  Future<bool> switchSession(String id, {String? announce}) async {
+    if (busy) {
+      transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
+      _refresh();
+      return false;
+    }
     if (!isValidSessionId(id)) {
       transcript.add(TuiRole.system, '会话 id 非法：只允许字母/数字/下划线/中文/短横，长度 1—64。');
       _refresh();
-      return;
+      return false;
     }
     if (ready && id == _sessionId) {
       transcript.add(TuiRole.system, '已在会话 $_sessionId。');
       _refresh();
-      return;
+      return false;
     }
     _unbind();
     _sessionId = id;
@@ -739,6 +783,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       announce ?? '已切换到会话 $_sessionId（数据文件：$_sessionId.jsonl）。',
     );
     _refresh();
+    return true;
   }
 
   /// 开启新会话。
@@ -790,6 +835,10 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleCompact();
       case 'rewind':
         await _handleRewind(arg);
+      case 'undo':
+        await undo(int.tryParse(arg.trim()) ?? 1);
+      case 'redo':
+        await redo();
       case 'background':
         await _handleBackground(arg);
       case 'doctor':

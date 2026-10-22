@@ -1,4 +1,4 @@
-/// 消息队列：busy 入队、收口依次出队、容量上限、打断/切会话清空。
+/// 消息队列：busy 入队、收口依次出队、容量上限、打断清空、busy 时拒绝切会话。
 library;
 
 import 'dart:async';
@@ -188,7 +188,7 @@ void main() {
     await first;
   });
 
-  test('切换会话清空队列', () async {
+  test('busy 时切换会话被拒绝（不丢在途轮次与队列）', () async {
     final (ConatusTuiController controller, Context app, _GateProvider provider) =
         await _build();
     addTearDown(app.dispose);
@@ -198,11 +198,24 @@ void main() {
     await controller.handleLine('排队');
     expect(controller.queuedCount, 1);
 
-    await controller.switchSession('session_11111111-2222-3333-4444-555555555555');
+    // 在途轮次里换会话会把 Agent Loop 从脚下抽走：拒绝并保留队列。
+    final bool switched = await controller.switchSession(
+      'session_11111111-2222-3333-4444-555555555555',
+    );
+    expect(switched, isFalse);
+    expect(controller.transcript.messages.last.text, contains('有在途轮次'));
+    expect(controller.queuedCount, 1);
 
-    expect(controller.queuedCount, 0);
     provider.gate.complete();
     await first;
+    await _until(() => !controller.busy && controller.queuedCount == 0);
+
+    // 收口后照常可切，队列保持清空。
+    final bool later = await controller.switchSession(
+      'session_11111111-2222-3333-4444-555555555555',
+    );
+    expect(later, isTrue);
+    expect(controller.queuedCount, 0);
   });
 
   test('空闲时 submit 直接执行不入队', () async {

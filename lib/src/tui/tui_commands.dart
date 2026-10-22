@@ -85,8 +85,17 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   TuiCommand(name: 'compact', description: '手动压缩当前会话（折叠早期历史）'),
   TuiCommand(
     name: 'rewind',
-    description: '回滚工作区到 N 轮前（[N] 缺省 1；list 查看可用检查点）',
+    description: '回滚到 N 轮前（一次性、不可 redo；[N] 缺省 1；list 查看检查点）',
     argHint: '[N|list]',
+  ),
+  TuiCommand(
+    name: 'undo',
+    description: '撤销最近 N 轮（工作区 + 对话，可 /redo 重做；[N] 缺省 1）',
+    argHint: '[N]',
+  ),
+  TuiCommand(
+    name: 'redo',
+    description: '重做上次 /undo（恢复文件并切回原会话）',
   ),
   TuiCommand(
     name: 'background',
