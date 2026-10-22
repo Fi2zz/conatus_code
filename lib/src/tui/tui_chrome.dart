@@ -11,7 +11,8 @@ const borderSode = BorderSide(color: Colors.blue);
 /// shell 模式下的输入框边框（紫色，与普通模式的蓝色区分）。
 const BorderSide kShellInputBorder = BorderSide(color: Colors.magenta);
 
-/// 输入栏：`> ` 前缀 + 单行输入框（思考中置灰只读，避免丢输入）。
+/// 输入栏：`> ` 前缀 + 单行输入框。思考中保持可编辑：回车把消息排队
+/// （控制器侧队列），占位提示显示已排队条数；「思考中」动画在状态栏。
 ///
 /// 附件以占位标记（`[image #N (宽×高)]`）形式留在输入框文本里，随文本提交时
 /// 提取（见 `tui_attachment.dart`），不再单独渲染附件行。
@@ -23,6 +24,7 @@ class TuiInputBar extends StatelessComponent {
     required this.busy,
     required this.onSubmitted,
     this.shellMode = false,
+    this.queuedCount = 0,
     this.onKeyEvent,
   });
 
@@ -35,8 +37,11 @@ class TuiInputBar extends StatelessComponent {
   /// 是否聚焦。
   final bool focused;
 
-  /// 是否思考中。
+  /// 是否思考中（不再锁输入，只影响占位提示）。
   final bool busy;
+
+  /// 已排队消息数（busy 时展示排队反馈）。
+  final int queuedCount;
 
   /// 提交回调。
   final ValueChanged<String> onSubmitted;
@@ -44,9 +49,10 @@ class TuiInputBar extends StatelessComponent {
   /// 文本框按键拦截（返回 true 吞掉）：`/` 菜单打开时用于 ↑↓/Enter/Esc/Tab。
   final bool Function(KeyboardEvent event)? onKeyEvent;
 
-  /// 占位提示：思考中 / shell 模式 / 普通输入。
+  /// 占位提示：排队反馈 / 思考中可输入 / shell 模式 / 普通输入。
   String _placeholder() {
-    if (busy) return '思考中…';
+    if (busy && queuedCount > 0) return '已排队 $queuedCount 条，回车继续排队';
+    if (busy) return '思考中…可继续输入，回车排队';
     return shellMode ? shellInputPlaceholder() : '输入消息，/help 查看命令';
   }
 
@@ -78,10 +84,8 @@ class TuiInputBar extends StatelessComponent {
           ),
           Expanded(
             child: TextField(
-              key: ValueKey<bool>(busy),
               controller: controller,
               focused: focused,
-              readOnly: busy,
               style: const TextStyle(color: Colors.white),
               placeholder: _placeholder(),
               onSubmitted: onSubmitted,

@@ -35,6 +35,7 @@ import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
 import '../story/story.dart';
 import '../story/story_commands.dart';
+import '../story/story_notices.dart';
 import '../story/story_pending.dart';
 import '../story/story_render.dart';
 import '../subagent/subagent_progress.dart';
@@ -1856,6 +1857,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       await provideStory(ctx, sessionId: id, session: session, review: true);
     }
     _agent = ctx.agentLoop;
+    // 轮内注入：排队消息与人的编辑通报在模型组下一次请求前取走。
+    _agent?.steering = _takeQueuedForSteering;
     _planMode = ctx.planMode;
     _goal = ctx.goal;
     // 权限模式按会话恢复：每个会话折叠自己的 permission/mode 后缀，
@@ -1962,6 +1965,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       }
     }
     // 消息队列：收口后投递下一条排队输入（一次一条，依次衔接）。
+    // 多数时候队列已被 steering 取空（轮内注入），这里是兜底路径。
     if (_queue.isNotEmpty && !busy) {
       final (String, List<TuiAttachment>) next = _queue.removeAt(0);
       unawaited(submit(next.$1, attachments: next.$2));
@@ -1974,6 +1978,24 @@ class ConatusTuiController implements TuiUserPromptHost {
         transcript.add(TuiRole.system, 'Stop hook 失败：$hookError');
       }
     }
+  }
+
+
+  /// SteeringSource：合并两个来源——先 storyNotices（人的编辑通报，先感知
+  /// 世界变化），后排队消息文本；取走即清空。Agent Loop 在组下一次模型
+  /// 请求前调用（轮内注入，不等轮末）。取出后刷新 UI（「已排队 n 条」
+  /// 即时递减）；注入消息的附件 v1 丢弃（插话是纯文本）。
+  Future<List<String>> _takeQueuedForSteering() async {
+    final List<String> notices =
+        _sessionCtx?.get<StoryNotices>('storyNotices')?.drain() ??
+            const <String>[];
+    final List<String> texts = <String>[
+      for (final (String, List<TuiAttachment>) entry in _queue) entry.$1,
+    ];
+    if (notices.isEmpty && texts.isEmpty) return const <String>[];
+    _queue.clear();
+    _refresh();
+    return <String>[...notices, ...texts];
   }
 
   /// 调度交付：空闲时把提醒当作一轮用户输入投递，返回是否成功入队。

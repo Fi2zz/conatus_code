@@ -813,6 +813,7 @@ class _AgentTuiState extends State<AgentTui> {
                 !_controller.formPrompt.open &&
                 !_controller.modelPrompt.open,
             busy: _controller.busy,
+            queuedCount: _controller.queuedCount,
             onSubmitted: (_) => _submit(),
             onKeyEvent: _onInputKey,
           ),

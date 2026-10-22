@@ -13,6 +13,7 @@ import 'package:test/test.dart';
 class _GateProvider implements LlmProvider {
   final Completer<void> gate = Completer<void>();
   final List<String> prompts = <String>[];
+  final List<List<String>> batches = <List<String>>[];
   int calls = 0;
 
   @override
@@ -25,6 +26,7 @@ class _GateProvider implements LlmProvider {
     List<Map<String, dynamic>>? tools,
   }) async {
     prompts.add(messages.last.content);
+    batches.add(messages.map((LlmMessage m) => m.content).toList());
     calls++;
     if (calls == 1) await gate.future;
     return LlmResult(content: 'reply-$calls', provider: 'gated', model: 'm');
@@ -68,7 +70,7 @@ Future<void> _until(bool Function() cond) async {
 }
 
 void main() {
-  test('busy 时入队，收口后依次出队执行', () async {
+  test('busy 时入队，下一次请求边界注入（轮末兜底）', () async {
     final (ConatusTuiController controller, Context app, _GateProvider provider) =
         await _build();
     addTearDown(app.dispose);
@@ -85,9 +87,13 @@ void main() {
 
     provider.gate.complete(); // 放行第一轮
     await first;
+    await _until(() => provider.calls >= 2);
     await _until(() => !controller.busy && controller.queuedCount == 0);
 
-    expect(provider.prompts, <String>['第一条', '第二条', '第三条']);
+    // 第一轮收口后兜底投递「第二条」；「第三条」在该轮请求边界被 steering
+    // 注入，因此第二轮一次带上两条，模型只被调用两次。
+    expect(provider.calls, 2);
+    expect(provider.batches[1], containsAll(<String>['第二条', '第三条']));
   });
 
   test('队列满（20 条）拒绝新输入', () async {
