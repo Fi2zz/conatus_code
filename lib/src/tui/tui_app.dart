@@ -68,6 +68,7 @@ class ConatusTuiRuntime {
     required this.maxSteps,
     required this.fallbackModels,
     required this.retryPolicy,
+    required this.storyEnabled,
     required void Function(FallbackLlm llm) switchLlm,
   }) : _switchLlm = switchLlm;
 
@@ -94,6 +95,9 @@ class ConatusTuiRuntime {
 
   /// 单个提供商内部的退避重试策略。
   final RetryPolicy retryPolicy;
+
+  /// 是否装配故事层（`[story] enabled`）。
+  final bool storyEnabled;
 
   final void Function(FallbackLlm llm) _switchLlm;
 
@@ -161,7 +165,9 @@ class ConatusTuiRuntime {
     BackgroundConfig? background,
     HooksConfig? hooks,
     LintConfig? lint,
+    StoryConfig? story,
   }) async {
+    final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
     final String sep = Platform.pathSeparator;
     final String resolvedWorkdir = workdir ?? Directory.current.path;
@@ -491,6 +497,15 @@ class ConatusTuiRuntime {
       ),
     );
     final SessionStore sessions = provideSessions(app);
+    // 故事层日志（doc/* 事件）：只在启用故事层时装配，关闭时零副作用。
+    if (storyEnabled) {
+      provideSessionLog(
+        app,
+        persistence: JsonlSessionPersistence(
+          dir: '$resolvedBaseDir${sep}story-log',
+        ),
+      );
+    }
 
     // ── system prompt / 记忆 / 压缩 / 技能 ──────────────────────
     final SystemPrompt prompt = provideSystemPrompt(app);
@@ -506,6 +521,23 @@ class ConatusTuiRuntime {
         text: () =>
             '编码任务先规划后执行：复杂任务先用 plan_write 制定执行计划，'
             '执行中每完成一步用 update_plan 标记进度；工具失败时反思原因并重试或调整方案。',
+      ),
+    );
+    if (storyEnabled) {
+      prompt.section(
+        PromptSection(
+          name: 'story-ops',
+          text: () =>
+              '文件编辑（write_file / edit_file / apply_patch）默认进入待定审阅：'
+              '人接受后才真正落盘。收到「已登记为待定补丁」的结果后继续推进或等待，'
+              '不要重试同一编辑。也可以用 ```ops 围栏块（JSON 数组的块操作）提议修改。',
+        ),
+      );
+    }
+    prompt.section(
+      PromptSection(
+        name: 'steering',
+        text: () => '用户可能在你工作途中插话：出现新的用户消息时，优先响应最新要求。',
       ),
     );
     // 项目上下文：AGENTS.md / NAVA.md（见 project_context.dart）。注入为
@@ -586,6 +618,7 @@ class ConatusTuiRuntime {
       maxSteps: maxSteps,
       fallbackModels: fallbackModels,
       retryPolicy: retryPolicy ?? const RetryPolicy(),
+      storyEnabled: storyEnabled,
       switchLlm: switchLlm,
     );
   }
@@ -613,6 +646,7 @@ class ConatusTuiRuntime {
       initialPermissionMode: initialPermissionMode,
       fallbackModels: fallbackModels,
       retryPolicy: retryPolicy,
+      storyEnabled: storyEnabled,
     );
     controller.switchLlm = switchLlm;
     return controller;

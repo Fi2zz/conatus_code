@@ -13,6 +13,7 @@ import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_compaction/conatus_compaction.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_cron/conatus_cron.dart';
+import 'package:conatus_doc/conatus_doc.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
@@ -32,6 +33,10 @@ import '../config/config_writer.dart';
 import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
+import '../story/story.dart';
+import '../story/story_commands.dart';
+import '../story/story_pending.dart';
+import '../story/story_render.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
 import '../tools/update_plan.dart';
@@ -64,6 +69,12 @@ part 'tui_controller_provider.dart';
 /// `/goal` 用法提示。
 const String kGoalUsage =
     '用法：/goal [status|set <文本>|edit <文本>|pause|resume|done|clear]';
+
+/// `/story` 用法提示。
+const String kStoryUsage =
+    '用法：/story（时间轴）| preview <n>（前 n 个补丁时刻）| discard <n>（驳回并写回）|'
+    ' fork <n>（从前 n 个补丁分叉新会话）| pending（待定补丁）| apply <i>（接受）|'
+    ' reject <i>（丢弃）';
 
 /// `/cron` 用法提示。
 const String kCronUsage = '用法：/cron [list|add <内容> <at|every|daily|cron> <规则>|'
@@ -105,6 +116,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.tts,
     this.ttsSink,
     this.initialPermissionMode = TuiPermissionMode.askWhenNeeded,
+    this.storyEnabled = false,
     List<String> fallbackModels = const <String>[],
     RetryPolicy retryPolicy = const RetryPolicy(),
   })  : _app = app,
@@ -150,6 +162,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   final Context _app;
   final SessionStore _sessions;
+
+  /// 是否装配故事层（`[story] enabled`）。
+  final bool storyEnabled;
 
   /// 配置里的回退链（`[llm] fallback_models`）；`/model` 切换主模型后仍跟随。
   final List<String> _fallbackModels;
@@ -745,6 +760,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleBackground(arg);
       case 'doctor':
         _showDoctor();
+      case 'story':
+        await _handleStory(arg);
       case 'cost':
         _showCost();
       case 'cron':
@@ -1159,6 +1176,122 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     buffer.write('\n${failed == 0 ? '未发现阻塞项。' : '发现 $failed 个需处理项（见上）。'}');
     transcript.add(TuiRole.system, buffer.toString());
+  }
+
+  /// `/story`：补丁时间轴与游标操作（不经模型，只读 `'doc'` 服务 +
+  /// `'storyPending'`）。子命令：preview / discard / fork / pending / apply。
+  Future<void> _handleStory(String arg) async {
+    if (!storyEnabled) {
+      transcript.add(
+        TuiRole.system,
+        '故事层未启用：在 config.toml 设 [story] enabled = true 后重启。',
+      );
+      return;
+    }
+    final DocEngine? engine = _sessionCtx?.get<DocEngine>('doc');
+    if (engine == null) {
+      transcript.add(TuiRole.system, '故事层不可用：会话未装配 doc 服务。');
+      return;
+    }
+    final int space = arg.indexOf(' ');
+    final String sub = space < 0 ? arg.trim() : arg.substring(0, space).trim();
+    final String rest = space < 0 ? '' : arg.substring(space + 1).trim();
+    await _runStorySub(engine, sub, rest);
+  }
+
+  Future<void> _runStorySub(DocEngine engine, String sub, String rest) async {
+    switch (sub) {
+      case '':
+        transcript.add(TuiRole.system, renderStoryTimeline(engine.log.patches));
+      case 'preview':
+        _previewStory(engine, rest);
+      case 'discard':
+        await _discardStory(engine, rest);
+      case 'fork':
+        await _forkStory(engine, rest);
+      case 'pending':
+        final StoryPending? pending = _storyPending();
+        transcript.add(
+          TuiRole.system,
+          renderStoryPending(
+            pending?.patches ?? const <DocPatch>[],
+            sources: pending?.sources ?? const <String, String>{},
+          ),
+        );
+      case 'apply':
+        await _applyStoryPending(engine, rest);
+      case 'reject':
+        _rejectStoryPending(rest);
+      default:
+        transcript.add(TuiRole.system, kStoryUsage);
+    }
+  }
+
+  StoryPending? _storyPending() => _sessionCtx?.get<StoryPending>('storyPending');
+
+  /// `/story preview <n>`：预览前 n 个补丁时刻的文档状态。
+  void _previewStory(DocEngine engine, String rest) {
+    final int? n = int.tryParse(rest);
+    if (n == null || n < 0 || n > engine.log.length) {
+      transcript.add(TuiRole.system, kStoryUsage);
+      return;
+    }
+    transcript.add(TuiRole.system, renderStoryPreview(engine.previewAt(n)));
+  }
+
+  /// `/story discard <n>`：驳回第 n 个补丁并把触及文件写回 fold 后内容。
+  Future<void> _discardStory(DocEngine engine, String rest) async {
+    final int? n = int.tryParse(rest);
+    try {
+      final StoryDiscardResult result =
+          await discardStoryPatch(engine, _app.get<FileSystem>('fs'), n ?? -1);
+      transcript.add(TuiRole.system, renderStoryDiscard(result));
+    } on ArgumentError catch (error) {
+      transcript.add(TuiRole.system, '${error.message}');
+    }
+  }
+
+  /// `/story fork <n>`：从前 n 个补丁分叉新会话并切过去（会话层 fork 已
+  /// 接线：SessionLog.fork 复制前缀，切过去后 provideStory rebuild 自然
+  /// 拿到分支历史）。
+  Future<void> _forkStory(DocEngine engine, String rest) async {
+    final int? n = int.tryParse(rest);
+    if (busy || n == null || n < 1 || n > engine.log.length) {
+      transcript.add(TuiRole.system, busy ? '有在途轮次，请稍候再试。' : kStoryUsage);
+      return;
+    }
+    if (_app.get<SessionLog>('sessionLog') == null) {
+      transcript.add(TuiRole.system, '故事层未持久化（无 sessionLog），无法分叉。');
+      return;
+    }
+    final String forkId = 'session_${newUuidV4()}';
+    await engine.forkAt(n, newSessionId: forkId);
+    await switchSession(
+      forkId,
+      announce: '已从前 $n 个补丁分叉新故事线，新会话 $forkId。',
+    );
+  }
+
+  /// `/story apply <i>`：应用第 i 个待应用补丁（经 fs 缝写文件后入故事）。
+  Future<void> _applyStoryPending(DocEngine engine, String rest) async {
+    final StoryPending? pending = _storyPending();
+    if (pending == null) {
+      transcript.add(TuiRole.system, '待应用通道不可用：会话未装配。');
+      return;
+    }
+    final String text =
+        await pending.apply(int.tryParse(rest) ?? -1, engine, _app.get<FileSystem>('fs'));
+    transcript.add(TuiRole.system, text);
+  }
+
+  /// `/story reject <i>`：丢弃第 i 个待定补丁（不落盘，文件未改动）。
+  void _rejectStoryPending(String rest) {
+    final StoryPending? pending = _storyPending();
+    if (pending == null) {
+      transcript.add(TuiRole.system, '待应用通道不可用：会话未装配。');
+      return;
+    }
+    transcript.add(TuiRole.system, pending.reject(int.tryParse(rest) ?? -1));
   }
 
   /// `/goal [子命令]`：管理当前会话的长期目标（不经模型，直接调 Goal 服务）。
@@ -1719,6 +1852,9 @@ class ConatusTuiController implements TuiUserPromptHost {
       configureSession?.call(child, session);
     });
     _sessionCtx = ctx;
+    if (storyEnabled) {
+      await provideStory(ctx, sessionId: id, session: session, review: true);
+    }
     _agent = ctx.agentLoop;
     _planMode = ctx.planMode;
     _goal = ctx.goal;

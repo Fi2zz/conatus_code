@@ -69,6 +69,12 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '让模型扫描仓库生成 AGENTS.md（已存在则更新）',
   ),
   TuiCommand(
+    name: 'story',
+    description:
+        '故事线（人机双写）：时间轴 / preview / discard / fork / pending / apply / reject',
+    argHint: '[子命令]',
+  ),
+  TuiCommand(
     name: 'commit',
     description: '提交流程：模型看暂存 diff、写 Conventional Commits 信息并 git_commit 提交',
   ),

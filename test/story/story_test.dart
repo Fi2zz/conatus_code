@@ -222,6 +222,7 @@ void main() {
         sessions: sessions,
         name: 'test',
         modelLabel: 'mock',
+        storyEnabled: true,
         onExit: () {},
       );
       addTearDown(() {
