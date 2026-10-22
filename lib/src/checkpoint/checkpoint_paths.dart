@@ -25,12 +25,17 @@ List<String> checkpointPathSegments(String path) {
       .toList();
 }
 
-/// 内置排除的相对路径前缀（**顶层匹配**）：可再生构建产物 / 应用数据目录。
-/// 与 [ignore]（用户配置）取并集——无论配置如何这些都不进快照。
+/// 内置排除的相对路径前缀（**顶层匹配**）：可再生构建产物 / 应用数据目录 /
+/// 用户 OpenCode 安装目录。与 [ignore]（用户配置）取并集——无论配置如何这些
+/// 都不进快照。
+///
+/// `.opencode` 必须在这里：nava 对它只读（见 `read_only_path_guard.dart`），
+/// 但 rewind 是 dart:io 直连、不走 fs 接缝——不排除就会把旧内容写回去。
 const List<String> kCheckpointDefaultIgnores = <String>[
   'build',
   '.dart_tool',
   'node_modules',
+  '.opencode',
 ];
 
 /// 版本库元数据目录名。**任意层级都排除**（不是顶层匹配）。

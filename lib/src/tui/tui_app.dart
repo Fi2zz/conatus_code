@@ -204,7 +204,17 @@ class ConatusTuiRuntime {
     provideTelemetry(app);
     instrumentTools(app);
 
-    provideFileSystemLocal(app, fs: fs);
+    // `.opencode`（项目级 + 全局）是用户 OpenCode 自己的目录：nava 只做兼容
+    // 读取，绝不创建 / 写入 / 删除。闸门包在 fs 接缝上，write_file /
+    // edit_file / apply_patch / story 写回等一切经 'fs' 的写操作自动继承
+    // （见 read_only_path_guard.dart）；读操作透传。
+    provideFileSystemLocal(
+      app,
+      fs: ReadOnlyPathGuard(
+        inner: fs ?? LocalFileSystem(),
+        protectedRoots: defaultReadOnlyRoots(resolvedWorkdir),
+      ),
+    );
     // 'shell' 既是 rg 的必需依赖（fs 工具回落到 ctx.get('shell')），也是命令执行
     // 的唯一接缝：注入受限实现后 rg / run_command / run_tests / run_code 一并跟随。
     provideShellLocal(app, executor: shell);
