@@ -98,6 +98,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '重做上次 /undo（恢复文件并切回原会话）',
   ),
   TuiCommand(
+    name: 'diff',
+    description: '查看差异（只读）：j/k 滚动、n/p 文件、d 切源、m 标记、q 关闭',
+    argHint: '[working|turn]',
+  ),
+  TuiCommand(
     name: 'background',
     description: '后台任务（list / output <id> / kill <id>）',
     argHint: '<子命令>',

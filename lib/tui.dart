@@ -13,6 +13,7 @@ library;
 
 export 'package:nocterm/nocterm.dart' hide isEmpty, isNotEmpty;
 
+export 'src/diff/tui_diff_view.dart' show TuiDiffView;
 export 'src/tui/ask_user_tool.dart'
     show
         AskUserTool,

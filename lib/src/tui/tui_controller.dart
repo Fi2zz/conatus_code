@@ -32,6 +32,8 @@ import '../config/config_path.dart';
 import '../config/config_writer.dart';
 import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
+import '../diff/diff_model.dart';
+import '../diff/diff_source.dart';
 import '../hooks/hooks.dart';
 import '../permissions/permission_wiring.dart';
 import '../revert/revert_compensate.dart';
@@ -95,6 +97,9 @@ const String kTeamUsage = '用法：/team（进入团队视图）[status|interru
 
 /// `/task` 用法提示。
 const String kTaskUsage = '用法：/task [claim <任务 id>|release <任务 id>]';
+
+/// `/diff` 用法提示。
+const String kDiffUsage = '用法：/diff [working|turn]（缺省 working；只读，不写工作区）';
 
 /// `/background` 用法提示。
 const String kBackgroundUsage =
@@ -336,6 +341,24 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 待回填到输入框的文本（`/undo` 回填被撤回的 prompt）；根组件取走即清空。
   String? _prefill;
 
+  /// `/diff` 视图是否打开。
+  bool _diffOpen = false;
+
+  /// `/diff` 当前比较范围。
+  DiffScope _diffScope = DiffScope.working;
+
+  /// `/diff` 最近一次加载的文件差异。
+  List<FileDiff> _diffFiles = const <FileDiff>[];
+
+  /// `/diff` 数据源降级说明（git 不可用 / 检查点缺失）；正常为 `null`。
+  String? _diffNotice;
+
+  /// `/diff` 加载代次：切换范围与关闭时递增，丢弃迟到的结果。
+  int _diffEpoch = 0;
+
+  /// `/diff` 的工作区根；缺省当前目录（测试指向临时仓库）。
+  String? diffWorkdir;
+
   /// 在飞轮次的取消句柄（Esc / 打断）；null = 无在飞轮次。
   AgentCancel? _cancel;
 
@@ -370,6 +393,18 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 当前会话 id。
   String get sessionId => _sessionId;
+
+  /// `/diff` 视图是否打开。
+  bool get diffOpen => _diffOpen;
+
+  /// `/diff` 当前比较范围。
+  DiffScope get diffScope => _diffScope;
+
+  /// `/diff` 当前文件差异。
+  List<FileDiff> get diffFiles => _diffFiles;
+
+  /// `/diff` 数据源降级说明；正常为 `null`。
+  String? get diffNotice => _diffNotice;
 
   /// 当前权限模式。
   @override
@@ -535,6 +570,87 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/redo`：回到最近一次 `/undo` 之前（恢复文件并切回原会话）。
   Future<void> redo() => _runRedo();
+
+  /// `/diff`：加载 [scope] 范围内的差异并打开只读视图。
+  ///
+  /// 空结果也打开视图（由视图给出「没有可显示的差异」），避免看起来像命令
+  /// 没反应；读取失败只进 [diffNotice]，不打断当前会话。
+  Future<void> openDiff(DiffScope scope) async {
+    _diffScope = scope;
+    await _loadDiff();
+    _diffOpen = true;
+    _refresh();
+  }
+
+  /// 视图内 `d` 切换比较范围：先同步范围，再异步重载（[diffOpen] 保持不变）。
+  void setDiffScope(DiffScope scope) {
+    if (!_diffOpen || scope == _diffScope) {
+      return;
+    }
+    _diffScope = scope;
+    unawaited(_loadDiff().then((_) => _refresh()));
+  }
+
+  /// 关闭 `/diff` 视图，丢弃当前数据与降级说明。
+  void closeDiff() {
+    _diffOpen = false;
+    _diffEpoch++;
+    _diffFiles = const <FileDiff>[];
+    _diffNotice = null;
+    _refresh();
+  }
+
+  /// 加载差异；迟到的结果按 [_diffEpoch] 丢弃。
+  Future<void> _loadDiff() async {
+    final int epoch = ++_diffEpoch;
+    final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
+      'checkpointManager',
+    );
+    if (checkpoint == null) {
+      _applyDiff(epoch, const <FileDiff>[], '未装配检查点，无法读取差异。');
+      return;
+    }
+    final DiffSource source = DiffSource(
+      workdir: diffWorkdir ?? Directory.current.path,
+      checkpoint: checkpoint,
+      sessionId: _sessionId,
+      turn: checkpoint.turn,
+    );
+    List<FileDiff> diffs = const <FileDiff>[];
+    String? notice;
+    try {
+      diffs = await source.load(_diffScope);
+      notice = source.notice;
+    } catch (error) {
+      notice = '读取差异失败：$error';
+    }
+    _applyDiff(epoch, diffs, notice);
+  }
+
+  void _applyDiff(int epoch, List<FileDiff> diffs, String? notice) {
+    if (epoch != _diffEpoch) {
+      return;
+    }
+    _diffFiles = diffs;
+    _diffNotice = notice;
+  }
+
+  /// `/diff [working|turn]`：参数非法时给用法提示且不打开视图。
+  Future<void> _handleDiff(String arg) async {
+    final DiffScope? scope = _parseDiffScope(arg);
+    if (scope == null) {
+      transcript.add(TuiRole.system, kDiffUsage);
+      return;
+    }
+    await openDiff(scope);
+  }
+
+  DiffScope? _parseDiffScope(String arg) {
+    if (arg.isEmpty || arg == 'working') {
+      return DiffScope.working;
+    }
+    return arg == 'turn' ? DiffScope.turn : null;
+  }
 
   /// 回填输入框：由根组件在下一次重绘时取走（`/undo` 回填被撤回的 prompt）。
   void prefillInput(String text) {
@@ -862,6 +978,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _runUndoArg(arg);
       case 'redo':
         await redo();
+      case 'diff':
+        await _handleDiff(arg);
       case 'background':
         await _handleBackground(arg);
       case 'doctor':

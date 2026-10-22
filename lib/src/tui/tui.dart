@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:nocterm/nocterm.dart';
 
+import '../diff/tui_diff_view.dart';
 import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
 import 'team_snapshot.dart';
@@ -612,6 +613,11 @@ class _AgentTuiState extends State<AgentTui> {
   }
 
   bool _onKey(KeyboardEvent event) {
+    // diff 视图打开时 Esc 一律关闭它（视图自己也会处理，这里兜底焦点异常）。
+    if (_controller.diffOpen && event.logicalKey == LogicalKey.escape) {
+      _controller.closeDiff();
+      return true;
+    }
     // Ctrl+T 在团队视图下切视图（TeamView 的提示语一直这么写，此前与 TODO
     // 展开撞了——同一按键两种行为，提示语还是在骗人）。对话视图下才是展开
     // TODO 列表（兜底：输入框聚焦时由 _onInputKey 先行处理）。
@@ -770,7 +776,7 @@ class _AgentTuiState extends State<AgentTui> {
         children: <Component>[
           Expanded(
             child: _view == ViewMode.chat
-                ? _body()
+                ? (_controller.diffOpen ? _diffView() : _body())
                 : TeamView(snapshot: _controller.teamSnapshot),
           ),
           // 交互浮层一律贴在输入栏上方（小面板），消息区保持可见。
@@ -816,20 +822,21 @@ class _AgentTuiState extends State<AgentTui> {
           if (_atMenu.open)
             AtRefMenuView(matches: _atMenu.matches, selected: _atMenu.index),
           TeamStatusBar(snapshot: _controller.teamSnapshot),
-          TuiInputBar(
-            controller: _input,
-            shellMode: _shell.active,
-            focused:
-                !_controller.picker.open &&
-                !_controller.choice.open &&
-                !_controller.providerPrompt.open &&
-                !_controller.formPrompt.open &&
-                !_controller.modelPrompt.open,
-            busy: _controller.busy,
-            queuedCount: _controller.queuedCount,
-            onSubmitted: (_) => _submit(),
-            onKeyEvent: _onInputKey,
-          ),
+          if (!_controller.diffOpen)
+            TuiInputBar(
+              controller: _input,
+              shellMode: _shell.active,
+              focused:
+                  !_controller.picker.open &&
+                  !_controller.choice.open &&
+                  !_controller.providerPrompt.open &&
+                  !_controller.formPrompt.open &&
+                  !_controller.modelPrompt.open,
+              busy: _controller.busy,
+              queuedCount: _controller.queuedCount,
+              onSubmitted: (_) => _submit(),
+              onKeyEvent: _onInputKey,
+            ),
           TuiStatusBar(
             shellMode: _shell.active,
             pickerOpen: _controller.picker.open,
@@ -850,6 +857,17 @@ class _AgentTuiState extends State<AgentTui> {
           ),
         ],
       ),
+    );
+  }
+
+  /// `/diff` 全屏视图：状态由控制器持有，按键与当前文件由视图自己管理。
+  Component _diffView() {
+    return TuiDiffView(
+      diffs: _controller.diffFiles,
+      scope: _controller.diffScope,
+      notice: _controller.diffNotice,
+      onClose: _controller.closeDiff,
+      onSwitchScope: _controller.setDiffScope,
     );
   }
 
