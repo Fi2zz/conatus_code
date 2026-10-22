@@ -17,6 +17,12 @@ export 'src/providers/model_profile.dart'
     show ModelProfile, ModelProfileStore;
 export 'src/providers/models_dev.dart'
     show ModelsDevClient, ModelsDevException, ModelsDevModel, keepForCoding;
+export 'src/providers/opencode_session.dart'
+    show
+        isOpenCodeBaseUrl,
+        kOpenCodeDefaultUserAgent,
+        kOpenCodeSessionHeader,
+        openCodeSessionId;
 export 'src/providers/provider_profile.dart' show ProviderProfile;
 export 'src/providers/provider_registry.dart' show ProviderRegistry;
 export 'src/providers/providers_provider.dart'

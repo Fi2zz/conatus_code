@@ -336,6 +336,8 @@ class ConatusTuiRuntime {
                   ? LlmApiStyle.responses
                   : LlmApiStyle.chat,
               models: modelsByProvider[config.name] ?? const <String>[],
+              sessionHeader: config.sessionHeader,
+              userAgent: config.userAgent,
             ),
         ],
         currentName: provider,

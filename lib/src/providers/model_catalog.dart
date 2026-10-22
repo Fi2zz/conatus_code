@@ -106,5 +106,6 @@ const List<ProviderPreset> kProviderPresets = <ProviderPreset>[
   ProviderPreset(id: 'cerebras', name: 'Cerebras', baseUrl: 'https://api.cerebras.ai/v1'),
   ProviderPreset(id: 'fireworks-ai', name: 'Fireworks AI', baseUrl: 'https://api.fireworks.ai/inference/v1'),
   ProviderPreset(id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1'),
-  ProviderPreset(id: 'opencode-go', name: 'OpenCode Go', baseUrl: 'https://opencode.ai/zen/go/v1'),
+  ProviderPreset(id: 'opencode-go', name: 'OpenCode Go', baseUrl: 'https://opencode.ai/inference/go/openai/v1'),
+  ProviderPreset(id: 'opencode-console', name: 'OpenCode Console', baseUrl: 'https://opencode.ai/inference/openai/v1'),
 ];

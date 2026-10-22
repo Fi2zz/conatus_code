@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- **OpenCode 网关接入**：新增 `x-opencode-session` 会话头（`session_<uuid>` →
+  `ses_<uuid>`，绑定会话后自动发送）、`[providers.*]` 的 `session_header` /
+  `user_agent` 配置；修正 `opencode-go` 端点并新增 `opencode-console` 预设；
+  默认 User-Agent 改为 `nava/0.1.0`。
+
 - **TUI 多行输入**：输入框支持 Shift/Ctrl/Alt+Enter 与 Ctrl+J 换行（最多 8 行，
   超出内部滚动），Enter 仍提交整段文本。
 - **故事层（可选）**：从 cowriter 并入故事层——编辑即补丁、事前审阅、`/story`

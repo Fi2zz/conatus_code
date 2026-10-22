@@ -371,6 +371,38 @@ type = "openai"         # openai→chat/completions；kimi→responses（缺省 
 - `type` 决定请求形态：`openai` 走 `chat/completions`，`kimi` 走 `responses`。
 - `oauth` 子表：字段保留（`key`）但**不实现** OAuth 调用；配了 `oauth.key` 且
   未配 `api_key` 的提供商启动时提示不可用，其余照常。
+
+### OpenCode Go / Console
+
+OpenCode 的推理网关兼容 OpenAI，但 **Go 计划要求每个会话带稳定的
+
+```http
+x-opencode-session: ses_...
+```
+
+nava 绑定会话后自动把 `session_<uuid>` 映射成 `ses_<uuid>` 并随每个请求发送
+（仅 `opencode.ai` 主机自动启用；代理/镜像可用 `session_header` 覆盖头名）。
+默认 User-Agent 为 `nava/0.1.0`，也可以按 provider 覆盖。
+
+```toml
+[llm]
+default_model = "opencode-go/glm-5.3"
+
+[providers.opencode-go]
+api_key = "oc_sk_..."        # https://opencode.ai/console 生成
+base_url = "https://opencode.ai/inference/go/openai/v1"   # Go
+# Pay-as-you-go 用：https://opencode.ai/inference/openai/v1
+type = "openai"              # GPT 系模型用 kimi（responses）
+# session_header = "x-opencode-session"   # 缺省按 opencode.ai 自动启用
+# user_agent = "nava/0.1.0"
+```
+
+- 端点必须带 `/openai/v1` 后缀（chat 走 `/chat/completions`，responses 走
+  `/responses`）；旧的 `opencode.ai/zen/go/v1` 已不可用。
+- nava 目前只支持 chat / responses 两种 wire；Go 里仅提供 Anthropic Messages
+  的模型（Claude Haiku、MiniMax M3、Qwen3.8 等）暂不可用。
+- `/provider add` 的预设有 `opencode-go`（Go）与 `opencode-console`（PAYG）。
+
 - 以代码装配：`provideProviders(app, providers: <ProviderProfile>[...],
 currentName: ..., credentials: ...)` 把注册表挂到 `'providers'` 服务，
   `registry.buildLlm(name, model: ...)` 按 profile 构造 OpenAI 兼容

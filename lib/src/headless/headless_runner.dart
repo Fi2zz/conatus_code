@@ -11,6 +11,7 @@ import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import '../providers/providers_provider.dart';
 import '../story/story.dart';
 import '../tui/tui_app.dart';
 
@@ -52,6 +53,7 @@ Future<HeadlessResult> runHeadless(
   final Session session = sessionId == null
       ? runtime.sessions.create()
       : await runtime.sessions.open(sessionId);
+  runtime.app.providers?.sessionId = session.id;
   final Context ctx = runtime.app.plugin(
     'headless:${session.id}',
     (Context child) {
@@ -73,6 +75,7 @@ Future<HeadlessResult> runHeadless(
     );
   } finally {
     ctx.dispose();
+    runtime.app.providers?.sessionId = null;
     await runtime.sessions.flush();
   }
 }

@@ -101,6 +101,8 @@ class ConfigParser extends ConfigValues {
       credentialKey: readString(table, 'credential_key') ?? '',
       type: _providerType(table, name),
       oauthKey: _readOauthKey(table, name),
+      sessionHeader: readString(table, 'session_header') ?? '',
+      userAgent: readString(table, 'user_agent') ?? '',
     );
   }
 

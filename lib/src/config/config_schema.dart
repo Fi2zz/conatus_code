@@ -72,6 +72,8 @@ class ProviderConfig {
     this.credentialKey = '',
     this.type = ProviderType.openai,
     this.oauthKey,
+    this.sessionHeader = '',
+    this.userAgent = '',
   });
 
   /// 提供商名（`[providers.<name>]` 的键，可含 `.` / `:`）。
@@ -95,6 +97,12 @@ class ProviderConfig {
 
   /// `oauth` 子表的 `key`；保留但不实现 OAuth 调用。
   final String? oauthKey;
+
+  /// 会话关联头名（如 `x-opencode-session`）；空串按 base_url 自动识别。
+  final String sessionHeader;
+
+  /// 请求 User-Agent；空串用默认值（OpenCode 网关为 `nava/0.1.0`）。
+  final String userAgent;
 }
 
 /// Agent Loop 行为。

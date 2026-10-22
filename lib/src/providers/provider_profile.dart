@@ -17,6 +17,7 @@ class ProviderProfile {
     this.description = '',
     this.userAgent = '',
     this.apiKey = '',
+    this.sessionHeader = '',
   });
 
   /// 从 JSON 反序列化；缺 `name` / `baseUrl` 时抛 [FormatException]。
@@ -40,6 +41,7 @@ class ProviderProfile {
       description: json['description'] as String? ?? '',
       userAgent: json['userAgent'] as String? ?? '',
       apiKey: json['apiKey'] as String? ?? '',
+      sessionHeader: json['sessionHeader'] as String? ?? '',
     );
   }
 
@@ -65,6 +67,9 @@ class ProviderProfile {
   /// harness 客户端，如 dsh）。
   final String userAgent;
 
+  /// 会话关联头名（如 `x-opencode-session`）；空串按 base_url 自动识别。
+  final String sessionHeader;
+
   /// 该提供商的 API Key（可选，来自 config.toml `[providers.*]` 的 `api_key`）。
   ///
   /// 非空时优先于凭据服务（`credentialKey` → 环境变量 / Vault 等）；空串则
@@ -85,5 +90,6 @@ class ProviderProfile {
         if (description.isNotEmpty) 'description': description,
         if (userAgent.isNotEmpty) 'userAgent': userAgent,
         if (apiKey.isNotEmpty) 'apiKey': apiKey,
+        if (sessionHeader.isNotEmpty) 'sessionHeader': sessionHeader,
       };
 }

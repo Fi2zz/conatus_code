@@ -3,7 +3,9 @@ library;
 
 import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_llm/conatus_llm.dart';
+import 'package:http/http.dart' as http;
 
+import 'opencode_session.dart';
 import 'provider_profile.dart';
 
 /// 模型提供商注册表（只读：数据源是 config.toml 的 `[providers.*]`）。
@@ -12,14 +14,25 @@ class ProviderRegistry {
     List<ProviderProfile> profiles = const <ProviderProfile>[],
     String? currentName,
     Credentials? credentials,
+    this.sessionId,
+    http.Client? client,
   })  : _profiles = List<ProviderProfile>.of(profiles),
         _current = currentName ?? (profiles.isEmpty ? null : profiles.first.name),
-        _credentials = credentials;
+        _credentials = credentials,
+        _client = client;
 
   final List<ProviderProfile> _profiles;
 
   /// Key 的来源（缺省不注入时配置内 `apiKey` 为空即无 Key）。
   final Credentials? _credentials;
+
+  /// 可注入的 HTTP client（测试与自定义传输用）。
+  final http.Client? _client;
+
+  /// 当前会话 id（TUI / headless 绑定会话时设置，解绑时清空）。
+  ///
+  /// OpenCode 网关请求据此发送 `x-opencode-session`；其它 provider 忽略。
+  String? sessionId;
 
   /// 当前选中的提供商名（装配期决定，运行期不变）。
   final String? _current;
@@ -76,15 +89,32 @@ class ProviderRegistry {
     if (profile == null || resolvedModel.isEmpty) {
       return null;
     }
+    final bool openCode = isOpenCodeBaseUrl(profile.baseUrl);
+    final String sessionHeader = profile.sessionHeader.isNotEmpty
+        ? profile.sessionHeader
+        : (openCode ? kOpenCodeSessionHeader : '');
+    final String userAgent = profile.userAgent.isNotEmpty
+        ? profile.userAgent
+        : (openCode ? kOpenCodeDefaultUserAgent : kDefaultLlmUserAgent);
     return OpenAiCompatibleProvider(
       name: profile.name,
       baseUrl: profile.baseUrl,
       model: resolvedModel,
       credentialKey: profile.credentialKey,
       apiStyle: profile.apiStyle,
-      userAgent: profile.userAgent.isEmpty ? kDefaultLlmUserAgent : profile.userAgent,
+      userAgent: userAgent,
       apiKey: profile.apiKey.isEmpty ? null : profile.apiKey,
       credentials: _credentials,
+      client: _client,
+      headersProvider: sessionHeader.isEmpty
+          ? null
+          : () {
+              final String? id = sessionId;
+              if (id == null || id.isEmpty) return const <String, String>{};
+              return <String, String>{
+                sessionHeader: openCodeSessionId(id),
+              };
+            },
     );
   }
 

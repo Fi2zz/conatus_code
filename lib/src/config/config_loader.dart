@@ -21,6 +21,17 @@ const String kDefaultConfigToml = '''
 
 # default_model = "deepseek/deepseek-chat"
 
+# OpenCode Go / Console（可选）：密钥在 https://opencode.ai/console 生成。
+# Go 计划要求每个会话带 x-opencode-session，nava 绑定会话后自动发送
+# （session_<uuid> → ses_<uuid>）；仅在 opencode.ai 主机上自动启用。
+# 走代理或网关要求别的头名时，用 session_header 覆盖。
+# [providers.opencode-go]
+# api_key = "oc_sk_..."
+# base_url = "https://opencode.ai/inference/go/openai/v1"
+# type = "openai"
+# session_header = "x-opencode-session"
+# user_agent = "nava/0.1.0"
+
 # 韧性：单个提供商内先退避重试，仍失败再按 fallback_models 换下一个。
 # [llm]
 # fallback_models = ["deepseek/deepseek-chat", "ark/doubao-seed-2-0-lite-260215"]

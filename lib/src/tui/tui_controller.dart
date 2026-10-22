@@ -1831,6 +1831,8 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _bind(String id) async {
     final Session session = await _sessions.open(id);
     _session = session;
+    // OpenCode 网关请求头按当前会话发送；其它 provider 忽略。
+    _app.providers?.sessionId = session.id;
     final Context ctx = _app.plugin('tui-session:$id', (Context child) {
       provideAgentLoop(
         child,
@@ -1936,6 +1938,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 会话的首轮不该等它。
     _checkpointBase = null;
     _queue.clear();
+    _app.providers?.sessionId = null;
     _sessionCtx?.dispose();
     _sessionCtx = null;
     _agent = null;
