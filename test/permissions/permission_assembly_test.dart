@@ -84,6 +84,8 @@ _Rig _assemble({
   track('edit_file', risk: ToolRisk.medium, paths: const <String>['path']);
   track('apply_patch', risk: ToolRisk.high);
   track('rg');
+  track('glob', paths: const <String>['path']);
+  track('skill');
   track('web_search');
   track('spawn_agent', risk: ToolRisk.medium);
   track('fs__read_file');
@@ -472,6 +474,108 @@ void main() {
         _call('run_command', <String, Object?>{'command': 'echo hi'}),
       );
       expect(shell.error!.code, 'PERMISSION_DENIED');
+    });
+
+    test('action=edit + resource=*.env 只拦截补丁里的 .env 目标', () async {
+      final _Rig rig = _assemble(
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'edit',
+              resource: '*.env',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+
+      final ToolResult blocked = await rig.tools.call(
+        _call('apply_patch', <String, Object?>{
+          'patch': '*** Update File: config/.env\n@@ -1 +1 @@\n-A=1\n+A=2',
+        }),
+      );
+      expect(blocked.error!.code, 'PERMISSION_DENIED');
+      expect(rig.runs, isEmpty);
+
+      final ToolResult allowed = await rig.tools.call(
+        _call('apply_patch', <String, Object?>{
+          'patch': '*** Update File: src/a.dart\n@@ -1 +1 @@\n-a\n+b',
+        }),
+      );
+      expect(allowed.isError, isFalse);
+      expect(rig.runs, <String>['apply_patch']);
+    });
+
+    test('apply_patch 解析 Add / Delete / Move to 且去重', () async {
+      final _Rig rig = _assemble(
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'edit',
+              resource: 'secret/*',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+
+      final ToolResult deleted = await rig.tools.call(
+        _call('apply_patch', <String, Object?>{
+          'patch': '*** Delete File: secret/key.txt',
+        }),
+      );
+      expect(deleted.error!.code, 'PERMISSION_DENIED');
+
+      final ToolResult moved = await rig.tools.call(
+        _call('apply_patch', <String, Object?>{
+          'patch': '*** Update File: src/a.dart\n'
+              '*** Move to: secret/b.dart\n',
+        }),
+      );
+      expect(moved.error!.code, 'PERMISSION_DENIED');
+    });
+
+    test('action=glob + resource=**/*.dart 命中 glob pattern', () async {
+      final _Rig rig = _assemble(
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'glob',
+              resource: '**/*.dart',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+
+      final ToolResult result = await rig.tools.call(
+        _call('glob', <String, Object?>{
+          'pattern': '**/*.dart',
+          'path': 'src',
+        }),
+      );
+      expect(result.error!.code, 'PERMISSION_DENIED');
+      expect(rig.runs, isEmpty);
+    });
+
+    test('action=skill + resource=review 命中技能名', () async {
+      final _Rig rig = _assemble(
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'skill',
+              resource: 'review',
+              effect: PermissionEffect.deny,
+            ),
+          ],
+        ),
+      );
+
+      final ToolResult result = await rig.tools.call(
+        _call('skill', <String, Object?>{'name': 'review'}),
+      );
+      expect(result.error!.code, 'PERMISSION_DENIED');
+      expect(rig.runs, isEmpty);
     });
   });
 
