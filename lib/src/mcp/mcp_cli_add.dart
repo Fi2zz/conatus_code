@@ -3,27 +3,49 @@ part of 'mcp_cli.dart';
 Future<int> _add(List<String> args, String? configPath, McpCliDeps deps) async {
   final _AddRequest? request = _parseAdd(args, deps);
   if (request == null) return 2;
+  try {
+    return _writeAdd(request, configPath, deps);
+  } on FormatException catch (error) {
+    _err(deps).writeln('配置写入失败：${error.message}（原文件未改动）');
+    return 2;
+  } on FileSystemException catch (error) {
+    _err(deps).writeln('配置读写失败：${error.message}');
+    return 2;
+  } on ProcessException catch (error) {
+    _err(deps).writeln('配置写入失败：${error.message}');
+    return 2;
+  } on StateError catch (error) {
+    _err(deps).writeln('配置写入失败：${error.message}');
+    return 2;
+  }
+}
+
+int _writeAdd(_AddRequest request, String? configPath, McpCliDeps deps) {
   final String path = configPath ?? resolveConfigPath();
   if (_protectedPath(path)) {
-    _err(deps).writeln('拒绝写入 .opencode：nava 只写 ~/.nava/config.toml。');
+    _err(deps).writeln(
+      '拒绝写入只读的 .opencode / ~/.config/opencode：nava 只写 ~/.nava/config.toml。',
+    );
     return 2;
   }
   final File file = File(path);
   final String toml = file.existsSync() ? file.readAsStringSync() : '';
-  final String next;
-  try {
-    next = appendMcpServerSection(
-      toml,
-      name: request.name,
-      url: request.url,
-      command: request.command,
-      oauth: request.oauth,
-    );
-  } on ArgumentError catch (error) {
-    return _usageError(deps, '${error.message}');
-  }
+  final bool replacing = mcpServerSectionExists(toml, request.name);
+  final String next = appendMcpServerSection(
+    toml,
+    name: request.name,
+    url: request.url,
+    command: request.command,
+    oauth: request.oauth,
+  );
   writeFileAtomic(path, next);
   _out(deps).writeln('已写入 MCP server ${request.name} → $path');
+  if (replacing) {
+    _err(deps).writeln(
+      '注意：已替换 MCP server ${request.name} 的整段配置；'
+      '原有 headers / env / oauth 等自定义字段未保留，请按需补回。',
+    );
+  }
   return 0;
 }
 
@@ -68,6 +90,6 @@ _AddRequest? _parseAdd(List<String> args, McpCliDeps deps) {
 }
 
 _AddRequest? _badAdd(McpCliDeps deps, String message) {
-  _err(deps).writeln('用法错误：$message\n$_usage');
+  _usageError(deps, message);
   return null;
 }

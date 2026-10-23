@@ -29,8 +29,17 @@ Future<int> _list(
 }
 
 String _describeServer(McpServerSpec spec) {
-  final String target =
-      spec.url ??
-      <String>[if (spec.command != null) spec.command!, ...spec.args].join(' ');
+  final List<String> command = <String>[
+    if (spec.command != null) spec.command!,
+    ...spec.args,
+  ];
+  final String target = spec.url ?? command.map(_quoteArg).join(' ');
   return '${spec.name}\t${spec.type.name}\t$target';
+}
+
+/// 带空白 / 引号 / 反斜杠的参数加引号，避免 `list` 输出无法还原命令。
+String _quoteArg(String arg) {
+  if (arg.isNotEmpty && !RegExp(r'''[\s"\\]''').hasMatch(arg)) return arg;
+  final String escaped = arg.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+  return '"$escaped"';
 }

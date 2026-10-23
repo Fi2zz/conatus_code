@@ -27,7 +27,6 @@ Future<void> main(List<String> args) async {
     stderr.writeln('用法错误：-p / --print 缺少任务文本。');
     exit(2);
   }
-
   final ConatusCodeConfig config;
   try {
     config = loadConfig(path: options.configPath);

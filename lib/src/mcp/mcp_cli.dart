@@ -54,15 +54,20 @@ typedef _AddRequest = ({
   bool? oauth,
 });
 
+typedef _Invocation = ({List<String> args, String? configPath, String? error});
+
 const String _usage = '''
-用法：nava mcp <子命令>
+用法：nava mcp <子命令> [--config <路径>]
   add <名字> --url <地址>       添加远程 server（http）
   add <名字> --no-oauth --url <地址>  添加远程 server 并关闭 OAuth
   add <名字> -- <命令...>       添加 stdio server
   list                         列出已配置的 server（不连接）
   auth <名字>                  对远程 server 做 OAuth 登录并保存令牌
   logout <名字>                删除该 server 的 OAuth 令牌
-  --global                     写全局配置（当前只有全局配置）''';
+  --oauth / --no-oauth         远程 server 的 OAuth 开关（缺省启用）
+  --global                     写全局配置（当前只有全局配置，等同缺省）
+  --config <路径>              配置文件路径（缺省 ~/.nava/config.toml，
+                               也可用 NAVA_HOME 指定配置目录）''';
 
 /// 执行 `nava mcp` 子命令，返回进程退出码。
 Future<int> runMcpCli(
@@ -70,34 +75,82 @@ Future<int> runMcpCli(
   String? configPath,
   McpCliDeps deps = const McpCliDeps(),
 }) async {
-  if (args.isEmpty) return _usageError(deps, '缺少子命令。');
-  final String action = args.first;
+  final _Invocation invocation = _extractConfig(args, configPath);
+  if (invocation.error != null) return _usageError(deps, invocation.error!);
+  final List<String> rest = invocation.args;
+  if (rest.isEmpty) return _usageError(deps, '缺少子命令。');
+  final String action = rest.first;
   if (action == 'help' || action == '--help' || action == '-h') {
     _out(deps).writeln(_usage);
     return 0;
   }
-  final List<String> rest = args.sublist(1);
+  final List<String> subArgs = rest.sublist(1);
   switch (action) {
     case 'add':
-      return _add(rest, configPath, deps);
+      return _add(subArgs, invocation.configPath, deps);
     case 'list':
-      return _list(rest, configPath, deps);
+      return _list(subArgs, invocation.configPath, deps);
     case 'auth':
-      return _auth(rest, configPath, deps);
+      return _auth(subArgs, invocation.configPath, deps);
     case 'logout':
-      return _logout(rest, deps);
+      return _logout(subArgs, deps);
     default:
       return _usageError(deps, '未知子命令 mcp $action。');
   }
 }
 
+/// 提取全局 `--config <路径>`；`--` 之后的参数原样交给 stdio 命令。
+_Invocation _extractConfig(List<String> args, String? fallback) {
+  final List<String> kept = <String>[];
+  String? path = fallback;
+  for (int index = 0; index < args.length; index++) {
+    final String arg = args[index];
+    if (arg == '--') {
+      kept.addAll(args.sublist(index));
+      break;
+    }
+    if (arg != '--config') {
+      kept.add(arg);
+      continue;
+    }
+    if (index + 1 >= args.length) {
+      return (
+        args: const <String>[],
+        configPath: path,
+        error: '--config 缺少路径。',
+      );
+    }
+    path = args[++index];
+  }
+  return (args: kept, configPath: path, error: null);
+}
+
 /// `.opencode` / `~/.config/opencode` 只读：任何写入路径都拒绝。
+///
+/// 相对路径按当前目录展开；符号链接同时检查链接目标，避免借链接写进去。
 bool _protectedPath(String path) {
-  final String normalized = path.replaceAll(r'\', '/');
-  return normalized.contains('/.opencode/') ||
-      normalized.endsWith('/.opencode') ||
-      normalized.contains('/.config/opencode/') ||
-      normalized.endsWith('/.config/opencode');
+  final File file = File(path);
+  if (_protectedSegments(file.absolute.path)) return true;
+  if (!file.existsSync()) return false;
+  try {
+    return _protectedSegments(file.resolveSymbolicLinksSync());
+  } on FileSystemException {
+    return false;
+  }
+}
+
+bool _protectedSegments(String path) {
+  final List<String> segments = path
+      .replaceAll(r'\', '/')
+      .toLowerCase()
+      .split('/');
+  if (segments.contains('.opencode')) return true;
+  for (int index = 0; index + 1 < segments.length; index++) {
+    if (segments[index] == '.config' && segments[index + 1] == 'opencode') {
+      return true;
+    }
+  }
+  return false;
 }
 
 int _usageError(McpCliDeps deps, String message) {

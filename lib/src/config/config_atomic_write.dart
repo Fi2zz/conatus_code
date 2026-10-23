@@ -11,12 +11,13 @@ const int kOwnerOnlyMode = 0x180;
 
 /// 原子写入 [path]：父目录自动创建，临时文件与目标同目录。
 ///
+/// 目标是符号链接（dotfiles 常见）时写穿到链接目标，**不切断链接**。
 /// [mode] 缺省 0600——配置里可能含 API Key，同机其他用户不能读。
 void writeFileAtomic(String path, String content, {int mode = kOwnerOnlyMode}) {
-  final File target = File(path);
+  final File target = _writeTarget(path);
   target.parent.createSync(recursive: true);
   final File temp = File(
-    '$path.$pid.${DateTime.now().microsecondsSinceEpoch}.tmp',
+    '${target.path}.$pid.${DateTime.now().microsecondsSinceEpoch}.tmp',
   );
   try {
     // 先建空文件并收权限，再写敏感内容：任何瞬间都不能出现 0644 的配置。
@@ -33,6 +34,12 @@ void writeFileAtomic(String path, String content, {int mode = kOwnerOnlyMode}) {
 /// 写配置（父目录自动创建）并收紧权限为 0600。
 void writeConfigFile(String path, String content) {
   writeFileAtomic(path, content);
+}
+
+/// 符号链接解析到真实文件；普通路径原样返回。
+File _writeTarget(String path) {
+  if (!FileSystemEntity.isLinkSync(path)) return File(path);
+  return File(File(path).resolveSymbolicLinksSync());
 }
 
 void _restrict(File file, int mode) {

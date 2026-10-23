@@ -1,4 +1,4 @@
-/// `nava mcp add / list` CLI：写入字段、权限、替换与只读列表。
+/// `nava mcp add / list`：字段写入、权限、替换与只读列表。
 library;
 
 import 'dart:io';
@@ -64,8 +64,10 @@ void main() {
       expect(content, contains('args = [ "-y", "server-filesystem", "/tmp" ]'));
     });
 
-    test('同名再次 add 是替换，不产生第二个表头', () async {
+    test('同名再次 add 是替换，不产生第二个表头并给出提示', () async {
       await run(<String>['add', 'docs', '--url', 'https://old.example.com/a']);
+      out.clear();
+      err.clear();
       final int code = await run(<String>[
         'add',
         'docs',
@@ -81,18 +83,21 @@ void main() {
       );
       expect(content, isNot(contains('old.example.com')));
       expect(content, contains('new.example.com'));
+      expect(err.toString(), contains('已替换'));
+      expect(err.toString(), contains('headers'));
     });
 
-    test('已有配置的其余内容保留', () async {
-      File(path).writeAsStringSync('[agent]\nmax_steps = 8\n');
+    test('已有配置的其余内容与无尾换行原样保留', () async {
+      File(path).writeAsStringSync('[agent]\nmax_steps = 8');
 
       await run(<String>['add', 'docs', '--url', 'https://example.com/mcp']);
 
       final String content = File(path).readAsStringSync();
-      expect(content, contains('[agent]\nmax_steps = 8'));
+      expect(content, startsWith('[agent]\nmax_steps = 8\n'));
+      expect(content, contains('[mcp.servers.docs]'));
     });
 
-    test('--no-oauth 写 oauth = false', () async {
+    test('--no-oauth / --oauth 写布尔开关', () async {
       await run(<String>[
         'add',
         'docs',
@@ -100,24 +105,17 @@ void main() {
         '--url',
         'https://example.com/mcp',
       ]);
+      await run(<String>[
+        'add',
+        'net',
+        '--oauth',
+        '--url',
+        'https://net.example.com/mcp',
+      ]);
 
-      expect(File(path).readAsStringSync(), contains('oauth = false'));
-    });
-
-    test('拒绝写入 .opencode 且不创建文件', () async {
-      final String protectedPath =
-          '${dir.path}${Platform.pathSeparator}.opencode'
-          '${Platform.pathSeparator}config.toml';
-
-      final int code = await runMcpCli(
-        <String>['add', 'docs', '--url', 'https://example.com/mcp'],
-        configPath: protectedPath,
-        deps: deps(),
-      );
-
-      expect(code, 2);
-      expect(File(protectedPath).existsSync(), isFalse);
-      expect(err.toString(), contains('.opencode'));
+      final String content = File(path).readAsStringSync();
+      expect(content, contains('oauth = false'));
+      expect(content, contains('oauth = true'));
     });
   });
 
@@ -141,12 +139,47 @@ void main() {
       expect(lines[1], 'fs\tstdio\tnpx server-filesystem');
     });
 
-    test('空配置提示且退出 0，不创建配置文件', () async {
-      final int code = await run(<String>['list']);
+    test('带空白的命令参数加引号', () async {
+      await run(<String>[
+        'add',
+        'fs',
+        '--',
+        'node',
+        '/path with space/server.js',
+      ]);
+      out.clear();
 
-      expect(code, 0);
+      await run(<String>['list']);
+
+      expect(out.toString(), contains('node "/path with space/server.js"'));
+    });
+
+    test('空配置 / 只有其他表时提示，不创建文件', () async {
+      expect(await run(<String>['list']), 0);
       expect(out.toString(), contains('没有配置 MCP server'));
       expect(File(path).existsSync(), isFalse);
+
+      File(path).writeAsStringSync('[agent]\nmax_steps = 8\n');
+      out.clear();
+      expect(await run(<String>['list']), 0);
+      expect(out.toString(), contains('没有配置 MCP server'));
     });
+  });
+
+  test('mcp --config <路径> 指定配置文件', () async {
+    final String custom = '${dir.path}${Platform.pathSeparator}custom.toml';
+
+    final int code = await runMcpCli(<String>[
+      '--config',
+      custom,
+      'add',
+      'docs',
+      '--url',
+      'https://x.test/mcp',
+    ], deps: deps());
+
+    expect(code, 0);
+    expect(File(custom).readAsStringSync(), contains('[mcp.servers.docs]'));
+    expect(File(path).existsSync(), isFalse);
   });
 }

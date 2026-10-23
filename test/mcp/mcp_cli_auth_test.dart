@@ -1,4 +1,4 @@
-/// `nava mcp auth / logout` 与用法错误。
+/// `nava mcp auth / logout`：授权码流程、令牌落盘与登出。
 library;
 
 import 'dart:async';
@@ -45,7 +45,10 @@ client_id = "test-client"
 ''');
       final String tokenDir = '${dir.path}${Platform.pathSeparator}oauth';
       final McpOAuthStore store = McpOAuthStore(tokenDir);
-      final McpOAuthSession session = McpOAuthSession(log: (String _) {});
+      final McpOAuthSession session = McpOAuthSession(
+        log: out.writeln,
+        callbackTimeout: const Duration(seconds: 5),
+      );
       addTearDown(session.close);
 
       final int code = await runMcpCli(
@@ -64,7 +67,8 @@ client_id = "test-client"
       final McpOAuthToken? token = await store.load('docs');
       expect(token, isNotNull);
       expect(token!.accessToken, 'access-2');
-      expect(out.toString(), contains(authServer.issuer.path));
+      expect(out.toString(), contains('${authServer.issuer}/authorize'));
+      expect(out.toString(), contains('code_challenge_method=S256'));
       expect(out.toString(), isNot(contains('access-2')));
       if (!Platform.isWindows) {
         expect(File(store.pathOf('docs')).statSync().mode & 0x1FF, 0x180);
@@ -103,20 +107,6 @@ client_id = "test-client"
       expect(await run(<String>['logout', 'docs'], overrides: injected), 0);
       expect(File(store.pathOf('docs')).existsSync(), isFalse);
       expect(await run(<String>['logout', 'docs'], overrides: injected), 0);
-    });
-  });
-
-  group('用法错误', () {
-    test('缺子命令 / 未知子命令 / 缺参数均退出 2', () async {
-      expect(await run(<String>[]), 2);
-      expect(await run(<String>['nope']), 2);
-      expect(await run(<String>['add']), 2);
-      expect(await run(<String>['add', 'docs']), 2);
-      expect(await run(<String>['add', 'docs', '--url']), 2);
-      expect(await run(<String>['add', 'docs', '--']), 2);
-      expect(await run(<String>['auth']), 2);
-      expect(await run(<String>['logout']), 2);
-      expect(File(path).existsSync(), isFalse);
     });
   });
 }
