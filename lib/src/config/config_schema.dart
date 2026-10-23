@@ -3,6 +3,7 @@ library;
 
 import 'package:conatus_agent/conatus_agent.dart' show PermissionRule;
 import 'package:conatus_llm/conatus_llm.dart';
+import 'package:conatus_mcp/conatus_mcp.dart' show McpOAuthConfig;
 
 /// LLM 选择：`provider/model` 同时定当前提供商与默认模型。
 class LlmConfig {
@@ -337,6 +338,7 @@ class McpServerSpec {
     this.env = const <String, String>{},
     this.url,
     this.headers = const <String, String>{},
+    this.oauth,
   });
 
   /// server 名（`[mcp.servers.<name>]` 的键），兼作工具名前缀（`server__tool`）。
@@ -359,6 +361,13 @@ class McpServerSpec {
 
   /// `http` / `sse` 的附加请求头（如 `Authorization`）。
   final Map<String, String> headers;
+
+  /// OAuth 客户端配置；`null` 表示未声明（按 [oauthEnabled] 取默认值）。
+  final McpOAuthConfig? oauth;
+
+  /// 本 server 是否应走 OAuth：stdio 一律忽略，远程缺省启用。
+  bool get oauthEnabled =>
+      type != McpServerType.stdio && (oauth?.enabled ?? true);
 }
 
 /// MCP 配置；对应 `[mcp]` 表。

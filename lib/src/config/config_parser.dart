@@ -8,6 +8,7 @@ import 'package:conatus_agent/conatus_agent.dart'
         normalizePermissionPath,
         permissionActionFor,
         permissionActionUsesPath;
+import 'package:conatus_mcp/conatus_mcp.dart' show McpOAuthConfig;
 
 import 'config_schema.dart';
 import 'config_values.dart';
@@ -358,7 +359,50 @@ class ConfigParser extends ConfigValues {
       env: readStringMap(table, 'env', 'mcp.servers.$name.env'),
       url: url,
       headers: readStringMap(table, 'headers', 'mcp.servers.$name.headers'),
+      oauth: _readMcpOAuth(table, name),
     );
+  }
+
+  /// `oauth` 键：布尔开关，或 `[mcp.servers.x.oauth]` 表（未声明返回 `null`）。
+  McpOAuthConfig? _readMcpOAuth(Map<String, dynamic> table, String name) {
+    final Object? raw = table['oauth'];
+    if (raw == null) return null;
+    if (raw is bool) return McpOAuthConfig(enabled: raw);
+    if (raw is! Map) {
+      throw ConfigException('$source：mcp.servers.$name.oauth 必须是布尔值或表。');
+    }
+    final Map<String, dynamic> oauth = raw.cast<String, dynamic>();
+    return McpOAuthConfig(
+      clientId: _readOAuthString(oauth, name, 'client_id'),
+      clientSecret: _readOAuthString(oauth, name, 'client_secret'),
+      scope: _readOAuthString(oauth, name, 'scope'),
+      callbackPort: _readOAuthPort(oauth, name),
+    );
+  }
+
+  String? _readOAuthString(
+    Map<String, dynamic> table,
+    String name,
+    String key,
+  ) {
+    final Object? value = table[key];
+    if (value == null) return null;
+    if (value is! String) {
+      throw ConfigException('$source：mcp.servers.$name.oauth.$key 必须是字符串。');
+    }
+    final String trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  int? _readOAuthPort(Map<String, dynamic> table, String name) {
+    final Object? value = table['callback_port'];
+    if (value == null) return null;
+    if (value is! int || value <= 0 || value > 65535) {
+      throw ConfigException(
+        '$source：mcp.servers.$name.oauth.callback_port 必须是 1-65535 的整数。',
+      );
+    }
+    return value;
   }
 
   McpServerType _mcpServerType(Map<String, dynamic> table, String name) {
