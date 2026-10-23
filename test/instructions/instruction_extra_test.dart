@@ -36,11 +36,14 @@ InstructionLoader _loader(String workdir, List<String> extra, {String? home}) {
 void main() {
   late HttpServer server;
   late String remote;
+  late int requests;
 
   setUp(() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     remote = 'http://127.0.0.1:${server.port}/AGENTS.md';
+    requests = 0;
     server.listen((HttpRequest request) async {
+      requests++;
       request.response.write('REMOTE-$request');
       await request.response.close();
     });
@@ -66,6 +69,15 @@ void main() {
     expect(text!.indexOf('PROJECT'), lessThan(text.indexOf('CONTRIB')));
     expect(text.indexOf('CONTRIB'), lessThan(text.indexOf('GUIDE')));
     expect(text.indexOf('GUIDE'), lessThan(text.indexOf('REMOTE-')));
+  });
+
+  test('URL 内容按会话缓存：重复 compose 只请求一次', () async {
+    final String root = _dir('nava-url-cache-');
+    final InstructionLoader loader = _loader(root, <String>[remote]);
+
+    expect(await loader.compose(), contains('REMOTE-'));
+    expect(await loader.compose(), contains('REMOTE-'));
+    expect(requests, 1);
   });
 
   test('`~` 展开到用户目录', () async {

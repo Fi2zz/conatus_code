@@ -34,9 +34,10 @@ InstructionLoader provideInstructionLoader(
   return loader;
 }
 
-/// 挂工具后置中间件：调用成功（或失败）后把目标路径交给 [loader]。
+/// 挂工具后置中间件：调用结束后把目标路径交给 [loader]。
 ///
-/// [onNoted] 用来在记下新文件后立即刷新 prompt 快照（可为 `null`）。
+/// 只有发现**新**的嵌套 `AGENTS.md` 才触发 [onNoted] 刷新；指令发现本身的
+/// 任何失败都被吞掉，绝不把成功工具变成 `TOOL_ERROR`。
 Disposer instrumentInstructionNotes(
   Context app,
   InstructionLoader loader, {
@@ -44,9 +45,12 @@ Disposer instrumentInstructionNotes(
 }) => app.tools.use((ToolCall call, Future<ToolResult> Function() next) async {
   final ToolResult result = await next();
   final String? path = instructionNotePath(call);
-  if (path != null) {
-    await loader.notePath(path);
-    await onNoted?.call();
+  if (path == null) return result;
+  try {
+    final bool noted = await loader.notePath(path);
+    if (noted) await onNoted?.call();
+  } on Exception {
+    // 指令层是增强项：读不到 / 刷新失败都不影响工具结果。
   }
   return result;
 }, tag: 'instructions');

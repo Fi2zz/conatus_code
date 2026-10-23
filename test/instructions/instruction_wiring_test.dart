@@ -21,9 +21,11 @@ void main() {
   late Directory dir;
   late Context app;
   late InstructionLoader loader;
+  late int refreshes;
 
   setUp(() {
     dir = Directory.systemTemp.createTempSync('nava-notes-');
+    refreshes = 0;
     File('${dir.path}${_sep}AGENTS.md').writeAsStringSync('ROOT');
     app = Context.root(name: 'instructions');
     provideTools(app);
@@ -32,7 +34,11 @@ void main() {
       workdir: dir.path,
       home: '${dir.path}${_sep}home',
     );
-    final Disposer disposer = instrumentInstructionNotes(app, loader);
+    final Disposer disposer = instrumentInstructionNotes(
+      app,
+      loader,
+      onNoted: () async => refreshes++,
+    );
     app.effect(() => disposer);
   });
 
@@ -72,6 +78,23 @@ void main() {
       expect(result.isError, isFalse);
       expect(await loader.compose(), contains('NESTED-$i'));
     }
+  });
+
+  test('重复读同一路径不触发刷新，只有新文件才刷新', () async {
+    registerTool('read_file');
+    final String nested = <String>[dir.path, 'pkg', 'sub'].join(_sep);
+    _write(nested, <String>['AGENTS.md'], 'NESTED-ONCE');
+    final String file = '$nested${_sep}file.dart';
+    _write(nested, <String>['file.dart'], 'x');
+
+    await app.tools.call(
+      ToolCall(name: 'read_file', arguments: <String, Object?>{'path': file}),
+    );
+    expect(refreshes, 1);
+    await app.tools.call(
+      ToolCall(name: 'read_file', arguments: <String, Object?>{'path': file}),
+    );
+    expect(refreshes, 1);
   });
 
   test('未列出的工具与无 path 参数不触发', () async {

@@ -162,8 +162,9 @@ class ConatusTuiRuntime {
   /// [defaultAgent] 是新会话默认 Agent（`[agent] default_agent`）；未知或仅子
   /// Agent 的定义回退到注册表默认的 `build`。
   /// [instructions] 是顶层 `instructions` 的额外来源（路径 / glob / URL），
-  /// 追加在项目 `AGENTS.md` 之后。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 19 个），调用方是进程级
+  /// 追加在项目 `AGENTS.md` 之后；[instructionHome] 覆盖用户级全局文件的
+  /// 家目录（测试注入假 home，缺省读 `HOME`）。
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 20 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
@@ -201,6 +202,7 @@ class ConatusTuiRuntime {
     PermissionConfig? permissions,
     ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
     List<String> instructions = const <String>[],
+    String? instructionHome,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
@@ -676,6 +678,7 @@ class ConatusTuiRuntime {
     final InstructionLoader instructionLoader = provideInstructionLoader(
       app,
       workdir: resolvedWorkdir,
+      home: instructionHome,
       extra: instructions,
     );
     final InstructionPrompt instructionPrompt = InstructionPrompt(

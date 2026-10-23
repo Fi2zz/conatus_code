@@ -89,4 +89,11 @@ void main() {
 
     expect(await _loader(missing, home: _dir('nava-home-')).compose(), isNull);
   });
+
+  test('纯空白文件按无内容处理', () async {
+    final String root = _dir('nava-blank-');
+    _write(root, <String>['AGENTS.md'], '  \n\t\n');
+
+    expect(await _loader(root, home: _dir('nava-home-')).compose(), isNull);
+  });
 }

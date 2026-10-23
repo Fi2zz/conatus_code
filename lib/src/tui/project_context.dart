@@ -6,16 +6,16 @@
 library;
 
 import '../instructions/instruction_loader.dart';
-import '../instructions/instruction_source.dart'
-    show kInstructionMaxChars;
+import '../instructions/instruction_source.dart' show kInstructionMaxChars;
 
 /// 单个上下文文件的最大字符数（旧名，等同 [kInstructionMaxChars]）。
 const int kProjectContextMaxChars = kInstructionMaxChars;
 
-/// 读工作目录根的项目上下文；无内容时返回 `null`。
+/// 读项目上下文；无内容时返回 `null`。
 ///
-/// 顺序与旧版一致：`AGENTS.md` 在前、`NAVA.md` 在后；符号链接指向工作区外时
-/// 一律不读（见 `instruction_source.dart` 的越界校验）。
+/// 顺序：项目根到工作目录逐层（`AGENTS.md` 在前、`NAVA.md` 在后），项目祖先层
+/// 只接受普通文件（符号链接重定向一律跳过）；工作目录内的文件 canonical 必须
+/// 仍在工作目录内。空白内容按「无内容」处理。
 Future<String?> loadProjectContext(String workdir) async {
   final InstructionLoader loader = InstructionLoader(
     workdir: workdir,

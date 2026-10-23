@@ -20,13 +20,15 @@ String _write(String base, List<String> parts, String content) {
 }
 
 Future<ConatusTuiRuntime> _boot(
-  String workdir, {
+  String workdir,
+  String home, {
   List<String> instructions = const <String>[],
 }) => ConatusTuiRuntime.create(
   baseDir: workdir,
   sessionDir: workdir,
   memoryFile: '$workdir$_sep.memory.json',
   workdir: workdir,
+  instructionHome: home,
   webTools: false,
   skills: false,
   llm: FallbackLlm(const <LlmProvider>[]),
@@ -43,19 +45,23 @@ String? _projectText(ConatusTuiRuntime runtime) {
 
 void main() {
   late Directory dir;
+  late Directory home;
 
   setUp(() {
     dir = Directory.systemTemp.createTempSync('nava-instr-runtime-');
+    home = Directory.systemTemp.createTempSync('nava-instr-home-');
   });
 
   tearDown(() {
     if (dir.existsSync()) dir.deleteSync(recursive: true);
+    if (home.existsSync()) home.deleteSync(recursive: true);
   });
 
   test('启动时装配 instructions 来源并注册 project 段', () async {
     _write(dir.path, <String>['extra.md'], 'CONFIG-EXTRA');
     final ConatusTuiRuntime runtime = await _boot(
       dir.path,
+      home.path,
       instructions: const <String>['extra.md'],
     );
     addTearDown(runtime.dispose);
@@ -68,9 +74,10 @@ void main() {
     final String nested = <String>[dir.path, 'pkg'].join(_sep);
     _write(nested, <String>['AGENTS.md'], 'RUNTIME-NESTED');
     final String file = _write(nested, <String>['a.dart'], 'void main() {}');
-    final ConatusTuiRuntime runtime = await _boot(dir.path);
+    final ConatusTuiRuntime runtime = await _boot(dir.path, home.path);
     addTearDown(runtime.dispose);
 
+    // 用户级全局文件不参与：假 home 为空，project 段此刻不该存在。
     expect(_projectText(runtime), isNull);
 
     final ToolResult result = await runtime.tools.call(
