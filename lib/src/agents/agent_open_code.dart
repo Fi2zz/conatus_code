@@ -19,7 +19,16 @@ const Map<String, String> _openCodeActions = <String, String>{
   'webfetch': 'webfetch',
   'websearch': 'websearch',
   'subagent': 'subagent',
+  'task': 'subagent',
   'skill': 'skill',
+};
+
+/// OpenCode 有、但 nava 没有对应工具的权限动作；保留规则只会永不命中。
+const Set<String> _unsupportedActions = <String>{
+  'list',
+  'todowrite',
+  'todoread',
+  'lsp',
 };
 
 /// nava 已知的权限动作（与 `permission_action.dart` 的动作表一致）。
@@ -65,6 +74,10 @@ bool agentActionKnown(String raw, String normalized) {
       _openCodeActions.containsKey(trimmed) ||
       _knownActions.contains(normalized);
 }
+
+/// nava 是否有对应工具承接该 OpenCode 动作。
+bool agentActionSupported(String raw) =>
+    !_unsupportedActions.contains(raw.trim());
 
 /// 把 OpenCode 工具名归一为 nava 工具名；未知名称原样返回。
 String mapAgentToolName(String raw) {

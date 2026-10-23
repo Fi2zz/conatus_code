@@ -9,7 +9,7 @@ import 'package:test/test.dart';
 import 'agent_test_support.dart';
 
 /// 非 root 的 Unix 用户才能用 chmod 制造不可读路径。
-bool get canDenyRead =>
+bool get unprivilegedUser =>
     !Platform.isWindows &&
     Process.runSync('id', <String>['-u']).stdout.toString().trim() != '0';
 
@@ -99,7 +99,7 @@ void main() {
     expect(registry.byId('ok')!.system, 'ok');
     expect(registry.warnings.single, contains('locked.md'));
     expect(registry.warnings.single, contains('无法读取 Agent 文件'));
-  }, skip: canDenyRead ? false : '需要非 root Unix 用户');
+  }, skip: unprivilegedUser ? false : '需要非 root Unix 用户');
 
   test('不可读目录记录警告并继续加载', () async {
     final Directory locked = Directory('${work.path}/.nava/agents')
@@ -111,7 +111,7 @@ void main() {
 
     expect(registry.warnings.single, contains('无法读取 Agent 目录'));
     expect(registry.byId('build'), isNotNull);
-  }, skip: canDenyRead ? false : '需要非 root Unix 用户');
+  }, skip: unprivilegedUser ? false : '需要非 root Unix 用户');
 
   test('加载不修改 .opencode（文件与内容保持不变）', () async {
     final Directory opencode = Directory('${work.path}/.opencode/agents');

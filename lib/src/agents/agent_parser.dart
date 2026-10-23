@@ -5,6 +5,8 @@ import 'package:conatus_skill/conatus_skill.dart';
 
 import 'agent_definition.dart';
 import 'agent_fields.dart';
+import 'agent_permissions.dart';
+import 'agent_tools.dart';
 
 /// 一次 Agent 解析的结果；失败时 [error] 说明原因。
 class AgentParseResult {
@@ -85,6 +87,7 @@ AgentDefinition _definition(
 ) {
   final Map<String, Object?> fields = document.fields;
   final String? mode = agentStringField(fields, 'mode');
+  final AgentTools toolSettings = agentToolsField(fields);
   return AgentDefinition(
     id: id,
     sourcePath: sourcePath,
@@ -93,7 +96,8 @@ AgentDefinition _definition(
     system: document.body,
     model: agentStringField(fields, 'model'),
     steps: agentStepsField(fields),
-    tools: agentToolsField(fields),
+    tools: toolSettings.whitelist,
+    disabledTools: toolSettings.disabled,
     permissions: agentPermissionsField(fields, warnings),
     hidden: agentBoolField(fields, 'hidden'),
     color: agentStringField(fields, 'color'),

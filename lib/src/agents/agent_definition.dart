@@ -38,6 +38,7 @@ class AgentDefinition {
     this.model,
     this.steps,
     this.tools,
+    this.disabledTools = const <String>[],
     this.permissions = const <PermissionRule>[],
     this.hidden = false,
     this.color,
@@ -62,7 +63,16 @@ class AgentDefinition {
   final int? steps;
 
   /// 工具白名单；`null` 表示不额外限制。
+  ///
+  /// 来自 `tools` 数组形式。空数组表示**禁止所有工具**；`null` 表示未设置
+  /// 白名单（全部默认可用，再减去 [disabledTools]）。
   final List<String>? tools;
+
+  /// 被显式禁用的工具（已映射为 nava 工具名）。
+  ///
+  /// 来自 OpenCode `tools` 映射里值为 `false` 的项；B4 应从可用工具集合中
+  /// 减去它们，未出现的工具保持默认启用。
+  final List<String> disabledTools;
 
   /// Agent 自带权限规则；追加在全局规则之后。
   final List<PermissionRule> permissions;
