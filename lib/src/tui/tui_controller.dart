@@ -152,7 +152,11 @@ class ConatusTuiController implements TuiUserPromptHost {
        _sessionId = initialSession ?? '',
        _fallbackModels = fallbackModels,
        _retryPolicy = retryPolicy {
-    picker = TuiSessionPicker(sessions, onChanged: _refresh);
+    picker = TuiSessionPicker(
+      sessions,
+      onChanged: _refresh,
+      onLoadError: _reportSessionLoadError,
+    );
     _app.provide('tuiController', this);
     final TuiPermissionGate? gate = app.get<TuiPermissionGate>('approval');
     _gate = gate;
@@ -355,12 +359,29 @@ class ConatusTuiController implements TuiUserPromptHost {
   late final TuiFormPrompt formPrompt = TuiFormPrompt(onChanged: _refresh);
 
   /// 会话重命名浮层（`/rename` 与面板 `r`）。
-  late final TuiRenamePrompt renamePrompt = TuiRenamePrompt(onChanged: _refresh);
+  late final TuiRenamePrompt renamePrompt = TuiRenamePrompt(
+    onChanged: _refresh,
+  );
 
   /// 删除会话前的确认钩子（返回 `false` 取消）。
   ///
   /// 缺省走选项浮层；测试 / 无界面运行时注入桩，避免弹窗等不到人。
   Future<bool> Function(String id)? confirmDelete;
+
+  /// 已报告过读取失败的会话 id：同一次运行只提示一次，避免每次开面板刷屏。
+  final Set<String> _failedSessionLoads = <String>{};
+
+  /// 面板读取某会话失败：提示一次，该行按「无历史」展示。
+  void _reportSessionLoadError(String id) {
+    if (!_failedSessionLoads.add(id)) {
+      return;
+    }
+    transcript.add(
+      TuiRole.system,
+      '会话 $id 的数据读取失败（JSONL 可能损坏），面板按无历史显示；'
+      '原始文件未改动。',
+    );
+  }
 
   /// 屏上记录。
   final Transcript transcript = Transcript();
@@ -1043,28 +1064,50 @@ class ConatusTuiController implements TuiUserPromptHost {
     renamePrompt.show(_sessionId, _session?.title);
   }
 
-  /// 重命名会话：追加标题事件并落盘；空标题拒绝（只提示，不抛）。
+  /// 重命名会话：追加标题事件并落盘；空标题 / 未知 id / IO 失败只提示。
   Future<bool> renameSession(String id, String title) async {
-    final Session session = _sessions.get(id) ?? await _sessions.open(id);
-    try {
-      session.rename(title);
-    } on ArgumentError {
+    if (title.trim().isEmpty) {
       showSystemNotice('会话标题不能为空。');
       return false;
     }
-    await _sessions.flush();
-    transcript.add(TuiRole.system, '已将会话 $id 重命名为「${session.title}」。');
-    _refresh();
-    return true;
+    try {
+      final Session? opened = _sessions.get(id);
+      final bool known =
+          opened != null || (await _sessions.persistedIds()).contains(id);
+      if (!known) {
+        showSystemNotice('会话 $id 不存在。');
+        return false;
+      }
+      final Session session = opened ?? await _sessions.open(id);
+      session.rename(title);
+      await _sessions.flush();
+      transcript.add(TuiRole.system, '已将会话 $id 重命名为「${session.title}」。');
+      // 面板里的行是不可变快照：改名后按原选中项重读，别跳到当前会话。
+      if (picker.open) {
+        await picker.show(_sessionId, selectedId: id);
+      }
+      _refresh();
+      return true;
+    } on ArgumentError {
+      showSystemNotice('会话标题不能为空。');
+      return false;
+    } catch (error) {
+      showSystemNotice('重命名会话 $id 失败：$error');
+      return false;
+    }
   }
 
-  /// 提交重命名输入框；未打开返回 `false`。提交前输入不写会话。
+  /// 提交重命名输入框；未打开或标题为空白时保持打开并返回 `false`。
   Future<bool> commitRename() async {
     final String? id = renamePrompt.targetId;
     if (id == null) {
       return false;
     }
     final String text = renamePrompt.text;
+    if (text.trim().isEmpty) {
+      showSystemNotice('会话标题不能为空。');
+      return false;
+    }
     renamePrompt.close();
     return renameSession(id, text);
   }
@@ -1079,10 +1122,17 @@ class ConatusTuiController implements TuiUserPromptHost {
     renamePrompt.show(id, session.title);
   }
 
-  /// 面板 `d`：二次确认后删除选中会话。
+  /// 面板 `d`：当前会话直接拒绝（不弹确认），其余二次确认后删除。
   Future<void> deleteSelectedSession() async {
     final String? id = picker.selectedId();
-    if (id == null || !await _confirmDelete(id)) {
+    if (id == null) {
+      return;
+    }
+    if (id == _sessionId) {
+      showSystemNotice('不能删除当前会话；先切换到别的会话再删。');
+      return;
+    }
+    if (!await _confirmDelete(id)) {
       return;
     }
     await deleteSession(id);
@@ -1106,32 +1156,74 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// 删除会话：拒绝当前会话；清 JSONL、检查点与故事线日志（不动导出文件）。
+  ///
+  /// 先 flush 在途写入（排队中的标题事件否则可能在删除后重建文件）；每一步
+  /// 独立捕获失败，最后一次性报告，避免「删了一半却没有任何提示」。
   Future<bool> deleteSession(String id) async {
     if (id == _sessionId) {
       showSystemNotice('不能删除当前会话；先切换到别的会话再删。');
       return false;
     }
-    final bool known =
-        _sessions.get(id) != null ||
-        (await _sessions.persistedIds()).contains(id);
+    bool known;
+    try {
+      known =
+          _sessions.get(id) != null ||
+          (await _sessions.persistedIds()).contains(id);
+    } catch (error) {
+      showSystemNotice('读取会话列表失败：$error');
+      return false;
+    }
     if (!known) {
       showSystemNotice('会话 $id 不存在。');
       return false;
     }
-    await _sessions.remove(id);
-    await _app.get<CheckpointManager>('checkpointManager')?.clearSession(id);
-    if (storyEnabled) {
-      await _app.get<SessionLog>('sessionLog')?.remove(id);
+    final List<String> errors = <String>[];
+    await _attemptDelete(errors, '会话数据', () async {
+      await _sessions.flush();
+      await _sessions.remove(id);
+    });
+    errors.addAll(await _clearSessionArtifacts(id));
+    if (errors.isEmpty) {
+      transcript.add(TuiRole.system, '已删除会话 $id（数据与检查点已清理；导出文件保留）。');
+    } else {
+      showSystemNotice('删除会话 $id 未完全成功：${errors.join('；')}');
     }
-    transcript.add(
-      TuiRole.system,
-      '已删除会话 $id（数据与检查点已清理；导出文件保留）。',
-    );
     if (picker.open) {
       await picker.show(_sessionId);
     }
     _refresh();
-    return true;
+    return errors.isEmpty;
+  }
+
+  /// 清检查点与故事线日志；每步独立捕获，返回失败说明。
+  Future<List<String>> _clearSessionArtifacts(String id) async {
+    final List<String> errors = <String>[];
+    final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
+      'checkpointManager',
+    );
+    if (checkpoint != null) {
+      await _attemptDelete(errors, '检查点', () => checkpoint.clearSession(id));
+    }
+    if (storyEnabled) {
+      final SessionLog? log = _app.get<SessionLog>('sessionLog');
+      if (log != null) {
+        await _attemptDelete(errors, '故事线日志', () => log.remove(id));
+      }
+    }
+    return errors;
+  }
+
+  /// 执行删除的一步；失败记进 [errors]，不中断后续清理。
+  Future<void> _attemptDelete(
+    List<String> errors,
+    String label,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } catch (error) {
+      errors.add('$label：$error');
+    }
   }
 
   /// 确认选择：切到选中会话并关闭面板。

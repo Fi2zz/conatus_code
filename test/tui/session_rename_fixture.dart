@@ -86,13 +86,16 @@ class RenameFixture {
 /// [start] 为 `false` 时跳过 `controller.start()`，留给 `AgentTui` 挂载时启动
 /// （根组件 `initState` 会调一次，重复调用会重复注册工具）。
 Future<RenameFixture> buildRenameFixture({bool start = true}) async {
-  final Directory dir =
-      Directory.systemTemp.createTempSync('nava-rename-delete-');
+  final Directory dir = Directory.systemTemp.createTempSync(
+    'nava-rename-delete-',
+  );
   addTearDown(() => dir.deleteSync(recursive: true));
-  final Directory sessionsDir =
-      Directory('${dir.path}${Platform.pathSeparator}sessions')..createSync();
-  final Directory projectDir =
-      Directory('${dir.path}${Platform.pathSeparator}project')..createSync();
+  final Directory sessionsDir = Directory(
+    '${dir.path}${Platform.pathSeparator}sessions',
+  )..createSync();
+  final Directory projectDir = Directory(
+    '${dir.path}${Platform.pathSeparator}project',
+  )..createSync();
 
   final Context app = Context.root();
   provideTools(app);
@@ -119,10 +122,7 @@ Future<RenameFixture> buildRenameFixture({bool start = true}) async {
   app.provide('checkpointManager', checkpoint);
 
   final Session current = sessions.create(id: renameCurrentId);
-  current.append(
-    kUserMessageEvent,
-    data: <String, Object?>{'text': '当前会话的问题'},
-  );
+  current.append(kUserMessageEvent, data: <String, Object?>{'text': '当前会话的问题'});
   final Session other = sessions.create(id: renameOtherId);
   other.append(
     kUserMessageEvent,

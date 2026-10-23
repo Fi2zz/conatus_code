@@ -37,7 +37,7 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '切换或新建会话（id 即数据文件名）',
     argHint: '<id>',
   ),
-  TuiCommand(name: 'sessions', description: '打开会话选择面板（↑↓ 选择，Enter 切换）'),
+  TuiCommand(name: 'sessions', description: '打开会话面板（↑↓ 选择，Enter 切换，r 重命名，d 删除）'),
   TuiCommand(
     name: 'rename',
     description: '重命名当前会话（缺省打开输入框；面板里 r 也可重命名）',

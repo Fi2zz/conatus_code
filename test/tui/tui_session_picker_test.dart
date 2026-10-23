@@ -8,10 +8,7 @@ import 'package:test/test.dart';
 import 'session_rename_fixture.dart';
 
 /// 等异步删除 / 刷新落地（面板按键处理是 unawaited 的）。
-Future<void> _eventually(
-  NoctermTester tester,
-  bool Function() done,
-) async {
+Future<void> _eventually(NoctermTester tester, bool Function() done) async {
   for (int i = 0; i < 200; i++) {
     if (done()) return;
     await tester.pump(const Duration(milliseconds: 5));
@@ -25,8 +22,9 @@ void main() {
 
     await fix.controller.openPicker();
 
-    final TuiSessionInfo info = fix.controller.picker.list
-        .firstWhere((TuiSessionInfo item) => item.id == renameOtherId);
+    final TuiSessionInfo info = fix.controller.picker.list.firstWhere(
+      (TuiSessionInfo item) => item.id == renameOtherId,
+    );
     expect(info.title, hasLength(40));
     expect(info.title, startsWith('Legacy question that is'));
     expect(info.updatedAt, isNotNull);
@@ -44,9 +42,33 @@ void main() {
 
     await fix.controller.openPicker();
 
-    final TuiSessionInfo info = fix.controller.picker.list
-        .firstWhere((TuiSessionInfo item) => item.id == renameOtherId);
+    final TuiSessionInfo info = fix.controller.picker.list.firstWhere(
+      (TuiSessionInfo item) => item.id == renameOtherId,
+    );
     expect(info.title, 'Own title');
+  });
+
+  test('损坏的 JSONL 只影响该行，不拖垮整个面板', () async {
+    final RenameFixture fix = await buildRenameFixture();
+    const String corruptId = 'session_corrupt';
+    fix.jsonl(corruptId).writeAsStringSync('{"seq":0,"type":"user/message"');
+
+    await fix.controller.openPicker();
+
+    final TuiSessionInfo corrupt = fix.controller.picker.list.firstWhere(
+      (TuiSessionInfo item) => item.id == corruptId,
+    );
+    expect(corrupt.title, isNull);
+    expect(corrupt.events, 0);
+    expect(corrupt.updatedAt, isNull);
+    expect(
+      fix.controller.picker.list.any(
+        (TuiSessionInfo item) => item.id == renameOtherId && item.title != null,
+      ),
+      isTrue,
+      reason: '其它会话仍正常显示',
+    );
+    expect(fix.controller.transcript.messages.last.text, contains(corruptId));
   });
 
   test('picker 里按 r 打开重命名输入框并预填；Esc 取消不写会话', () async {
@@ -75,6 +97,51 @@ void main() {
     expect(fix.controller.session!.title, isNull);
   });
 
+  test('rename prompt 里 Enter 提交：面板行同步新标题且保留选中项', () async {
+    final RenameFixture fix = await buildRenameFixture(start: false);
+    final NoctermTester tester = await NoctermTester.create();
+    addTearDown(tester.dispose);
+    await tester.pumpComponent(AgentTui(controller: fix.controller));
+    await _eventually(tester, () => fix.controller.ready);
+    await fix.controller.openPicker();
+    await tester.pump();
+    fix.controller.movePicker(
+      fix.controller.picker.list.indexWhere(
+            (TuiSessionInfo item) => item.id == renameOtherId,
+          ) -
+          fix.controller.picker.index,
+    );
+
+    await tester.sendKeyEvent(const KeyboardEvent(logicalKey: LogicalKey.keyR));
+    await tester.pump();
+    expect(fix.controller.renamePrompt.open, isTrue);
+    await tester.enterText('Panel rename');
+    await tester.pump();
+    await tester.sendKeyEvent(
+      const KeyboardEvent(logicalKey: LogicalKey.enter),
+    );
+    await _eventually(
+      tester,
+      () =>
+          !fix.controller.renamePrompt.open &&
+          fix.sessions.get(renameOtherId)?.title == 'Panel rename' &&
+          fix.controller.picker.list
+                  .firstWhere((TuiSessionInfo item) => item.id == renameOtherId)
+                  .title ==
+              'Panel rename',
+    );
+
+    expect(fix.controller.picker.open, isTrue);
+    expect(fix.controller.picker.selectedId(), renameOtherId);
+    expect(
+      fix.controller.picker.list
+          .firstWhere((TuiSessionInfo item) => item.id == renameOtherId)
+          .title,
+      'Panel rename',
+      reason: '面板行不能停留在旧标题',
+    );
+  });
+
   test('picker 里按 d 二次确认后删除选中会话', () async {
     final RenameFixture fix = await buildRenameFixture(start: false);
     fix.controller.confirmDelete = (String id) async => id == renameOtherId;
@@ -85,8 +152,9 @@ void main() {
     await fix.controller.openPicker();
     await tester.pump();
     fix.controller.movePicker(
-      fix.controller.picker.list
-          .indexWhere((TuiSessionInfo item) => item.id == renameOtherId) -
+      fix.controller.picker.list.indexWhere(
+            (TuiSessionInfo item) => item.id == renameOtherId,
+          ) -
           fix.controller.picker.index,
     );
     expect(fix.controller.picker.selectedId(), renameOtherId);

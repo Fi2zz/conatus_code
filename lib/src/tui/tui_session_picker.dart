@@ -19,7 +19,7 @@ class TuiSessionInfo {
   /// 是否在内存中已打开。
   final bool active;
 
-  /// 已记录的事件数（未打开时为 0）。
+  /// 已记录的事件数（读取失败或空会话为 0）。
   final int events;
 
   /// 最近一次事件时间（未打开或空会话为 `null`）。
@@ -52,28 +52,34 @@ String? deriveSessionTitle(List<SessionEvent> events) {
     if (flat.isEmpty) {
       continue;
     }
-    return flat.length <= kTuiSessionTitlePreview
-        ? flat
-        : flat.substring(0, kTuiSessionTitlePreview);
+    final List<int> runes = flat.runes.toList(growable: false);
+    if (runes.length <= kTuiSessionTitlePreview) {
+      return flat;
+    }
+    // 按 rune 截断，避免把代理对（emoji 等）切成半个字符。
+    return String.fromCharCodes(runes.take(kTuiSessionTitlePreview));
   }
   return null;
 }
 
-/// 短会话 id：去掉 `session_` 前缀，最多 8 字符（面板窄，完整 id 换行）。
+/// 短会话 id：去掉 `session_` 前缀，最多 12 字符（面板窄，完整 id 换行）。
 String shortSessionId(String id) {
   const String prefix = 'session_';
   final String body = id.startsWith(prefix) ? id.substring(prefix.length) : id;
-  return body.length <= 8 ? body : body.substring(0, 8);
+  return body.length <= 12 ? body : body.substring(0, 12);
 }
 
 /// 会话选择面板状态。
 class TuiSessionPicker {
-  TuiSessionPicker(this._sessions, {required this.onChanged});
+  TuiSessionPicker(this._sessions, {required this.onChanged, this.onLoadError});
 
   final SessionStore _sessions;
 
   /// 状态变化回调。
   final void Function() onChanged;
+
+  /// 某个已持久化会话读取失败时的回调（损坏 JSONL 等）。
+  final void Function(String id)? onLoadError;
 
   /// 面板是否打开。
   bool open = false;
@@ -84,11 +90,13 @@ class TuiSessionPicker {
   /// 当前光标。
   int index = 0;
 
-  /// 打开面板：汇合活跃会话与已持久化会话，并定位到当前会话。
+  /// 打开面板：汇合活跃会话与已持久化会话，并定位到 [selectedId]（缺省当前会话）。
   ///
   /// 已持久化但未打开的会话经 [SessionStore.open] 载入事件，用来展示标题与
   /// 更新时间；标题只读派生（无标题事件时取首条用户消息），不回写会话。
-  Future<void> show(String currentId) async {
+  /// 单个会话读取失败（如截断的 JSONL）只让该行退化为「id + 未知时间」，
+  /// 并经 [onLoadError] 报告，不会中断整个面板。
+  Future<void> show(String currentId, {String? selectedId}) async {
     final Set<String> ids = <String>{
       ..._sessions.ids,
       ...await _sessions.persistedIds(),
@@ -97,24 +105,39 @@ class TuiSessionPicker {
     for (final String id in ids) {
       final Session? opened = _sessions.get(id);
       final bool active = opened != null;
-      final Session session = opened ?? await _sessions.open(id);
-      final List<SessionEvent> events = session.events;
-      infos.add(TuiSessionInfo(
-        id: id,
-        active: active,
-        events: events.length,
-        updatedAt: events.isEmpty ? null : events.last.time,
-        title: session.title ?? deriveSessionTitle(events),
-      ));
+      final Session? session = opened ?? await _load(id);
+      final List<SessionEvent> events =
+          session?.events ?? const <SessionEvent>[];
+      infos.add(
+        TuiSessionInfo(
+          id: id,
+          active: active,
+          events: events.length,
+          updatedAt: events.isEmpty ? null : events.last.time,
+          title: session?.title ?? deriveSessionTitle(events),
+        ),
+      );
     }
     infos.sort((TuiSessionInfo a, TuiSessionInfo b) => a.id.compareTo(b.id));
     list = infos;
-    index = list.indexWhere((TuiSessionInfo info) => info.id == currentId);
+    index = list.indexWhere(
+      (TuiSessionInfo info) => info.id == (selectedId ?? currentId),
+    );
     if (index < 0) {
       index = 0;
     }
     open = true;
     onChanged();
+  }
+
+  /// 载入一个未打开的会话；读取失败时报告并返回 `null`（不向上抛）。
+  Future<Session?> _load(String id) async {
+    try {
+      return await _sessions.open(id);
+    } catch (_) {
+      onLoadError?.call(id);
+      return null;
+    }
   }
 
   /// 关闭面板。
