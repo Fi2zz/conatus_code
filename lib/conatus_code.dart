@@ -209,7 +209,11 @@ export 'src/lint/linter.dart'
         kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
-export 'src/mcp/mcp_prompt_commands.dart' show loadMcpPromptCommands;
+export 'src/mcp/mcp_prompt_commands.dart'
+    show
+        kMcpReservedServerName,
+        loadMcpPromptCommands,
+        registerMcpPromptCommands;
 export 'src/permissions/permission_rule_pattern.dart'
     show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;

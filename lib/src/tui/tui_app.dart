@@ -30,7 +30,6 @@ import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
 import '../checkpoint/checkpoint_backend.dart';
 import '../checkpoint/checkpoint_manager.dart';
-import '../commands/command_definition.dart';
 import '../commands/command_registry.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
@@ -157,6 +156,7 @@ class ConatusTuiRuntime {
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
   /// [mcpTransportFactory] 是 MCP 传输的测试注入点（缺省按配置分派）。
+  /// [commandHome] 覆盖命令发现的家目录（测试注入假 home；缺省读环境变量）。
   /// [shellInteractive] 是用户直发命令（`!` shell 模式）的交互缝，缺省本地直执
   /// 不经命令白名单；模型发起的命令仍走 [shell]（沙箱照常）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
@@ -195,6 +195,7 @@ class ConatusTuiRuntime {
     Credentials? credentials,
     List<McpServerSpec>? mcpServers,
     McpTransport Function(McpServerConfig config)? mcpTransportFactory,
+    String? commandHome,
     bool interactive = true,
     String? workdir,
     CheckpointConfig? checkpoint,
@@ -540,16 +541,14 @@ class ConatusTuiRuntime {
     // 自定义命令：只读发现，`.opencode` 仅读取不写入（见 CommandRegistry）。
     final CommandRegistry commandRegistry = await CommandRegistry.load(
       workdir: resolvedWorkdir,
+      home: commandHome,
     );
     // MCP prompt → `/<server>:<prompt>`；同名磁盘命令优先，不覆盖已发现定义。
     if (mcpRegistry != null) {
-      for (final CommandDefinition def in await loadMcpPromptCommands(
-        mcpRegistry,
-      )) {
-        if (commandRegistry.byName(def.name) == null) {
-          commandRegistry.add(def);
-        }
-      }
+      registerMcpPromptCommands(
+        commandRegistry,
+        await loadMcpPromptCommands(mcpRegistry, onWarning: stderr.writeln),
+      );
     }
     app.provide('commandRegistry', commandRegistry);
     final AgentProfileResolver agentProfiles = AgentProfileResolver(

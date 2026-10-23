@@ -1,4 +1,4 @@
-/// tui_app 装配：资源工具与 prompt 命令进注册表，磁盘命令优先。
+/// tui_app 装配：资源工具与 prompt 命令进注册表。
 library;
 
 import 'dart:io';
@@ -34,6 +34,7 @@ class _Stub implements LlmProvider {
 }
 
 Future<ConatusTuiRuntime> _bootRuntime(Directory dir) async {
+  final Directory home = Directory('${dir.path}/home')..createSync();
   final ConatusTuiRuntime rt = await ConatusTuiRuntime.create(
     baseDir: dir.path,
     sessionDir: dir.path,
@@ -41,6 +42,7 @@ Future<ConatusTuiRuntime> _bootRuntime(Directory dir) async {
     workdir: dir.path,
     webTools: false,
     skills: false,
+    commandHome: home.path,
     llm: FallbackLlm(<LlmProvider>[_Stub()]),
     mcpServers: <McpServerSpec>[
       const McpServerSpec(
@@ -69,21 +71,5 @@ void main() {
     final CommandDefinition? def = registry.byName('docs:review');
     expect(def, isNotNull, reason: 'prompt 命令应进注册表');
     expect(def!.executor, isNotNull);
-  });
-
-  test('同名磁盘命令优先于 prompt 命令', () async {
-    final Directory dir = Directory.systemTemp.createTempSync('nava-prompt');
-    addTearDown(() => dir.deleteSync(recursive: true));
-    File('${dir.path}/.nava/commands/docs:review.md')
-      ..parent.createSync(recursive: true)
-      ..writeAsStringSync('磁盘命令');
-    final ConatusTuiRuntime rt = await _bootRuntime(dir);
-
-    final CommandDefinition? def = rt.app
-        .require<CommandRegistry>('commandRegistry')
-        .byName('docs:review');
-    expect(def, isNotNull);
-    expect(def!.executor, isNull, reason: '磁盘命令不应被 prompt 覆盖');
-    expect(def.sourcePath, isNot(''));
   });
 }

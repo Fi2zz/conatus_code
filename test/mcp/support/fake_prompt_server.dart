@@ -48,7 +48,7 @@ Map<String, Object?> _reply(
             'name': 'review',
             'description': '审查代码',
             'arguments': <Object?>[
-              <String, Object?>{'name': 'path'},
+              <String, Object?>{'name': 'path', 'required': true},
               <String, Object?>{'name': 'depth'},
             ],
           },
@@ -78,9 +78,10 @@ Map<String, Object?> _reply(
 
 String _arg(Map<String, Object?>? params, String key) {
   final Object? arguments = params?['arguments'];
-  return arguments is Map<String, Object?> ? '${arguments[key] ?? ''}' : '';
+  if (arguments is! Map<String, Object?>) return '<absent>';
+  return arguments.containsKey(key) ? '${arguments[key]}' : '<absent>';
 }
 
-/// 一台 docs server 的 `[mcp.servers.docs]` 声明。
-McpServerConfig docsServerConfig() =>
-    McpServerConfig(name: 'docs', type: McpTransportType.stdio, command: 'x');
+/// 一台 server 的 `[mcp.servers.<name>]` 声明。
+McpServerConfig mcpServerConfig(String name) =>
+    McpServerConfig(name: name, type: McpTransportType.stdio, command: 'x');
