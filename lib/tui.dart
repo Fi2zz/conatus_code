@@ -73,6 +73,7 @@ export 'src/tui/tui_plan.dart';
 export 'src/tui/tui_plan_view.dart';
 export 'src/tui/tui_provider.dart';
 export 'src/tui/tui_provider_view.dart';
+export 'src/tui/tui_rename_view.dart';
 export 'src/tui/tui_session_picker.dart';
 export 'src/tui/tui_session_picker_view.dart';
 export 'src/tui/tui_shell_mode.dart'

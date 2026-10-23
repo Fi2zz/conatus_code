@@ -40,6 +40,7 @@ import 'tui_plan.dart';
 import 'tui_plan_view.dart';
 import 'tui_provider.dart';
 import 'tui_provider_view.dart';
+import 'tui_rename_view.dart';
 import 'tui_session_picker_view.dart';
 import 'tui_shell_mode.dart';
 import 'tui_status_info.dart';
@@ -473,6 +474,23 @@ class _AgentTuiState extends State<AgentTui> {
     return true;
   }
 
+  /// 重命名浮层按键：Enter 提交、Esc 取消；其余交给输入框。
+  bool _onRenameKey(KeyboardEvent event) {
+    final TuiRenamePrompt prompt = _controller.renamePrompt;
+    if (!prompt.open) {
+      return false;
+    }
+    if (event.logicalKey == LogicalKey.enter) {
+      unawaited(_controller.commitRename());
+    } else if (event.logicalKey == LogicalKey.escape) {
+      prompt.close();
+    } else {
+      return false; // 其余按键交给标题输入框。
+    }
+    _refresh();
+    return true;
+  }
+
   /// Plan 面板按键：Enter 进入/退出、Esc 关闭；未打开返回 false。
   bool _onPlanKey(KeyboardEvent event) {
     final TuiPlanPrompt prompt = _controller.planPrompt;
@@ -734,6 +752,9 @@ class _AgentTuiState extends State<AgentTui> {
     if (_onCopyKey(event)) {
       return true;
     }
+    if (_onRenameKey(event)) {
+      return true;
+    }
     if (_onChoiceKey(event)) {
       return true;
     }
@@ -766,6 +787,10 @@ class _AgentTuiState extends State<AgentTui> {
         _controller.movePicker(-1);
       } else if (event.logicalKey == LogicalKey.arrowDown) {
         _controller.movePicker(1);
+      } else if (event.logicalKey == LogicalKey.keyR) {
+        unawaited(_controller.openRenameForSelected());
+      } else if (event.logicalKey == LogicalKey.keyD) {
+        unawaited(_controller.deleteSelectedSession());
       } else if (event.logicalKey == LogicalKey.enter) {
         unawaited(_controller.pickSelected());
       } else if (event.logicalKey == LogicalKey.escape) {
@@ -875,9 +900,12 @@ class _AgentTuiState extends State<AgentTui> {
   @override
   Component build(BuildContext context) {
     return Focusable(
-      // 带输入框的浮层（表单 / 模型搜索）打开时让出焦点，由浮层内的
+      // 带输入框的浮层（表单 / 模型搜索 / 重命名）打开时让出焦点，由浮层内的
       // TextField 接收字符与按键（其 onKeyEvent 即浮层按键处理）。
-      focused: !_controller.modelPrompt.open && !_controller.formPrompt.open,
+      focused:
+          !_controller.modelPrompt.open &&
+          !_controller.formPrompt.open &&
+          !_controller.renamePrompt.open,
       onKeyEvent: _onKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -888,6 +916,11 @@ class _AgentTuiState extends State<AgentTui> {
                 : TeamView(snapshot: _controller.teamSnapshot),
           ),
           // 交互浮层一律贴在输入栏上方（小面板），消息区保持可见。
+          if (_controller.renamePrompt.open)
+            TuiRenameView(
+              prompt: _controller.renamePrompt,
+              onKeyEvent: _onRenameKey,
+            ),
           if (_controller.choice.open)
             TuiChoiceView(
               request: _controller.choice.request!,
@@ -949,6 +982,7 @@ class _AgentTuiState extends State<AgentTui> {
                   !_controller.providerPrompt.open &&
                   !_controller.formPrompt.open &&
                   !_controller.modelPrompt.open &&
+                  !_controller.renamePrompt.open &&
                   !_controller.themePrompt.open,
               busy: _controller.busy,
               queuedCount: _controller.queuedCount,

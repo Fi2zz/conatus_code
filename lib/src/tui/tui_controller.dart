@@ -77,6 +77,7 @@ import 'tui_permission_gate.dart';
 import 'tui_permission_prompt.dart';
 import 'tui_plan.dart';
 import 'tui_provider.dart';
+import 'tui_rename_view.dart';
 import 'tui_session_picker.dart';
 import 'tui_skill_command.dart';
 import 'voice_reporter.dart';
@@ -353,6 +354,14 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 表单浮层。
   late final TuiFormPrompt formPrompt = TuiFormPrompt(onChanged: _refresh);
 
+  /// 会话重命名浮层（`/rename` 与面板 `r`）。
+  late final TuiRenamePrompt renamePrompt = TuiRenamePrompt(onChanged: _refresh);
+
+  /// 删除会话前的确认钩子（返回 `false` 取消）。
+  ///
+  /// 缺省走选项浮层；测试 / 无界面运行时注入桩，避免弹窗等不到人。
+  Future<bool> Function(String id)? confirmDelete;
+
   /// 屏上记录。
   final Transcript transcript = Transcript();
 
@@ -440,6 +449,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 当前会话 id。
   String get sessionId => _sessionId;
+
+  /// 当前会话；未绑定为 `null`（测试与外部只读检查用）。
+  Session? get session => _session;
 
   /// 当前会话 Agent ID。
   String get agentId => _agentId;
@@ -1022,6 +1034,106 @@ class ConatusTuiController implements TuiUserPromptHost {
   void closePicker() => picker.close();
   void movePicker(int delta) => picker.move(delta);
 
+  /// `/rename [标题]`：有参直接改当前会话；无参打开输入框（预填已有标题）。
+  Future<void> _handleRename(String arg) async {
+    if (arg.isNotEmpty) {
+      await renameSession(_sessionId, arg);
+      return;
+    }
+    renamePrompt.show(_sessionId, _session?.title);
+  }
+
+  /// 重命名会话：追加标题事件并落盘；空标题拒绝（只提示，不抛）。
+  Future<bool> renameSession(String id, String title) async {
+    final Session session = _sessions.get(id) ?? await _sessions.open(id);
+    try {
+      session.rename(title);
+    } on ArgumentError {
+      showSystemNotice('会话标题不能为空。');
+      return false;
+    }
+    await _sessions.flush();
+    transcript.add(TuiRole.system, '已将会话 $id 重命名为「${session.title}」。');
+    _refresh();
+    return true;
+  }
+
+  /// 提交重命名输入框；未打开返回 `false`。提交前输入不写会话。
+  Future<bool> commitRename() async {
+    final String? id = renamePrompt.targetId;
+    if (id == null) {
+      return false;
+    }
+    final String text = renamePrompt.text;
+    renamePrompt.close();
+    return renameSession(id, text);
+  }
+
+  /// 面板 `r`：给选中会话打开重命名输入框（预填已有标题）。
+  Future<void> openRenameForSelected() async {
+    final String? id = picker.selectedId();
+    if (id == null) {
+      return;
+    }
+    final Session session = _sessions.get(id) ?? await _sessions.open(id);
+    renamePrompt.show(id, session.title);
+  }
+
+  /// 面板 `d`：二次确认后删除选中会话。
+  Future<void> deleteSelectedSession() async {
+    final String? id = picker.selectedId();
+    if (id == null || !await _confirmDelete(id)) {
+      return;
+    }
+    await deleteSession(id);
+  }
+
+  Future<bool> _confirmDelete(String id) async {
+    final Future<bool> Function(String id)? hook = confirmDelete;
+    if (hook != null) {
+      return hook(id);
+    }
+    final String? answer = await choice.ask(
+      TuiChoiceRequest(
+        title: '删除会话 $id？',
+        choices: const <TuiChoice>[
+          TuiChoice(id: 'delete', label: '删除'),
+          TuiChoice(id: 'cancel', label: '取消', current: true),
+        ],
+      ),
+    );
+    return answer == 'delete';
+  }
+
+  /// 删除会话：拒绝当前会话；清 JSONL、检查点与故事线日志（不动导出文件）。
+  Future<bool> deleteSession(String id) async {
+    if (id == _sessionId) {
+      showSystemNotice('不能删除当前会话；先切换到别的会话再删。');
+      return false;
+    }
+    final bool known =
+        _sessions.get(id) != null ||
+        (await _sessions.persistedIds()).contains(id);
+    if (!known) {
+      showSystemNotice('会话 $id 不存在。');
+      return false;
+    }
+    await _sessions.remove(id);
+    await _app.get<CheckpointManager>('checkpointManager')?.clearSession(id);
+    if (storyEnabled) {
+      await _app.get<SessionLog>('sessionLog')?.remove(id);
+    }
+    transcript.add(
+      TuiRole.system,
+      '已删除会话 $id（数据与检查点已清理；导出文件保留）。',
+    );
+    if (picker.open) {
+      await picker.show(_sessionId);
+    }
+    _refresh();
+    return true;
+  }
+
   /// 确认选择：切到选中会话并关闭面板。
   Future<void> pickSelected() async {
     final String? id = picker.selectedId();
@@ -1101,6 +1213,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         openAgentPicker();
       case 'sessions':
         await openPicker();
+      case 'rename':
+        await _handleRename(arg);
       case 'session':
         if (arg.isEmpty) {
           await openPicker();

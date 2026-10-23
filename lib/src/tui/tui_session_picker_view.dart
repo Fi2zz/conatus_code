@@ -77,7 +77,7 @@ class _SessionPickerViewState extends State<SessionPickerView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
           Text(
-            '会话（↑↓ 选择，Enter 切换，Esc 关闭）',
+            '会话（↑↓ 选择，Enter 切换，r 重命名，d 删除，Esc 关闭）',
             style: TextStyle(
               color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
@@ -90,7 +90,10 @@ class _SessionPickerViewState extends State<SessionPickerView> {
               style: TextStyle(color: NavaTheme.palette.muted),
             )
           else
-            Expanded(
+            SizedBox(
+              // 面板贴在输入栏上方，父 Column 高度无界：列表按会话数取高，
+              // 超过 10 行在面板内滚动，而不是把整屏撑爆。
+              height: sessions.length.clamp(1, 10).toDouble(),
               child: ListView.builder(
                 controller: _scroll,
                 itemCount: sessions.length,
@@ -106,14 +109,18 @@ class _SessionPickerViewState extends State<SessionPickerView> {
   Component _row(TuiSessionInfo session, bool isSelected) {
     final String mark = session.id == component.currentId ? '*' : ' ';
     final String cursor = isSelected ? '>' : ' ';
-    final String detail = session.active
-        ? '${session.events} 条事件  ${timeAgo(session.updatedAt)}'
-        : '已保存';
+    final String title = session.title?.trim() ?? '';
+    final String label = title.isEmpty ? '未命名会话' : title;
+    final String detail = <String>[
+      shortSessionId(session.id),
+      timeAgo(session.updatedAt),
+      if (session.active) '${session.events} 条事件',
+    ].join(' · ');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
       color: isSelected ? NavaTheme.palette.selected : null,
       child: Text(
-        '$cursor$mark ${session.id}  $detail',
+        '$cursor$mark $label  $detail',
         style: TextStyle(
           color: isSelected
               ? NavaTheme.palette.selectedText
