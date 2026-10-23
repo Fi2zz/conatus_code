@@ -103,6 +103,12 @@ enabled = true
 debounce_seconds = 10         # 去抖窗口（秒），防连续编辑连跑
 # command = "dart analyze"    # 覆盖自动探测（默认按项目类型探测）
 
+# TUI 外观（可选）：主题 default / dark / light / tokyonight（未知值回落 default）；
+# animations 控制思考中动画等。也可在界面里用 /theme 切换（仅当前进程生效）。
+# [tui]
+# theme = "default"
+# animations = true
+
 [agent]
 # workdir = "/path/to/your/project"
 # default_agent = "build"            # 新会话默认 Agent；未知 ID 回退 build

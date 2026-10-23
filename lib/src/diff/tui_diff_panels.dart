@@ -6,15 +6,16 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import '../tui/theme/nava_theme.dart';
 import 'diff_model.dart';
 import 'tui_diff_parts.dart';
 
-const Map<TuiDiffLineKind, Color> _lineColors = <TuiDiffLineKind, Color>{
-  TuiDiffLineKind.header: Colors.brightCyan,
-  TuiDiffLineKind.context: Colors.gray,
-  TuiDiffLineKind.addition: Colors.brightGreen,
-  TuiDiffLineKind.deletion: Colors.brightRed,
-  TuiDiffLineKind.note: Colors.brightYellow,
+Map<TuiDiffLineKind, Color> get _lineColors => <TuiDiffLineKind, Color>{
+  TuiDiffLineKind.header: NavaTheme.palette.highlight,
+  TuiDiffLineKind.context: NavaTheme.palette.muted,
+  TuiDiffLineKind.addition: NavaTheme.palette.success,
+  TuiDiffLineKind.deletion: NavaTheme.palette.danger,
+  TuiDiffLineKind.note: NavaTheme.palette.warning,
 };
 
 /// 视图标题：范围、按键提示、已读计数与数据源降级说明。
@@ -44,23 +45,26 @@ class TuiDiffHeader extends StatelessComponent {
           children: <Component>[
             Text(
               '差异 · ${diffScopeLabel(scope)}',
-              style: const TextStyle(
-                color: Colors.brightBlue,
+              style: TextStyle(
+                color: NavaTheme.palette.accent,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const Spacer(),
-            Text('已读 $reviewed', style: const TextStyle(color: Colors.gray)),
+            Text(
+              '已读 $reviewed',
+              style: TextStyle(color: NavaTheme.palette.muted),
+            ),
           ],
         ),
-        const Text(
+        Text(
           'j/k 滚动 · n/p 文件 · d 切源 · m 标记 · q 关闭',
-          style: TextStyle(color: Colors.gray),
+          style: TextStyle(color: NavaTheme.palette.muted),
         ),
         if (notice != null)
           Text(
             '提示：$notice',
-            style: const TextStyle(color: Colors.brightYellow),
+            style: TextStyle(color: NavaTheme.palette.warning),
           ),
       ],
     );
@@ -94,7 +98,10 @@ class TuiDiffTreePane extends StatelessComponent {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Component>[
-        Text('文件 ${diffs.length}', style: const TextStyle(color: Colors.gray)),
+        Text(
+          '文件 ${diffs.length}',
+          style: TextStyle(color: NavaTheme.palette.muted),
+        ),
         Expanded(
           child: ListView.builder(
             controller: controller,
@@ -112,11 +119,13 @@ class TuiDiffTreePane extends StatelessComponent {
     final String mark = reviewed.contains(diff.path) ? '✓' : ' ';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: current ? const Color.fromRGB(30, 40, 60) : null,
+      color: current ? NavaTheme.palette.selected : null,
       child: Text(
         '${current ? '>' : ' '}$mark ${diffStatusMark(diff.status)} ${diff.path}',
         style: TextStyle(
-          color: current ? Colors.brightWhite : Colors.white,
+          color: current
+              ? NavaTheme.palette.selectedText
+              : NavaTheme.palette.text,
           fontWeight: current ? FontWeight.bold : FontWeight.normal,
         ),
       ),
@@ -142,8 +151,8 @@ class TuiDiffPane extends StatelessComponent {
         Text(
           '${diff.path}  ${diffStatusLabel(diff.status)}  '
           '+${diff.additions} -${diff.deletions}',
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: NavaTheme.palette.text,
             fontWeight: FontWeight.bold,
           ),
         ),

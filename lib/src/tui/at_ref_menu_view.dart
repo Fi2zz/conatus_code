@@ -4,6 +4,7 @@ library;
 import 'package:nocterm/nocterm.dart';
 
 import 'at_ref_menu.dart';
+import 'theme/nava_theme.dart';
 
 /// 文件补全视图；按键与过滤在 [AtRefMenu] / 根组件处理。
 class AtRefMenuView extends StatelessComponent {
@@ -24,8 +25,8 @@ class AtRefMenuView extends StatelessComponent {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
       decoration: BoxDecoration(
-        color: const Color.fromRGB(20, 20, 40),
-        border: BoxBorder.all(color: Colors.brightBlue),
+        color: NavaTheme.palette.panel,
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -34,7 +35,7 @@ class AtRefMenuView extends StatelessComponent {
             _row(matches[i], i == selected),
           Text(
             '(${selected + 1}/${matches.length})',
-            style: const TextStyle(color: Colors.gray),
+            style: TextStyle(color: NavaTheme.palette.muted),
           ),
         ],
       ),
@@ -44,7 +45,7 @@ class AtRefMenuView extends StatelessComponent {
   Component _row(AtRefCandidate candidate, bool isSelected) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: isSelected ? const Color.fromRGB(30, 40, 60) : null,
+      color: isSelected ? NavaTheme.palette.selected : null,
       child: Row(
         children: <Component>[
           SizedBox(
@@ -52,7 +53,9 @@ class AtRefMenuView extends StatelessComponent {
             child: Text(
               candidate.path,
               style: TextStyle(
-                color: isSelected ? Colors.brightWhite : Colors.brightCyan,
+                color: isSelected
+                    ? NavaTheme.palette.selectedText
+                    : NavaTheme.palette.highlight,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -62,7 +65,9 @@ class AtRefMenuView extends StatelessComponent {
             child: Text(
               candidate.name,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.gray,
+                color: isSelected
+                    ? NavaTheme.palette.text
+                    : NavaTheme.palette.muted,
               ),
             ),
           ),

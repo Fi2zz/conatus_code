@@ -32,6 +32,9 @@ Future<void> main(List<String> args) async {
     exit(2);
   }
 
+  // 主题是进程级全局状态：装配前落定，界面与浮层取色都用同一套 token。
+  NavaTheme.use(config.tui.theme);
+
   // headless 安全闸门（E-9）：`-p` 不装审批链，OS 沙箱是唯一防线；沙箱被
   // 显式关掉时无人值守 = 裸奔，拒绝启动（除非 --allow-unsafe-headless 显式
   // 承担风险）。always_ask 这类显式加严的审批配置在 headless 落空时也不

@@ -5,6 +5,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_permission.dart';
 import 'tui_permission_prompt.dart';
 
@@ -21,15 +22,15 @@ class TuiPermissionView extends StatelessComponent {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
-          const Text(
+          Text(
             '权限模式（↑↓ 选择，Enter 切换，Esc 关闭）',
             style: TextStyle(
-              color: Colors.brightBlue,
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -46,7 +47,7 @@ class TuiPermissionView extends StatelessComponent {
     final bool isCurrent = mode == prompt.current;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: isSelected ? const Color.fromRGB(30, 40, 60) : null,
+      color: isSelected ? NavaTheme.palette.selected : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
@@ -54,13 +55,19 @@ class TuiPermissionView extends StatelessComponent {
             '${isSelected ? '>' : ' '} ${mode.label}'
             '${isCurrent ? '  ← 当前' : ''}',
             style: TextStyle(
-              color: isSelected ? Colors.brightWhite : Colors.white,
+              color: isSelected
+                  ? NavaTheme.palette.selectedText
+                  : NavaTheme.palette.text,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           Text(
             '   ${mode.description}',
-            style: TextStyle(color: isSelected ? Colors.white : Colors.gray),
+            style: TextStyle(
+              color: isSelected
+                  ? NavaTheme.palette.text
+                  : NavaTheme.palette.muted,
+            ),
           ),
         ],
       ),

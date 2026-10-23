@@ -16,6 +16,8 @@ import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
 import 'team_snapshot.dart';
 import 'team_views.dart';
+import 'theme/nava_theme.dart';
+import 'theme/theme_view.dart';
 import 'tui_attachment.dart';
 import 'tui_choice.dart';
 import 'tui_choice_view.dart';
@@ -355,6 +357,9 @@ class _AgentTuiState extends State<AgentTui> {
     if (_onPermissionKey(event)) {
       return true;
     }
+    if (_onThemeKey(event)) {
+      return true;
+    }
     if (_onProviderKey(event)) {
       return true;
     }
@@ -442,6 +447,27 @@ class _AgentTuiState extends State<AgentTui> {
       prompt.cancel();
     } else {
       return false; // 其余按键交给搜索框（type to search）。
+    }
+    _refresh();
+    return true;
+  }
+
+  /// 主题浮层按键：↑↓ 选择、Enter 应用、Esc 取消；未打开返回 false。
+  bool _onThemeKey(KeyboardEvent event) {
+    final ThemePrompt prompt = _controller.themePrompt;
+    if (!prompt.open) {
+      return false;
+    }
+    if (event.logicalKey == LogicalKey.arrowUp) {
+      prompt.move(-1);
+    } else if (event.logicalKey == LogicalKey.arrowDown) {
+      prompt.move(1);
+    } else if (event.logicalKey == LogicalKey.enter) {
+      prompt.confirm();
+    } else if (event.logicalKey == LogicalKey.escape) {
+      prompt.cancel();
+    } else {
+      return false;
     }
     _refresh();
     return true;
@@ -827,6 +853,12 @@ class _AgentTuiState extends State<AgentTui> {
             ),
           if (_controller.permissionPrompt.open)
             TuiPermissionView(prompt: _controller.permissionPrompt),
+          if (_controller.themePrompt.open)
+            ThemeView(
+              names: _controller.themePrompt.names,
+              selected: _controller.themePrompt.index,
+              current: _controller.themePrompt.current,
+            ),
           if (_controller.planPrompt.open)
             TuiPlanView(prompt: _controller.planPrompt),
           if (_menu.open)
@@ -891,17 +923,20 @@ class _AgentTuiState extends State<AgentTui> {
   /// 浮层优先渲染：选项 / 会话面板 / 表单 / provider；无浮层返回 `null`。
   Component _body() {
     if (!_controller.ready) {
-      return const Center(
-        child: Text('正在加载会话…', style: TextStyle(color: Colors.gray)),
+      return Center(
+        child: Text(
+          '正在加载会话…',
+          style: TextStyle(color: NavaTheme.palette.muted),
+        ),
       );
     }
     final List<TuiMessage> messages = _controller.transcript.messages;
     final bool loading = _controller.busy;
     if (messages.isEmpty && !loading) {
-      return const Center(
+      return Center(
         child: Text(
           '输入文字开始对话；/help 查看命令。',
-          style: TextStyle(color: Colors.gray),
+          style: TextStyle(color: NavaTheme.palette.muted),
         ),
       );
     }

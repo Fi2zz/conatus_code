@@ -5,6 +5,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_form.dart';
 
 /// 表单浮层。
@@ -31,26 +32,26 @@ class TuiFormView extends StatelessComponent {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
           Text(
             request.title,
-            style: const TextStyle(
-              color: Colors.brightBlue,
+            style: TextStyle(
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
-          Text(request.hint, style: const TextStyle(color: Colors.gray)),
+          Text(request.hint, style: TextStyle(color: NavaTheme.palette.muted)),
           const SizedBox(height: 1),
           for (int i = 0; i < request.fields.length; i++)
             _field(request.fields[i], i == index),
           const SizedBox(height: 1),
-          const Text(
+          Text(
             'Tab / ↑↓ 切换 · Enter 下一字段 · Esc 取消',
-            style: TextStyle(color: Colors.gray),
+            style: TextStyle(color: NavaTheme.palette.muted),
           ),
         ],
       ),
@@ -63,18 +64,22 @@ class TuiFormView extends StatelessComponent {
       children: <Component>[
         Text(
           field.label,
-          style: TextStyle(color: isFocused ? Colors.brightCyan : Colors.gray),
+          style: TextStyle(
+            color: isFocused
+                ? NavaTheme.palette.highlight
+                : NavaTheme.palette.muted,
+          ),
         ),
         Row(
           children: <Component>[
-            const Text('> ', style: TextStyle(color: Colors.green)),
+            Text('> ', style: TextStyle(color: NavaTheme.palette.prompt)),
             Expanded(
               child: TextField(
                 controller: field.controller,
                 focused: isFocused,
                 obscureText: field.obscure,
                 placeholder: field.placeholder,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: NavaTheme.palette.text),
                 onKeyEvent: onKeyEvent,
               ),
             ),

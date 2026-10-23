@@ -5,6 +5,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_choice.dart';
 
 /// 选项浮层。
@@ -27,21 +28,21 @@ class TuiChoiceView extends StatelessComponent {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
           Text(
             request.title,
-            style: const TextStyle(
-              color: Colors.brightBlue,
+            style: TextStyle(
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Text(
+          Text(
             '↑↓ 选择 · Enter 确认 · Esc 取消',
-            style: TextStyle(color: Colors.gray),
+            style: TextStyle(color: NavaTheme.palette.muted),
           ),
           const SizedBox(height: 1),
           for (int i = 0; i < request.choices.length; i++)
@@ -54,7 +55,7 @@ class TuiChoiceView extends StatelessComponent {
   Component _row(TuiChoice choice, bool isSelected) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: isSelected ? const Color.fromRGB(30, 40, 60) : null,
+      color: isSelected ? NavaTheme.palette.selected : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Component>[
@@ -63,15 +64,17 @@ class TuiChoiceView extends StatelessComponent {
               Text(
                 '${isSelected ? '>' : ' '} ${choice.label}',
                 style: TextStyle(
-                  color: isSelected ? Colors.brightWhite : Colors.white,
+                  color: isSelected
+                      ? NavaTheme.palette.selectedText
+                      : NavaTheme.palette.text,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               if (choice.current) ...<Component>[
                 const Text(' '),
-                const Text(
+                Text(
                   '← 当前',
-                  style: TextStyle(color: Colors.brightYellow),
+                  style: TextStyle(color: NavaTheme.palette.warning),
                 ),
               ],
             ],
@@ -79,7 +82,7 @@ class TuiChoiceView extends StatelessComponent {
           if (choice.description.isNotEmpty)
             Text(
               '  ${choice.description}',
-              style: const TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
         ],
       ),

@@ -3,6 +3,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_message.dart';
 
 /// 思考中动画帧。
@@ -53,25 +54,32 @@ class MessageView extends StatelessComponent {
 
   @override
   Component build(BuildContext context) {
+    final Map<TuiRole, Color> messageColors = NavaTheme.palette.message;
     switch (message.role) {
       case TuiRole.user:
         return _line(
-          Text(message.text, style: const TextStyle(color: Colors.white)),
+          Text(
+            message.text,
+            style: TextStyle(color: messageColors[TuiRole.user]),
+          ),
         );
       case TuiRole.assistant:
         return _line(MarkdownText(message.text));
       case TuiRole.tool:
-        return _indent(_foldTool(message), Colors.cyan);
+        return _indent(_foldTool(message), messageColors[TuiRole.tool]!);
       case TuiRole.plan:
-        return _indent(_foldPlan(message), Colors.brightBlue);
+        return _indent(_foldPlan(message), messageColors[TuiRole.plan]!);
       case TuiRole.thinking:
-        return _indent(_foldThinking(message), Colors.brightBlack);
+        return _indent(
+          _foldThinking(message),
+          messageColors[TuiRole.thinking]!,
+        );
       case TuiRole.stage:
-        return _indent(message.text, Colors.brightBlack);
+        return _indent(message.text, messageColors[TuiRole.stage]!);
       case TuiRole.system:
-        return _indent(message.text, Colors.yellow);
+        return _indent(message.text, messageColors[TuiRole.system]!);
       case TuiRole.nav:
-        return _indent(message.text, Colors.magenta);
+        return _indent(message.text, messageColors[TuiRole.nav]!);
     }
   }
 
@@ -133,7 +141,7 @@ class LoadingView extends StatelessComponent {
       padding: const EdgeInsets.only(left: 2),
       child: Text(
         '${tuiSpinner(tick)} 思考中${tuiDots(tick)}',
-        style: const TextStyle(color: Colors.brightYellow),
+        style: TextStyle(color: NavaTheme.palette.warning),
       ),
     );
   }

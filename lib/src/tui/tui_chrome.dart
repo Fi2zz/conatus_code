@@ -3,13 +3,15 @@ library;
 
 import 'dart:io';
 import 'package:nocterm/nocterm.dart';
+import 'theme/nava_theme.dart';
 import 'tui_shell_mode.dart';
 import 'tui_views.dart';
 
-const borderSode = BorderSide(color: Colors.blue);
+BorderSide get borderSode => BorderSide(color: NavaTheme.palette.inputBorder);
 
 /// shell 模式下的输入框边框（紫色，与普通模式的蓝色区分）。
-const BorderSide kShellInputBorder = BorderSide(color: Colors.magenta);
+BorderSide get kShellInputBorder =>
+    BorderSide(color: NavaTheme.palette.shellBorder);
 
 /// 输入框最多显示的行数（超出后内部滚动；终端高度有限，不无限吃屏）。
 const int kInputMaxLines = 8;
@@ -64,8 +66,7 @@ class TuiInputBar extends StatelessComponent {
   }
 
   /// 输入框边框：shell 模式紫色（一眼区分当前在跑 shell），其余蓝色。
-  BorderSide get _border =>
-      shellMode ? kShellInputBorder : borderSode;
+  BorderSide get _border => shellMode ? kShellInputBorder : borderSode;
 
   @override
   Component build(BuildContext context) {
@@ -86,7 +87,9 @@ class TuiInputBar extends StatelessComponent {
           Text(
             shellMode ? '! ' : '> ',
             style: TextStyle(
-              color: shellMode ? Colors.brightYellow : Colors.green,
+              color: shellMode
+                  ? NavaTheme.palette.warning
+                  : NavaTheme.palette.prompt,
             ),
           ),
           Expanded(
@@ -95,7 +98,7 @@ class TuiInputBar extends StatelessComponent {
               focused: focused,
               minLines: 1,
               maxLines: kInputMaxLines,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: NavaTheme.palette.text),
               placeholder: _placeholder(),
               onSubmitted: onSubmitted,
               onKeyEvent: onKeyEvent,
@@ -238,7 +241,7 @@ class TuiStatusBar extends StatelessComponent {
                 permissionLabel,
                 maxLines: 1,
                 softWrap: false,
-                style: const TextStyle(color: Colors.brightYellow),
+                style: TextStyle(color: NavaTheme.palette.warning),
               ),
             Text(
               permissionLabel.isEmpty ? modelLabel : '   $modelLabel',
@@ -250,13 +253,17 @@ class TuiStatusBar extends StatelessComponent {
         Expanded(
           child: showHint
               ? Padding(
-                  padding: EdgeInsets.symmetric(horizontal: _kSegmentGap.toDouble()),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: _kSegmentGap.toDouble(),
+                  ),
                   child: Text(
                     hint,
                     maxLines: 1,
                     softWrap: false,
                     style: TextStyle(
-                      color: busy ? Colors.brightYellow : Colors.gray,
+                      color: busy
+                          ? NavaTheme.palette.warning
+                          : NavaTheme.palette.muted,
                     ),
                   ),
                 )
@@ -266,7 +273,7 @@ class TuiStatusBar extends StatelessComponent {
           showRight ? _rightText() : '',
           maxLines: 1,
           softWrap: false,
-          style: const TextStyle(color: Colors.gray),
+          style: TextStyle(color: NavaTheme.palette.muted),
         ),
       ],
     );

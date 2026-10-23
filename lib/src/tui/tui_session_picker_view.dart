@@ -5,6 +5,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_session_picker.dart';
 import 'tui_views.dart';
 
@@ -70,23 +71,23 @@ class _SessionPickerViewState extends State<SessionPickerView> {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
-          const Text(
+          Text(
             '会话（↑↓ 选择，Enter 切换，Esc 关闭）',
             style: TextStyle(
-              color: Colors.brightBlue,
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 1),
           if (sessions.isEmpty)
-            const Text(
+            Text(
               '暂无会话；直接输入开始对话，或 /new 开一个。',
-              style: TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             )
           else
             Expanded(
@@ -110,11 +111,13 @@ class _SessionPickerViewState extends State<SessionPickerView> {
         : '已保存';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: isSelected ? const Color.fromRGB(30, 40, 60) : null,
+      color: isSelected ? NavaTheme.palette.selected : null,
       child: Text(
         '$cursor$mark ${session.id}  $detail',
         style: TextStyle(
-          color: isSelected ? Colors.brightWhite : Colors.white,
+          color: isSelected
+              ? NavaTheme.palette.selectedText
+              : NavaTheme.palette.text,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),

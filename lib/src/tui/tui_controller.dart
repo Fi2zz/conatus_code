@@ -58,6 +58,8 @@ import 'at_ref.dart';
 import 'session_exporter.dart';
 import 'team_snapshot.dart';
 import 'team_subscription.dart';
+import 'theme/nava_theme.dart';
+import 'theme/theme_view.dart';
 import 'trace_renderer.dart';
 import 'transcript.dart';
 import 'tui_attachment.dart';
@@ -329,6 +331,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   late final TuiPermissionPrompt permissionPrompt = TuiPermissionPrompt(
     onChanged: _refresh,
   );
+
+  /// 主题选择浮层（`/theme` 打开；↑↓ 选择，Enter 应用）。
+  late final ThemePrompt themePrompt = ThemePrompt(onChanged: _refresh);
 
   /// Plan Mode 面板浮层（`/plan`）。
   late final TuiPlanPrompt planPrompt = TuiPlanPrompt(onChanged: _refresh);
@@ -703,6 +708,12 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     _diffScope = scope;
     unawaited(_loadDiff().then((_) => _refresh()));
+  }
+
+  /// 切换 TUI 主题并通知界面重绘；未知名字由 [NavaTheme] 回落 `default`。
+  void setTheme(String name) {
+    NavaTheme.use(name);
+    _refresh();
   }
 
   /// 关闭 `/diff` 视图，丢弃当前数据与降级说明。
@@ -1089,6 +1100,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleProvider(arg);
       case 'permission':
         await _handlePermission();
+      case 'theme':
+        await _handleTheme();
       case 'plan':
         _openPlanPanel();
       case 'goal':
@@ -2545,6 +2558,17 @@ class ConatusTuiController implements TuiUserPromptHost {
     } on TeamException catch (e) {
       transcript.add(TuiRole.system, '任务操作失败：${e.message}');
     }
+  }
+
+  /// `/theme`：打开主题浮层，选中后立即应用（仅当前进程生效）。
+  Future<void> _handleTheme() async {
+    final String? name = await themePrompt.choose();
+    if (name == null) {
+      transcript.add(TuiRole.system, '已取消主题切换。');
+      return;
+    }
+    setTheme(name);
+    transcript.add(TuiRole.system, '已切换到「$name」主题。');
   }
 
   /// `/permission`：打开权限模式选择面板（不经模型）。

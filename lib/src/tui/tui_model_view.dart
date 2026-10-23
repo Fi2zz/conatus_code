@@ -5,15 +5,12 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_model.dart';
 
 /// 模型选择浮层。
 class TuiModelView extends StatelessComponent {
-  const TuiModelView({
-    super.key,
-    required this.prompt,
-    this.onKeyEvent,
-  });
+  const TuiModelView({super.key, required this.prompt, this.onKeyEvent});
 
   /// 浮层状态。
   final TuiModelPrompt prompt;
@@ -32,34 +29,34 @@ class TuiModelView extends StatelessComponent {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
-          const Text(
+          Text(
             'Select a model',
             style: TextStyle(
-              color: Colors.brightBlue,
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Text(
+          Text(
             'Tab 切换提供商 · ↑↓ 选择 · Esc 取消',
-            style: TextStyle(color: Colors.gray),
+            style: TextStyle(color: NavaTheme.palette.muted),
           ),
           _providerTabs(),
           _search(),
           const SizedBox(height: 1),
           if (matches.isEmpty)
-            const Text('（无匹配模型）', style: TextStyle(color: Colors.gray))
+            Text('（无匹配模型）', style: TextStyle(color: NavaTheme.palette.muted))
           else
             for (int i = start; i < end; i++)
               _row(matches[i], i == prompt.index),
           if (end < matches.length)
             Text(
               '▼ 还有 ${matches.length - end} 个',
-              style: const TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
         ],
       ),
@@ -71,23 +68,24 @@ class TuiModelView extends StatelessComponent {
     return Row(
       children: <Component>[
         _tab('All', prompt.providerFilter == null),
-        for (final String name in prompt.providers) _tab(name, prompt.providerFilter == name),
+        for (final String name in prompt.providers)
+          _tab(name, prompt.providerFilter == name),
       ],
     );
   }
 
   Component _tab(String label, bool active) => Text(
-        active ? '[$label] ' : '$label  ',
-        style: TextStyle(
-          color: active ? Colors.brightYellow : Colors.gray,
-          fontWeight: active ? FontWeight.bold : FontWeight.normal,
-        ),
-      );
+    active ? '[$label] ' : '$label  ',
+    style: TextStyle(
+      color: active ? NavaTheme.palette.warning : NavaTheme.palette.muted,
+      fontWeight: active ? FontWeight.bold : FontWeight.normal,
+    ),
+  );
 
   Component _search() {
     return Row(
       children: <Component>[
-        const Text('> ', style: TextStyle(color: Colors.green)),
+        Text('> ', style: TextStyle(color: NavaTheme.palette.prompt)),
         Expanded(
           child: TextField(
             // 稳定 key：搜索触发重建时保持元素身份，否则焦点丢失。
@@ -95,7 +93,7 @@ class TuiModelView extends StatelessComponent {
             controller: prompt.search,
             focused: true,
             placeholder: '输入过滤模型名',
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: NavaTheme.palette.text),
             onKeyEvent: onKeyEvent,
             onChanged: prompt.setQuery,
           ),
@@ -110,7 +108,7 @@ class TuiModelView extends StatelessComponent {
         : '';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: isSelected ? const Color.fromRGB(30, 40, 60) : null,
+      color: isSelected ? NavaTheme.palette.selected : null,
       child: Row(
         children: <Component>[
           SizedBox(
@@ -118,7 +116,9 @@ class TuiModelView extends StatelessComponent {
             child: Text(
               '${isSelected ? '>' : ' '} ${item.model}',
               style: TextStyle(
-                color: isSelected ? Colors.brightWhite : Colors.white,
+                color: isSelected
+                    ? NavaTheme.palette.selectedText
+                    : NavaTheme.palette.text,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -127,15 +127,22 @@ class TuiModelView extends StatelessComponent {
           Expanded(
             child: Text(
               item.provider,
-              style: TextStyle(color: isSelected ? Colors.white : Colors.gray),
+              style: TextStyle(
+                color: isSelected
+                    ? NavaTheme.palette.text
+                    : NavaTheme.palette.muted,
+              ),
             ),
           ),
           if (item.vision)
-            const Text('图 ', style: TextStyle(color: Colors.brightGreen)),
+            Text('图 ', style: TextStyle(color: NavaTheme.palette.success)),
           if (contextLabel.isNotEmpty)
-            Text(contextLabel, style: const TextStyle(color: Colors.gray)),
+            Text(
+              contextLabel,
+              style: TextStyle(color: NavaTheme.palette.muted),
+            ),
           if (item.current)
-            const Text(' ← 当前', style: TextStyle(color: Colors.brightYellow)),
+            Text(' ← 当前', style: TextStyle(color: NavaTheme.palette.warning)),
         ],
       ),
     );

@@ -10,6 +10,7 @@ import 'package:nocterm/nocterm.dart';
 
 import '../subagent/swarm_member.dart';
 import 'team_snapshot.dart';
+import 'theme/nava_theme.dart';
 
 /// 成员状态图标与文案。
 (String, String) memberStatusDisplay(TeammateStatus status) {
@@ -59,16 +60,18 @@ class TeamStatusBar extends StatelessComponent {
     ];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: const BoxDecoration(
-        color: Color.fromRGB(0, 20, 40),
-        border: BoxBorder(top: BorderSide(color: Colors.cyan)),
+      decoration: BoxDecoration(
+        color: NavaTheme.palette.background,
+        border: BoxBorder(
+          top: BorderSide(color: NavaTheme.palette.info),
+        ),
       ),
       child: Row(
         children: <Component>[
           Expanded(
             child: Text(
               ' ${parts.join(' | ')}',
-              style: const TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
           ),
         ],
@@ -102,12 +105,12 @@ class MemberCard extends StatelessComponent {
           if (currentTask != null)
             Text(
               '  任务: ${currentTask.description}',
-              style: const TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
           if (member.status == TeammateStatus.waiting)
-            const Text(
+            Text(
               '  等待依赖完成',
-              style: TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
         ],
       ),
@@ -140,13 +143,13 @@ class TaskRow extends StatelessComponent {
           if (assignee != null)
             Text(
               '  负责: ${assignee.name}',
-              style: const TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
           if (task.dependsOn.isNotEmpty &&
               task.status == TeamTaskStatus.pending)
             Text(
               '  依赖: ${task.dependsOn.join(', ')}',
-              style: const TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
         ],
       ),
@@ -202,7 +205,7 @@ class MemberLaneView extends StatelessComponent {
     return Text(
       '$icon ${mate.name}  [$status]',
       style: TextStyle(
-        color: lane.active ? Colors.cyan : Colors.gray,
+        color: lane.active ? NavaTheme.palette.info : NavaTheme.palette.muted,
         fontWeight: FontWeight.bold,
       ),
     );
@@ -212,7 +215,7 @@ class MemberLaneView extends StatelessComponent {
   Component _swarmHeader() => Text(
         '◆ $id',
         style: TextStyle(
-          color: lane.active ? Colors.cyan : Colors.gray,
+          color: lane.active ? NavaTheme.palette.info : NavaTheme.palette.muted,
           fontWeight: FontWeight.bold,
         ),
       );
@@ -220,7 +223,9 @@ class MemberLaneView extends StatelessComponent {
   /// 泳道头：正在跑的成员亮一点，静默的用暗色。
   Component _line(TeamActivityLine line) => Text(
         '  ${line.text}',
-        style: TextStyle(color: line.failed ? Colors.red : Colors.gray),
+        style: TextStyle(
+          color: line.failed ? NavaTheme.palette.error : NavaTheme.palette.muted,
+        ),
       );
 
   /// 只留最后 N 行，活动的最新一条永远可见。
@@ -243,9 +248,9 @@ class TeamView extends StatelessComponent {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Component>[
-          const Text(
+          Text(
             '团队泳道（Esc 或 Ctrl+T 返回对话；/team interrupt <成员> 中断）',
-            style: TextStyle(color: Colors.cyan),
+            style: TextStyle(color: NavaTheme.palette.info),
           ),
           const SizedBox(height: 1),
           for (final Teammate member in snapshot.members)
@@ -261,9 +266,12 @@ class TeamView extends StatelessComponent {
               MemberLaneView(id: e.key, lane: e.value),
           if (snapshot.tasks.isNotEmpty) ...<Component>[
             const SizedBox(height: 1),
-            const Text(
+            Text(
               '任务板',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: NavaTheme.palette.text,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             for (final TeamTask task in snapshot.tasks)
               TaskRow(task: task, members: snapshot.members),

@@ -5,6 +5,7 @@ import 'package:nocterm/nocterm.dart';
 
 import '../agents/agent_definition.dart';
 import '../agents/agent_picker.dart';
+import 'theme/nava_theme.dart';
 
 /// Agent 选择面板视图。
 class AgentPickerView extends StatelessComponent {
@@ -19,21 +20,24 @@ class AgentPickerView extends StatelessComponent {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
-          const Text(
+          Text(
             'Agent（↑↓ 选择，Enter 切换，Esc 关闭）',
             style: TextStyle(
-              color: Colors.brightBlue,
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 1),
           if (picker.list.isEmpty)
-            const Text('没有可用的 Agent。', style: TextStyle(color: Colors.gray))
+            Text(
+              '没有可用的 Agent。',
+              style: TextStyle(color: NavaTheme.palette.muted),
+            )
           else
             for (int at = 0; at < picker.list.length; at++)
               _row(picker.list[at], at == picker.index),
@@ -56,13 +60,15 @@ class AgentPickerView extends StatelessComponent {
         : '  ${agent.description}$mode';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: selected ? const Color.fromRGB(30, 40, 60) : null,
+      color: selected ? NavaTheme.palette.selected : null,
       child: Text(
         '$cursor$mark ${agent.id}$description',
         style: TextStyle(
           color: usable
-              ? (selected ? Colors.brightWhite : Colors.white)
-              : Colors.gray,
+              ? (selected
+                    ? NavaTheme.palette.selectedText
+                    : NavaTheme.palette.text)
+              : NavaTheme.palette.muted,
           fontWeight: selected ? FontWeight.bold : FontWeight.normal,
         ),
       ),

@@ -60,6 +60,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '打开权限模式选择面板（始终询问 / 按需询问 / 从不询问）',
   ),
   TuiCommand(
+    name: 'theme',
+    description: '切换 TUI 主题（default / dark / light / tokyonight）',
+  ),
+  TuiCommand(
     name: 'plan',
     description: '进入 / 退出 Plan Mode（先规划，经 exit_plan_mode 提交后执行）',
   ),

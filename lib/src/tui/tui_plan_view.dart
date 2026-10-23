@@ -6,6 +6,7 @@ library;
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_plan.dart';
 
 /// Plan Mode 面板。
@@ -22,21 +23,21 @@ class TuiPlanView extends StatelessComponent {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Component>[
-          const Text(
+          Text(
             'Plan Mode',
             style: TextStyle(
-              color: Colors.brightBlue,
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Text(
+          Text(
             'Enter 进入/退出 · Esc 关闭',
-            style: TextStyle(color: Colors.gray),
+            style: TextStyle(color: NavaTheme.palette.muted),
           ),
           const SizedBox(height: 1),
           Row(
@@ -45,7 +46,9 @@ class TuiPlanView extends StatelessComponent {
               Text(
                 prompt.active ? '● 已激活' : '○ 未激活',
                 style: TextStyle(
-                  color: prompt.active ? Colors.brightGreen : Colors.gray,
+                  color: prompt.active
+                      ? NavaTheme.palette.success
+                      : NavaTheme.palette.muted,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -53,20 +56,22 @@ class TuiPlanView extends StatelessComponent {
           ),
           const SizedBox(height: 1),
           if (plan == null)
-            const Text(
+            Text(
               '尚未写入计划（激活后模型会经 plan_write 写入）。',
-              style: TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             )
           else ...<Component>[
             Text(
               '计划：${plan.goal}',
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: NavaTheme.palette.text),
             ),
             for (int i = 0; i < plan.steps.length; i++)
               Text(
                 '  ${plan.steps[i].done ? '✓' : '☐'} ${i + 1}. ${plan.steps[i].text}',
                 style: TextStyle(
-                  color: plan.steps[i].done ? Colors.gray : Colors.white,
+                  color: plan.steps[i].done
+                      ? NavaTheme.palette.muted
+                      : NavaTheme.palette.text,
                 ),
               ),
           ],

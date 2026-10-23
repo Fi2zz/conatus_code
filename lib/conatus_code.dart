@@ -120,6 +120,7 @@ export 'src/config/config_schema.dart'
         ServiceConfig,
         StoryConfig,
         ThinkingConfig,
+        TuiConfig,
         XerjConfig;
 export 'src/config/config_writer.dart'
     show

@@ -542,6 +542,17 @@ class LoopControlConfig {
   final int reservedContextSize;
 }
 
+/// TUI 外观配置；对应 `[tui]` 表。
+class TuiConfig {
+  const TuiConfig({this.theme = 'default', this.animations = true});
+
+  /// 主题名（`default` / `dark` / `light` / `tokyonight`；未知回落到 `default`）。
+  final String theme;
+
+  /// 是否启用动画（思考中 spinner 等）。
+  final bool animations;
+}
+
 /// 完整配置。
 class ConatusCodeConfig {
   const ConatusCodeConfig({
@@ -565,6 +576,7 @@ class ConatusCodeConfig {
     this.story = const StoryConfig(),
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
+    this.tui = const TuiConfig(),
     this.defaultPlanMode = false,
     this.extraSkillDirs = const <String>[],
     this.mergeAllSkills = false,
@@ -624,6 +636,9 @@ class ConatusCodeConfig {
 
   /// `[loop_control]` 表。
   final LoopControlConfig loopControl;
+
+  /// `[tui]` 表。
+  final TuiConfig tui;
 
   /// 顶层 `default_plan_mode`：启动时默认进入 Plan Mode。
   final bool defaultPlanMode;

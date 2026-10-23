@@ -38,6 +38,7 @@ class ConfigParser extends ConfigValues {
     story: _readStory(),
     background: _readBackground(),
     loopControl: _readLoopControl(),
+    tui: _readTui(),
     defaultPlanMode: readBool(raw, 'default_plan_mode', false),
     extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
     mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
@@ -473,6 +474,14 @@ class ConfigParser extends ConfigValues {
         'reserved_context_size',
         50000,
       ),
+    );
+  }
+
+  TuiConfig _readTui() {
+    final Map<String, dynamic> table = readTable('tui');
+    return TuiConfig(
+      theme: readString(table, 'theme') ?? 'default',
+      animations: readBool(table, 'animations', true),
     );
   }
 

@@ -5,6 +5,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import '../tui/theme/nava_theme.dart';
 import 'diff_model.dart';
 import 'tui_diff_panels.dart';
 import 'tui_diff_parts.dart';
@@ -149,7 +150,7 @@ class _TuiDiffViewState extends State<TuiDiffView> {
         margin: const EdgeInsets.all(1),
         padding: const EdgeInsets.all(1),
         decoration: BoxDecoration(
-          border: BoxBorder.all(color: Colors.brightBlue),
+          border: BoxBorder.all(color: NavaTheme.palette.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -174,7 +175,7 @@ class _TuiDiffViewState extends State<TuiDiffView> {
       return Center(
         child: Text(
           diffEmptyMessage(_scope),
-          style: const TextStyle(color: Colors.gray),
+          style: TextStyle(color: NavaTheme.palette.muted),
         ),
       );
     }

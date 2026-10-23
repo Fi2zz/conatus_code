@@ -5,6 +5,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'theme/nava_theme.dart';
 import 'tui_provider.dart';
 
 /// provider 浮层。
@@ -35,22 +36,21 @@ class TuiProviderView extends StatelessComponent {
       margin: const EdgeInsets.all(1),
       padding: const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        border: BoxBorder.all(color: Colors.brightBlue),
+        border: BoxBorder.all(color: NavaTheme.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.brightBlue,
+            style: TextStyle(
+              color: NavaTheme.palette.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
-          Text(hint, style: const TextStyle(color: Colors.gray)),
+          Text(hint, style: TextStyle(color: NavaTheme.palette.muted)),
           const SizedBox(height: 1),
-          for (int i = 0; i < items.length; i++)
-            _row(items[i], i == selected),
+          for (int i = 0; i < items.length; i++) _row(items[i], i == selected),
         ],
       ),
     );
@@ -59,7 +59,7 @@ class TuiProviderView extends StatelessComponent {
   Component _row(TuiProviderItem item, bool isSelected) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      color: isSelected ? const Color.fromRGB(30, 40, 60) : null,
+      color: isSelected ? NavaTheme.palette.selected : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Component>[
@@ -68,20 +68,25 @@ class TuiProviderView extends StatelessComponent {
               Text(
                 '${isSelected ? '>' : ' '} ${item.label}',
                 style: TextStyle(
-                  color: isSelected ? Colors.brightWhite : Colors.white,
+                  color: isSelected
+                      ? NavaTheme.palette.selectedText
+                      : NavaTheme.palette.text,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
               if (item.current) ...<Component>[
                 const Text(' '),
-                const Text('← 当前', style: TextStyle(color: Colors.brightYellow)),
+                Text(
+                  '← 当前',
+                  style: TextStyle(color: NavaTheme.palette.warning),
+                ),
               ],
             ],
           ),
           if (item.baseUrl.isNotEmpty)
             Text(
               '    ${item.baseUrl}',
-              style: const TextStyle(color: Colors.gray),
+              style: TextStyle(color: NavaTheme.palette.muted),
             ),
         ],
       ),
