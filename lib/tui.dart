@@ -14,6 +14,8 @@ library;
 export 'package:nocterm/nocterm.dart' hide isEmpty, isNotEmpty;
 
 export 'src/diff/tui_diff_view.dart' show TuiDiffView;
+export 'src/tabs/tab_bar.dart' show TabBar;
+export 'src/tabs/tab_manager.dart' show SessionTab, TabManager, kTabCap;
 export 'src/tui/ask_user_tool.dart'
     show
         AskUserTool,

@@ -18,6 +18,7 @@ abstract final class KeyActions {
   static const String theme = 'theme.switch';
   static const String tabNext = 'tab.next';
   static const String tabPrevious = 'tab.previous';
+  static const String tabClose = 'tab.close';
 
   /// `/keybinds` 的展示顺序。
   static const List<String> ordered = <String>[
@@ -32,6 +33,7 @@ abstract final class KeyActions {
     theme,
     tabNext,
     tabPrevious,
+    tabClose,
   ];
 
   /// 已知动作集合（未知 ID 只告警、不生效）。
@@ -51,6 +53,7 @@ const Map<String, String> kDefaultKeybinds = <String, String>{
   KeyActions.theme: '<leader>t',
   KeyActions.tabNext: 'ctrl+tab',
   KeyActions.tabPrevious: 'ctrl+shift+tab',
+  KeyActions.tabClose: '<leader>w',
   'leader': 'ctrl+x',
 };
 

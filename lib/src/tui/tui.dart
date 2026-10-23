@@ -11,6 +11,7 @@ import 'package:conatus_llm/conatus_llm.dart';
 import 'package:nocterm/nocterm.dart';
 
 import '../diff/tui_diff_view.dart';
+import '../tabs/tab_bar.dart';
 import 'agent_picker_view.dart';
 import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
@@ -82,6 +83,8 @@ class _AgentTuiState extends State<AgentTui> {
   void initState() {
     super.initState();
     _controller.onChanged = _refresh;
+    _controller.onTabLeave = _saveTabScroll;
+    _controller.onTabRestore = _restoreTabScroll;
     // /team 无参数时切视图；重复进同一视图会「切不回来」，故显式置位。
     _controller.onOpenTeamView = () => setState(() {
       _view = _view == ViewMode.team ? ViewMode.chat : ViewMode.team;
@@ -111,6 +114,8 @@ class _AgentTuiState extends State<AgentTui> {
     _keys.dispose();
     _controller
       ..onChanged = null
+      ..onTabLeave = null
+      ..onTabRestore = null
       ..onOpenTeamView = null
       ..dispose();
     _input
@@ -353,8 +358,12 @@ class _AgentTuiState extends State<AgentTui> {
         _openPalette();
       case KeyActions.theme:
         unawaited(_controller.handleLine('/theme'));
-      case KeyActions.tabNext || KeyActions.tabPrevious:
-        _toggleView();
+      case KeyActions.tabNext:
+        unawaited(_controller.activateNextTab());
+      case KeyActions.tabPrevious:
+        unawaited(_controller.activatePreviousTab());
+      case KeyActions.tabClose:
+        unawaited(_controller.closeActiveTab());
     }
   }
 
@@ -897,6 +906,22 @@ class _AgentTuiState extends State<AgentTui> {
     });
   }
 
+  /// 离开标签前记录聊天滚动位置（切换成功后由 [_restoreTabScroll] 恢复）。
+  void _saveTabScroll() {
+    if (_controller.ready) {
+      _controller.tabs.saveScroll(_scroll.offset);
+    }
+  }
+
+  /// 切回标签后恢复滚动位置：等目标会话内容完成布局再跳。
+  void _restoreTabScroll(double offset) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _scroll.jumpTo(offset);
+      }
+    });
+  }
+
   @override
   Component build(BuildContext context) {
     return Focusable(
@@ -910,6 +935,13 @@ class _AgentTuiState extends State<AgentTui> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
+          TabBar(
+            tabs: _controller.tabs.tabs,
+            active: _controller.tabs.active,
+            closeHint: _controller.keymap
+                .labelsFor(KeyActions.tabClose)
+                .join(', '),
+          ),
           Expanded(
             child: _view == ViewMode.chat
                 ? (_controller.diffOpen ? _diffView() : _body())

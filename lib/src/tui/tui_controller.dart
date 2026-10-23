@@ -52,6 +52,7 @@ import '../story/story_pending.dart';
 import '../story/story_render.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
+import '../tabs/tab_manager.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
@@ -389,6 +390,15 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 会话选择面板。
   late final TuiSessionPicker picker;
 
+  /// 会话标签（视图态单活：同一时刻只有一个会话绑定 Agent Loop）。
+  final TabManager tabs = TabManager();
+
+  /// 离开当前标签前保存聊天滚动位置（由视图注入）。
+  void Function()? onTabLeave;
+
+  /// 切换完成后恢复目标标签的滚动位置（由视图注入）。
+  void Function(double offset)? onTabRestore;
+
   /// 状态变化通知（组件据此 `setState`）。
   void Function()? onChanged;
 
@@ -618,7 +628,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (_sessionId.isEmpty) {
       _sessionId = _sessions.create().id;
     }
-    await _bind(_sessionId);
+    await _bindStartup(_sessionId);
+    _syncTabState();
     _addKeybindWarnings();
     _refresh();
     // 回填当前模型的上下文窗口（来自 models.dev 档案，未就绪则稍后补）。
@@ -630,6 +641,40 @@ class ConatusTuiController implements TuiUserPromptHost {
         providerPrompt.show(providerItems(registry));
       }
     }
+  }
+
+  /// 绑定启动会话；读取失败（JSONL 损坏）时换一个新会话并提示。
+  Future<void> _bindStartup(String id) async {
+    try {
+      await _bind(id);
+    } catch (error) {
+      _sessionId = _sessions.create().id;
+      await _bind(_sessionId);
+      transcript.add(
+        TuiRole.system,
+        '会话 $id 读取失败（数据可能损坏），已改开新会话 $_sessionId：$error',
+      );
+    }
+  }
+
+  /// 把当前绑定的会话同步到标签：已存在则更新标题并激活，否则新开一个。
+  void _syncTabState() {
+    final String id = _sessionId;
+    if (id.isEmpty) return;
+    final String title = _tabTitle(_session);
+    final int existing = tabs.indexOf(id);
+    if (existing >= 0) {
+      tabs.retitle(id, title);
+      tabs.activate(existing);
+      return;
+    }
+    tabs.open(id, title: title);
+  }
+
+  /// 标签标题：优先会话标题，旧会话回退首条用户消息（与面板一致）。
+  String _tabTitle(Session? session) {
+    if (session == null) return '';
+    return session.title ?? deriveSessionTitle(session.events) ?? '';
   }
 
   /// 把键位配置的告警（未知动作 / 非法键位 / 冲突）上屏。
@@ -1081,6 +1126,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       final Session session = opened ?? await _sessions.open(id);
       session.rename(title);
       await _sessions.flush();
+      tabs.retitle(id, session.title ?? '');
       transcript.add(TuiRole.system, '已将会话 $id 重命名为「${session.title}」。');
       // 面板里的行是不可变快照：改名后按原选中项重读，别跳到当前会话。
       if (picker.open) {
@@ -1184,6 +1230,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     });
     errors.addAll(await _clearSessionArtifacts(id));
     if (errors.isEmpty) {
+      _dropDeletedTab(id);
       transcript.add(TuiRole.system, '已删除会话 $id（数据与检查点已清理；导出文件保留）。');
     } else {
       showSystemNotice('删除会话 $id 未完全成功：${errors.join('；')}');
@@ -1193,6 +1240,14 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     _refresh();
     return errors.isEmpty;
+  }
+
+  /// 删除会话后清掉它的标签（当前会话禁止删除，故只会是非活跃标签）。
+  void _dropDeletedTab(String id) {
+    final int index = tabs.indexOf(id);
+    if (index >= 0 && index != tabs.active) {
+      tabs.close(index);
+    }
   }
 
   /// 清检查点与故事线日志；每步独立捕获，返回失败说明。
@@ -1240,7 +1295,16 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// busy（有在途轮次）时拒绝并返回 `false`：此时释放会话子上下文会把正在
   /// 跑的 Agent Loop 从脚下抽走，`/undo`、`/redo` 这类编排也据此判定未生效。
   /// 撤销/重做自身（[_revertInFlight]）不受此限——它就是那条编排。
-  Future<bool> switchSession(String id, {String? announce}) async {
+  Future<bool> switchSession(String id, {String? announce}) =>
+      _switchSession(id, announce: announce, saveTabScroll: true);
+
+  /// 切换会话的实现；[saveTabScroll] 为 `false` 时由调用方已保存滚动位置
+  /// （关闭活跃标签后目标标签的偏移不能被当前会话的位置覆盖）。
+  Future<bool> _switchSession(
+    String id, {
+    String? announce,
+    required bool saveTabScroll,
+  }) async {
     if (busy && !_revertInFlight) {
       transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
       _refresh();
@@ -1256,6 +1320,12 @@ class ConatusTuiController implements TuiUserPromptHost {
       _refresh();
       return false;
     }
+    if (!_canOpenTab(id)) {
+      showSystemNotice('最多 $kTabCap 个标签；先关闭一个标签再打开新会话。');
+      return false;
+    }
+    final String previous = _sessionId;
+    if (saveTabScroll) onTabLeave?.call();
     // 显式切会话即放弃撤销点：`RevertStage` 跨会话存活会让用户在别的会话里
     // `/redo`，用另一个会话的快照覆盖当前工作区（撤销后新建的文件会被删）。
     // `/undo` / `/redo` 自身在切换后重新设置 / 清空它，不受影响。
@@ -1263,7 +1333,13 @@ class ConatusTuiController implements TuiUserPromptHost {
     _prefill = null;
     _unbind();
     _sessionId = id;
-    await _bind(id);
+    try {
+      await _bind(id);
+    } catch (error) {
+      return _recoverSession(previous, id, error);
+    }
+    _syncTabState();
+    _restoreActiveScroll();
     transcript.add(
       TuiRole.system,
       announce ?? '已切换到会话 $_sessionId（数据文件：$_sessionId.jsonl）。',
@@ -1272,10 +1348,109 @@ class ConatusTuiController implements TuiUserPromptHost {
     return true;
   }
 
+  /// 目标会话读取失败（JSONL 损坏等）：回绑原会话并留在原标签。
+  Future<bool> _recoverSession(
+    String previous,
+    String failedId,
+    Object error,
+  ) async {
+    _unbind();
+    _sessionId = previous;
+    try {
+      await _bind(previous);
+    } catch (_) {
+      // 原会话也读不出来：退到全新会话，至少控制器保持可用。
+      _sessionId = _sessions.create().id;
+      await _bind(_sessionId);
+    }
+    _syncTabState();
+    _restoreActiveScroll();
+    showSystemNotice('会话 $failedId 读取失败（数据可能损坏），已留在会话 $_sessionId：$error');
+    return false;
+  }
+
+  /// 目标标签有保存过的滚动位置时才恢复（新标签保持自动到底部）。
+  void _restoreActiveScroll() {
+    if (tabs.activeScrollSaved) {
+      onTabRestore?.call(tabs.restoreScroll());
+    }
+  }
+
+  /// 是否还能为 [id] 开标签（已打开的不占新名额）。
+  bool _canOpenTab(String id) => tabs.contains(id) || tabs.canAdd;
+
+  /// 激活指定标签；切换被 busy 拒绝时返回 `false`。
+  Future<bool> activateTab(int index) async {
+    if (index < 0 || index >= tabs.tabs.length) return false;
+    if (index == tabs.active) return true;
+    return switchSession(tabs.tabs[index].sessionId);
+  }
+
+  /// 切到下一个标签（循环）。
+  Future<bool> activateNextTab() => _stepTab(1);
+
+  /// 切到上一个标签（循环）。
+  Future<bool> activatePreviousTab() => _stepTab(-1);
+
+  Future<bool> _stepTab(int delta) {
+    final int count = tabs.tabs.length;
+    if (count < 2) return Future<bool>.value(false);
+    final int next = (tabs.active + delta + count) % count;
+    return activateTab(next);
+  }
+
+  /// 关闭当前标签。
+  Future<bool> closeActiveTab() => closeTab(tabs.active);
+
+  /// 关闭标签：只移除视图态，不删除会话数据。
+  Future<bool> closeTab(int index) async {
+    if (index < 0 || index >= tabs.tabs.length) return false;
+    final bool removingActive = index == tabs.active;
+    if (removingActive && (busy || _revertInFlight)) {
+      showSystemNotice('有在途轮次，请稍候再试。');
+      return false;
+    }
+    final String removed = tabs.tabs[index].sessionId;
+    if (removingActive) onTabLeave?.call();
+    tabs.close(index);
+    if (!removingActive) {
+      _refresh();
+      return true;
+    }
+    return _switchAfterClose(removed);
+  }
+
+  /// 关闭活跃标签后切到邻居；关掉最后一个时开一个新会话补位。
+  Future<bool> _switchAfterClose(String removed) async {
+    if (tabs.tabs.isEmpty) {
+      final Session session = _sessions.create();
+      return _switchSession(
+        session.id,
+        announce: '已关闭最后一个标签，开启新会话 ${session.id}。',
+        saveTabScroll: false,
+      );
+    }
+    final String target = tabs.tabs[tabs.active].sessionId;
+    final bool switched = await _switchSession(
+      target,
+      announce: '已关闭标签 $removed，切到会话 $target。',
+      saveTabScroll: false,
+    );
+    if (!switched) {
+      _syncTabState();
+      _refresh();
+    }
+    return switched;
+  }
+
   /// 开启新会话。
   Future<void> newSession() async {
     if (busy || _revertInFlight) {
       showSystemNotice('有操作进行中，请稍候再试。');
+      return;
+    }
+    if (!tabs.canAdd) {
+      showSystemNotice('最多 $kTabCap 个标签；先关闭一个标签再开新会话。');
       return;
     }
     final Session session = _sessions.create();

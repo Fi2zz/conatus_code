@@ -113,7 +113,7 @@ debounce_seconds = 10         # 去抖窗口（秒），防连续编辑连跑
 # <leader> 开头为两段式：先按 leader，2 秒内再按后续键。
 # 动作：app.exit / app.clear / help.show / session.new / session.list /
 #       model.list / agent.list / command.palette / theme.switch /
-#       tab.next / tab.previous
+#       tab.next / tab.previous / tab.close
 # 视图内按键（浮层 / diff / Ctrl+T / Ctrl+O）保持内置，不在此配置。
 # [keybinds]
 # leader = "ctrl+x"
