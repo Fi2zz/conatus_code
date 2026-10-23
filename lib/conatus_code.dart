@@ -83,6 +83,7 @@ export 'src/commands/command_expander.dart'
 export 'src/commands/command_parser.dart'
     show CommandParseResult, parseCommandDocument, parseCommandDocumentDetailed;
 export 'src/commands/command_registry.dart' show CommandRegistry;
+export 'src/cli/harness_command.dart' show kHarnessUsage, runHarnessCommand;
 export 'src/config/config_credentials.dart' show ConfigCredentials;
 export 'src/config/config_loader.dart' show ConfigException, loadConfig;
 export 'src/config/config_path.dart'

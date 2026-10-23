@@ -12,8 +12,10 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
+import 'package:conatus_harness/conatus_harness.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
+import 'package:conatus_memory/conatus_memory.dart';
 import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 
@@ -209,6 +211,7 @@ class ConatusTuiRuntime {
     ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
     List<String> instructions = const <String>[],
     String? instructionHome,
+    HarnessManifest? harness,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
@@ -742,6 +745,7 @@ class ConatusTuiRuntime {
       ),
     );
     provideMemoryTools(app);
+    provideMemoryRecorder(app);
     provideCompaction(app);
     provideSkillLibrary(app);
     if (skills) {
@@ -776,6 +780,8 @@ class ConatusTuiRuntime {
       },
       options: CronRuntimeOptions(notifier: systemCronNotifier()),
     );
+
+    if (harness != null) applyHarness(app, harness);
 
     return ConatusTuiRuntime._(
       app: app,

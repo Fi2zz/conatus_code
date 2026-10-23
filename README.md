@@ -724,6 +724,24 @@ token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn
 **已知边界**：泳道视图是**独占**的——切过去就没有对话区。若要「边看边聊」需要改
 布局，那不是本次动的范围。
 
+## harness（可选）
+
+`nava harness` 管理可版本化的 harness 制品（`HarnessManifest`）：指令段、执行档位
+（推理强度 + 工具预算）与工具边界，由 `conatus_harness` 装配成一棵可回滚的
+Context 子树。
+
+```bash
+nava harness list ./harnesses          # 列出目录下的 manifest
+nava harness show harnesses/std.json   # 规范化 JSON（键顺序稳定）
+nava harness diff a.json b.json        # 人可读差异
+nava harness check harnesses/std.json  # 校验，可用于 CI
+nava --harness harnesses/std.json      # 本次运行装配（TUI 与 -p 共用）
+```
+
+**注意**：`allowedTools` 非 `null` 时白名单外工具会被拒（`TOOL_NOT_IN_HARNESS`），
+这是真实限制而不是提示；先用 `allowedTools: null` 只切指令段与预算更安全。
+`reasoningEffort` 只是声明——当前由 harness 记录，宿主仍未按档位改 provider 选项。
+
 ## headless（`-p`）与安全姿态
 
 `nava -p <任务>` 跑**无人值守的单轮**：装配完整运行时（工具 / 沙箱 / MCP /
