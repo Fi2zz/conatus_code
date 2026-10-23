@@ -519,6 +519,7 @@ class ConatusTuiRuntime {
       registry: agentRegistry,
       providers: registry,
     );
+    app.onDispose(agentProfiles.close);
 
     // 子 Agent：进度出口 + **独立的轮次预算**。
     //

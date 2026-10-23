@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/providers.dart';
+import 'package:conatus_code/tui.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:test/test.dart';
 
@@ -116,7 +117,13 @@ void main() {
     final SubAgentProfile custom = (await resolver.resolve('models'))!;
     expect(custom.llm, isA<OpenAiCompatibleProvider>());
     expect((custom.llm! as OpenAiCompatibleProvider).model, 'gpt-x');
+    expect(
+      identical(custom.llm, (await resolver.resolve('models'))!.llm),
+      isTrue,
+      reason: '同一 provider/model 复用同一个 provider 实例',
+    );
     expect((await resolver.resolve('broken'))!.llm, isNull);
+    expect(resolver.warnings, contains(contains('nope/gpt-x')));
   });
 
   test('OpenCode tools 开关映射为 disabledTools', () async {
@@ -142,5 +149,48 @@ void main() {
       registry: await load(),
     );
     expect(await resolver.resolve('missing'), isNull);
+  });
+
+  test('primary 模式 Agent 可按 ID spawn（plan 依赖该行为）', () async {
+    writeAgent(
+      Directory('${workdir.path}/.nava/agents'),
+      'primary.md',
+      frontmatter: 'mode: primary',
+      body: 'PRIMARY',
+    );
+    final AgentProfileResolver resolver = AgentProfileResolver(
+      registry: await load(),
+    );
+
+    expect((await resolver.resolve('primary'))!.system, 'PRIMARY');
+    expect((await resolver.resolve('plan'))!.id, 'plan');
+  });
+
+  test('tui_app 装配把 AgentRegistry 解析器注入 spawn_agent', () async {
+    writeAgent(
+      Directory('${workdir.path}/.nava/agents'),
+      'wired.md',
+      frontmatter: 'mode: subagent',
+      body: 'WIRED',
+    );
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: home.path,
+      sessionDir: home.path,
+      memoryFile: '${home.path}/memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      workdir: workdir.path,
+      interactive: false,
+    );
+    addTearDown(runtime.dispose);
+
+    final SpawnAgentTool tool =
+        runtime.tools.get('spawn_agent')! as SpawnAgentTool;
+    expect(tool.profileResolver, isA<AgentProfileResolver>());
+    final SubAgentProfile? profile = await tool.profileResolver!.resolve(
+      'wired',
+    );
+    expect(profile?.system, 'WIRED');
   });
 }
