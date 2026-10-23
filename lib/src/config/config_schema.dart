@@ -116,10 +116,14 @@ class AgentConfig {
     this.workdir,
     this.projectDir,
     this.subagentPermission = 'inherit',
+    this.defaultAgent = 'build',
   });
 
   /// 单轮最大步数。
   final int maxSteps;
+
+  /// 新会话默认 Agent（`[agent] default_agent`）；未知 ID 回退 `build`。
+  final String defaultAgent;
 
   /// 工作目录（沙箱根）；`null` 表示当前工作目录。
   final String? workdir;

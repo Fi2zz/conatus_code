@@ -5,6 +5,11 @@
 /// conatus_code 自身新增能力的入口（配置、沙箱、新增工具）。
 library;
 
+export 'src/agents/agent_builtins.dart' show kBuiltinAgents;
+export 'src/agents/agent_definition.dart' show AgentDefinition, AgentMode;
+export 'src/agents/agent_parser.dart'
+    show AgentParseResult, parseAgentDocument, parseAgentDocumentDetailed;
+export 'src/agents/agent_registry.dart' show AgentRegistry;
 export 'src/assembly/permission_mode.dart' show toTuiPermissionMode;
 export 'src/autonomous/autonomous_assembly.dart' show provideAutonomous;
 export 'src/background/background_tasks.dart'

@@ -151,6 +151,7 @@ class ConfigParser extends ConfigValues {
       subagentPermission: _subagentPermission(
         readString(table, 'subagent_permission'),
       ),
+      defaultAgent: readString(table, 'default_agent') ?? 'build',
     );
   }
 
