@@ -32,6 +32,27 @@ void main() {
       runMcpCli(args, configPath: path, deps: overrides ?? deps());
 
   group('auth / logout', () {
+    test('令牌目录只读时 auth / logout 退出 2 并给可读错误', () async {
+      const String home = '/tmp/nava-readonly/.opencode';
+      final McpCliDeps injected = McpCliDeps(
+        out: out,
+        err: err,
+        env: const <String, String>{'NAVA_HOME': home},
+      );
+
+      expect(await run(<String>['logout', 'docs'], overrides: injected), 2);
+      expect(err.toString(), contains('OAuth 令牌目录不可用'));
+
+      err.clear();
+      File(path).writeAsStringSync('''
+[mcp.servers.docs]
+type = "http"
+url = "https://example.com/mcp"
+''');
+      expect(await run(<String>['auth', 'docs'], overrides: injected), 2);
+      expect(err.toString(), contains('OAuth 令牌目录不可用'));
+    });
+
     test('auth 完成授权并把令牌写入注入的存储', () async {
       final FakeOAuthServer authServer = await FakeOAuthServer.start();
       addTearDown(authServer.close);

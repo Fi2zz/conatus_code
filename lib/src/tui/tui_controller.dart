@@ -774,6 +774,16 @@ class ConatusTuiController implements TuiUserPromptHost {
     );
   }
 
+  /// 两组模型候选是否完全一致（含展示标签）。
+  bool _sameModelChoice(_ModelChoice left, _ModelChoice right) {
+    if (left.label != right.label) return false;
+    if (left.entries.length != right.entries.length) return false;
+    for (int index = 0; index < left.entries.length; index++) {
+      if (left.entries[index] != right.entries[index]) return false;
+    }
+    return true;
+  }
+
   /// 把当前链记为基线（用户 `/model`、`/provider` 显式切换后调用）。
   void _rememberModelBaseline() => _modelBaseline = _currentModelChoice();
 
@@ -788,16 +798,24 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// 切会话后按目标会话的 Agent 恢复模型（无 `model:` 时回到基线）。
+  ///
+  /// AgentLoop 在 `_bind` 时已经捕获了旧的 `LlmProvider`，只换链槽位不会
+  /// 影响它；因此这里必须带着重绑一起切换（否则标签看起来换了模型，真实
+  /// 请求仍走旧模型）。
   Future<void> _restoreBoundAgentModel() async {
     final String? spec = agentDefinition?.model;
-    if (spec == null || spec.trim().isEmpty) {
-      _restoreBaselineModel();
+    if (spec != null && spec.trim().isNotEmpty) {
+      final String? warning = await _applyModelSpec(spec);
+      if (warning != null) {
+        showSystemNotice('Agent $_agentId 的模型不可用：$warning，沿用当前模型。');
+      }
       return;
     }
-    final String? warning = await _applyModelSpec(spec, rebindNow: false);
-    if (warning != null) {
-      showSystemNotice('Agent $_agentId 的模型不可用：$warning，沿用当前模型。');
+    final _ModelChoice? baseline = _modelBaseline;
+    if (baseline == null || _sameModelChoice(_currentModelChoice(), baseline)) {
+      return;
     }
+    if (_restoreBaselineModel()) await rebind();
   }
 
   /// 释放当前会话绑定（幂等）。
@@ -1310,26 +1328,28 @@ class ConatusTuiController implements TuiUserPromptHost {
     final int checkpoints = checkpoint?.listFor(id).length ?? 0;
     if (checkpoints > 0) parts.add('检查点 $checkpoints 个');
     final SessionLog? log = _app.get<SessionLog>('sessionLog');
+    final String? storyDir = _app.get<String>('storyLogDir');
     if (log != null) {
       try {
         if ((await log.list()).contains(id)) parts.add('故事线日志');
       } catch (_) {
         // 日志不可读不影响删除确认：清理时还会再报一次。
       }
+    } else if (storyDir != null &&
+        File('$storyDir${Platform.pathSeparator}$id.jsonl').existsSync()) {
+      parts.add('故事线日志');
     }
     final String export = _exportFileOf(id);
     if (File(export).existsSync()) parts.add('导出文件保留（$export）');
     return parts.isEmpty ? '没有可清理的附属文件。' : '将清理：${parts.join('；')}。';
   }
 
-  /// 会话的缺省导出路径（与会话导出器保持同一命名）。
+  /// 会话的缺省导出路径（与会话导出器 / `[agent] project_dir` 对齐）。
   String _exportFileOf(String id) {
-    final String workdir =
-        _app.get<String>('workdir') ?? Directory.current.path;
     final String bare = id.startsWith('session_')
         ? id.substring('session_'.length)
         : id;
-    return '${resolveProjectDataDir(workdir: workdir)}'
+    return '${_projectDataDir()}'
         '${Platform.pathSeparator}exports${Platform.pathSeparator}nava-$bare.md';
   }
 
@@ -1879,6 +1899,18 @@ class ConatusTuiController implements TuiUserPromptHost {
     final Session? session = _session;
     // 命令同样是一轮用户输入：写进会话，重开 / 导出时才看得到上下文。
     session?.append(kUserMessageEvent, data: <String, Object?>{'text': prompt});
+    // 工具结果必须有配对的 assistant tool_calls：否则下次压缩的配对检查
+    // （balancedCutAtOrBefore）会看到孤立结果直接失败，且这个断点会落盘。
+    final String callId = 'command-$name';
+    session?.append(
+      kAssistantMessageEvent,
+      data: <String, Object?>{
+        'text': '',
+        'toolCalls': toolCallsToJson(<LlmToolCall>[
+          LlmToolCall(id: callId, name: 'spawn_agent'),
+        ]),
+      },
+    );
     final AgentCancel cancel = AgentCancel();
     _cancel = cancel;
     _foregroundInterrupt = () {
@@ -1889,8 +1921,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     transcript.add(TuiRole.system, '命令 /$name 以前台子 Agent 执行，请稍候。');
     _refresh();
     try {
-      final ToolResult result = await Future.any<ToolResult>(
-        <Future<ToolResult>>[
+      ToolResult result;
+      try {
+        result = await Future.any<ToolResult>(<Future<ToolResult>>[
           tools.call(
             ToolCall(
               name: 'spawn_agent',
@@ -1901,21 +1934,26 @@ class ConatusTuiController implements TuiUserPromptHost {
             ),
           ),
           cancel.whenCancelled.then((_) => ToolResult.failure('已打断')),
-        ],
-      );
-      if (cancel.cancelled) {
-        transcript.add(TuiRole.system, '已打断这一轮。');
-        return;
+        ]);
+      } catch (error) {
+        result = ToolResult.failure('子 Agent 执行异常：$error');
       }
+      // 取消 / 异常也写结果：assistant tool_calls 一旦落盘就必须闭合，
+      // 否则会话在后续压缩时永久失衡。
+      final bool interrupted = cancel.cancelled;
       session?.append(
         kToolResultEvent,
         data: <String, Object?>{
-          'callId': 'command-$name',
+          'callId': callId,
           'name': 'spawn_agent',
-          'content': result.content,
-          'isError': result.isError,
+          'content': interrupted ? '已打断' : result.content,
+          'isError': interrupted || result.isError,
         },
       );
+      if (interrupted) {
+        transcript.add(TuiRole.system, '已打断这一轮。');
+        return;
+      }
       if (result.isError) {
         showSystemNotice('子 Agent 执行失败：${result.content}');
       }

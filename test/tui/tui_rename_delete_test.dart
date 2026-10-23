@@ -3,6 +3,7 @@ library;
 
 import 'dart:io';
 
+import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
@@ -121,6 +122,63 @@ void main() {
     expect(await fix.controller.deleteSession(renameOtherId), isTrue);
 
     expect(log.existsSync(), isFalse);
+  });
+
+  test('删除确认在故事层关闭时也列出遗留故事线日志', () async {
+    final RenameFixture fix = await buildRenameFixture(storyEnabled: false);
+    final File log = File(
+      '${fix.storyLogDir.path}${Platform.pathSeparator}$renameOtherId.jsonl',
+    );
+    log.parent.createSync(recursive: true);
+    log.writeAsStringSync('{"type":"doc/note"}\n');
+    await fix.controller.openPicker();
+    fix.controller.movePicker(
+      fix.controller.picker.list.indexWhere(
+            (TuiSessionInfo item) => item.id == renameOtherId,
+          ) -
+          fix.controller.picker.index,
+    );
+
+    final Future<void> pending = fix.controller.deleteSelectedSession();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fix.controller.choice.request!.title, contains('故事线日志'));
+    fix.controller.choice.cancel();
+    await pending;
+  });
+
+  test('删除确认的导出路径遵循 [agent] project_dir', () async {
+    final RenameFixture fix = await buildRenameFixture();
+    final Directory work = Directory.systemTemp.createTempSync('nava-proj-');
+    addTearDown(() => work.deleteSync(recursive: true));
+    fix.app
+      ..provide('workdir', work.path)
+      ..provide('projectDir', 'data');
+    final String dataDir = resolveProjectDataDir(
+      workdir: work.path,
+      projectDir: 'data',
+    );
+    File(
+        '$dataDir${Platform.pathSeparator}exports'
+        '${Platform.pathSeparator}nava-other.md',
+      )
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync('x');
+    await fix.controller.openPicker();
+    fix.controller.movePicker(
+      fix.controller.picker.list.indexWhere(
+            (TuiSessionInfo item) => item.id == renameOtherId,
+          ) -
+          fix.controller.picker.index,
+    );
+
+    final Future<void> pending = fix.controller.deleteSelectedSession();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fix.controller.choice.request!.title, contains('导出文件保留'));
+    expect(fix.controller.choice.request!.title, contains(dataDir));
+    fix.controller.choice.cancel();
+    await pending;
   });
 
   test('未知会话删除返回 false', () async {

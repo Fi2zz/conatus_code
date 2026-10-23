@@ -33,6 +33,11 @@ Future<void> main(List<String> args) async {
   } on ConfigException catch (error) {
     stderr.writeln('配置错误：${error.message}');
     exit(2);
+  } on FileSystemException catch (error) {
+    // 首次启动的模板写入可能被 `.opencode` 只读闸门拒绝：给一行可读错误，
+    // 不要把 FileSystemException 的调用栈甩给用户。
+    stderr.writeln('配置错误：无法写入 ${error.path ?? '配置文件'}（${error.message}）');
+    exit(2);
   }
 
   // 主题是进程级全局状态：装配前落定，界面与浮层取色都用同一套 token。

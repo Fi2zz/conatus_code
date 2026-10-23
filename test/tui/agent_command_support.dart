@@ -7,6 +7,7 @@ import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
+import 'package:conatus_compaction/conatus_compaction.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
@@ -67,6 +68,7 @@ Future<CommandHarness> buildCommandHarness({
   Map<String, String> extraFiles = const <String, String>{},
   bool withShell = false,
   bool withSpawn = false,
+  bool withCompaction = false,
   String? defaultAgent,
   ProviderRegistry? registry,
   List<String> chainEntries = const <String>[],
@@ -115,6 +117,7 @@ Future<CommandHarness> buildCommandHarness({
     app.provide('providers', registry);
   }
   if (withShell) provideShellLocal(app);
+  if (withCompaction) provideCompaction(app);
   provideMemory(app);
   final SessionStore sessions = provideSessions(app);
   final PermissionWiring wiring = PermissionWiring(

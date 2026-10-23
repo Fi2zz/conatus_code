@@ -21,8 +21,8 @@ Future<int> _auth(
     _err(deps).writeln('MCP server $name 是 stdio，不需要 OAuth。');
     return 2;
   }
-  final McpOAuthStore store =
-      deps.oauthStore ?? McpOAuthStore(resolveOAuthTokenDir());
+  final McpOAuthStore? store = _oauthStore(deps);
+  if (store == null) return 2;
   final McpOAuthSession session =
       deps.session ??
       McpOAuthSession(log: (String line) => _out(deps).writeln(line));
@@ -47,12 +47,24 @@ Future<int> _auth(
 
 Future<int> _logout(List<String> args, McpCliDeps deps) async {
   if (args.length != 1) return _usageError(deps, 'logout 需要一个 server 名字。');
-  final McpOAuthStore store =
-      deps.oauthStore ?? McpOAuthStore(resolveOAuthTokenDir());
+  final McpOAuthStore? store = _oauthStore(deps);
+  if (store == null) return 2;
   final String name = args.first;
   await store.remove(name);
   _out(deps).writeln('已删除 $name 的 OAuth 令牌（${store.pathOf(name)}）。');
   return 0;
+}
+
+/// 令牌存储；`NAVA_HOME` 指向只读目录时打印可读错误并返回 `null`（退出 2）。
+McpOAuthStore? _oauthStore(McpCliDeps deps) {
+  final McpOAuthStore? injected = deps.oauthStore;
+  if (injected != null) return injected;
+  try {
+    return McpOAuthStore(resolveOAuthTokenDir(env: deps.env));
+  } on StateError catch (error) {
+    _err(deps).writeln('OAuth 令牌目录不可用：${error.message}');
+    return null;
+  }
 }
 
 McpConfig _loadMcp(String path) =>

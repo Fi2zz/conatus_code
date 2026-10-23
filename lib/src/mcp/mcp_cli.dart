@@ -30,6 +30,7 @@ class McpCliDeps {
     this.session,
     this.oauthStore,
     this.openUrl,
+    this.env,
   });
 
   /// 正常输出目标。
@@ -46,6 +47,9 @@ class McpCliDeps {
 
   /// 打开授权 URL 的回调；测试用它模拟浏览器点击。
   final void Function(Uri)? openUrl;
+
+  /// 解析令牌目录用的环境变量；缺省 [Platform.environment]（测试注入用）。
+  final Map<String, String>? env;
 }
 
 typedef _AddRequest = ({

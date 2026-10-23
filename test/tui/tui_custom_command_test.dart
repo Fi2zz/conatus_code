@@ -233,6 +233,52 @@ void main() {
     );
   });
 
+  test('subagent 命令的工具事件成对：压缩与后续轮次不报错', () async {
+    final CommandHarness harness = await buildCommandHarness(
+      commands: <String, String>{
+        'research.md':
+            '---\nagent: explore\nsubagent: true\n---\n调研：\$ARGUMENTS',
+      },
+      withSpawn: true,
+      withCompaction: true,
+    );
+    addTearDown(harness.dispose);
+
+    await harness.controller.handleLine('/research src/core');
+    final session = harness.controller.session!;
+    final assistant = session.events.lastWhere(
+      (event) =>
+          event.type == kAssistantMessageEvent &&
+          (event.data as Map)['toolCalls'] is List,
+    );
+    final tool = session.events.lastWhere(
+      (event) => event.type == kToolResultEvent,
+    );
+    final List<dynamic> calls =
+        (assistant.data as Map)['toolCalls'] as List<dynamic>;
+    expect((calls.single as Map)['id'], (tool.data as Map)['callId']);
+    expect((tool.data as Map)['content'], contains('fake-spawn'));
+
+    // 下一轮会走压缩的配对检查；事件不平衡时这里会变成「出错」。
+    await harness.controller.handleLine('继续');
+
+    expect(harness.provider.turns, hasLength(1));
+    expect(
+      harness.controller.transcript.messages.any(
+        (TuiMessage message) =>
+            message.text.contains('出错') || message.text.contains('配对'),
+      ),
+      isFalse,
+    );
+
+    final String exported = SessionExport(
+      session: session,
+      modelLabel: 'mock',
+    ).toMarkdown();
+    expect(exported, contains('spawn_agent'));
+    expect(exported, contains('fake-spawn'));
+  });
+
   test('subagent 命令的 model: 明确提示不生效', () async {
     final CommandHarness harness = await buildCommandHarness(
       commands: <String, String>{
