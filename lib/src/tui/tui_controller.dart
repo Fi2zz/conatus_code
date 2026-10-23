@@ -55,6 +55,8 @@ import '../subagent/swarm_member.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
+import 'keymap/keymap.dart';
+import 'keymap/keymap_view.dart';
 import 'session_exporter.dart';
 import 'team_snapshot.dart';
 import 'team_subscription.dart';
@@ -143,6 +145,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.initialAgentId,
     List<String> fallbackModels = const <String>[],
     RetryPolicy retryPolicy = const RetryPolicy(),
+    this.keybinds = const <String, String>{},
   }) : _app = app,
        _sessions = sessions,
        _sessionId = initialSession ?? '',
@@ -193,6 +196,12 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 启动时指定的 Agent ID；空 / 未知 / 仅子 Agent 时回退到注册表默认值。
   final String? initialAgentId;
+
+  /// `[keybinds]` 原始配置；[keymap] 据此合成（缺省动作用内置默认值）。
+  final Map<String, String> keybinds;
+
+  /// 合成后的全局键位表；根组件与 `/keybinds` 共用同一份。
+  late final Keymap keymap = Keymap.fromConfig(keybinds);
 
   /// 当前会话 Agent ID（`/agents` 切换后更新）。
   String _agentId = 'build';
@@ -577,6 +586,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       _sessionId = _sessions.create().id;
     }
     await _bind(_sessionId);
+    _addKeybindWarnings();
     _refresh();
     // 回填当前模型的上下文窗口（来自 models.dev 档案，未就绪则稍后补）。
     seedModelContextLength();
@@ -586,6 +596,13 @@ class ConatusTuiController implements TuiUserPromptHost {
       if (registry != null) {
         providerPrompt.show(providerItems(registry));
       }
+    }
+  }
+
+  /// 把键位配置的告警（未知动作 / 非法键位 / 冲突）上屏。
+  void _addKeybindWarnings() {
+    for (final String warning in keymap.warnings) {
+      transcript.add(TuiRole.system, warning);
     }
   }
 
@@ -1148,6 +1165,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _exportSession(arg);
       case 'clear':
         transcript.clear();
+      case 'keybinds':
+        transcript.add(TuiRole.system, renderKeybinds(keymap));
       default:
         // 内置命令优先；未命中再查自定义命令，最后才把命令词当技能名试一次。
         if (!await runCustomCommand(command, arg) &&

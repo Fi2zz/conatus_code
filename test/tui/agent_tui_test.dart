@@ -359,6 +359,41 @@ void main() {
       app.dispose();
     }
   });
+
+  test('F1 由全局键位打开帮助', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      await tester.sendKeyEvent(
+        const KeyboardEvent(logicalKey: LogicalKey.f1),
+      );
+      await tester.pump();
+      expect(tester.terminalState, containsText('按键：Esc 关闭面板/视图'));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
+  test('主题浮层 Esc 由根组件兜底关闭（输入栏不在焦点路径）', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      // 主题浮层打开时输入栏让出焦点，Esc 只能由根组件兜底处理。
+      unawaited(controller.handleLine('/theme'));
+      await tester.pump();
+      expect(controller.themePrompt.open, isTrue);
+
+      await tester.sendEscape();
+      await tester.pump();
+      expect(controller.themePrompt.open, isFalse);
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
 }
 
 /// 装配一个最小 TUI 并挂载，返回（控制器, 测试器, 应用上下文）。

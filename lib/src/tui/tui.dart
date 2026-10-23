@@ -14,6 +14,8 @@ import '../diff/tui_diff_view.dart';
 import 'agent_picker_view.dart';
 import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
+import 'keymap/keymap.dart';
+import 'keymap/keymap_dispatcher.dart';
 import 'team_snapshot.dart';
 import 'team_views.dart';
 import 'theme/nava_theme.dart';
@@ -62,6 +64,7 @@ class _AgentTuiState extends State<AgentTui> {
     commands: () => _controller.commands,
   );
   late final AtRefMenu _atMenu = AtRefMenu(cwd: () => Directory.current.path);
+  late final KeymapDispatcher _keys = KeymapDispatcher(_controller.keymap);
   final TuiShellMode _shell = TuiShellMode();
   Timer? _spin;
   Timer? _exitTimer;
@@ -104,6 +107,7 @@ class _AgentTuiState extends State<AgentTui> {
   void dispose() {
     _spin?.cancel();
     _exitTimer?.cancel();
+    _keys.dispose();
     _controller
       ..onChanged = null
       ..onOpenTeamView = null
@@ -314,11 +318,68 @@ class _AgentTuiState extends State<AgentTui> {
     return file.writeAsBytes(base64Decode(image.base64Data));
   }
 
+  /// 全局键位：先问 dispatcher；leader 前缀或已被吞掉的第二段返回 true。
+  bool _onGlobalKey(KeyboardEvent event) {
+    final bool pendingBefore = _keys.leaderPending;
+    final String? action = _keys.dispatch(event);
+    if (action == null) {
+      return pendingBefore || _keys.leaderPending;
+    }
+    _runKeyAction(action, event);
+    return true;
+  }
+
+  /// 执行键位动作：全局动作映射到既有命令 / 视图切换。
+  void _runKeyAction(String action, KeyboardEvent event) {
+    switch (action) {
+      case KeyActions.exit:
+        _exitFromKey(event);
+      case KeyActions.clear:
+        _controller.transcript.clear();
+        _refresh();
+      case KeyActions.help:
+        unawaited(_controller.handleLine('/help'));
+        _refresh();
+      case KeyActions.sessionNew:
+        unawaited(_controller.handleLine('/new'));
+      case KeyActions.sessionList:
+        unawaited(_controller.handleLine('/sessions'));
+      case KeyActions.modelList:
+        unawaited(_controller.handleLine('/model'));
+      case KeyActions.agentList:
+        unawaited(_controller.handleLine('/agents'));
+      case KeyActions.palette:
+        _openPalette();
+      case KeyActions.theme:
+        unawaited(_controller.handleLine('/theme'));
+      case KeyActions.tabNext || KeyActions.tabPrevious:
+        _toggleView();
+    }
+  }
+
+  /// 退出键：Ctrl+C 仍走既有清空 / 复制 / 打断 / 二次确认语义。
+  void _exitFromKey(KeyboardEvent event) {
+    if (event.matches(LogicalKey.keyC, ctrl: true) && _onCopyKey(event)) {
+      return;
+    }
+    _exit();
+  }
+
+  /// `<leader>p`：把 `/` 写进输入框，触发命令菜单。
+  void _openPalette() {
+    _input.text = '/';
+    _input.selection = const TextSelection.collapsed(offset: 1);
+    _refresh();
+  }
+
   /// 输入框按键拦截：`/` 菜单打开时用 ↑↓ 选择、Enter 运行、Tab 补全；
   /// Esc 一律返回 false 冒泡，由根组件 `_onKey` 统一处理（关闭面板/视图、打断轮次）。
   /// Ctrl+T 视图切换、Ctrl+C/Alt+C 复制/打断/退出，Ctrl+V 粘贴（路径/图片），
   /// 均先于文本域消费。
   bool _onInputKey(KeyboardEvent event) {
+    if (_onGlobalKey(event)) {
+      return true;
+    }
     if (_onShellKey(event)) {
       return true;
     }
@@ -641,6 +702,13 @@ class _AgentTuiState extends State<AgentTui> {
   }
 
   bool _onKey(KeyboardEvent event) {
+    if (_onGlobalKey(event)) {
+      return true;
+    }
+    // 主题浮层是模态：输入栏让出焦点，按键（含 Esc）由根组件统一处理。
+    if (_onThemeKey(event)) {
+      return true;
+    }
     // diff 视图打开时 Esc 一律关闭它（视图自己也会处理，这里兜底焦点异常）。
     if (_controller.diffOpen && event.logicalKey == LogicalKey.escape) {
       _controller.closeDiff();
@@ -880,7 +948,8 @@ class _AgentTuiState extends State<AgentTui> {
                   !_controller.choice.open &&
                   !_controller.providerPrompt.open &&
                   !_controller.formPrompt.open &&
-                  !_controller.modelPrompt.open,
+                  !_controller.modelPrompt.open &&
+                  !_controller.themePrompt.open,
               busy: _controller.busy,
               queuedCount: _controller.queuedCount,
               onSubmitted: (_) => _submit(),

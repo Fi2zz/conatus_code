@@ -39,6 +39,7 @@ class ConfigParser extends ConfigValues {
     background: _readBackground(),
     loopControl: _readLoopControl(),
     tui: _readTui(),
+    keybinds: _readKeybinds(),
     defaultPlanMode: readBool(raw, 'default_plan_mode', false),
     extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
     mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
@@ -483,6 +484,36 @@ class ConfigParser extends ConfigValues {
       theme: readString(table, 'theme') ?? 'default',
       animations: readBool(table, 'animations', true),
     );
+  }
+
+  /// `[keybinds]`：动作 ID → 键位文本。
+  ///
+  /// 未加引号的 `session.new` 会被 TOML 解析成嵌套表，这里统一摊平成点号键；
+  /// `false` 表示关闭动作，映射成 `none`（与字符串写法同义）。
+  Map<String, String> _readKeybinds() {
+    final Map<String, String> bindings = <String, String>{};
+    _flattenKeybinds(readTable('keybinds'), '', bindings);
+    return bindings;
+  }
+
+  void _flattenKeybinds(
+    Map<String, dynamic> table,
+    String prefix,
+    Map<String, String> out,
+  ) {
+    for (final MapEntry<String, dynamic> entry in table.entries) {
+      final String key = prefix.isEmpty ? entry.key : '$prefix.${entry.key}';
+      final Object? value = entry.value;
+      if (value is Map) {
+        _flattenKeybinds(value.cast<String, dynamic>(), key, out);
+      } else if (value is String) {
+        out[key] = value;
+      } else if (value == false) {
+        out[key] = 'none';
+      } else {
+        throw ConfigException('$source：keybinds.$key 必须是字符串或 false。');
+      }
+    }
   }
 
   ApprovalMode _approvalMode(String? value) {

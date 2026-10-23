@@ -109,6 +109,21 @@ debounce_seconds = 10         # 去抖窗口（秒），防连续编辑连跑
 # theme = "default"
 # animations = true
 
+# 全局键位（可选）：动作 ID 含点号，必须加引号；none / false 关闭该动作。
+# <leader> 开头为两段式：先按 leader，2 秒内再按后续键。
+# 动作：app.exit / app.clear / help.show / session.new / session.list /
+#       model.list / agent.list / command.palette / theme.switch /
+#       tab.next / tab.previous
+# 视图内按键（浮层 / diff / Ctrl+T / Ctrl+O）保持内置，不在此配置。
+# [keybinds]
+# leader = "ctrl+x"
+# "app.exit" = "ctrl+c,ctrl+d"
+# "app.clear" = "ctrl+l"
+# "help.show" = "f1"
+# "session.new" = "<leader>n"
+# "theme.switch" = "<leader>t"
+# "tab.next" = "none"          # 关闭某个动作
+
 [agent]
 # workdir = "/path/to/your/project"
 # default_agent = "build"            # 新会话默认 Agent；未知 ID 回退 build

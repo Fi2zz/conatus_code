@@ -157,6 +157,7 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     argHint: '<子命令>',
   ),
   TuiCommand(name: 'clear', description: '清空屏上记录（不改动会话数据）'),
+  TuiCommand(name: 'keybinds', description: '查看当前键位绑定与冲突'),
   TuiCommand(name: 'exit', description: '退出并关闭 TUI（同 /quit、Ctrl+C）'),
 ];
 

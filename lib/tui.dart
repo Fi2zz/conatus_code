@@ -24,6 +24,10 @@ export 'src/tui/ask_user_tool.dart'
 export 'src/tui/at_ref.dart' show expandAtRefs, kAtRefMaxBytes, kAtRefMaxCount;
 export 'src/tui/at_ref_menu.dart';
 export 'src/tui/at_ref_menu_view.dart';
+export 'src/tui/keymap/key_binding.dart';
+export 'src/tui/keymap/keymap.dart';
+export 'src/tui/keymap/keymap_dispatcher.dart';
+export 'src/tui/keymap/keymap_view.dart';
 export 'src/tui/session_exporter.dart';
 export 'src/tui/team_lanes.dart';
 export 'src/tui/team_snapshot.dart';

@@ -190,6 +190,7 @@ Future<void> main(List<String> args) async {
     planning: true,
     initialPermissionMode: toTuiPermissionMode(config.approval.mode),
     onExit: shutdownApp,
+    keybinds: config.keybinds,
   );
   await runApp(AgentTui(controller: controller));
   await runtime.dispose();

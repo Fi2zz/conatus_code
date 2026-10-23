@@ -577,6 +577,7 @@ class ConatusCodeConfig {
     this.background = const BackgroundConfig(),
     this.loopControl = const LoopControlConfig(),
     this.tui = const TuiConfig(),
+    this.keybinds = const <String, String>{},
     this.defaultPlanMode = false,
     this.extraSkillDirs = const <String>[],
     this.mergeAllSkills = false,
@@ -639,6 +640,12 @@ class ConatusCodeConfig {
 
   /// `[tui]` 表。
   final TuiConfig tui;
+
+  /// `[keybinds]` 表：动作 ID（如 `app.exit`）→ 键位文本（逗号分隔多键）。
+  ///
+  /// 动作 ID 含点号，TOML 里需加引号（`"app.exit" = "ctrl+c"`）；`none` / `false`
+  /// 关闭该动作。未知动作与冲突由 `Keymap` 在启动时告警。
+  final Map<String, String> keybinds;
 
   /// 顶层 `default_plan_mode`：启动时默认进入 Plan Mode。
   final bool defaultPlanMode;

@@ -777,6 +777,7 @@ class ConatusTuiRuntime {
     String name = '默认',
     bool planning = false,
     TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,
+    Map<String, String> keybinds = const <String, String>{},
   }) {
     final ConatusTuiController controller = ConatusTuiController(
       app: app,
@@ -791,6 +792,7 @@ class ConatusTuiRuntime {
       fallbackModels: fallbackModels,
       retryPolicy: retryPolicy,
       storyEnabled: storyEnabled,
+      keybinds: keybinds,
     );
     controller.switchLlm = switchLlm;
     return controller;
