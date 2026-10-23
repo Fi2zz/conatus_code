@@ -21,6 +21,9 @@ String renderKeybinds(Keymap keymap) {
   }
   _writeConflicts(buffer, keymap.conflicts);
   buffer.writeln('视图内按键（浮层 / diff / Ctrl+T / Ctrl+O）保持内置，不支持配置。');
+  buffer.writeln(
+    'Ctrl+Tab / Ctrl+Shift+Tab 是可配置的 tab.next / tab.previous；团队视图用 /team。',
+  );
   return buffer.toString();
 }
 

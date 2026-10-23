@@ -290,6 +290,28 @@ void main() {
     expect(controller.sessionId, original);
   });
 
+  test('8 个标签时 /undo 仍能切到分叉会话（挤掉非活跃标签）', () async {
+    final (ConatusTuiController controller, Context app, String root) =
+        await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));
+    addTearDown(() => _disposeAfterSettle(app, controller));
+    await _twoTurns(controller, root);
+    final String original = controller.sessionId;
+
+    // 另开 7 个会话把标签占满，再切回有历史的会话执行 /undo。
+    for (int i = 0; i < 7; i++) {
+      final Session extra = app.require<SessionStore>('sessions').create();
+      expect(await controller.switchSession(extra.id), isTrue);
+    }
+    expect(controller.tabs.tabs, hasLength(8));
+    expect(await controller.switchSession(original), isTrue);
+
+    await controller.handleLine('/undo');
+
+    expect(controller.sessionId, isNot(original));
+    expect(controller.tabs.tabs, hasLength(8), reason: '系统流程挤掉一个非活跃标签');
+    expect(controller.transcript.messages.last.text, contains('已撤销'));
+  });
+
   test('/rewind 仍可用且不产生可重做的撤销点', () async {
     final (ConatusTuiController controller, Context app, String root) =
         await _build(beforeStart: (String root) => _write(root, 'a.txt', 'v0'));

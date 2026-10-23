@@ -648,19 +648,33 @@ class ConatusTuiController implements TuiUserPromptHost {
     try {
       await _bind(id);
     } catch (error) {
+      await _bindFallbackSession(id, error);
+    }
+  }
+
+  /// 打开备用会话；失败只提示、不向上抛（启动与恢复都必须保持可用）。
+  Future<bool> _bindFallbackSession(String failedId, Object error) async {
+    try {
       _sessionId = _sessions.create().id;
       await _bind(_sessionId);
       transcript.add(
         TuiRole.system,
-        '会话 $id 读取失败（数据可能损坏），已改开新会话 $_sessionId：$error',
+        '会话 $failedId 读取失败（数据可能损坏），已改开新会话 $_sessionId：$error',
       );
+      return true;
+    } catch (fallbackError) {
+      transcript.add(
+        TuiRole.system,
+        '会话 $failedId 读取失败，备用会话也未能打开：$fallbackError',
+      );
+      return false;
     }
   }
 
   /// 把当前绑定的会话同步到标签：已存在则更新标题并激活，否则新开一个。
   void _syncTabState() {
     final String id = _sessionId;
-    if (id.isEmpty) return;
+    if (id.isEmpty || !ready) return;
     final String title = _tabTitle(_session);
     final int existing = tabs.indexOf(id);
     if (existing >= 0) {
@@ -1295,8 +1309,19 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// busy（有在途轮次）时拒绝并返回 `false`：此时释放会话子上下文会把正在
   /// 跑的 Agent Loop 从脚下抽走，`/undo`、`/redo` 这类编排也据此判定未生效。
   /// 撤销/重做自身（[_revertInFlight]）不受此限——它就是那条编排。
-  Future<bool> switchSession(String id, {String? announce}) =>
-      _switchSession(id, announce: announce, saveTabScroll: true);
+  ///
+  /// [system] 供撤销 / 重做 / rewind / 故事分叉等系统流程使用：标签满额时
+  /// 挤掉一个非活跃标签腾位，而不是让核心流程失败。
+  Future<bool> switchSession(
+    String id, {
+    String? announce,
+    bool system = false,
+  }) => _switchSession(
+    id,
+    announce: announce,
+    saveTabScroll: true,
+    system: system,
+  );
 
   /// 切换会话的实现；[saveTabScroll] 为 `false` 时由调用方已保存滚动位置
   /// （关闭活跃标签后目标标签的偏移不能被当前会话的位置覆盖）。
@@ -1304,23 +1329,15 @@ class ConatusTuiController implements TuiUserPromptHost {
     String id, {
     String? announce,
     required bool saveTabScroll,
+    bool system = false,
   }) async {
-    if (busy && !_revertInFlight) {
-      transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
+    final String? blocked = _blockedSwitchReason(id);
+    if (blocked != null) {
+      transcript.add(TuiRole.system, blocked);
       _refresh();
       return false;
     }
-    if (!isValidSessionId(id)) {
-      transcript.add(TuiRole.system, '会话 id 非法：只允许字母/数字/下划线/中文/短横，长度 1—64。');
-      _refresh();
-      return false;
-    }
-    if (ready && id == _sessionId) {
-      transcript.add(TuiRole.system, '已在会话 $_sessionId。');
-      _refresh();
-      return false;
-    }
-    if (!_canOpenTab(id)) {
+    if (!_tabSlotAvailable(id, system: system)) {
       showSystemNotice('最多 $kTabCap 个标签；先关闭一个标签再打开新会话。');
       return false;
     }
@@ -1348,6 +1365,35 @@ class ConatusTuiController implements TuiUserPromptHost {
     return true;
   }
 
+  /// 切换会话的前置拒绝原因；可切换时返回 `null`。
+  String? _blockedSwitchReason(String id) {
+    if (busy && !_revertInFlight) {
+      return '有在途轮次，请稍候再试。';
+    }
+    if (!isValidSessionId(id)) {
+      return '会话 id 非法：只允许字母/数字/下划线/中文/短横，长度 1—64。';
+    }
+    if (ready && id == _sessionId) {
+      return '已在会话 $_sessionId。';
+    }
+    return null;
+  }
+
+  /// 目标会话是否已有标签名额；[system] 流程满额时挤掉非活跃标签。
+  bool _tabSlotAvailable(String id, {required bool system}) {
+    if (tabs.contains(id) || tabs.canAdd) {
+      return true;
+    }
+    return system && tabs.evictInactive();
+  }
+
+  /// 目标标签有保存过的滚动位置时恢复；新标签跳到会话末尾（不是顶部）。
+  void _restoreActiveScroll() {
+    onTabRestore?.call(
+      tabs.activeScrollSaved ? tabs.restoreScroll() : double.infinity,
+    );
+  }
+
   /// 目标会话读取失败（JSONL 损坏等）：回绑原会话并留在原标签。
   Future<bool> _recoverSession(
     String previous,
@@ -1356,28 +1402,21 @@ class ConatusTuiController implements TuiUserPromptHost {
   ) async {
     _unbind();
     _sessionId = previous;
-    try {
-      await _bind(previous);
-    } catch (_) {
-      // 原会话也读不出来：退到全新会话，至少控制器保持可用。
-      _sessionId = _sessions.create().id;
-      await _bind(_sessionId);
-    }
+    await _rebindPrevious(previous);
     _syncTabState();
     _restoreActiveScroll();
     showSystemNotice('会话 $failedId 读取失败（数据可能损坏），已留在会话 $_sessionId：$error');
     return false;
   }
 
-  /// 目标标签有保存过的滚动位置时才恢复（新标签保持自动到底部）。
-  void _restoreActiveScroll() {
-    if (tabs.activeScrollSaved) {
-      onTabRestore?.call(tabs.restoreScroll());
+  /// 回绑原会话；原会话也读不出来时退到一个全新会话（失败只提示）。
+  Future<void> _rebindPrevious(String previous) async {
+    try {
+      await _bind(previous);
+    } catch (error) {
+      await _bindFallbackSession(previous, error);
     }
   }
-
-  /// 是否还能为 [id] 开标签（已打开的不占新名额）。
-  bool _canOpenTab(String id) => tabs.contains(id) || tabs.canAdd;
 
   /// 激活指定标签；切换被 busy 拒绝时返回 `false`。
   Future<bool> activateTab(int index) async {
@@ -1424,11 +1463,15 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<bool> _switchAfterClose(String removed) async {
     if (tabs.tabs.isEmpty) {
       final Session session = _sessions.create();
-      return _switchSession(
+      final bool switched = await _switchSession(
         session.id,
         announce: '已关闭最后一个标签，开启新会话 ${session.id}。',
         saveTabScroll: false,
       );
+      if (!switched) {
+        await _sessions.remove(session.id);
+      }
+      return switched;
     }
     final String target = tabs.tabs[tabs.active].sessionId;
     final bool switched = await _switchSession(
@@ -2260,6 +2303,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       announce:
           '已回滚到第 ${result.turn} 轮（$counts，对话已回到该轮），'
           '新会话 $forkId。',
+      system: true,
     );
   }
 
@@ -2450,7 +2494,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     final String forkId = 'session_${newUuidV4()}';
     await engine.forkAt(n, newSessionId: forkId);
-    await switchSession(forkId, announce: '已从前 $n 个补丁分叉新故事线，新会话 $forkId。');
+    await switchSession(
+      forkId,
+      announce: '已从前 $n 个补丁分叉新故事线，新会话 $forkId。',
+      system: true,
+    );
   }
 
   /// `/story apply <i>`：应用第 i 个待应用补丁（经 fs 缝写文件后入故事）。

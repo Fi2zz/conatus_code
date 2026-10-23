@@ -384,7 +384,8 @@ class _AgentTuiState extends State<AgentTui> {
 
   /// 输入框按键拦截：`/` 菜单打开时用 ↑↓ 选择、Enter 运行、Tab 补全；
   /// Esc 一律返回 false 冒泡，由根组件 `_onKey` 统一处理（关闭面板/视图、打断轮次）。
-  /// Ctrl+T 视图切换、Ctrl+C/Alt+C 复制/打断/退出，Ctrl+V 粘贴（路径/图片），
+  /// Ctrl+T（团队视图）/ Ctrl+Tab（会话标签，走可配置键位）、
+  /// Ctrl+C/Alt+C 复制/打断/退出，Ctrl+V 粘贴（路径/图片），
   /// 均先于文本域消费。
   bool _onInputKey(KeyboardEvent event) {
     if (_onGlobalKey(event)) {

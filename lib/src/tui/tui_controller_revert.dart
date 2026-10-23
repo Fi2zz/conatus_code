@@ -29,9 +29,7 @@ extension _RevertCommands on ConatusTuiController {
       'checkpointManager',
     );
     if (session == null || checkpoint == null) {
-      showSystemNotice(
-        session == null ? '撤销不可用：会话尚未绑定。' : '撤销不可用：未装配检查点。',
-      );
+      showSystemNotice(session == null ? '撤销不可用：会话尚未绑定。' : '撤销不可用：未装配检查点。');
       return;
     }
     if (busy) {
@@ -87,6 +85,7 @@ extension _RevertCommands on ConatusTuiController {
     final bool switched = await switchSession(
       stage.forkSessionId,
       announce: _undoAnnounce(stage, result.restore, checkpointsOn, rounds),
+      system: true,
     );
     if (!switched) {
       await _abandonUndo(stage, checkpointsOn);
@@ -117,9 +116,7 @@ extension _RevertCommands on ConatusTuiController {
     if (error == null) {
       showSystemNotice('撤销未完成：会话未切换，已把工作区恢复到第 ${stage.fromTurn} 轮。');
     } else {
-      showSystemNotice(
-        '撤销未完成：会话未切换，补偿恢复失败（$error），请检查工作区。',
-      );
+      showSystemNotice('撤销未完成：会话未切换，补偿恢复失败（$error），请检查工作区。');
     }
   }
 

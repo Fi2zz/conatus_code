@@ -5,8 +5,8 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import '../tui/session_display.dart';
 import '../tui/theme/nava_theme.dart';
-import '../tui/tui_session_picker.dart';
 import 'tab_manager.dart';
 
 /// 会话标签栏。
@@ -39,8 +39,10 @@ class TabBar extends StatelessComponent {
       final String mark = index == active ? '▸' : ' ';
       labels.add('$mark${index + 1}:${_label(tabs[index])}');
     }
-    final String hint =
-        '[${tabs.length}/$kTabCap] +  (ctrl+tab 切换 · $closeHint 关闭)';
+    final String close = closeHint.trim().isEmpty
+        ? ''
+        : ' · ${closeHint.trim()} 关闭';
+    final String hint = '[${tabs.length}/$kTabCap] +  (ctrl+tab 切换$close)';
     return '${labels.join(' │ ')}  $hint';
   }
 

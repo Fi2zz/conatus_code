@@ -2,7 +2,7 @@
 ///
 /// 标签是纯视图状态，不持有 Agent Loop，也不参与会话持久化。同一时刻只有
 /// 一个活跃标签——后台标签不会继续流式输出（单活）。关闭标签只移除视图态，
-/// 会话数据由 [SessionStore] 负责，不在这里删除。
+/// 会话数据由会话仓库（`SessionStore`）负责，不在这里删除。
 library;
 
 /// 标签容量上限（再多的会话请走 `/sessions` 面板）。
@@ -81,12 +81,14 @@ class TabManager {
   /// 关闭指定标签。
   ///
   /// 关闭活跃标签时切到邻居（优先后一个，越界则前一个）；关闭后没有标签时
-  /// 活跃下标回到 `-1`，由上层决定补一个新标签。
+  /// 活跃下标回到 `-1`，由上层决定补一个新标签。滚动位置记录一并清掉，
+  /// 重新打开同一会话时按新标签处理（回到会话末尾，而不是旧偏移）。
   void close(int index) {
     if (index < 0 || index >= _tabs.length) {
       return;
     }
-    _tabs.removeAt(index);
+    final SessionTab removed = _tabs.removeAt(index);
+    _scrollSaved.remove(removed.sessionId);
     if (_tabs.isEmpty) {
       _active = -1;
       return;
@@ -98,6 +100,20 @@ class TabManager {
     if (index == _active) {
       _active = index.clamp(0, _tabs.length - 1);
     }
+  }
+
+  /// 挤掉一个非活跃标签给系统流程（撤销 / 重做 / rewind / 故事分叉）腾位。
+  ///
+  /// 只在满额、且存在非活跃标签时生效；返回是否腾出名额。
+  bool evictInactive() {
+    if (_tabs.length <= 1) {
+      return false;
+    }
+    final int victim = _active == _tabs.length - 1
+        ? _active - 1
+        : _tabs.length - 1;
+    close(victim);
+    return true;
   }
 
   /// 更新标签标题（重命名后同步）。

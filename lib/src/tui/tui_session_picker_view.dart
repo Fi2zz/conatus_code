@@ -6,6 +6,7 @@ library;
 
 import 'package:nocterm/nocterm.dart';
 
+import 'session_display.dart';
 import 'theme/nava_theme.dart';
 import 'tui_session_picker.dart';
 import 'tui_views.dart';

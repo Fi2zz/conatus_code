@@ -656,6 +656,8 @@ token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn
 - 每条泳道保留最近 12 行（`kTeamLaneMaxLines`），连续正文会合并成一行，
   否则一条长回答就能刷掉整个泳道。
 - `Esc` 或 `Ctrl+T` 返回对话。`Ctrl+T` 在对话视图下才是展开 TODO 列表。
+- `Ctrl+Tab` / `Ctrl+Shift+Tab` 切换会话标签（`<leader>w` 关闭当前标签）；
+  团队视图用 `/team` 进入——`Ctrl+Tab` 不再切视图。
 - 任务板在泳道之后（没有任务时不渲染）。
 - 状态栏显示团队人数 / 任务完成数 / 成本（成本取共用的 costTracker 真实费率）。
 

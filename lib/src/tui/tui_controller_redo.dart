@@ -68,6 +68,7 @@ extension _RedoCommands on ConatusTuiController {
     } else if (!await switchSession(
       stage.originalSessionId,
       announce: announce,
+      system: true,
     )) {
       showSystemNotice(
         '重做未完成：工作区已恢复到第 ${stage.fromTurn} 轮，'

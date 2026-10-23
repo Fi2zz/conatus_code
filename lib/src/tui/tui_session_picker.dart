@@ -62,13 +62,6 @@ String? deriveSessionTitle(List<SessionEvent> events) {
   return null;
 }
 
-/// 短会话 id：去掉 `session_` 前缀，最多 12 字符（面板窄，完整 id 换行）。
-String shortSessionId(String id) {
-  const String prefix = 'session_';
-  final String body = id.startsWith(prefix) ? id.substring(prefix.length) : id;
-  return body.length <= 12 ? body : body.substring(0, 12);
-}
-
 /// 会话选择面板状态。
 class TuiSessionPicker {
   TuiSessionPicker(this._sessions, {required this.onChanged, this.onLoadError});

@@ -72,6 +72,34 @@ void main() {
     expect(tabs.restoreScroll(), 40);
   });
 
+  test('关闭后重开同一会话按新标签处理，不恢复旧偏移', () {
+    final TabManager tabs = TabManager()
+      ..open('s1')
+      ..saveScroll(80)
+      ..open('s2');
+
+    tabs.close(0);
+    tabs.open('s1');
+
+    expect(tabs.active, 1);
+    expect(tabs.restoreScroll(), 0);
+    expect(tabs.activeScrollSaved, isFalse);
+  });
+
+  test('满额时 evictInactive 只挤掉非活跃标签', () {
+    final TabManager tabs = TabManager();
+    for (int i = 1; i <= 8; i++) {
+      tabs.open('s$i');
+    }
+    tabs.activate(3);
+
+    expect(tabs.evictInactive(), isTrue);
+
+    expect(tabs.tabs, hasLength(7));
+    expect(tabs.active, 3);
+    expect(tabs.tabs[tabs.active].sessionId, 's4');
+  });
+
   test('最多 8 个标签，满了不再新增也不抢走活跃位置', () {
     final TabManager tabs = TabManager();
     for (int i = 1; i <= 8; i++) {
