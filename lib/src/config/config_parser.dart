@@ -42,7 +42,14 @@ class ConfigParser extends ConfigValues {
     extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
     mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
     telemetry: readBool(raw, 'telemetry', false),
+    instructions: _readInstructions(),
   );
+
+  /// 顶层 `instructions`：路径 / glob / URL 字符串数组；空串过滤掉。
+  List<String> _readInstructions() => <String>[
+    for (final String entry in readStringList(raw, 'instructions'))
+      if (entry.trim().isNotEmpty) entry.trim(),
+  ];
 
   /// 顶层 `default_model`（kimi 风格）优先，回退 `[llm] default_model`。
   LlmConfig _readLlm() {

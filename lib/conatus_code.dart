@@ -163,6 +163,32 @@ export 'src/headless/headless_guard.dart'
 export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
 export 'src/hooks/hooks.dart' show HookResult, Hooks, provideHooks, runHooks;
+export 'src/instructions/instruction_loader.dart'
+    show InstructionLoader, kInstructionFileNames;
+export 'src/instructions/instruction_prompt.dart' show InstructionPrompt;
+export 'src/instructions/instruction_source.dart'
+    show
+        InstructionDoc,
+        InstructionTarget,
+        capInstructionText,
+        expandInstructionHome,
+        isWithinWorkdir,
+        joinInstructionPath,
+        kInstructionMaxChars,
+        kInstructionTotalMaxChars,
+        kInstructionTotalTruncated,
+        kInstructionTruncated,
+        kInstructionUrlTimeout,
+        loadInstructionTargets,
+        readInstructionFile,
+        resolveInstructionTargets;
+export 'src/instructions/instruction_wiring.dart'
+    show
+        instrumentInstructionNotes,
+        instructionNotePath,
+        kInstructionNoteTools,
+        kInstructionsService,
+        provideInstructionLoader;
 export 'src/lint/dart_machine.dart'
     show
         DartDiagnostic,

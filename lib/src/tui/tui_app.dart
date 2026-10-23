@@ -35,6 +35,9 @@ import '../config/config_schema.dart';
 import '../config/project_data_dir.dart';
 import '../format/formatter_service.dart';
 import '../hooks/hooks.dart';
+import '../instructions/instruction_loader.dart';
+import '../instructions/instruction_prompt.dart';
+import '../instructions/instruction_wiring.dart';
 import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
 import '../permissions/permission_wiring.dart';
@@ -43,7 +46,6 @@ import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
 import '../tools/code_tools.dart';
 import 'ask_user_tool.dart';
-import 'project_context.dart';
 import 'system_notifier.dart';
 import 'tui_choice.dart';
 import 'tui_controller.dart';
@@ -159,7 +161,9 @@ class ConatusTuiRuntime {
   /// 工具），供 headless 单轮执行使用。
   /// [defaultAgent] 是新会话默认 Agent（`[agent] default_agent`）；未知或仅子
   /// Agent 的定义回退到注册表默认的 `build`。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 18 个），调用方是进程级
+  /// [instructions] 是顶层 `instructions` 的额外来源（路径 / glob / URL），
+  /// 追加在项目 `AGENTS.md` 之后。
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 19 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
@@ -196,6 +200,7 @@ class ConatusTuiRuntime {
     StoryConfig? story,
     PermissionConfig? permissions,
     ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
+    List<String> instructions = const <String>[],
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
@@ -663,15 +668,28 @@ class ConatusTuiRuntime {
         text: () => '用户可能在你工作途中插话：出现新的用户消息时，优先响应最新要求。',
       ),
     );
-    // 项目上下文：AGENTS.md / NAVA.md（见 project_context.dart）。注入为
-    // `'workdir'` 服务供 `/init` 等命令定位仓库根。
+    // 项目指令：全局 AGENTS.md → 项目根 → 工作目录 → 嵌套 → `instructions`
+    // （见 instructions/）。`project` 段的 text provider 每次 assemble 都会触发
+    // 重新装配，工具的嵌套发现因此下一轮即生效；注入 `'workdir'` 服务供
+    // `/init` 等命令定位仓库根。
     app.provide('workdir', resolvedWorkdir);
-    final String? projectContext = await loadProjectContext(resolvedWorkdir);
-    if (projectContext != null) {
-      prompt.section(
-        PromptSection(name: 'project', text: () => projectContext),
-      );
-    }
+    final InstructionLoader instructionLoader = provideInstructionLoader(
+      app,
+      workdir: resolvedWorkdir,
+      extra: instructions,
+    );
+    final InstructionPrompt instructionPrompt = InstructionPrompt(
+      loader: instructionLoader,
+      prompt: prompt,
+    );
+    await instructionPrompt.start();
+    app.effect(
+      () => instrumentInstructionNotes(
+        app,
+        instructionLoader,
+        onNoted: instructionPrompt.refresh,
+      ),
+    );
     // 检查点：每轮收口后快照工作区（见 checkpoint_manager.dart）。数据目录
     // 取 baseDir（缺省 ~/.nava/projects/<编码工作区>，不在工作区内），快照/
     // 恢复走 dart:io 直连。

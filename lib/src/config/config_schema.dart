@@ -569,6 +569,7 @@ class ConatusCodeConfig {
     this.extraSkillDirs = const <String>[],
     this.mergeAllSkills = false,
     this.telemetry = false,
+    this.instructions = const <String>[],
   });
 
   final LlmConfig llm;
@@ -635,4 +636,8 @@ class ConatusCodeConfig {
 
   /// 顶层 `telemetry`：遥测开关。
   final bool telemetry;
+
+  /// 顶层 `instructions`：额外指令来源（路径 / glob / URL），按书写顺序追加在
+  /// 项目 `AGENTS.md` 之后；相对路径以工作目录为基准，`~` 展开家目录。
+  final List<String> instructions;
 }

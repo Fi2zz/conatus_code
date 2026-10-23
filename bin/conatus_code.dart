@@ -150,6 +150,7 @@ Future<void> main(List<String> args) async {
     story: config.story,
     permissions: config.permissions,
     approvalMode: config.approval.mode,
+    instructions: config.instructions,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。
