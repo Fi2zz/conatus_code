@@ -69,6 +69,11 @@ export 'src/checkpoint/checkpoint_types.dart'
 export 'src/checkpoint/global_git_ignore.dart' show resolveGlobalGitIgnore;
 export 'src/checkpoint/shadow_git_runner.dart'
     show GitResult, GitRunner, ProcessGitRunner, UnavailableGitRunner;
+export 'src/commands/command_definition.dart' show CommandDefinition;
+export 'src/commands/command_expander.dart'
+    show expandCommand, kCommandShellOutputLimit;
+export 'src/commands/command_parser.dart' show parseCommandDocument;
+export 'src/commands/command_registry.dart' show CommandRegistry;
 export 'src/config/config_credentials.dart' show ConfigCredentials;
 export 'src/config/config_loader.dart' show ConfigException, loadConfig;
 export 'src/config/config_path.dart'
