@@ -1,13 +1,19 @@
 // conatus_code — 基于 conatus 运行时的终端编码智能体
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart'
     show SubAgentPermission, parseSubAgentPermission;
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/tui.dart';
+import 'package:conatus_harness/conatus_harness.dart';
 
 Future<void> main(List<String> args) async {
+  // 子命令先于选项解析：`harness` 是动词，不是选项值。
+  if (args.isNotEmpty && args.first == 'harness') {
+    exit(await runHarnessCommand(args.sublist(1)));
+  }
   final TuiOptions options = TuiOptions.parse(args);
   if (options.helpRequested) {
     stdout.write(TuiOptions.usage);
@@ -115,6 +121,7 @@ Future<void> main(List<String> args) async {
     provider = defaultModel.substring(0, slash);
     model = defaultModel.substring(slash + 1);
   }
+  final HarnessManifest? harness = _loadHarness(options.harnessPath);
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
     baseDir: projectDataDir,
     configPath: resolveConfigPath(explicit: options.configPath),
@@ -149,6 +156,7 @@ Future<void> main(List<String> args) async {
     story: config.story,
     permissions: config.permissions,
     approvalMode: config.approval.mode,
+    harness: harness,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。
@@ -188,4 +196,22 @@ Future<void> main(List<String> args) async {
   );
   await runApp(AgentTui(controller: controller));
   await runtime.dispose();
+}
+
+/// 读取并解析 `--harness` 指定的 manifest；路径为空返回 `null`，失败即退出 2。
+HarnessManifest? _loadHarness(String? path) {
+  if (path == null) return null;
+  try {
+    final Object? raw = jsonDecode(File(path).readAsStringSync());
+    if (raw is! Map<String, Object?>) {
+      throw const FormatException('顶层必须是 JSON 对象');
+    }
+    return HarnessManifest.fromJson(raw);
+  } on FileSystemException catch (error) {
+    stderr.writeln('harness 读取失败：${error.message}');
+    exit(2);
+  } on FormatException catch (error) {
+    stderr.writeln('harness 解析失败：${error.message}');
+    exit(2);
+  }
 }

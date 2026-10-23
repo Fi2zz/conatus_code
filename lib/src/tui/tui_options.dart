@@ -33,6 +33,7 @@ class TuiOptions {
     this.continueRequested = false,
     this.allowUnsafeHeadless = false,
     this.printRequested = false,
+    this.harnessPath,
   });
 
   /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
@@ -69,6 +70,9 @@ class TuiOptions {
   /// 启动（见 `validateHeadlessSafety`）。
   final bool allowUnsafeHeadless;
 
+  /// `--harness <路径>` 指定的 manifest 文件；`null` 表示不装配。
+  final String? harnessPath;
+
   /// 用法文案。
   static const String usage =
       '用法：nava '
@@ -82,8 +86,10 @@ class TuiOptions {
       '       --allow-unsafe-headless 才能启动\n'
       '  --allow-unsafe-headless  允许 headless 在沙箱关闭时启动（危险）\n'
       '  --output-format   headless 输出格式：text / json（缺省 text）\n'
+      '  --harness <路径>  装配指定 harness manifest（JSON）\n'
       '  --continue        恢复最近一次会话（--session 优先于它）\n'
-      '  --version         打印版本号后退出\n';
+      '  --version         打印版本号后退出\n'
+      '       nava harness list|show|diff|check  ↗ 管理 harness 制品\n';
 
   /// 解析命令行参数。
   ///
@@ -101,6 +107,7 @@ class TuiOptions {
     bool continueRequested = false;
     bool allowUnsafeHeadless = false;
     bool printRequested = false;
+    String? harnessPath;
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
@@ -122,6 +129,8 @@ class TuiOptions {
         }
       } else if (arg == '--config' && index + 1 < args.length) {
         configPath = args[++index];
+      } else if (arg == '--harness' && index + 1 < args.length) {
+        harnessPath = args[++index];
       } else if (arg == '--print' || arg == '-p') {
         printRequested = true;
         final bool hasValue =
@@ -146,6 +155,7 @@ class TuiOptions {
       continueRequested: continueRequested,
       allowUnsafeHeadless: allowUnsafeHeadless,
       printRequested: printRequested,
+      harnessPath: harnessPath,
     );
   }
 }

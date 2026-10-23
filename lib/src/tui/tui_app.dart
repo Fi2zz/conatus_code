@@ -12,6 +12,7 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
+import 'package:conatus_harness/conatus_harness.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
@@ -190,6 +191,7 @@ class ConatusTuiRuntime {
     StoryConfig? story,
     PermissionConfig? permissions,
     ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
+    HarnessManifest? harness,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
@@ -706,6 +708,8 @@ class ConatusTuiRuntime {
       },
       options: CronRuntimeOptions(notifier: systemCronNotifier()),
     );
+
+    if (harness != null) applyHarness(app, harness);
 
     return ConatusTuiRuntime._(
       app: app,
