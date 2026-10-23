@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:nocterm/nocterm.dart';
 
+import '../agents/agent_picker.dart';
 import '../diff/tui_diff_view.dart';
 import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
@@ -653,6 +654,18 @@ class _AgentTuiState extends State<AgentTui> {
     if (_onPlanKey(event)) {
       return true;
     }
+    if (_controller.agentPicker.open) {
+      if (event.logicalKey == LogicalKey.arrowUp) {
+        _controller.moveAgentPicker(-1);
+      } else if (event.logicalKey == LogicalKey.arrowDown) {
+        _controller.moveAgentPicker(1);
+      } else if (event.logicalKey == LogicalKey.enter) {
+        unawaited(_controller.pickAgent());
+      } else if (event.logicalKey == LogicalKey.escape) {
+        _controller.closeAgentPicker();
+      }
+      return true; // 面板打开时吞掉按键，避免误输入。
+    }
     if (_controller.picker.open) {
       if (event.logicalKey == LogicalKey.arrowUp) {
         _controller.movePicker(-1);
@@ -791,6 +804,8 @@ class _AgentTuiState extends State<AgentTui> {
               currentId: _controller.sessionId,
               selected: _controller.picker.index,
             ),
+          if (_controller.agentPicker.open)
+            AgentPickerView(picker: _controller.agentPicker),
           if (_controller.formPrompt.open)
             TuiFormView(
               request: _controller.formPrompt.request!,
@@ -828,6 +843,7 @@ class _AgentTuiState extends State<AgentTui> {
               shellMode: _shell.active,
               focused:
                   !_controller.picker.open &&
+                  !_controller.agentPicker.open &&
                   !_controller.choice.open &&
                   !_controller.providerPrompt.open &&
                   !_controller.formPrompt.open &&
@@ -839,7 +855,7 @@ class _AgentTuiState extends State<AgentTui> {
             ),
           TuiStatusBar(
             shellMode: _shell.active,
-            pickerOpen: _controller.picker.open,
+            pickerOpen: _controller.picker.open || _controller.agentPicker.open,
             busy: _controller.busy,
             tick: _tick,
             modelLabel: _controller.modelLabel,

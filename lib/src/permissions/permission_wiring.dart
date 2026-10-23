@@ -38,6 +38,7 @@ class PermissionWiring {
 
   List<PermissionRule> _projectRules = <PermissionRule>[];
   List<PermissionRule> _sessionRules = <PermissionRule>[];
+  List<PermissionRule> _agentRules = <PermissionRule>[];
   ToolRisk? _askThreshold = ToolRisk.high;
   String _agentId = 'build';
 
@@ -49,10 +50,14 @@ class PermissionWiring {
   int get skippedRules => _skippedRules;
   int _skippedRules = 0;
 
-  /// 当前合成后的规则（config → project → session）。
-  List<PermissionRule> get rules => List<PermissionRule>.unmodifiable(
-    <PermissionRule>[...configRules, ..._projectRules, ..._sessionRules],
-  );
+  /// 当前合成后的规则（config → project → session → agent）。
+  List<PermissionRule> get rules =>
+      List<PermissionRule>.unmodifiable(<PermissionRule>[
+        ...configRules,
+        ..._projectRules,
+        ..._sessionRules,
+        ..._agentRules,
+      ]);
 
   /// 载入项目规则；文件缺失 / 损坏时按空规则处理（不阻塞启动），
   /// 但把失败原因留在 [loadError] 供启动提示与 `/doctor` 展示。
@@ -66,6 +71,18 @@ class PermissionWiring {
   /// 替换会话级规则（切会话时由控制器设为空列表）。
   void setSessionRules(List<PermissionRule> rules) {
     _sessionRules = _normalizeRules(rules, workdir);
+    _publish();
+  }
+
+  /// 替换当前 Agent 自带规则；**只收紧**：丢弃 `allow`，只保留 `deny` / `ask`。
+  ///
+  /// Agent 规则追加在 config → project → session 之后，因此 deny 覆盖前面的
+  /// allow；反向放宽（Agent 的 allow 覆盖项目 deny）被直接过滤掉。
+  void setAgentRules(List<PermissionRule> rules) {
+    _agentRules = _normalizeRules(<PermissionRule>[
+      for (final PermissionRule rule in rules)
+        if (rule.effect != PermissionEffect.allow) rule,
+    ], workdir);
     _publish();
   }
 
@@ -120,6 +137,7 @@ class PermissionWiring {
       ...configRules,
       ..._projectRules,
       ..._sessionRules,
+      ..._agentRules,
     ], workdir);
     for (final PermissionRule rule in rules) {
       for (final PermissionRule current in existing) {

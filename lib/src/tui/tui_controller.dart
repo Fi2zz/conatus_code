@@ -23,11 +23,17 @@ import 'package:conatus_team/conatus_team.dart';
 import 'package:conatus_tts/conatus_tts.dart';
 
 import '../../providers.dart';
+import '../agents/agent_definition.dart';
+import '../agents/agent_picker.dart';
+import '../agents/agent_registry.dart';
 import '../autonomous/autonomous_assembly.dart';
 import '../background/background_tasks.dart';
 import '../budget/cost_tracker.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
+import '../commands/command_definition.dart';
+import '../commands/command_dispatcher.dart';
+import '../commands/command_registry.dart';
 import '../config/config_path.dart';
 import '../config/config_writer.dart';
 import '../config/project_data_dir.dart';
@@ -129,6 +135,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.ttsSink,
     this.initialPermissionMode = TuiPermissionMode.askWhenNeeded,
     this.storyEnabled = false,
+    this.initialAgentId,
     List<String> fallbackModels = const <String>[],
     RetryPolicy retryPolicy = const RetryPolicy(),
   }) : _app = app,
@@ -178,6 +185,18 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 是否装配故事层（`[story] enabled`）。
   final bool storyEnabled;
+
+  /// 启动时指定的 Agent ID；空 / 未知 / 仅子 Agent 时回退到注册表默认值。
+  final String? initialAgentId;
+
+  /// 当前会话 Agent ID（`/agents` 切换后更新）。
+  String _agentId = 'build';
+
+  /// 当前 Agent 注入的 system prompt 段撤销函数。
+  Disposer? _agentPromptDisposer;
+
+  /// 自定义命令临时覆盖的还原点（本轮结束后在 [_afterTurn] 还原）。
+  _TurnOverride? _turnOverride;
 
   /// 配置里的回退链（`[llm] fallback_models`）；`/model` 切换主模型后仍跟随。
   final List<String> _fallbackModels;
@@ -303,6 +322,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// Plan Mode 面板浮层（`/plan`）。
   late final TuiPlanPrompt planPrompt = TuiPlanPrompt(onChanged: _refresh);
 
+  /// Agent 选择面板（`/agents` 打开）。
+  late final AgentPicker agentPicker = AgentPicker(onChanged: _refresh);
+
   /// 表单浮层。
   late final TuiFormPrompt formPrompt = TuiFormPrompt(onChanged: _refresh);
 
@@ -394,6 +416,20 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 当前会话 id。
   String get sessionId => _sessionId;
 
+  /// 当前会话 Agent ID。
+  String get agentId => _agentId;
+
+  /// Plan Mode 是否激活（`/plan` 或 `plan` Agent）。
+  bool get planModeActive => _planMode?.state == PlanModeState.active;
+
+  /// 当前 Agent 定义；注册表未装配或未命中时为 `null`。
+  AgentDefinition? get agentDefinition => _agentRegistry?.byId(_agentId);
+
+  AgentRegistry? get _agentRegistry => _app.get<AgentRegistry>('agentRegistry');
+
+  CommandRegistry? get _commandRegistry =>
+      _app.get<CommandRegistry>('commandRegistry');
+
   /// `/diff` 视图是否打开。
   bool get diffOpen => _diffOpen;
 
@@ -476,14 +512,36 @@ class ConatusTuiController implements TuiUserPromptHost {
       'permissionWiring',
     );
     if (wiring != null) {
-      wiring.applyMode(askThreshold: threshold, agentId: 'build');
+      wiring.applyMode(askThreshold: threshold, agentId: _agentId);
       return;
     }
     final PermissionScopeSlot? slot = _app.get<PermissionScopeSlot>(
       kPermissionScopeService,
     );
     slot?.set(
-      PermissionScope(rules: slot.current.rules, askThreshold: threshold),
+      PermissionScope(
+        rules: slot.current.rules,
+        askThreshold: threshold,
+        agentId: _agentId,
+      ),
+    );
+  }
+
+  /// 把当前 Agent 的系统提示注入 system prompt（重复调用先撤销上一段）。
+  void _applyAgentPrompt() {
+    _agentPromptDisposer?.call();
+    _agentPromptDisposer = null;
+    final String system = agentDefinition?.system.trim() ?? '';
+    if (system.isEmpty) {
+      return;
+    }
+    final SystemPrompt? prompt = _app.get<SystemPrompt>('systemPrompt');
+    _agentPromptDisposer = prompt?.section(
+      PromptSection(
+        name: 'agent-${identityHashCode(this)}',
+        order: -10,
+        text: () => system,
+      ),
     );
   }
 
@@ -492,6 +550,8 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 未指定会话 id（构造时 `initialSession` 为 `null`）时，先经会话仓库新建
   /// 一个 `session_<uuid>` 会话再绑定，不会恢复历史会话。
   Future<void> start() async {
+    _agentId = _startupAgentId();
+    await _applyStartupAgentModel();
     if (_sessionId.isEmpty) {
       _sessionId = _sessions.create().id;
     }
@@ -505,6 +565,32 @@ class ConatusTuiController implements TuiUserPromptHost {
       if (registry != null) {
         providerPrompt.show(providerItems(registry));
       }
+    }
+  }
+
+  /// 解析启动 Agent：显式配置优先；未知 / 仅子 Agent 回退注册表默认值。
+  String _startupAgentId() {
+    final AgentRegistry? registry = _agentRegistry;
+    final String requested = initialAgentId?.trim() ?? '';
+    if (registry == null) {
+      return requested.isEmpty ? 'build' : requested;
+    }
+    if (requested.isNotEmpty) {
+      final AgentDefinition? explicit = registry.byId(requested);
+      if (explicit != null && explicit.mode != AgentMode.subagent) {
+        return explicit.id;
+      }
+    }
+    return registry.defaultAgent.id;
+  }
+
+  /// 启动 Agent 自带模型时先换链，再绑定会话。
+  Future<void> _applyStartupAgentModel() async {
+    final String? spec = _agentRegistry?.byId(_agentId)?.model;
+    if (spec == null) return;
+    final String? warning = await _applyModelSpec(spec, rebindNow: false);
+    if (warning != null) {
+      transcript.add(TuiRole.system, '启动 Agent 的模型不可用：$warning，沿用当前模型。');
     }
   }
 
@@ -944,9 +1030,15 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'quit' || 'exit':
         onExit?.call();
       case 'help':
-        transcript.openHelp(buildTuiHelpText(extra: _skillCommands));
+        transcript.openHelp(
+          buildTuiHelpText(
+            extra: <TuiCommand>[..._skillCommands, ..._customCommands],
+          ),
+        );
       case 'new':
         await newSession();
+      case 'agents':
+        openAgentPicker();
       case 'sessions':
         await openPicker();
       case 'session':
@@ -1012,22 +1104,324 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'clear':
         transcript.clear();
       default:
-        // 静态命令都不匹配时，把命令词当作技能名试一次。
-        if (!await _runSkill(command, arg)) {
+        // 内置命令优先；未命中再查自定义命令，最后才把命令词当技能名试一次。
+        if (!await runCustomCommand(command, arg) &&
+            !await _runSkill(command, arg)) {
           transcript.add(TuiRole.system, '未知命令：/$command（/help 查看可用命令）');
         }
     }
     _refresh();
   }
 
-  /// 当前可用的斜杠命令：静态表 + 技能注册表投影出的技能命令。
+  /// 当前可用的斜杠命令：静态表 + 技能注册表投影 + 自定义命令。
+  ///
+  /// 内置命令排在最前；与内置 / 技能同名的自定义命令不进入菜单（执行时同样
+  /// 被内置命令挡住）。
   List<TuiCommand> get commands => <TuiCommand>[
     ...tuiCommands,
     ..._skillCommands,
+    ..._customCommands,
   ];
 
   List<TuiCommand> get _skillCommands =>
       skillTuiCommands(_app.get<SkillRegistry>('skillRegistry'));
+
+  List<TuiCommand> get _customCommands {
+    final CommandDispatcher? dispatcher = _dispatcher;
+    if (dispatcher == null) return const <TuiCommand>[];
+    final Set<String> reserved = <String>{
+      for (final TuiCommand command in tuiCommands) command.name,
+      for (final TuiCommand command in _skillCommands) command.name,
+    };
+    return <TuiCommand>[
+      for (final CommandDefinition def in dispatcher.all)
+        if (!reserved.contains(def.name) &&
+            def.name != 'skill' &&
+            !def.name.startsWith(kTuiSkillCommandPrefix))
+          TuiCommand(
+            name: def.name,
+            description: dispatcher.menuDescription(def),
+          ),
+    ];
+  }
+
+  /// 构造分发器；命令 / Agent 注册表任一缺失时返回 `null`（功能降级）。
+  CommandDispatcher? get _dispatcher {
+    final CommandRegistry? registry = _commandRegistry;
+    final AgentRegistry? agents = _agentRegistry;
+    if (registry == null || agents == null) return null;
+    return CommandDispatcher(
+      registry: registry,
+      agents: agents,
+      providers: _app.providers,
+      runShell: _runCommandShell,
+    );
+  }
+
+  /// 展开命令模板时的 shell 块执行：走用户直发的交互 shell，失败即抛出。
+  Future<String> _runCommandShell(String command) async {
+    final ShellExecutor? shell =
+        _app.get<ShellExecutor>('shellInteractive') ??
+        _app.get<ShellExecutor>('shell');
+    if (shell == null) {
+      throw StateError('shell 不可用');
+    }
+    final ShellRunResult result = await shell.run(
+      shell.resolve(
+        ShellExecRequest(command: command, timeoutMs: kShellBangTimeoutMs),
+      ),
+    );
+    if (result.timedOut) {
+      throw StateError('命令超时（${kShellBangTimeoutMs ~/ 1000}s）');
+    }
+    final int? code = result.exitCode;
+    if (code == 0) return result.stdout.text;
+    final String out = result.stdout.text;
+    final String err = result.stderr.text;
+    final String body = out.isEmpty ? err : (err.isEmpty ? out : '$out\n$err');
+    throw StateError('命令失败（exit $code）：${body.isEmpty ? '（无输出）' : body}');
+  }
+
+  /// 执行一条自定义命令；不是自定义命令时返回 `false`（调用方继续兜底）。
+  ///
+  /// 展开失败（含 shell 块失败）只上屏提示，不提交任何 prompt。
+  Future<bool> runCustomCommand(String name, String args) async {
+    final CommandDispatcher? dispatcher = _dispatcher;
+    final CommandDefinition? def = dispatcher?.byName(name);
+    if (def == null) return false;
+    if (busy || _revertInFlight) {
+      showSystemNotice('有操作进行中，命令 /$name 稍后再试。');
+      return true;
+    }
+    final String prompt;
+    try {
+      prompt = await dispatcher!.expand(def, args);
+    } catch (error) {
+      showSystemNotice('命令 /$name 展开失败：$error');
+      return true;
+    }
+    if (prompt.trim().isEmpty) {
+      showSystemNotice('命令 /$name 没有可提交的内容。');
+      return true;
+    }
+    if (def.subagent) {
+      await _runCommandSubagent(name, def, prompt);
+      return true;
+    }
+    await _applyCommandOverrides(def);
+    transcript.add(TuiRole.system, '已展开自定义命令 /$name。');
+    await submit(prompt);
+    return true;
+  }
+
+  /// 自定义命令的 `subagent: true`：前台调用 `spawn_agent`，结果写入记录。
+  Future<void> _runCommandSubagent(
+    String name,
+    CommandDefinition def,
+    String prompt,
+  ) async {
+    final ToolRegistry tools = _app.tools;
+    if (tools.get('spawn_agent') == null) {
+      showSystemNotice('命令 /$name 需要 spawn_agent，但当前未装配。');
+      return;
+    }
+    transcript.add(TuiRole.system, '命令 /$name 以前台子 Agent 执行，请稍候。');
+    _refresh();
+    final ToolResult result = await tools.call(
+      ToolCall(
+        name: 'spawn_agent',
+        arguments: <String, Object?>{
+          'task': prompt,
+          if (def.agent != null) 'agent': def.agent,
+        },
+      ),
+    );
+    if (result.isError) {
+      showSystemNotice('子 Agent 执行失败：${result.content}');
+      return;
+    }
+    transcript.add(TuiRole.system, result.content);
+    _refresh();
+  }
+
+  /// 应用命令声明的 Agent / 模型覆盖，并登记本轮结束后的还原点。
+  Future<void> _applyCommandOverrides(CommandDefinition def) async {
+    if (def.agent == null && def.model == null) return;
+    final LlmChain? current = _app.get<LlmChainSlot>('llmChainSlot')?.current;
+    final _TurnOverride restore = _TurnOverride(
+      agentId: _agentId,
+      entries: current?.entries ?? const <String>[],
+      modelLabel: modelLabel,
+    );
+    bool applied = false;
+    if (def.agent != null) {
+      applied = await _activateAgent(def.agent!, announce: false);
+      if (!applied) {
+        showSystemNotice('Agent ${def.agent} 不可用，沿用当前 Agent。');
+      }
+    }
+    if (def.model != null) {
+      if (restore.entries.isEmpty) {
+        showSystemNotice('当前没有可用模型链，模型覆盖已跳过。');
+      } else {
+        final String? warning = await _applyModelSpec(def.model!);
+        if (warning != null) {
+          showSystemNotice('$warning，沿用当前模型。');
+        } else {
+          applied = true;
+        }
+      }
+    }
+    if (applied) _turnOverride = restore;
+  }
+
+  /// 按 `provider[/model]` 临时替换 LLM 链；失败返回可展示原因。
+  Future<String?> _applyModelSpec(String spec, {bool rebindNow = true}) async {
+    final ProviderRegistry? registry = _app.providers;
+    if (registry == null) return '未装配模型提供商';
+    final int slash = spec.indexOf('/');
+    final String provider = (slash < 0 ? spec : spec.substring(0, slash))
+        .trim();
+    final String? typedModel = slash < 0
+        ? null
+        : spec.substring(slash + 1).trim();
+    final ProviderProfile? profile = registry.byName(provider);
+    if (profile == null) return '未知提供商：$provider';
+    final String label = (typedModel != null && typedModel.isNotEmpty)
+        ? typedModel
+        : (profile.defaultModel ?? '');
+    if (label.isEmpty) return '提供商 $provider 没有可用模型';
+    final LlmChain? chain = buildLlmChain(
+      registry,
+      entries: <String>['$provider/$label', ..._fallbackModels],
+      policy: _retryPolicy,
+      notices: _app.get<LlmNotices>('llmNotices'),
+    );
+    final LlmChainSlot? slot = _app.get<LlmChainSlot>('llmChainSlot');
+    final void Function(FallbackLlm)? swap = switchLlm;
+    if (chain == null) return '没有可用模型：$provider/$label';
+    if (slot == null || swap == null) return '模型切换未装配';
+    slot.current = chain;
+    swap(chain.llm);
+    modelLabel = label;
+    if (rebindNow) await rebind();
+    return null;
+  }
+
+  /// 本轮结束后还原自定义命令的 Agent / 模型覆盖。
+  Future<void> _restoreTurnOverride() async {
+    final _TurnOverride? restore = _turnOverride;
+    if (restore == null) return;
+    _turnOverride = null;
+    _agentId = restore.agentId;
+    final LlmChainSlot? slot = _app.get<LlmChainSlot>('llmChainSlot');
+    final void Function(FallbackLlm)? swap = switchLlm;
+    if (restore.entries.isNotEmpty && slot != null && swap != null) {
+      final ProviderRegistry? registry = _app.providers;
+      final LlmChain? chain = registry == null
+          ? null
+          : buildLlmChain(
+              registry,
+              entries: restore.entries,
+              policy: _retryPolicy,
+              notices: _app.get<LlmNotices>('llmNotices'),
+            );
+      if (chain != null) {
+        slot.current = chain;
+        swap(chain.llm);
+        modelLabel = restore.modelLabel;
+      }
+    }
+    // rebind 会清空排队输入；还原期间先把队列存下来，成功重绑后再放回，
+    // 让本轮结束后原本排队的消息照常投递。
+    final List<(String, List<TuiAttachment>)> pending =
+        List<(String, List<TuiAttachment>)>.of(_queue);
+    if (ready && !busy) {
+      final bool rebound = await rebind();
+      if (rebound) _queue.addAll(pending);
+    }
+    _syncAgentPlanMode(restore.agentId);
+  }
+
+  /// `/agents`：打开 Agent 选择面板。
+  void openAgentPicker() {
+    final AgentRegistry? registry = _agentRegistry;
+    if (registry == null) {
+      showSystemNotice('Agent 注册表未装配，无法选择 Agent。');
+      return;
+    }
+    agentPicker.show(registry, currentId: _agentId);
+  }
+
+  /// 关闭 Agent 选择面板。
+  void closeAgentPicker() => agentPicker.close();
+
+  /// 移动 Agent 选择面板光标。
+  void moveAgentPicker(int delta) => agentPicker.move(delta);
+
+  /// 确认 Agent 选择：仅子 Agent 条目只提示，不切换。
+  Future<void> pickAgent() async {
+    final AgentDefinition? agent = agentPicker.selectedAgent;
+    final AgentDefinition? blocked = agentPicker.focused;
+    agentPicker.close();
+    if (agent == null) {
+      showSystemNotice(
+        blocked == null ? '没有可切换的 Agent。' : '${blocked.id} 只能作为子 Agent 使用。',
+      );
+      return;
+    }
+    await switchAgent(agent.id);
+  }
+
+  /// 切换当前会话 Agent：重建 system prompt / 模型 / 权限作用域。
+  Future<bool> switchAgent(String id) async {
+    if (busy || _revertInFlight) {
+      showSystemNotice('有操作进行中，请稍候再切换 Agent。');
+      return false;
+    }
+    final AgentDefinition? def = _agentRegistry?.byId(id);
+    if (def == null) {
+      showSystemNotice('未知 Agent：$id');
+      return false;
+    }
+    if (def.mode == AgentMode.subagent) {
+      showSystemNotice('Agent ${def.id} 只能作为子 Agent 使用。');
+      return false;
+    }
+    await _activateAgent(def.id, announce: true);
+    return true;
+  }
+
+  /// 激活 Agent：先换模型（若有），再重绑会话并同步 Plan Mode。
+  Future<bool> _activateAgent(String id, {required bool announce}) async {
+    final AgentDefinition? def = _agentRegistry?.byId(id);
+    if (def == null || def.mode == AgentMode.subagent) return false;
+    _agentId = def.id;
+    if (def.model != null) {
+      final String? warning = await _applyModelSpec(
+        def.model!,
+        rebindNow: false,
+      );
+      if (warning != null) {
+        showSystemNotice('Agent ${def.id} 的模型不可用：$warning，沿用当前模型。');
+      }
+    }
+    await rebind();
+    _syncAgentPlanMode(def.id);
+    if (announce) showSystemNotice('已切换到 Agent「${def.id}」。');
+    return true;
+  }
+
+  /// `plan` 进入 Plan Mode，`build` 退出；其余 Agent 不改动 Plan Mode。
+  void _syncAgentPlanMode(String id) {
+    final PlanMode? planMode = _planMode;
+    if (planMode == null) return;
+    if (id == 'plan' && planMode.state != PlanModeState.active) {
+      planMode.enter();
+    } else if (id == 'build' && planMode.state == PlanModeState.active) {
+      planMode.exit();
+    }
+  }
 
   /// 把 `/skill:<技能名> [补充要求]` 当作技能调用；不是 `skill:` 前缀命令时
   /// 返回 `false`（裸 `/skill` 给用法提示）。
@@ -2120,6 +2514,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       await provideStory(ctx, sessionId: id, session: session, review: true);
     }
     _agent = ctx.agentLoop;
+    _applyAgentPrompt();
     // 轮内注入：排队消息与人的编辑通报在模型组下一次请求前取走。
     _agent?.steering = _takeQueuedForSteering;
     _planMode = ctx.planMode;
@@ -2131,11 +2526,14 @@ class ConatusTuiController implements TuiUserPromptHost {
       session,
       fallback: initialPermissionMode,
     );
-    // 会话规则初始为空；保留独立层以便后续按会话扩展（config → project →
-    // session，后者覆盖前者）。
-    _app
-        .get<PermissionWiring>('permissionWiring')
-        ?.setSessionRules(const <PermissionRule>[]);
+    // 会话规则初始为空；Agent 自带规则只收紧（allow 被丢弃并追加在末尾）。
+    final PermissionWiring? wiring = _app.get<PermissionWiring>(
+      'permissionWiring',
+    );
+    wiring?.setSessionRules(const <PermissionRule>[]);
+    wiring?.setAgentRules(
+      agentDefinition?.permissions ?? const <PermissionRule>[],
+    );
     _syncPermissionMode();
     transcript.rebuildFrom(session);
     _eventSub = session.onEvent((SessionEvent event) {
@@ -2205,6 +2603,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     _checkpointBase = null;
     _queue.clear();
     _app.providers?.sessionId = null;
+    _agentPromptDisposer?.call();
+    _agentPromptDisposer = null;
     _sessionCtx?.dispose();
     _sessionCtx = null;
     _agent = null;
@@ -2239,6 +2639,9 @@ class ConatusTuiController implements TuiUserPromptHost {
         transcript.add(TuiRole.system, error);
       }
     }
+    // 自定义命令的 Agent / 模型覆盖只作用于这一轮：收口后先还原，再投递排队
+    // 消息，避免覆盖泄漏到下一条输入。
+    await _restoreTurnOverride();
     // 消息队列：收口后投递下一条排队输入（一次一条，依次衔接）。
     // 多数时候队列已被 steering 取空（轮内注入），这里是兜底路径。
     if (_queue.isNotEmpty && !busy) {
@@ -2318,6 +2721,24 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   void _refresh() => onChanged?.call();
+}
+
+/// 自定义命令的临时覆盖还原点。
+class _TurnOverride {
+  const _TurnOverride({
+    required this.agentId,
+    required this.entries,
+    required this.modelLabel,
+  });
+
+  /// 命令执行前的 Agent ID。
+  final String agentId;
+
+  /// 命令执行前的 LLM 链候选项（`provider/model`，首项为主）。
+  final List<String> entries;
+
+  /// 命令执行前的模型标签。
+  final String modelLabel;
 }
 
 /// 把 costTracker 适配成团队的 [TeamCostSource]。

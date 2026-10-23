@@ -29,6 +29,7 @@ import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
 import '../checkpoint/checkpoint_backend.dart';
 import '../checkpoint/checkpoint_manager.dart';
+import '../commands/command_registry.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
 import '../config/project_data_dir.dart';
@@ -156,7 +157,9 @@ class ConatusTuiRuntime {
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
   /// [interactive] 为 `false` 时跳过人机交互件（浮层 / 审批服务 / `ask_user`
   /// 工具），供 headless 单轮执行使用。
-  // REASON: 装配入口的参数聚合是既定形态（本参数已 17 个），调用方是进程级
+  /// [defaultAgent] 是新会话默认 Agent（`[agent] default_agent`）；未知或仅子
+  /// Agent 的定义回退到注册表默认的 `build`。
+  // REASON: 装配入口的参数聚合是既定形态（本参数已 18 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
     String? sessionDir,
@@ -171,6 +174,7 @@ class ConatusTuiRuntime {
     String? model,
     int maxSteps = 8,
     SubAgentPermission subagentPermission = SubAgentPermission.inherit,
+    String? defaultAgent,
     FallbackLlm? llm,
     RetryPolicy? retryPolicy,
     List<String> fallbackModels = const <String>[],
@@ -513,8 +517,14 @@ class ConatusTuiRuntime {
     // ── 自定义 Agent：发现 + spawn_agent 的 profile 解析 ──────────
     final AgentRegistry agentRegistry = await AgentRegistry.load(
       workdir: resolvedWorkdir,
+      defaultId: defaultAgent,
     );
     app.provide('agentRegistry', agentRegistry);
+    // 自定义命令：只读发现，`.opencode` 仅读取不写入（见 CommandRegistry）。
+    final CommandRegistry commandRegistry = await CommandRegistry.load(
+      workdir: resolvedWorkdir,
+    );
+    app.provide('commandRegistry', commandRegistry);
     final AgentProfileResolver agentProfiles = AgentProfileResolver(
       registry: agentRegistry,
       providers: registry,

@@ -9,6 +9,7 @@ export 'src/agents/agent_builtins.dart' show kBuiltinAgents;
 export 'src/agents/agent_definition.dart' show AgentDefinition, AgentMode;
 export 'src/agents/agent_parser.dart'
     show AgentParseResult, parseAgentDocument, parseAgentDocumentDetailed;
+export 'src/agents/agent_picker.dart' show AgentPicker, AgentPickerView;
 export 'src/agents/agent_registry.dart' show AgentRegistry;
 export 'src/agents/agent_resolver.dart' show AgentProfileResolver;
 export 'src/assembly/permission_mode.dart' show toTuiPermissionMode;
@@ -76,6 +77,7 @@ export 'src/checkpoint/global_git_ignore.dart' show resolveGlobalGitIgnore;
 export 'src/checkpoint/shadow_git_runner.dart'
     show GitResult, GitRunner, ProcessGitRunner, UnavailableGitRunner;
 export 'src/commands/command_definition.dart' show CommandDefinition;
+export 'src/commands/command_dispatcher.dart' show CommandDispatcher;
 export 'src/commands/command_expander.dart'
     show expandCommand, kCommandShellOutputLimit;
 export 'src/commands/command_parser.dart'

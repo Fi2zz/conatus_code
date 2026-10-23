@@ -126,6 +126,7 @@ Future<void> main(List<String> args) async {
     subagentPermission:
         parseSubAgentPermission(config.agent.subagentPermission) ??
         SubAgentPermission.inherit,
+    defaultAgent: config.agent.defaultAgent,
     retryPolicy: config.llm.retry.toPolicy(),
     fallbackModels: config.llm.fallbackModels,
     turnBudget: TurnBudget(

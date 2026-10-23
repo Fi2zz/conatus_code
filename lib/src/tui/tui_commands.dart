@@ -48,6 +48,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '打开模型选择浮层（搜索过滤，Enter 切换）',
   ),
   TuiCommand(
+    name: 'agents',
+    description: '切换主会话 Agent（plan / build / 自定义；↑↓ 选择，Enter 确认）',
+  ),
+  TuiCommand(
     name: 'provider',
     description: '打开提供商管理浮层（add 导入 / <名字> 切换 / remove 删除）',
   ),
