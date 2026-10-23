@@ -1,4 +1,4 @@
-/// MCP 装配的 OAuth 运行时行为：无令牌只跳过该 server，有令牌正常挂载。
+/// MCP 装配的 OAuth 运行时行为：无令牌先试未鉴权，401 才跳过该 server。
 library;
 
 import 'dart:io';
@@ -40,23 +40,47 @@ void main() {
     command: 'npx',
   );
 
-  test('无令牌：该 server 标记 needs_auth 并跳过，其余照常挂载', () async {
+  /// 假传输：对指定 server 在 connect 时模拟 401。
+  McpTransport Function(McpServerConfig) fakeFactory({
+    required String needsAuth,
+  }) => (McpServerConfig config) {
+    final FakeMcpTransport transport = fakes.build(config);
+    if (config.name == needsAuth) {
+      transport.connectError = const McpException('needs_auth', 'HTTP 401');
+    }
+    return transport;
+  };
+
+  test('受保护 server 无令牌：标 needs_auth 并跳过，其余照常', () async {
     final List<String> messages = <String>[];
     final McpRegistry registry = (await attachMcpServers(
       ctx,
       <McpServerSpec>[local, remote],
-      transportFactory: fakes.build,
+      transportFactory: fakeFactory(needsAuth: 'net'),
       oauthStore: McpOAuthStore(dir.path),
       onError: messages.add,
     ))!;
 
     expect(registry.servers, <String>['fs']);
-    expect(fakes.transports.keys, <String>['fs']);
     expect(messages, hasLength(1));
     expect(messages.single, contains('net'));
     expect(messages.single, contains('needs_auth'));
     expect(messages.single, contains('mcp auth net'));
     expect(dir.listSync(), isEmpty);
+  });
+
+  test('公开 server 无令牌：先按未鉴权连接，照常挂载', () async {
+    final List<String> messages = <String>[];
+    final McpRegistry registry = (await attachMcpServers(
+      ctx,
+      <McpServerSpec>[remote],
+      transportFactory: fakes.build,
+      oauthStore: McpOAuthStore(dir.path),
+      onError: messages.add,
+    ))!;
+
+    expect(registry.servers, <String>['net']);
+    expect(messages, isEmpty);
   });
 
   test('有令牌：正常挂载，且令牌不进配置头', () async {
@@ -76,6 +100,50 @@ void main() {
     expect(messages, isEmpty);
     expect(fakes.configs['net']!.headers, isEmpty);
     expect((await store.load('net'))!.accessToken, 'access-secret');
+  });
+
+  test('静态 Authorization 头：不要求 OAuth，照常挂载', () async {
+    final List<String> messages = <String>[];
+    const McpServerSpec spec = McpServerSpec(
+      name: 'net',
+      type: McpServerType.http,
+      url: 'https://example.com/mcp',
+      headers: <String, String>{'Authorization': 'Bearer static'},
+    );
+
+    final McpRegistry registry = (await attachMcpServers(
+      ctx,
+      <McpServerSpec>[spec],
+      transportFactory: fakes.build,
+      oauthStore: McpOAuthStore(dir.path),
+      onError: messages.add,
+    ))!;
+
+    expect(registry.servers, <String>['net']);
+    expect(messages, isEmpty);
+    expect(fakes.configs['net']!.headers['Authorization'], 'Bearer static');
+  });
+
+  test('显式 oauth.enabled = true 时压过静态头，401 仍标 needs_auth', () async {
+    final List<String> messages = <String>[];
+    const McpServerSpec spec = McpServerSpec(
+      name: 'net',
+      type: McpServerType.http,
+      url: 'https://example.com/mcp',
+      headers: <String, String>{'Authorization': 'Bearer static'},
+      oauth: McpOAuthConfig(),
+    );
+
+    final McpRegistry registry = (await attachMcpServers(
+      ctx,
+      <McpServerSpec>[spec],
+      transportFactory: fakeFactory(needsAuth: 'net'),
+      oauthStore: McpOAuthStore(dir.path),
+      onError: messages.add,
+    ))!;
+
+    expect(registry.servers, isEmpty);
+    expect(messages.single, contains('needs_auth'));
   });
 
   test('oauth = false：没有令牌也照常挂载', () async {
@@ -100,7 +168,7 @@ void main() {
     expect(messages, isEmpty);
   });
 
-  test('缺令牌的 server 不影响其余远程 server', () async {
+  test('缺令牌的受保护 server 不影响其余远程 server', () async {
     await McpOAuthStore(
       dir.path,
     ).save('oknet', const McpOAuthToken(accessToken: 't'));
@@ -116,7 +184,12 @@ void main() {
           url: 'https://example.com/sse',
         ),
       ],
-      transportFactory: fakes.build,
+      transportFactory: (McpServerConfig config) {
+        if (config.name == 'net') {
+          return fakeFactory(needsAuth: 'net')(config);
+        }
+        return fakes.build(config);
+      },
       oauthStore: McpOAuthStore(dir.path),
       onError: messages.add,
     ))!;

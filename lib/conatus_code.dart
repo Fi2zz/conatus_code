@@ -210,6 +210,7 @@ export 'src/lint/linter.dart'
         kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
+export 'src/mcp/mcp_oauth_runtime.dart' show McpOAuthRuntime;
 export 'src/mcp/mcp_prompt_commands.dart'
     show
         kMcpReservedServerName,

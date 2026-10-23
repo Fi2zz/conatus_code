@@ -38,7 +38,6 @@ void main() {
       name: 'net',
       type: McpServerType.http,
       url: 'https://example.com/mcp',
-      oauth: McpOAuthConfig(enabled: false),
       headers: <String, String>{'Authorization': r'Bearer ${MISSING_KEY}'},
     ),
   ];
@@ -140,7 +139,6 @@ void main() {
           name: 'net',
           type: McpServerType.http,
           url: 'https://x',
-          oauth: McpOAuthConfig(enabled: false),
           headers: <String, String>{'Authorization': r'Bearer ${MISSING_KEY}'},
         ),
       ],

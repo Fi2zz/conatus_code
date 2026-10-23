@@ -6,7 +6,6 @@ import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
-import 'package:conatus_mcp/conatus_mcp.dart' show McpOAuthConfig;
 import 'package:test/test.dart';
 
 import '../mcp/support/fake_mcp_transport.dart';
@@ -43,12 +42,7 @@ Future<(ConatusTuiController, Context)> _buildWithMcp() async {
   final FakeMcpServers fakes = FakeMcpServers();
   await attachMcpServers(app, const <McpServerSpec>[
     McpServerSpec(name: 'fs', type: McpServerType.stdio, command: 'npx'),
-    McpServerSpec(
-      name: 'net',
-      type: McpServerType.http,
-      url: 'https://x',
-      oauth: McpOAuthConfig(enabled: false),
-    ),
+    McpServerSpec(name: 'net', type: McpServerType.http, url: 'https://x'),
   ], transportFactory: fakes.build);
   final ConatusTuiController controller = ConatusTuiController(
     app: app,

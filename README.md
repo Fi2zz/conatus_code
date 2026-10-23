@@ -433,6 +433,12 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
 风险映射后按当前权限模式走审批；`/mcp` 查看已接入的 server（就绪状态 / 工具数）。
 
 - `type`：`stdio`（本地子进程，`command` + `args`）/ `http` / `sse`（远程端点 `url`）。
+- 远程 server **缺省尝试 OAuth**：令牌存 `~/.nava/oauth/<server>.json`（文件 0600、
+  目录 0700，含 DCR `client_id` 以便新进程刷新），过期前 60 秒自动刷新；没有令牌
+  时先按未鉴权连接，服务端真返回 401 才标记 `needs_auth` 并只跳过该 server。
+- `oauth = false` 关闭 OAuth；已配置静态 `headers.Authorization` 的 server 默认
+  不要求 OAuth（显式 `[mcp.servers.<名字>.oauth] enabled = true` 可覆盖）。
+  `nava mcp auth <名字>` 登录，`nava mcp logout <名字>` 删除令牌。
 - `env` / `headers` 支持 `${KEY}` 占位符，经凭据服务（`[credentials]` / 环境变量）
   解析；**解析结果不得写进日志**。
 - **安全边界**：MCP server 是用户在配置里显式声明的受信端，其 stdio 子进程

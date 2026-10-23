@@ -10,11 +10,11 @@ import 'dart:io';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
+import 'package:http/http.dart' as http;
 
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
-
-part 'mcp_assembly_oauth.dart';
+import 'mcp_oauth_runtime.dart';
 
 /// 逐台装配 [specs] 声明的 MCP server；空列表返回 `null`（不占 `'mcp'` 键）。
 ///
@@ -22,8 +22,10 @@ part 'mcp_assembly_oauth.dart';
 /// 提示并跳过（MCP server 是外部进程，不能让它拖垮启动）。`env` / `headers`
 /// 里的 `${KEY}` 占位符经 [credentials] 解析；解析结果不写日志。
 ///
-/// 远程 server 缺省走 OAuth：令牌从 [oauthStore]（缺省 `~/.nava/oauth`）读取，
-/// 没有令牌时只跳过该台并报告 `needs_auth`，不影响其他 server。
+/// 远程 server 缺省尝试 OAuth：令牌从 [oauthStore]（缺省 `~/.nava/oauth`）
+/// 读取；没有令牌时先按未鉴权连接，服务端真返回 401 才标记 `needs_auth` 并
+/// 只跳过该台。静态 `Authorization` 头优先，不要求 OAuth（显式 `enabled = true`
+/// 除外）。
 ///
 /// [transportFactory] 是测试注入点（假传输）；[onError] 缺省写 stderr。
 // REASON: 装配入口聚合（6 个参数）：测试需要注入传输、令牌目录与错误出口。
@@ -44,11 +46,10 @@ Future<McpRegistry?> attachMcpServers(
     try {
       final McpServerConfig config = toMcpServerConfig(spec, credentials);
       reportUnresolvedPlaceholders(spec.name, config, report);
-      final McpOAuthToken? token = await _loadToken(spec, store, report);
-      if (token == null && spec.oauthEnabled) continue;
-      final _OAuthRuntime? auth = token == null
+      final McpOAuthToken? token = await _loadToken(spec, store);
+      final McpOAuthRuntime? auth = token == null
           ? null
-          : _runtime(spec, store, token);
+          : McpOAuthRuntime(spec: spec, store: store, initial: token);
       final McpClient client = McpClient(
         transport:
             transportFactory?.call(config) ??
@@ -60,6 +61,8 @@ Future<McpRegistry?> attachMcpServers(
         serverName: config.name,
       );
       await registry.attach(app, client);
+    } on McpException catch (error) {
+      _reportFailure(spec.name, error, report);
     } catch (error) {
       // 收敛整段：配置转换 / 传输构造 / 握手中任一抛错都只跳过这一台，
       // 不中断其余 server 的装配（此前只包住 attach，程序化调用会整循环中断）。
@@ -67,6 +70,50 @@ Future<McpRegistry?> attachMcpServers(
     }
   }
   return registry;
+}
+
+/// 401 / 缺少令牌：提示用 CLI 登录；其他异常走通用失败提示。
+void _reportFailure(
+  String server,
+  McpException error,
+  void Function(String) report,
+) {
+  if (error.code == 'needs_auth') {
+    report(
+      'MCP server $server 需要授权（needs_auth），已跳过；'
+      '运行 nava mcp auth $server 登录',
+    );
+    return;
+  }
+  report('MCP server $server 连接失败，已跳过：$error');
+}
+
+/// 读某台 server 的令牌；未启用 OAuth、或静态 `Authorization` 头优先时返回
+/// `null`（按无鉴权 / 静态头挂载）。
+Future<McpOAuthToken?> _loadToken(
+  McpServerSpec spec,
+  McpOAuthStore store,
+) async {
+  if (!_oauthActive(spec)) return null;
+  return store.load(spec.name);
+}
+
+/// 该 server 是否走 OAuth。
+///
+/// 静态 `Authorization` 头意味着用户已自行配置鉴权：除非显式
+/// `[mcp.servers.x.oauth] enabled = true`，否则不要求令牌。公开 server 不做
+/// 预判——先按无鉴权连接，真返回 401 才标 `needs_auth`。
+bool _oauthActive(McpServerSpec spec) {
+  if (!spec.oauthEnabled) return false;
+  if (spec.oauth?.enabled == true) return true;
+  return !_hasAuthorizationHeader(spec.headers);
+}
+
+bool _hasAuthorizationHeader(Map<String, String> headers) {
+  for (final String key in headers.keys) {
+    if (key.toLowerCase() == 'authorization') return true;
+  }
+  return false;
 }
 
 /// 报告 [config] 的 `env` / `headers` 里仍以 `${KEY}` 形式存在的未解析占位符。
@@ -129,6 +176,7 @@ McpTransport toMcpTransport(
   McpServerConfig config, {
   Future<Map<String, String>> Function()? authHeaders,
   Future<Map<String, String>> Function()? refreshAuth,
+  http.Client? client,
 }) => switch (config.type) {
   McpTransportType.stdio => StdioTransport(
     command: config.command!,
@@ -140,11 +188,13 @@ McpTransport toMcpTransport(
     headers: config.headers,
     authHeaders: authHeaders,
     refreshAuth: refreshAuth,
+    client: client,
   ),
   McpTransportType.sse => SseTransport(
     url: config.url!,
     headers: config.headers,
     authHeaders: authHeaders,
     refreshAuth: refreshAuth,
+    client: client,
   ),
 };

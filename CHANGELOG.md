@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- **MCP OAuth 运行时**：远程 server 缺省尝试 OAuth；令牌原子写入
+  `~/.nava/oauth/<server>.json`（0600、目录 0700），持久化 DCR `client_id`，
+  过期前 60 秒主动刷新，401 刷新一次后重试，失败标记 `needs_auth` 且只跳过该
+  server。无令牌时先按未鉴权连接（公开 server 不受影响）；静态
+  `headers.Authorization` 默认不要求 OAuth，`oauth = false` 显式关闭。
 - **权限规则落地**：`[[permissions]]` 规则表、最外层 `instrumentPermission`
   中间件、项目级 `permissions.json` 持久化与 `/doctor` 覆盖。动作归一
   （`run_command`→`shell`、`read_file`→`read`、`rg`→`grep`，四个 git 写工具
