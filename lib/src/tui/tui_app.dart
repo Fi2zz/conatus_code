@@ -19,6 +19,8 @@ import 'package:conatus_skill/conatus_skill.dart';
 import '../../fs_tools.dart';
 import '../../providers.dart';
 import '../../xerj.dart';
+import '../agents/agent_registry.dart';
+import '../agents/agent_resolver.dart';
 import '../assembly/permission_mode.dart';
 import '../background/background_tasks.dart';
 import '../background/background_tools.dart';
@@ -508,6 +510,16 @@ class ConatusTuiRuntime {
 
     provideReflection(app);
 
+    // ── 自定义 Agent：发现 + spawn_agent 的 profile 解析 ──────────
+    final AgentRegistry agentRegistry = await AgentRegistry.load(
+      workdir: resolvedWorkdir,
+    );
+    app.provide('agentRegistry', agentRegistry);
+    final AgentProfileResolver agentProfiles = AgentProfileResolver(
+      registry: agentRegistry,
+      providers: registry,
+    );
+
     // 子 Agent：进度出口 + **独立的轮次预算**。
     //
     // `llm` 传未包装的 resolvedLlm，让每个子 Agent 拿一个自己计数的新
@@ -549,6 +561,7 @@ class ConatusTuiRuntime {
         'git_diff',
       ],
       permissionMode: subagentPermission,
+      profileResolver: agentProfiles,
     );
 
     // ── 后台任务：消费 [background] 配置与 'shell' 的 start() 能力缝 ──
