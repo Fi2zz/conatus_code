@@ -29,6 +29,12 @@ String resolveConfigDir({Map<String, String>? env}) {
   return '$home${Platform.pathSeparator}$kConfigDirName';
 }
 
+/// 解析 OAuth 令牌目录：`<配置目录>/oauth`（缺省 `~/.nava/oauth`）。
+///
+/// 令牌只写这里，绝不碰 `.opencode` / `~/.config/opencode`（只读兼容）。
+String resolveOAuthTokenDir({Map<String, String>? env}) =>
+    '${resolveConfigDir(env: env)}${Platform.pathSeparator}oauth';
+
 /// 解析配置文件路径：`--config` 参数优先，否则配置目录下的 [kConfigFileName]。
 String resolveConfigPath({String? explicit, Map<String, String>? env}) {
   final String? override = cleanConfigValue(explicit);

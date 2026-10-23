@@ -84,6 +84,21 @@ callback_port = 7317
       expect(oauth.clientConfigured, isTrue);
     });
 
+    test('令牌目录固定在 NAVA_HOME/oauth，不落 .opencode', () {
+      expect(
+        resolveOAuthTokenDir(env: <String, String>{'NAVA_HOME': '/tmp/nava-x'}),
+        '/tmp/nava-x/oauth',
+      );
+      expect(
+        resolveOAuthTokenDir(env: <String, String>{'HOME': '/home/u'}),
+        '/home/u/.nava/oauth',
+      );
+      expect(
+        resolveOAuthTokenDir(env: <String, String>{'NAVA_HOME': '/tmp/nava-x'}),
+        isNot(contains('.opencode')),
+      );
+    });
+
     test('oauth 表内 enabled = false 生效', () {
       final ConatusCodeConfig config = _load('''
 [mcp.servers.remote]

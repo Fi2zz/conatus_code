@@ -11,7 +11,10 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
 
+import '../config/config_path.dart';
 import '../config/config_schema.dart';
+
+part 'mcp_assembly_oauth.dart';
 
 /// 逐台装配 [specs] 声明的 MCP server；空列表返回 `null`（不占 `'mcp'` 键）。
 ///
@@ -19,24 +22,41 @@ import '../config/config_schema.dart';
 /// 提示并跳过（MCP server 是外部进程，不能让它拖垮启动）。`env` / `headers`
 /// 里的 `${KEY}` 占位符经 [credentials] 解析；解析结果不写日志。
 ///
+/// 远程 server 缺省走 OAuth：令牌从 [oauthStore]（缺省 `~/.nava/oauth`）读取，
+/// 没有令牌时只跳过该台并报告 `needs_auth`，不影响其他 server。
+///
 /// [transportFactory] 是测试注入点（假传输）；[onError] 缺省写 stderr。
-// REASON: 装配入口聚合（5 个参数）：测试需要注入传输与错误出口，拆对象反而绕。
+// REASON: 装配入口聚合（6 个参数）：测试需要注入传输、令牌目录与错误出口。
 Future<McpRegistry?> attachMcpServers(
   Context app,
   List<McpServerSpec> specs, {
   Credentials? credentials,
   McpTransport Function(McpServerConfig config)? transportFactory,
   void Function(String message)? onError,
+  McpOAuthStore? oauthStore,
 }) async {
   if (specs.isEmpty) return null;
   final McpRegistry registry = await provideMcp(app, const <McpServerConfig>[]);
   final void Function(String) report = onError ?? stderr.writeln;
+  final McpOAuthStore store =
+      oauthStore ?? McpOAuthStore(resolveOAuthTokenDir());
   for (final McpServerSpec spec in specs) {
     try {
       final McpServerConfig config = toMcpServerConfig(spec, credentials);
       reportUnresolvedPlaceholders(spec.name, config, report);
+      final McpOAuthToken? token = await _loadToken(spec, store, report);
+      if (token == null && spec.oauthEnabled) continue;
+      final _OAuthRuntime? auth = token == null
+          ? null
+          : _runtime(spec, store, token);
       final McpClient client = McpClient(
-        transport: transportFactory?.call(config) ?? toMcpTransport(config),
+        transport:
+            transportFactory?.call(config) ??
+            toMcpTransport(
+              config,
+              authHeaders: auth?.headers,
+              refreshAuth: auth?.refresh,
+            ),
         serverName: config.name,
       );
       await registry.attach(app, client);
@@ -58,15 +78,17 @@ void reportUnresolvedPlaceholders(
   McpServerConfig config,
   void Function(String message) report,
 ) {
-  final Map<String, Map<String, String>> sections = <String, Map<String, String>>{
-    'env': config.env,
-    'headers': config.headers,
-  };
+  final Map<String, Map<String, String>> sections =
+      <String, Map<String, String>>{
+        'env': config.env,
+        'headers': config.headers,
+      };
   for (final MapEntry<String, Map<String, String>> section
       in sections.entries) {
     for (final MapEntry<String, String> item in section.value.entries) {
-      for (final RegExpMatch match
-          in _placeholderPattern.allMatches(item.value)) {
+      for (final RegExpMatch match in _placeholderPattern.allMatches(
+        item.value,
+      )) {
         report(
           'MCP server $server：${section.key} 键 ${item.key} 的占位符 '
           '\${${match.group(1)}} 未解析（原样下发，通常导致鉴权失败）',
@@ -86,27 +108,43 @@ final RegExp _placeholderPattern = RegExp(r'\$\{([^}]+)\}');
 McpServerConfig toMcpServerConfig(
   McpServerSpec spec,
   Credentials? credentials,
-) =>
-    McpServerConfig(
-      name: spec.name,
-      type: switch (spec.type) {
-        McpServerType.stdio => McpTransportType.stdio,
-        McpServerType.http => McpTransportType.http,
-        McpServerType.sse => McpTransportType.sse,
-      },
-      command: spec.command,
-      args: spec.args,
-      env: resolveCredentialPlaceholders(spec.env, credentials),
-      url: spec.url,
-      headers: resolveCredentialPlaceholders(spec.headers, credentials),
-    );
+) => McpServerConfig(
+  name: spec.name,
+  type: switch (spec.type) {
+    McpServerType.stdio => McpTransportType.stdio,
+    McpServerType.http => McpTransportType.http,
+    McpServerType.sse => McpTransportType.sse,
+  },
+  command: spec.command,
+  args: spec.args,
+  env: resolveCredentialPlaceholders(spec.env, credentials),
+  url: spec.url,
+  headers: resolveCredentialPlaceholders(spec.headers, credentials),
+);
 
 /// 按传输类型分派默认传输实现（与 `provideMcp` 的内部分派一致）。
-McpTransport toMcpTransport(McpServerConfig config) => switch (config.type) {
-      McpTransportType.stdio => StdioTransport(
-          command: config.command!, args: config.args, env: config.env),
-      McpTransportType.http =>
-        HttpTransport(url: config.url!, headers: config.headers),
-      McpTransportType.sse =>
-        SseTransport(url: config.url!, headers: config.headers),
-    };
+///
+/// [authHeaders] / [refreshAuth] 只对 HTTP 系传输生效（stdio 忽略）。
+McpTransport toMcpTransport(
+  McpServerConfig config, {
+  Future<Map<String, String>> Function()? authHeaders,
+  Future<Map<String, String>> Function()? refreshAuth,
+}) => switch (config.type) {
+  McpTransportType.stdio => StdioTransport(
+    command: config.command!,
+    args: config.args,
+    env: config.env,
+  ),
+  McpTransportType.http => HttpTransport(
+    url: config.url!,
+    headers: config.headers,
+    authHeaders: authHeaders,
+    refreshAuth: refreshAuth,
+  ),
+  McpTransportType.sse => SseTransport(
+    url: config.url!,
+    headers: config.headers,
+    authHeaders: authHeaders,
+    refreshAuth: refreshAuth,
+  ),
+};

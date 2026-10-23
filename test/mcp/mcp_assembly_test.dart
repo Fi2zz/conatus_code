@@ -38,6 +38,7 @@ void main() {
       name: 'net',
       type: McpServerType.http,
       url: 'https://example.com/mcp',
+      oauth: McpOAuthConfig(enabled: false),
       headers: <String, String>{'Authorization': r'Bearer ${MISSING_KEY}'},
     ),
   ];
@@ -106,8 +107,16 @@ void main() {
     final McpRegistry registry = (await attachMcpServers(
       ctx,
       <McpServerSpec>[
-        const McpServerSpec(name: 'bad', type: McpServerType.stdio, command: 'x'),
-        const McpServerSpec(name: 'ok', type: McpServerType.stdio, command: 'npx'),
+        const McpServerSpec(
+          name: 'bad',
+          type: McpServerType.stdio,
+          command: 'x',
+        ),
+        const McpServerSpec(
+          name: 'ok',
+          type: McpServerType.stdio,
+          command: 'npx',
+        ),
       ],
       transportFactory: (McpServerConfig config) {
         if (config.name == 'bad') throw StateError('构造传输即炸');
@@ -131,6 +140,7 @@ void main() {
           name: 'net',
           type: McpServerType.http,
           url: 'https://x',
+          oauth: McpOAuthConfig(enabled: false),
           headers: <String, String>{'Authorization': r'Bearer ${MISSING_KEY}'},
         ),
       ],
@@ -144,7 +154,8 @@ void main() {
     expect(messages.single, isNot(contains('Bearer')));
   });
 
-  test('env/headers 占位符经凭据解析；缺失键原样保留', () async {    final Credentials credentials = InMemoryCredentials(
+  test('env/headers 占位符经凭据解析；缺失键原样保留', () async {
+    final Credentials credentials = InMemoryCredentials(
       initial: <String, String>{'TAVILY_API_KEY': 'tvly-secret'},
     );
 

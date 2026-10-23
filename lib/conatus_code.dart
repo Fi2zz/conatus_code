@@ -91,6 +91,7 @@ export 'src/config/config_path.dart'
         kConfigFileName,
         kConfigHomeEnv,
         resolveConfigDir,
+        resolveOAuthTokenDir,
         resolveConfigPath;
 export 'src/config/config_schema.dart'
     show

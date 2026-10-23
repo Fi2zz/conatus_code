@@ -6,6 +6,7 @@ import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
+import 'package:conatus_mcp/conatus_mcp.dart' show McpOAuthConfig;
 import 'package:test/test.dart';
 
 import '../mcp/support/fake_mcp_transport.dart';
@@ -20,16 +21,14 @@ class _StubProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      Future<LlmResult>.error(StateError('stub 不应被调用'));
+  }) => Future<LlmResult>.error(StateError('stub 不应被调用'));
 
   @override
   Stream<LlmStreamEvent> chatStream(
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}
@@ -42,14 +41,15 @@ Future<(ConatusTuiController, Context)> _buildWithMcp() async {
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_StubProvider()]));
   final SessionStore sessions = provideSessions(app);
   final FakeMcpServers fakes = FakeMcpServers();
-  await attachMcpServers(
-    app,
-    const <McpServerSpec>[
-      McpServerSpec(name: 'fs', type: McpServerType.stdio, command: 'npx'),
-      McpServerSpec(name: 'net', type: McpServerType.http, url: 'https://x'),
-    ],
-    transportFactory: fakes.build,
-  );
+  await attachMcpServers(app, const <McpServerSpec>[
+    McpServerSpec(name: 'fs', type: McpServerType.stdio, command: 'npx'),
+    McpServerSpec(
+      name: 'net',
+      type: McpServerType.http,
+      url: 'https://x',
+      oauth: McpOAuthConfig(enabled: false),
+    ),
+  ], transportFactory: fakes.build);
   final ConatusTuiController controller = ConatusTuiController(
     app: app,
     sessions: sessions,
@@ -99,8 +99,9 @@ void main() {
   });
 
   test('命令表包含 mcp 且帮助里可查', () {
-    final TuiCommand mcp =
-        tuiCommands.firstWhere((TuiCommand c) => c.name == 'mcp');
+    final TuiCommand mcp = tuiCommands.firstWhere(
+      (TuiCommand c) => c.name == 'mcp',
+    );
     expect(mcp.description, contains('MCP server'));
     expect(mcp.takesArgs, isFalse);
   });
