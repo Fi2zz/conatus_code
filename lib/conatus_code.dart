@@ -76,6 +76,7 @@ export 'src/checkpoint/checkpoint_types.dart'
 export 'src/checkpoint/global_git_ignore.dart' show resolveGlobalGitIgnore;
 export 'src/checkpoint/shadow_git_runner.dart'
     show GitResult, GitRunner, ProcessGitRunner, UnavailableGitRunner;
+export 'src/cli/harness_command.dart' show kHarnessUsage, runHarnessCommand;
 export 'src/commands/command_definition.dart' show CommandDefinition;
 export 'src/commands/command_dispatcher.dart' show CommandDispatcher;
 export 'src/commands/command_expander.dart'
@@ -83,7 +84,6 @@ export 'src/commands/command_expander.dart'
 export 'src/commands/command_parser.dart'
     show CommandParseResult, parseCommandDocument, parseCommandDocumentDetailed;
 export 'src/commands/command_registry.dart' show CommandRegistry;
-export 'src/cli/harness_command.dart' show kHarnessUsage, runHarnessCommand;
 export 'src/config/config_credentials.dart' show ConfigCredentials;
 export 'src/config/config_loader.dart' show ConfigException, loadConfig;
 export 'src/config/config_path.dart'
