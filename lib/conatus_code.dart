@@ -9,7 +9,7 @@ export 'src/agents/agent_builtins.dart' show kBuiltinAgents;
 export 'src/agents/agent_definition.dart' show AgentDefinition, AgentMode;
 export 'src/agents/agent_parser.dart'
     show AgentParseResult, parseAgentDocument, parseAgentDocumentDetailed;
-export 'src/agents/agent_picker.dart' show AgentPicker, AgentPickerView;
+export 'src/agents/agent_picker.dart' show AgentPicker;
 export 'src/agents/agent_registry.dart' show AgentRegistry;
 export 'src/agents/agent_resolver.dart' show AgentProfileResolver;
 export 'src/assembly/permission_mode.dart' show toTuiPermissionMode;

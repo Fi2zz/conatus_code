@@ -1,6 +1,7 @@
 /// 命令测试替身：模型、假 spawn_agent、可记录请求的 provider 注册表。
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -33,8 +34,17 @@ class CommandCaptureProvider implements LlmProvider {
   /// 收到的调用。
   final List<CapturedTurn> turns = <CapturedTurn>[];
 
-  /// 现场快照回调；装配后由 harness 接到控制器。
-  void Function(CapturedTurn turn)? onTurn;
+  /// 最近一次请求的 system prompt。
+  String lastSystemPrompt = '';
+
+  /// prompt 回调；装配后由 harness 记录调用时的 Agent / Plan Mode。
+  void Function(String prompt)? onPrompt;
+
+  /// 首次模型调用已开始。
+  final Completer<void> started = Completer<void>();
+
+  /// 非空时模型调用挂起，直到测试放行。
+  Completer<void>? gate;
 
   @override
   String get name => 'capture';
@@ -46,6 +56,7 @@ class CommandCaptureProvider implements LlmProvider {
     List<Map<String, dynamic>>? tools,
   }) async {
     _record(messages);
+    await _pause();
     return const LlmResult(content: '完成。', provider: 'capture', model: 'm');
   }
 
@@ -56,18 +67,25 @@ class CommandCaptureProvider implements LlmProvider {
     List<Map<String, dynamic>>? tools,
   }) async* {
     _record(messages);
+    await _pause();
     yield const LlmTextDelta('完成。');
     yield const LlmStreamDone(provider: 'capture', model: 'm');
   }
 
+  Future<void> _pause() async {
+    if (!started.isCompleted) started.complete();
+    final Completer<void>? pending = gate;
+    if (pending != null) await pending.future;
+  }
+
   void _record(List<LlmMessage> messages) {
-    final CapturedTurn turn = CapturedTurn(
-      prompt: messages.isEmpty ? '' : messages.last.content,
-      agentId: '',
-      planModeActive: false,
-    );
-    turns.add(turn);
-    onTurn?.call(turn);
+    for (final LlmMessage message in messages) {
+      if (message.role == 'system') {
+        lastSystemPrompt = message.content;
+        break;
+      }
+    }
+    onPrompt?.call(messages.isEmpty ? '' : messages.last.content);
   }
 
   @override
@@ -78,6 +96,12 @@ class CommandCaptureProvider implements LlmProvider {
 class FakeSpawnTool extends Tool {
   /// 收到的参数。
   final List<Map<String, Object?>> calls = <Map<String, Object?>>[];
+
+  /// 首次调用已开始。
+  final Completer<void> started = Completer<void>();
+
+  /// 非空时调用挂起，直到测试放行（模拟长时间子 Agent）。
+  Completer<void>? gate;
 
   @override
   String get name => 'spawn_agent';
@@ -97,7 +121,31 @@ class FakeSpawnTool extends Tool {
       'task': context.str('task'),
       'agent': context.string('agent'),
     });
+    if (!started.isCompleted) started.complete();
+    final Completer<void>? pending = gate;
+    if (pending != null) await pending.future;
     return ToolResult.success('[fake-spawn] 已完成');
+  }
+}
+
+/// 中风险副作用工具：Plan Mode 激活时应被拦截。
+class FakeMutateTool extends Tool {
+  /// 是否真正执行过。
+  bool mutated = false;
+
+  @override
+  String get name => 'mutate';
+
+  @override
+  String get description => '假副作用工具';
+
+  @override
+  ToolRisk get riskLevel => ToolRisk.medium;
+
+  @override
+  Future<ToolResult> call(ToolContext context) async {
+    mutated = true;
+    return ToolResult.success('已修改');
   }
 }
 

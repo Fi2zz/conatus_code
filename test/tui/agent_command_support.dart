@@ -10,7 +10,6 @@ import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
-import 'package:test/test.dart';
 
 import 'agent_command_fakes.dart';
 
@@ -23,6 +22,7 @@ class CommandHarness {
     required this.controller,
     required this.provider,
     required this.spawn,
+    required this.mutate,
     required this.exited,
   });
 
@@ -43,6 +43,9 @@ class CommandHarness {
 
   /// 假 spawn_agent。
   final FakeSpawnTool spawn;
+
+  /// 假副作用工具（Plan Mode 拦截断言）。
+  final FakeMutateTool mutate;
 
   /// `/exit` 是否触发（可变标志）。
   final List<bool> exited;
@@ -92,8 +95,11 @@ Future<CommandHarness> buildCommandHarness({
 
   final Context app = Context.root();
   provideTools(app);
+  provideSystemPrompt(app);
   final CommandCaptureProvider provider = CommandCaptureProvider();
   final FakeSpawnTool spawn = FakeSpawnTool();
+  final FakeMutateTool mutate = FakeMutateTool();
+  app.tools.register(mutate);
   if (withSpawn) app.tools.register(spawn);
   Disposer llmDisposer;
   if (registry == null) {
@@ -130,8 +136,13 @@ Future<CommandHarness> buildCommandHarness({
     onExit: () => exited[0] = true,
   );
   _wireLlmSwap(app, controller, llmDisposer);
-  provider.onTurn = (CapturedTurn turn) =>
-      _snapshot(provider, controller, turn);
+  provider.onPrompt = (String prompt) => provider.turns.add(
+    CapturedTurn(
+      prompt: prompt,
+      agentId: controller.agentId,
+      planModeActive: controller.planModeActive,
+    ),
+  );
   await controller.start();
   return CommandHarness._(
     root: root,
@@ -140,6 +151,7 @@ Future<CommandHarness> buildCommandHarness({
     controller: controller,
     provider: provider,
     spawn: spawn,
+    mutate: mutate,
     exited: exited,
   );
 }
@@ -164,22 +176,6 @@ void _wireLlmSwap(
   };
 }
 
-/// 把「调用发生时」的 Agent / Plan Mode 写回最近一条记录。
-void _snapshot(
-  CommandCaptureProvider provider,
-  ConatusTuiController controller,
-  CapturedTurn turn,
-) {
-  provider.turns[provider.turns.length - 1] = CapturedTurn(
-    prompt: turn.prompt,
-    agentId: controller.agentId,
-    planModeActive: controller.planModeActive,
-  );
-}
-
 /// 注册表断言辅助：按 ID 找列表下标。
 int indexOfAgent(List<AgentDefinition> list, String id) =>
     list.indexWhere((AgentDefinition agent) => agent.id == id);
-
-/// 测试结束清理。
-void disposeHarness(CommandHarness harness) => addTearDown(harness.dispose);

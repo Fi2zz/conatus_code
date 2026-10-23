@@ -1,9 +1,11 @@
 /// 自定义命令接入 TUI：分发、内置优先、shell 错误与 Agent/Model 覆盖。
 library;
 
+import 'dart:async';
 
 import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
+import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
@@ -23,6 +25,7 @@ void main() {
 
     expect(harness.provider.turns, hasLength(1));
     expect(harness.provider.turns.single.prompt, contains('请处理：src/a.dart'));
+    expect(harness.provider.lastSystemPrompt, isNot(contains('通用编码 Agent')));
     expect(
       harness.controller.transcript.messages.any(
         (TuiMessage m) => m.text.contains('src/a.dart'),
@@ -84,8 +87,40 @@ void main() {
     expect(turn.prompt, contains('给出计划：登录流程'));
     expect(turn.agentId, 'plan');
     expect(turn.planModeActive, isTrue);
+    expect(harness.provider.lastSystemPrompt, contains('只读规划'));
     expect(harness.controller.agentId, 'build');
     expect(harness.controller.planModeActive, isFalse);
+  });
+
+  test('手动 Plan Mode 不被 agent: build 关闭，副作用工具仍被拦截', () async {
+    final CommandHarness harness = await buildCommandHarness(
+      commands: <String, String>{
+        'draft.md': '---\nagent: build\n---\n继续：\$ARGUMENTS',
+      },
+    );
+    addTearDown(harness.dispose);
+    await harness.controller.handleLine('/plan');
+    await harness.controller.confirmPlanPanel();
+    expect(harness.controller.planModeActive, isTrue);
+
+    harness.provider.gate = Completer<void>();
+    final Future<void> turn = harness.controller.handleLine('/draft 收尾');
+    await harness.provider.started.future;
+    final ToolResult blocked = await harness.app.tools.call(
+      const ToolCall(name: 'mutate'),
+    );
+    expect(blocked.isError, isTrue);
+    expect(harness.mutate.mutated, isFalse);
+
+    harness.provider.gate!.complete();
+    await turn;
+    expect(harness.controller.planModeActive, isTrue);
+    expect(
+      harness.controller.transcript.messages.any(
+        (TuiMessage m) => m.text.contains('已退出 Plan Mode'),
+      ),
+      isFalse,
+    );
   });
 
   test('model 覆盖本轮生效，轮末恢复原模型', () async {
@@ -116,6 +151,34 @@ void main() {
     expect(requestModel(requests.last), 'a1');
   });
 
+  test('模型覆盖构造失败只警告并沿用当前模型', () async {
+    final (
+      ProviderRegistry registry,
+      List<http.Request> requests,
+    ) = buildRecordingRegistry(<String, List<String>>{
+      'alpha': <String>['a1'],
+    });
+    final CommandHarness harness = await buildCommandHarness(
+      commands: <String, String>{'draft.md': '---\nmodel: nope/x\n---\n请起草'},
+      registry: registry,
+      chainEntries: <String>['alpha/a1'],
+    );
+    addTearDown(harness.dispose);
+
+    await harness.controller.handleLine('/draft');
+
+    expect(harness.provider.turns, isEmpty);
+    expect(requests, hasLength(1));
+    expect(requestModel(requests.single), 'a1');
+    expect(harness.controller.modelLabel, 'a1');
+    expect(
+      harness.controller.transcript.messages.any(
+        (TuiMessage m) => m.text.contains('沿用当前模型'),
+      ),
+      isTrue,
+    );
+  });
+
   test('subagent: true 前台执行 spawn_agent 并写入结果', () async {
     final CommandHarness harness = await buildCommandHarness(
       commands: <String, String>{
@@ -136,6 +199,40 @@ void main() {
       harness.controller.transcript.messages.last.text,
       contains('fake-spawn'),
     );
+  });
+
+  test('前台子 Agent 期间 busy，排队输入被清空且 Esc 可打断', () async {
+    final CommandHarness harness = await buildCommandHarness(
+      commands: <String, String>{
+        'research.md':
+            '---\nagent: explore\nsubagent: true\n---\n调研：\$ARGUMENTS',
+      },
+      withSpawn: true,
+    );
+    addTearDown(harness.dispose);
+    harness.spawn.gate = Completer<void>();
+
+    final Future<bool> running = harness.controller.runCustomCommand(
+      'research',
+      '长任务',
+    );
+    await harness.spawn.started.future;
+    expect(harness.controller.busy, isTrue);
+
+    await harness.controller.submit('排队追问');
+    expect(harness.controller.queuedCount, 1);
+
+    harness.controller.interrupt();
+    await running;
+    expect(harness.controller.busy, isFalse);
+    expect(harness.controller.queuedCount, 0);
+    expect(
+      harness.controller.transcript.messages.any(
+        (TuiMessage m) => m.text.contains('已打断这一轮'),
+      ),
+      isTrue,
+    );
+    harness.spawn.gate!.complete();
   });
 
   test('启动 Agent 自带 model 时首轮即使用该模型', () async {
@@ -167,6 +264,8 @@ void main() {
       commands: <String, String>{
         'draft.md':
             '---\ndescription: 起草\nagent: plan\nmodel: beta/b1\n---\n正文',
+        'quit.md': '---\n---\n不该出现的 quit',
+        'skill:demo.md': '---\n---\n不该出现的技能占位',
       },
     );
     addTearDown(harness.dispose);
@@ -177,10 +276,16 @@ void main() {
       commands.take(tuiCommands.length).map((TuiCommand c) => c.name),
       tuiCommands.map((TuiCommand c) => c.name),
     );
+    expect(commands.any((TuiCommand c) => c.name == 'quit'), isFalse);
+    expect(commands.any((TuiCommand c) => c.name == 'skill:demo'), isFalse);
     final TuiCommand draft = commands.firstWhere(
       (TuiCommand c) => c.name == 'draft',
     );
     expect(draft.description, contains('agent: plan'));
     expect(draft.description, contains('model: beta/b1'));
+
+    await harness.controller.handleLine('/skill:demo');
+    expect(harness.provider.turns, isEmpty);
+    expect(harness.controller.transcript.messages.last.text, contains('未知命令'));
   });
 }

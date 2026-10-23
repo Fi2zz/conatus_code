@@ -3,8 +3,11 @@ library;
 
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/providers.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
+import 'agent_command_fakes.dart';
 import 'agent_command_support.dart';
 
 const Map<String, String> _agents = <String, String>{
@@ -102,6 +105,33 @@ void main() {
 
     expect(picker.selectedAgent, isNotNull);
     expect(picker.selectedAgent!.mode, isNot(AgentMode.subagent));
+  });
+
+  test('从带 model 的 Agent 切回 build 恢复非 Agent 基线模型', () async {
+    final (
+      ProviderRegistry registry,
+      List<http.Request> requests,
+    ) = buildRecordingRegistry(<String, List<String>>{
+      'alpha': <String>['a1'],
+      'beta': <String>['b1'],
+    });
+    final CommandHarness harness = await buildCommandHarness(
+      agents: <String, String>{
+        'reviewer.md': '---\nmodel: beta/b1\n---\n你是审查者。',
+      },
+      registry: registry,
+      chainEntries: <String>['alpha/a1'],
+    );
+    addTearDown(harness.dispose);
+    expect(harness.controller.modelLabel, 'a1');
+
+    expect(await harness.controller.switchAgent('reviewer'), isTrue);
+    expect(harness.controller.modelLabel, 'b1');
+
+    expect(await harness.controller.switchAgent('build'), isTrue);
+    expect(harness.controller.modelLabel, 'a1');
+    await harness.controller.handleLine('普通提问');
+    expect(requestModel(requests.last), 'a1');
   });
 
   test('[agent] default_agent 作为启动 Agent', () async {

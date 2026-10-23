@@ -10,8 +10,8 @@ import 'dart:io';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:nocterm/nocterm.dart';
 
-import '../agents/agent_picker.dart';
 import '../diff/tui_diff_view.dart';
+import 'agent_picker_view.dart';
 import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
 import 'team_snapshot.dart';
@@ -221,7 +221,8 @@ class _AgentTuiState extends State<AgentTui> {
     if (!_shell.active) {
       return false;
     }
-    final bool exited = event.logicalKey == LogicalKey.escape ||
+    final bool exited =
+        event.logicalKey == LogicalKey.escape ||
         (_input.text.isEmpty && event.logicalKey == LogicalKey.backspace);
     if (!exited) {
       return false;

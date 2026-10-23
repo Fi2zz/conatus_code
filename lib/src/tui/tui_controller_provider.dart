@@ -490,6 +490,7 @@ extension _ProviderCommands on ConatusTuiController {
     _app.require<LlmChainSlot>('llmChainSlot').current = chain;
     swap(chain.llm);
     modelLabel = label;
+    _rememberModelBaseline();
     final bool rebound = await rebind();
     final String skipped = chain.skipped.isEmpty
         ? ''
