@@ -103,6 +103,34 @@ String? realPathViaAncestor(String path) {
   }
 }
 
+/// 待写入路径是否命中只读的 OpenCode 目录。
+///
+/// 判定三种拼写，任一命中即拒绝：
+/// - 字面绝对路径（`--config .opencode/config.toml`、`NAVA_HOME=.opencode`）；
+/// - 最近已存在祖先解析后的真实路径（父目录是符号链接指向 `.opencode`）；
+/// - 与 [defaultReadOnlyRoots] 的字面 / 真实拼写做段级比较。
+///
+/// 必须在任何 `createSync` / 写盘之前调用：受保护目录可能尚不存在，先创建
+/// 就已经晚了。
+bool readOnlyWritePath(String path, {String? workdir, String? home}) {
+  final String literal = File(path).absolute.path;
+  if (readOnlyRelativePath(literal)) return true;
+  final String? real = realPathViaAncestor(literal);
+  if (real != null && readOnlyRelativePath(real)) return true;
+  final List<String> roots = defaultReadOnlyRoots(
+    workdir ?? Directory.current.path,
+    home: home,
+  );
+  for (final String root in roots) {
+    if (underReadOnlyRoot(literal, root)) return true;
+    final String? realRoot = realPathViaAncestor(root);
+    if (real != null && realRoot != null && underReadOnlyRoot(real, realRoot)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// 去掉冗余的 `.` / `..` 与末尾分隔符（不解析符号链接）。
 ///
 /// Windows 盘符单独保留：`C:\foo` 不能变成 `\C:\foo`（多了前缀分隔符后

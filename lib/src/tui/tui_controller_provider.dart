@@ -50,7 +50,7 @@ extension _ProviderCommands on ConatusTuiController {
     _refresh();
   }
 
-  /// `/model [搜索词]`：打开模型选择浮层；选中后切换当前提供商的模型。  ///
+  /// `/model [搜索词]`：打开模型选择浮层；选中后切换当前提供商的模型。
   /// 候选优先取配置内模型（`[models.*]`），配置无清单时从 models.dev 兜底；
   /// 参数作为初始搜索词预填。未装配注册表时委托宿主的 [onModelCommand] 钩子，
   /// 两者都不可用时提示先配置提供商（没有缺省回退链，见 README）。

@@ -229,6 +229,10 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
   `deny read "/etc/*"`。
 - **工作区外**：路径落到 workdir 外时追加 `external_directory` 判定；`rg` 的
   `path` 参数也参与边界检查（但不会把每次 rg 变成路径信任提示）。
+- **MCP 资源**：`action = "list_mcp_resources"` / `"read_mcp_resource"` 配合
+  `resource = "<server>"` / `"<server>:*"` 可只放行单台；旧式
+  `action = "<server>_list_mcp_resources"` / `"<server>_read_mcp_resource"`
+  仍会与现行动作同时判定（取更严格者）。
 - **持久化**：交互里「总是允许」写进项目数据目录的 `permissions.json`；若会
   覆盖已有 deny（含「更具体的 deny」如 `git push origin *` 对上 `git push *`）
   则拒绝落盘，仅本次会话放行。
@@ -244,6 +248,9 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
   接缝上的只读闸门拦截；删除工作区的祖先目录也会被拒（否则会连带删掉
   `.opencode`）。
 - 检查点默认排除 `.opencode` 与 `.config/opencode`，恢复不会把它们写回。
+- **配置与令牌写入同一道闸门**：`--config .opencode/config.toml`、
+  `NAVA_HOME=.opencode`、父目录符号链接指向 `.opencode` 都在创建文件之前拒绝；
+  `~/.nava/oauth` 在派生阶段就校验，令牌绝不会落到只读目录。
 - 命令侧（`run_command` / git 写工具）有字面识别兜底：**best-effort**，不是
   安全边界；变量拼接、`sh -c`、读脚本再执行都能绕过。真正的边界是 Seatbelt
   （`deny file-write*`），sandbox 关闭时请自行确认风险。
@@ -277,6 +284,49 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 打断会**清空队列**并提示条数；切换会话同样清空。cron/提醒的投递不受影响
 （busy 时仍由调度器重试）。
 
+## 标签、主题、键位与扩展
+
+**会话标签**：每个标签是一个独立会话（JSONL + 检查点 + 权限模式 + Agent）。
+`ctrl+tab` / `ctrl+shift+tab` 切换，`<leader>w` 关闭（只移除视图，不删数据）；
+上限 8 个，标签栏的切换 / 关闭提示取自当前 keymap。`/new` 新会话使用
+`[agent] default_agent`，不继承上一个标签的 Agent——切回旧标签会恢复它自己的
+`agent/selected` 记录。
+
+**主题**：`/theme` 切换 `default` / `dark` / `light` / `tokyonight`（仅当前进程）；
+也可在 `[tui]` 写 `theme` 与 `animations`。
+
+**键位**：`[keybinds]` 按动作 ID 覆盖，`<leader>` 是两段式前缀，`none` 关闭动作：
+
+```toml
+[keybinds]
+leader = "ctrl+x"
+"app.exit" = "ctrl+c,ctrl+d"
+"session.new" = "<leader>n"
+"tab.next" = "ctrl+tab"
+"tab.close" = "<leader>w"
+```
+
+`/keybinds` 展示当前生效值与冲突告警；未知动作 / 非法键位会在启动时提示。
+
+**自定义命令**：`.opencode/commands/**/*.md`（只读兼容）与
+`.nava/commands/**/*.md`（项目 / 全局）发现为 `/<相对路径>`。正文是 prompt，
+`$ARGUMENTS` 展开用户参数；frontmatter 支持 `agent:`、`model:` 与
+`subagent: true`（前台跑 `spawn_agent`，命令与结果作为 `user/message` /
+`tool/result` 进会话）。`subagent: true` 的 `model:` 不生效（模型由 agent 定义
+决定），会明确提示。
+
+**自定义 Agent**：`.opencode/agents/**/*.md` 与 `.nava/agents/**/*.md`；同名覆盖
+内置 `build` / `plan` / `general` / `explore`。frontmatter 支持 `mode`
+（`primary` / `subagent` / `all`）、`model`、`steps`、`tools` 白名单 / 开关与
+`permission`。`[agent] default_agent` 决定新会话默认值。内置 `general` 显式列出
+可写工具白名单（read / write / edit / git 读写 / web），但 high 风险工具
+（`run_command`、`run_tests`、`git_commit`）与 `spawn_agent` 仍被框架挡在子
+Agent 之外。
+
+**MCP CLI**：`nava mcp add <名字> --url <http(s) 地址>` / `-- <命令...>`、
+`list`、`auth`、`logout`；`--config` / `NAVA_HOME` 可覆盖配置位置。写路径统一
+经 `.opencode` 只读闸门（字面路径、`NAVA_HOME`、符号链接父目录都拒绝，见下节）。
+
 ## `/commit` 与 `/doctor`
 
 - `/commit`：完整提交流程——`git_status` 看未暂存的 → `git_add` 暂存 →
@@ -285,7 +335,8 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 - `/review`：审查当前未提交改动（命名/边界/安全/性能，**只审不改**），
   提交/提 PR 前自检。
 - `/doctor`：体检——配置 / 提供商 / 回退链 / 模型窗口与费率 / 沙箱（Layer 1/2）/
-  工具表 / MCP / rg 逐项 ✓/✗ + 修复提示，自查用。
+  工具表 / MCP / Agent 与命令发现（坏文件、未知 Agent `model:`）/ rg 逐项
+  ✓/✗ + 修复提示，自查用；发现告警启动时也会上屏（前 5 条）。
 
 ### `/trace` 复盘
 
@@ -438,7 +489,10 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
   时先按未鉴权连接，服务端真返回 401 才标记 `needs_auth` 并只跳过该 server。
 - `oauth = false` 关闭 OAuth；已配置静态 `headers.Authorization` 的 server 默认
   不要求 OAuth（显式 `[mcp.servers.<名字>.oauth] enabled = true` 可覆盖）。
-  `nava mcp auth <名字>` 登录，`nava mcp logout <名字>` 删除令牌。
+  `nava mcp auth <名字>` 登录，`nava mcp logout <名字>` 删除令牌；
+  `nava mcp add <名字> --url <http(s) 地址>` / `-- <命令...>` 写配置（非 http(s)
+  地址拒绝），`nava mcp list` 只读列出。刷新令牌不轮换时保留旧
+  `refresh_token`；401 先重读令牌文件，别的 nava 进程已刷新就直接复用。
 - `env` / `headers` 支持 `${KEY}` 占位符，经凭据服务（`[credentials]` / 环境变量）
   解析；**解析结果不得写进日志**。
 - **安全边界**：MCP server 是用户在配置里显式声明的受信端，其 stdio 子进程

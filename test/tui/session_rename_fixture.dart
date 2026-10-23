@@ -48,6 +48,7 @@ class RenameFixture {
     required this.sessions,
     required this.sessionsDir,
     required this.storyLog,
+    required this.storyLogDir,
     required this.checkpoint,
     required this.store,
   });
@@ -64,8 +65,11 @@ class RenameFixture {
   /// 会话 JSONL 目录。
   final Directory sessionsDir;
 
-  /// 故事线日志。
+  /// 故事线日志（服务未装配时仅作占位）。
   final InMemorySessionLog storyLog;
+
+  /// 故事线日志目录（关闭故事层时删除走这里）。
+  final Directory storyLogDir;
 
   /// 检查点管理器。
   final CheckpointManager checkpoint;
@@ -85,7 +89,10 @@ class RenameFixture {
 ///
 /// [start] 为 `false` 时跳过 `controller.start()`，留给 `AgentTui` 挂载时启动
 /// （根组件 `initState` 会调一次，重复调用会重复注册工具）。
-Future<RenameFixture> buildRenameFixture({bool start = true}) async {
+Future<RenameFixture> buildRenameFixture({
+  bool start = true,
+  bool storyEnabled = true,
+}) async {
   final Directory dir = Directory.systemTemp.createTempSync(
     'nava-rename-delete-',
   );
@@ -106,7 +113,11 @@ Future<RenameFixture> buildRenameFixture({bool start = true}) async {
   provideFsTools(app, fs: fs, enableSearch: false);
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[StubProvider()]));
   final InMemorySessionLog storyLog = InMemorySessionLog();
-  provideSessionLog(app, log: storyLog);
+  final Directory storyLogDir = Directory(
+    '${dir.path}${Platform.pathSeparator}story-log',
+  );
+  app.provide('storyLogDir', storyLogDir.path);
+  if (storyEnabled) provideSessionLog(app, log: storyLog);
   final SessionStore sessions = provideSessions(
     app,
     persistence: JsonlSessionPersistence(dir: sessionsDir.path),
@@ -139,7 +150,7 @@ Future<RenameFixture> buildRenameFixture({bool start = true}) async {
     name: 'test',
     initialSession: renameCurrentId,
     modelLabel: 'stub',
-    storyEnabled: true,
+    storyEnabled: storyEnabled,
     onExit: () {},
   );
   if (start) {
@@ -157,6 +168,7 @@ Future<RenameFixture> buildRenameFixture({bool start = true}) async {
     sessions: sessions,
     sessionsDir: sessionsDir,
     storyLog: storyLog,
+    storyLogDir: storyLogDir,
     checkpoint: checkpoint,
     store: store,
   );

@@ -40,14 +40,13 @@ Future<McpRegistry?> attachMcpServers(
   if (specs.isEmpty) return null;
   final McpRegistry registry = await provideMcp(app, const <McpServerConfig>[]);
   final void Function(String) report = onError ?? stderr.writeln;
-  final McpOAuthStore store =
-      oauthStore ?? McpOAuthStore(resolveOAuthTokenDir());
+  final McpOAuthStore? store = _oauthStore(oauthStore, report);
   for (final McpServerSpec spec in specs) {
     try {
       final McpServerConfig config = toMcpServerConfig(spec, credentials);
       reportUnresolvedPlaceholders(spec.name, config, report);
       final McpOAuthToken? token = await _loadToken(spec, store);
-      final McpOAuthRuntime? auth = token == null
+      final McpOAuthRuntime? auth = token == null || store == null
           ? null
           : McpOAuthRuntime(spec: spec, store: store, initial: token);
       final McpClient client = McpClient(
@@ -90,11 +89,26 @@ void _reportFailure(
 
 /// 读某台 server 的令牌；未启用 OAuth、或静态 `Authorization` 头优先时返回
 /// `null`（按无鉴权 / 静态头挂载）。
+/// 令牌存储：`NAVA_HOME` 指向只读目录时只报错、不落盘（服务器照常尝试
+/// 未鉴权连接，公开 server 不受影响）。
+McpOAuthStore? _oauthStore(
+  McpOAuthStore? injected,
+  void Function(String) report,
+) {
+  if (injected != null) return injected;
+  try {
+    return McpOAuthStore(resolveOAuthTokenDir());
+  } on StateError catch (error) {
+    report('MCP OAuth 令牌目录不可用：${error.message}');
+    return null;
+  }
+}
+
 Future<McpOAuthToken?> _loadToken(
   McpServerSpec spec,
-  McpOAuthStore store,
+  McpOAuthStore? store,
 ) async {
-  if (!_oauthActive(spec)) return null;
+  if (!_oauthActive(spec) || store == null) return null;
   return store.load(spec.name);
 }
 

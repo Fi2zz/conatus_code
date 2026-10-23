@@ -201,6 +201,59 @@ void main() {
     );
   });
 
+  test('subagent 命令写入 user/message 与 tool/result 事件', () async {
+    final CommandHarness harness = await buildCommandHarness(
+      commands: <String, String>{
+        'research.md':
+            '---\nagent: explore\nsubagent: true\n---\n调研：\$ARGUMENTS',
+      },
+      withSpawn: true,
+    );
+    addTearDown(harness.dispose);
+
+    await harness.controller.handleLine('/research src/core');
+    final session = harness.controller.session!;
+    final user = session.events.where(
+      (event) => event.type == kUserMessageEvent,
+    );
+    final tools = session.events.where(
+      (event) => event.type == kToolResultEvent,
+    );
+
+    expect((user.last.data as Map)['text'], contains('调研：src/core'));
+    expect((tools.last.data as Map)['name'], 'spawn_agent');
+    expect((tools.last.data as Map)['content'], contains('fake-spawn'));
+
+    harness.controller.transcript.rebuildFrom(session);
+    expect(
+      harness.controller.transcript.messages.any(
+        (TuiMessage message) => message.text.contains('fake-spawn'),
+      ),
+      isTrue,
+    );
+  });
+
+  test('subagent 命令的 model: 明确提示不生效', () async {
+    final CommandHarness harness = await buildCommandHarness(
+      commands: <String, String>{
+        'research.md':
+            '---\nagent: explore\nsubagent: true\nmodel: beta/b1\n---\n调研',
+      },
+      withSpawn: true,
+    );
+    addTearDown(harness.dispose);
+
+    await harness.controller.handleLine('/research');
+
+    expect(harness.spawn.calls, hasLength(1));
+    expect(
+      harness.controller.transcript.messages.any(
+        (TuiMessage message) => message.text.contains('model: beta/b1'),
+      ),
+      isTrue,
+    );
+  });
+
   test('前台子 Agent 期间 busy，排队输入被清空且 Esc 可打断', () async {
     final CommandHarness harness = await buildCommandHarness(
       commands: <String, String>{

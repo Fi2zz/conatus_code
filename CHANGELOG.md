@@ -4,6 +4,29 @@
 
 ## [未发布]
 
+- **会话标签 / 主题 / 键位**：标签栏（`ctrl+tab` / `ctrl+shift+tab` 切换、
+  `<leader>w` 关闭，提示取自 keymap）、`/theme`（default / dark / light /
+  tokyonight）与 `[keybinds]` 可配置动作（含冲突与未知动作告警）。每个标签
+  独立恢复会话的 Agent（`agent/selected`）与权限模式；`/new` 使用
+  `[agent] default_agent`，不再继承上一个标签。
+- **自定义命令与 Agent**：`.opencode` / `.nava` 的 `commands/`、`agents/` 四层
+  发现；命令支持 `agent:` / `model:` / `subagent: true`，子 Agent 命令把 prompt
+  与结果写入 `user/message` / `tool/result`（重开 / 导出可见）；Agent 支持
+  `mode` / `model` / `steps` / `tools`，内置 `general` 显式可写白名单（high 风险
+  与 `spawn_agent` 仍被框架排除）。
+- **MCP CLI 与 OAuth 加固**：`nava mcp add / list / auth / logout`（`--config`
+  可覆盖）；`add --url` 只接受 http(s)。刷新响应不轮换时保留旧
+  `refresh_token`；401 先重读令牌文件（跨进程复用），`http-status` 正文本地
+  截断并脱敏 Bearer / token。旧式权限动作 `<server>_list_mcp_resources` /
+  `<server>_read_mcp_resource` 继续生效。
+- **`.opencode` 写保护覆盖配置 / 令牌**：`writeFileAtomic` / `writeConfigFile`
+  与 OAuth 令牌目录派生统一走 `defaultReadOnlyRoots` + 最近已存在祖先解析；
+  `--config .opencode/...`、`NAVA_HOME=.opencode`、符号链接父目录都在创建文件
+  前拒绝。
+- **发现告警可见**：Agent / 命令注册表与 Agent 模型解析的告警进入启动提示
+  与 `/doctor`（来源文件 + 原因）。
+- **删除会话**：确认框展示 JSONL 大小、检查点数、故事线日志与保留的导出文件；
+  故事层关闭后仍清理历史故事线日志。
 - **MCP OAuth 运行时**：远程 server 缺省尝试 OAuth；令牌原子写入
   `~/.nava/oauth/<server>.json`（0600、目录 0700），持久化 DCR `client_id`，
   过期前 60 秒主动刷新，401 刷新一次后重试，失败标记 `needs_auth` 且只跳过该

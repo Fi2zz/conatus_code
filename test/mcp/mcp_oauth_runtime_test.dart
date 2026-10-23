@@ -78,6 +78,22 @@ void main() {
     expect(authServer.tokenRequests.single['resource'], spec.url);
   });
 
+  test('401 先重读令牌文件：别的进程已刷新时直接用新值', () async {
+    final McpOAuthRuntime runtime = await runtimeFor(token());
+    await store.save(
+      spec.name,
+      token(
+        access: 'access-other',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      ),
+    );
+
+    final Map<String, String> headers = await runtime.refresh();
+
+    expect(headers['Authorization'], 'Bearer access-other');
+    expect(authServer.tokenRequests, isEmpty);
+  });
+
   test('真实传输 401：刷新后带新头重试并落盘', () async {
     final McpOAuthRuntime runtime = await runtimeFor(token());
     final List<http.Request> requests = <http.Request>[];

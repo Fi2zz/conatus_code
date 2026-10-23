@@ -26,6 +26,7 @@ import '../../providers.dart';
 import '../agents/agent_definition.dart';
 import '../agents/agent_picker.dart';
 import '../agents/agent_registry.dart';
+import '../agents/agent_resolver.dart';
 import '../autonomous/autonomous_assembly.dart';
 import '../background/background_tasks.dart';
 import '../budget/cost_tracker.dart';
@@ -65,6 +66,7 @@ import 'theme/nava_theme.dart';
 import 'theme/theme_view.dart';
 import 'trace_renderer.dart';
 import 'transcript.dart';
+import 'tui_agent_selection.dart';
 import 'tui_attachment.dart';
 import 'tui_choice.dart';
 import 'tui_commands.dart';
@@ -211,6 +213,13 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 当前会话 Agent ID（`/agents` 切换后更新）。
   String _agentId = 'build';
+
+  /// 首次绑定（启动）用 `initialAgentId` / 配置默认值；之后的新会话一律用
+  /// `[agent] default_agent`，不继承上一个标签的选择。
+  bool _firstBind = true;
+
+  /// 本次重绑临时指定的 Agent（自定义命令覆盖）；非空时优先于会话事件。
+  String? _bindAgentOverride;
 
   /// 当前 Agent 注入的 system prompt 段撤销函数。
   Disposer? _agentPromptDisposer;
@@ -629,8 +638,11 @@ class ConatusTuiController implements TuiUserPromptHost {
       _sessionId = _sessions.create().id;
     }
     await _bindStartup(_sessionId);
+    _firstBind = false;
+    _persistAgentSelection();
     _syncTabState();
     _addKeybindWarnings();
+    _addDiscoveryWarnings();
     _refresh();
     // 回填当前模型的上下文窗口（来自 models.dev 档案，未就绪则稍后补）。
     seedModelContextLength();
@@ -698,6 +710,26 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
   }
 
+  /// 启动时把 Agent / 命令发现告警上屏（来源文件与原因都在告警文本里）。
+  ///
+  /// 只展示前 5 条；其余提示去 `/doctor` 看，避免坏目录一次刷屏。
+  void _addDiscoveryWarnings() {
+    final List<String> warnings = <String>[
+      ...?_agentRegistry?.warnings,
+      ...?_commandRegistry?.warnings,
+      ...?_app.get<AgentProfileResolver>('agentProfiles')?.warnings,
+    ];
+    for (final String warning in warnings.take(5)) {
+      transcript.add(TuiRole.system, warning);
+    }
+    if (warnings.length > 5) {
+      transcript.add(
+        TuiRole.system,
+        '还有 ${warnings.length - 5} 条 Agent / 命令发现告警，见 /doctor。',
+      );
+    }
+  }
+
   /// 解析启动 Agent：显式配置优先；未知 / 仅子 Agent 回退注册表默认值。
   String _startupAgentId() {
     final AgentRegistry? registry = _agentRegistry;
@@ -712,6 +744,25 @@ class ConatusTuiController implements TuiUserPromptHost {
       }
     }
     return registry.defaultAgent.id;
+  }
+
+  /// 新会话的 Agent：`[agent] default_agent`（注册表已处理未知 / subagent 回退）。
+  String _defaultAgentId() => _agentRegistry?.defaultAgent.id ?? 'build';
+
+  /// 会话记录的 Agent；无记录、未知或仅子 Agent 时用 [fallback]。
+  String _sessionAgentId(Session session, String fallback) {
+    final String? recorded = restoreAgentId(session);
+    if (recorded == null) return fallback;
+    final AgentDefinition? def = _agentRegistry?.byId(recorded);
+    if (def == null || def.mode == AgentMode.subagent) return fallback;
+    return def.id;
+  }
+
+  /// 首次绑定 / 显式切换后把当前 Agent 写入会话；重复选择不追加。
+  void _persistAgentSelection() {
+    final Session? session = _session;
+    if (session == null) return;
+    persistAgentSelection(session, _agentId);
   }
 
   /// 当前 LLM 链 + 标签；无链时 entries 为空。
@@ -733,6 +784,19 @@ class ConatusTuiController implements TuiUserPromptHost {
     final String? warning = await _applyModelSpec(spec, rebindNow: false);
     if (warning != null) {
       transcript.add(TuiRole.system, '启动 Agent 的模型不可用：$warning，沿用当前模型。');
+    }
+  }
+
+  /// 切会话后按目标会话的 Agent 恢复模型（无 `model:` 时回到基线）。
+  Future<void> _restoreBoundAgentModel() async {
+    final String? spec = agentDefinition?.model;
+    if (spec == null || spec.trim().isEmpty) {
+      _restoreBaselineModel();
+      return;
+    }
+    final String? warning = await _applyModelSpec(spec, rebindNow: false);
+    if (warning != null) {
+      showSystemNotice('Agent $_agentId 的模型不可用：$warning，沿用当前模型。');
     }
   }
 
@@ -760,6 +824,18 @@ class ConatusTuiController implements TuiUserPromptHost {
     await _bind(id);
     _refresh();
     return true;
+  }
+
+  /// 以 [agentId] 重绑当前会话（自定义命令的临时 Agent 覆盖用）。
+  ///
+  /// 覆盖只作用于这次重绑；会话事件不动，回合结束的还原路径照常生效。
+  Future<bool> _rebindAs(String agentId) async {
+    _bindAgentOverride = agentId;
+    try {
+      return await rebind();
+    } finally {
+      _bindAgentOverride = null;
+    }
   }
 
   /// 处理一行输入：斜杠命令本地处理，其余进对话链路。
@@ -971,9 +1047,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       final String out = result.stdout.text;
       return out.isEmpty ? '（无输出）' : out;
     }
-    final String out = result.stdout.text;
-    final String err = result.stderr.text;
-    final String body = out.isEmpty ? err : (err.isEmpty ? out : '$out\n$err');
+    final String body = _joinedOutput(result.stdout.text, result.stderr.text);
     // 127 是 shell「命令未找到」的约定退出码：错误行原样直出，不加
     // 「命令失败（exit 127）」包装，观感与终端直出一致。
     if (code == 127 && body.isNotEmpty) return body;
@@ -1203,9 +1277,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (hook != null) {
       return hook(id);
     }
+    final String summary = await _deleteSummary(id);
     final String? answer = await choice.ask(
       TuiChoiceRequest(
-        title: '删除会话 $id？',
+        title: '删除会话 $id？\n$summary',
         choices: const <TuiChoice>[
           TuiChoice(id: 'delete', label: '删除'),
           TuiChoice(id: 'cancel', label: '取消', current: true),
@@ -1214,6 +1289,52 @@ class ConatusTuiController implements TuiUserPromptHost {
     );
     return answer == 'delete';
   }
+
+  /// 删除确认的清理范围：JSONL 大小、检查点数、故事线、导出文件。
+  Future<String> _deleteSummary(String id) async {
+    final List<String> parts = <String>[];
+    final SessionPersistence? persistence = _app.get<SessionPersistence>(
+      'sessionPersistence',
+    );
+    if (persistence is JsonlSessionPersistence) {
+      final File file = File(
+        '${persistence.dir}${Platform.pathSeparator}$id.jsonl',
+      );
+      if (file.existsSync()) {
+        parts.add('会话数据 ${_fileSizeLabel(file.lengthSync())}');
+      }
+    }
+    final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
+      'checkpointManager',
+    );
+    final int checkpoints = checkpoint?.listFor(id).length ?? 0;
+    if (checkpoints > 0) parts.add('检查点 $checkpoints 个');
+    final SessionLog? log = _app.get<SessionLog>('sessionLog');
+    if (log != null) {
+      try {
+        if ((await log.list()).contains(id)) parts.add('故事线日志');
+      } catch (_) {
+        // 日志不可读不影响删除确认：清理时还会再报一次。
+      }
+    }
+    final String export = _exportFileOf(id);
+    if (File(export).existsSync()) parts.add('导出文件保留（$export）');
+    return parts.isEmpty ? '没有可清理的附属文件。' : '将清理：${parts.join('；')}。';
+  }
+
+  /// 会话的缺省导出路径（与会话导出器保持同一命名）。
+  String _exportFileOf(String id) {
+    final String workdir =
+        _app.get<String>('workdir') ?? Directory.current.path;
+    final String bare = id.startsWith('session_')
+        ? id.substring('session_'.length)
+        : id;
+    return '${resolveProjectDataDir(workdir: workdir)}'
+        '${Platform.pathSeparator}exports${Platform.pathSeparator}nava-$bare.md';
+  }
+
+  String _fileSizeLabel(int bytes) =>
+      bytes < 1024 ? '$bytes B' : '${(bytes / 1024).toStringAsFixed(1)} KB';
 
   /// 删除会话：拒绝当前会话；清 JSONL、检查点与故事线日志（不动导出文件）。
   ///
@@ -1273,10 +1394,16 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (checkpoint != null) {
       await _attemptDelete(errors, '检查点', () => checkpoint.clearSession(id));
     }
-    if (storyEnabled) {
-      final SessionLog? log = _app.get<SessionLog>('sessionLog');
-      if (log != null) {
-        await _attemptDelete(errors, '故事线日志', () => log.remove(id));
+    // 不看当前 `storyEnabled`：关闭故事层后仍可能有历史日志要清。服务未
+    // 装配时退回目录服务直接删文件（文件名与会话 id 一一对应）。
+    final SessionLog? log = _app.get<SessionLog>('sessionLog');
+    if (log != null) {
+      await _attemptDelete(errors, '故事线日志', () => log.remove(id));
+    } else {
+      final String? dir = _app.get<String>('storyLogDir');
+      final File file = File('${dir ?? ''}${Platform.pathSeparator}$id.jsonl');
+      if (dir != null && file.existsSync()) {
+        await _attemptDelete(errors, '故事线日志', () async => file.delete());
       }
     }
     return errors;
@@ -1355,6 +1482,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     } catch (error) {
       return _recoverSession(previous, id, error);
     }
+    await _restoreBoundAgentModel();
     _syncTabState();
     _restoreActiveScroll();
     transcript.add(
@@ -1666,11 +1794,16 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     final int? code = result.exitCode;
     if (code == 0) return result.stdout.text;
-    final String out = result.stdout.text;
-    final String err = result.stderr.text;
-    final String body = out.isEmpty ? err : (err.isEmpty ? out : '$out\n$err');
+    final String body = _joinedOutput(result.stdout.text, result.stderr.text);
     final String status = code == null ? '未知退出码（可能超时）' : 'exit $code';
     throw StateError('命令失败（$status）：${_capCommandOutput(body)}');
+  }
+
+  /// 合并 stdout / stderr：优先保留非空侧，两侧都有时换行拼接。
+  String _joinedOutput(String out, String err) {
+    if (out.isEmpty) return err;
+    if (err.isEmpty) return out;
+    return '$out\n$err';
   }
 
   /// 截断 shell 失败输出，避免一段构建日志把提示刷出屏幕。
@@ -1735,6 +1868,17 @@ class ConatusTuiController implements TuiUserPromptHost {
       showSystemNotice('命令 /$name 需要 spawn_agent，但当前未装配。');
       return;
     }
+    if (def.model != null && def.model!.trim().isNotEmpty) {
+      // 子 Agent 的模型由 Agent profile（`agent:` 对应定义）决定，spawn_agent
+      // 没有单次 model 参数：明确告知而不是静默忽略。
+      showSystemNotice(
+        '命令 /$name 的 model: ${def.model} 对子 Agent 不生效；'
+        '请给 agent 定义设置 model，或改用普通命令。',
+      );
+    }
+    final Session? session = _session;
+    // 命令同样是一轮用户输入：写进会话，重开 / 导出时才看得到上下文。
+    session?.append(kUserMessageEvent, data: <String, Object?>{'text': prompt});
     final AgentCancel cancel = AgentCancel();
     _cancel = cancel;
     _foregroundInterrupt = () {
@@ -1763,11 +1907,18 @@ class ConatusTuiController implements TuiUserPromptHost {
         transcript.add(TuiRole.system, '已打断这一轮。');
         return;
       }
+      session?.append(
+        kToolResultEvent,
+        data: <String, Object?>{
+          'callId': 'command-$name',
+          'name': 'spawn_agent',
+          'content': result.content,
+          'isError': result.isError,
+        },
+      );
       if (result.isError) {
         showSystemNotice('子 Agent 执行失败：${result.content}');
-        return;
       }
-      transcript.add(TuiRole.system, result.content);
     } finally {
       _foregroundInterrupt = null;
       _cancel = null;
@@ -1819,7 +1970,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     if (!applied) return;
     _turnOverride = restore;
-    await rebind();
+    await _rebindAs(_agentId);
     // rebind 会 dispose 旧 PlanMode（active 时会写 inactive 事件）；按本轮
     // 期望状态恢复：手动 Plan Mode 原样保留，`agent: plan` 补进入。
     if (restore.planModeActive || def.agent == 'plan') {
@@ -1976,7 +2127,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     } else {
       _restoreBaselineModel();
     }
-    if (rebindNow) await rebind();
+    // 显式切换才写会话事件；自定义命令的临时覆盖（announce=false）不能改写
+    // 会话归属，否则本轮结束后还原的是「命令里的 Agent」。
+    if (announce) _persistAgentSelection();
+    if (rebindNow) await _rebindAs(def.id);
     if (syncPlanMode) _syncAgentPlanMode(def.id);
     if (announce) showSystemNotice('已切换到 Agent「${def.id}」。');
     return true;
@@ -2387,7 +2541,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     final StringBuffer buffer = StringBuffer('nava 体检：');
     int failed = 0;
     for (final DoctorCheck check in checks) {
-      final String mark = check.ok ? '✓' : (check.warning ? '⚠' : '✗');
+      final String mark = switch ((check.ok, check.warning)) {
+        (true, _) => '✓',
+        (false, true) => '⚠',
+        _ => '✗',
+      };
       if (!check.ok && !check.warning) failed++;
       buffer
         ..write('\n  $mark ${check.name}')
@@ -3076,6 +3234,10 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _bind(String id) async {
     final Session session = await _sessions.open(id);
     _session = session;
+    // Agent 选择按会话恢复：标签之间互不继承（_firstBind 只用于启动会话）。
+    // 自定义命令的临时覆盖优先于会话事件，回合结束后再还原。
+    final String fallback = _firstBind ? _startupAgentId() : _defaultAgentId();
+    _agentId = _bindAgentOverride ?? _sessionAgentId(session, fallback);
     // OpenCode 网关请求头按当前会话发送；其它 provider 忽略。
     _app.providers?.sessionId = session.id;
     final Context ctx = _app.plugin('tui-session:$id', (Context child) {

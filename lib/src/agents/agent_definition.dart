@@ -62,15 +62,17 @@ class AgentDefinition {
   /// 单轮最大步数；`null` 表示沿用全局配置。
   final int? steps;
 
-  /// 工具白名单；`null` 表示不额外限制。
+  /// 工具白名单；`null` 表示未设置（不额外限制）。
   ///
-  /// 来自 `tools` 数组形式。空数组表示**禁止所有工具**；`null` 表示未设置
-  /// 白名单（全部默认可用，再减去 [disabledTools]）。
+  /// 来自 `tools` 数组形式。空数组表示**禁止所有工具**。作为**子 Agent**
+  /// 使用时，`null` 会落到宿主 `spawn_agent` 的默认白名单（只读探索集），
+  /// 而不是全部工具——需要写能力的内置 / 自定义子 Agent 必须显式列出。
+  /// 作为主会话 Agent 时 `null` 才表示不额外限制。
   final List<String>? tools;
 
   /// 被显式禁用的工具（已映射为 nava 工具名）。
   ///
-  /// 来自 OpenCode `tools` 映射里值为 `false` 的项；B4 应从可用工具集合中
+  /// 来自 OpenCode `tools` 映射里值为 `false` 的项；运行时从可用工具集合中
   /// 减去它们，未出现的工具保持默认启用。
   final List<String> disabledTools;
 

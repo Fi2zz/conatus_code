@@ -45,6 +45,19 @@ void main() {
       }
     });
 
+    test('拒绝非 http(s) 的 --url', () async {
+      final int code = await run(<String>[
+        'add',
+        'docs',
+        '--url',
+        'file:///tmp/config.toml',
+      ]);
+
+      expect(code, 2);
+      expect(err.toString(), contains('http'));
+      expect(File(path).existsSync(), isFalse);
+    });
+
     test('-- <command...> 写入 stdio server', () async {
       final int code = await run(<String>[
         'add',

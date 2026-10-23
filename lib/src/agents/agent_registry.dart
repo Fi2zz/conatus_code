@@ -39,6 +39,9 @@ class AgentRegistry {
   /// 按 ID 精确查找；未命中返回 `null`（hidden Agent 同样可解析）。
   AgentDefinition? byId(String id) => _agents[id.trim()];
 
+  /// 全部 Agent（含 hidden / subagent），按 ID 排序。
+  List<AgentDefinition> get all => _sorted(_agents.values);
+
   /// 选择器可见的 Agent（不含 hidden），按 ID 排序。
   List<AgentDefinition> get visible =>
       _sorted(_agents.values.where((AgentDefinition agent) => !agent.hidden));

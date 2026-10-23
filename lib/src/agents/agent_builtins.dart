@@ -31,12 +31,34 @@ const AgentDefinition _planAgent = AgentDefinition(
 );
 
 /// 内置 `general`：可写的通用子 Agent；不能再 spawn 由工具自身限制。
+///
+/// [tools] 必须显式给出：`null` 会回落到宿主的只读默认白名单（read / rg /
+/// glob / git 只读），与「广工具、可写」的定位矛盾。high 风险工具（run_command
+/// / run_tests / git_commit）即使列在这里也会被 `spawn_agent` 的 `_usable`
+/// 挡掉——子 Agent 没有审批层，这是硬边界。
 const AgentDefinition _generalAgent = AgentDefinition(
   id: 'general',
   sourcePath: 'builtin:general',
   description: '通用子 Agent',
   mode: AgentMode.subagent,
   system: '你是通用子 Agent。独立完成委派的子任务，汇报结果与关键证据。',
+  tools: <String>[
+    'read_file',
+    'list_files',
+    'rg',
+    'glob',
+    'write_file',
+    'edit_file',
+    'apply_patch',
+    'git_status',
+    'git_diff',
+    'git_add',
+    'git_branch',
+    'git_stash',
+    'web_search',
+    'fetch_url',
+    'update_plan',
+  ],
 );
 
 /// 内置 `explore`：只读探索，工具白名单限定在读取与联网查询。

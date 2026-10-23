@@ -32,8 +32,17 @@ class McpOAuthRuntime {
     return _bearer(_token);
   }
 
-  /// 401 后强制刷新一次并返回新头；失败抛 `needs_auth`。
+  /// 401 后刷新并返回新头；失败抛 `needs_auth`。
+  ///
+  /// 先重读令牌文件：另一个 nava 进程可能已经刷新并轮换了令牌，这时直接用
+  /// 磁盘上的新值，避免拿旧 refresh_token 再换一次（部分 AS 会判定重放并
+  /// 吊销，双方都变 needs_auth）。
   Future<Map<String, String>> refresh() async {
+    final McpOAuthToken? stored = await _store.load(_spec.name);
+    if (stored != null && stored.accessToken != _token.accessToken) {
+      _token = stored;
+      return _bearer(_token);
+    }
     await _ensureRefreshed();
     return _bearer(_token);
   }

@@ -1,7 +1,10 @@
 /// `/doctor`：体检聚合与命令展示。
 library;
 
+import 'dart:io';
+
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -17,16 +20,14 @@ class _StubProvider implements LlmProvider {
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) async =>
-      const LlmResult(content: 'ok', provider: 'stub', model: 'm');
+  }) async => const LlmResult(content: 'ok', provider: 'stub', model: 'm');
 
   @override
   Stream<LlmStreamEvent> chatStream(
     List<LlmMessage> messages, {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
-  }) =>
-      const Stream<LlmStreamEvent>.empty();
+  }) => const Stream<LlmStreamEvent>.empty();
 
   @override
   void close() {}
@@ -55,16 +56,13 @@ void main() {
 
     final List<DoctorCheck> checks = doctorChecks(app);
 
-    expect(
-      checks.firstWhere((DoctorCheck c) => c.name == '配置文件').ok,
-      isFalse,
-    );
-    expect(
-      checks.firstWhere((DoctorCheck c) => c.name == '模型提供商').ok,
-      isFalse,
-    );
+    expect(checks.firstWhere((DoctorCheck c) => c.name == '配置文件').ok, isFalse);
+    expect(checks.firstWhere((DoctorCheck c) => c.name == '模型提供商').ok, isFalse);
     expect(checks.firstWhere((DoctorCheck c) => c.name == '工具表').ok, isTrue);
-    expect(checks.firstWhere((DoctorCheck c) => c.name == 'MCP server').ok, isFalse);
+    expect(
+      checks.firstWhere((DoctorCheck c) => c.name == 'MCP server').ok,
+      isFalse,
+    );
   });
 
   test('/doctor 输出逐项标记与汇总', () async {
@@ -82,5 +80,47 @@ void main() {
 
   test('命令表包含 doctor', () {
     expect(tuiCommands.any((TuiCommand c) => c.name == 'doctor'), isTrue);
+  });
+
+  test('Agent / 命令发现告警进入 /doctor，带来源文件与原因', () async {
+    final (ConatusTuiController controller, Context app) = await _build();
+    addTearDown(app.dispose);
+    final Directory work = Directory.systemTemp.createTempSync('nava-doctor-');
+    final Directory home = Directory.systemTemp.createTempSync('nava-doc-h-');
+    addTearDown(() {
+      work.deleteSync(recursive: true);
+      home.deleteSync(recursive: true);
+    });
+    File('${work.path}/.nava/commands/bad.md')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync('---\nagent: 1\n---\nbad\n');
+    File('${work.path}/.nava/agents/bad.md')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync('---\nmode: nope\n---\nbad\n');
+    File('${work.path}/.nava/agents/model.md')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync('---\nmode: subagent\nmodel: nope/gpt-x\n---\nbad\n');
+    app.provide(
+      'commandRegistry',
+      await CommandRegistry.load(workdir: work.path, home: home.path),
+    );
+    final AgentRegistry agents = await AgentRegistry.load(
+      workdir: work.path,
+      home: home.path,
+    );
+    app.provide('agentRegistry', agents);
+    final AgentProfileResolver profiles = AgentProfileResolver(
+      registry: agents,
+      providers: ProviderRegistry(profiles: <ProviderProfile>[]),
+    );
+    await profiles.validateModels();
+    app.provide('agentProfiles', profiles);
+
+    await controller.handleLine('/doctor');
+
+    final String text = controller.transcript.messages.last.text;
+    expect(text, contains('Agent / 命令发现'));
+    expect(text, contains('bad.md'));
+    expect(text, contains('nope/gpt-x'));
   });
 }

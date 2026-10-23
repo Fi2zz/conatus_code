@@ -9,7 +9,10 @@ import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
 
 import '../../providers.dart';
+import '../agents/agent_registry.dart';
+import '../agents/agent_resolver.dart';
 import '../budget/cost_tracker.dart';
+import '../commands/command_registry.dart';
 import '../permissions/permission_wiring.dart';
 import '../sandbox/jailed_file_system.dart';
 import '../sandbox/rejecting_shell.dart';
@@ -56,8 +59,34 @@ List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
   _shellCheck(app),
   _fsCheck(app),
   _permissionCheck(app),
+  _discoveryCheck(app),
   DoctorCheck(name: 'rg', ok: _rgAvailable(), hint: 'PATH 里没有 rg（搜索工具会降级/报错）'),
 ];
+
+/// Agent / 命令发现的跳过项与 Agent 模型回退。
+///
+/// 这些告警此前只存在于注册表里，用户看不到坏掉的 `.md` 或写错的 `model:`；
+/// 这里把来源文件与原因一起报出来（最多 3 条 + 总数）。
+DoctorCheck _discoveryCheck(Context app) {
+  final List<String> warnings = <String>[
+    ...?app.get<AgentRegistry>('agentRegistry')?.warnings,
+    ...?app.get<CommandRegistry>('commandRegistry')?.warnings,
+    ...?app.get<AgentProfileResolver>('agentProfiles')?.warnings,
+  ];
+  if (warnings.isEmpty) {
+    return const DoctorCheck(name: 'Agent / 命令发现', ok: true, hint: '无告警');
+  }
+  final String head = warnings.take(3).join('；');
+  final String more = warnings.length > 3
+      ? '（另有 ${warnings.length - 3} 条）'
+      : '';
+  return DoctorCheck(
+    name: 'Agent / 命令发现',
+    ok: false,
+    warning: true,
+    hint: '$head$more',
+  );
+}
 
 DoctorCheck _providerCheck(Context app) {
   final ProviderRegistry? registry = app.get<ProviderRegistry>('providers');

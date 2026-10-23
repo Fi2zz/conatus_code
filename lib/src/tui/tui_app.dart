@@ -555,7 +555,11 @@ class ConatusTuiRuntime {
       registry: agentRegistry,
       providers: registry,
     );
+    // `/doctor` 与启动提示读取解析器的告警（未知 / 非法 model 回退）。
+    app.provide('agentProfiles', agentProfiles);
     app.onDispose(agentProfiles.close);
+    // 启动时即校验 Agent 的 model，让坏配置当场可见而不是等到 spawn。
+    await agentProfiles.validateModels();
 
     // 子 Agent：进度出口 + **独立的轮次预算**。
     //
@@ -633,13 +637,15 @@ class ConatusTuiRuntime {
       ),
     );
     final SessionStore sessions = provideSessions(app);
-    // 故事层日志（doc/* 事件）：只在启用故事层时装配，关闭时零副作用。
+    // 故事层日志（doc/* 事件）：启用时才装配服务（关闭时零副作用）。
+    // 目录本身始终登记：删除会话时即使故事层已关闭，也要能找到并清掉历史
+    // 故事线文件（见 `_clearSessionArtifacts`）。
+    final String storyLogDir = '$resolvedBaseDir${sep}story-log';
+    app.provide('storyLogDir', storyLogDir);
     if (storyEnabled) {
       provideSessionLog(
         app,
-        persistence: JsonlSessionPersistence(
-          dir: '$resolvedBaseDir${sep}story-log',
-        ),
+        persistence: JsonlSessionPersistence(dir: storyLogDir),
       );
     }
 

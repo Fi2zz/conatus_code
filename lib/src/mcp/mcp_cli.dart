@@ -15,6 +15,7 @@ import '../config/config_mcp_writer.dart';
 import '../config/config_parser.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
+import '../read_only_paths.dart';
 
 part 'mcp_cli_add.dart';
 part 'mcp_cli_auth.dart';
@@ -123,34 +124,6 @@ _Invocation _extractConfig(List<String> args, String? fallback) {
     path = args[++index];
   }
   return (args: kept, configPath: path, error: null);
-}
-
-/// `.opencode` / `~/.config/opencode` 只读：任何写入路径都拒绝。
-///
-/// 相对路径按当前目录展开；符号链接同时检查链接目标，避免借链接写进去。
-bool _protectedPath(String path) {
-  final File file = File(path);
-  if (_protectedSegments(file.absolute.path)) return true;
-  if (!file.existsSync()) return false;
-  try {
-    return _protectedSegments(file.resolveSymbolicLinksSync());
-  } on FileSystemException {
-    return false;
-  }
-}
-
-bool _protectedSegments(String path) {
-  final List<String> segments = path
-      .replaceAll(r'\', '/')
-      .toLowerCase()
-      .split('/');
-  if (segments.contains('.opencode')) return true;
-  for (int index = 0; index + 1 < segments.length; index++) {
-    if (segments[index] == '.config' && segments[index + 1] == 'opencode') {
-      return true;
-    }
-  }
-  return false;
 }
 
 int _usageError(McpCliDeps deps, String message) {

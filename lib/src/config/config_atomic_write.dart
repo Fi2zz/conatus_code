@@ -6,6 +6,8 @@ library;
 
 import 'dart:io';
 
+import '../read_only_paths.dart';
+
 /// 0600（`rw-------`）的十进制值；Dart 没有八进制字面量。
 const int kOwnerOnlyMode = 0x180;
 
@@ -13,7 +15,13 @@ const int kOwnerOnlyMode = 0x180;
 ///
 /// 目标是符号链接（dotfiles 常见）时写穿到链接目标，**不切断链接**。
 /// [mode] 缺省 0600——配置里可能含 API Key，同机其他用户不能读。
+///
+/// `.opencode` / `~/.config/opencode` 及其符号链接别名一律拒绝（在创建父
+/// 目录之前判定，见 [readOnlyWritePath]）。
 void writeFileAtomic(String path, String content, {int mode = kOwnerOnlyMode}) {
+  if (readOnlyWritePath(path)) {
+    throw FileSystemException(kReadOnlyPathMessage, path);
+  }
   final File target = _writeTarget(path);
   target.parent.createSync(recursive: true);
   final File temp = File(

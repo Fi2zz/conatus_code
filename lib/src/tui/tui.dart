@@ -939,6 +939,9 @@ class _AgentTuiState extends State<AgentTui> {
           TabBar(
             tabs: _controller.tabs.tabs,
             active: _controller.tabs.active,
+            nextHint: _controller.keymap
+                .labelsFor(KeyActions.tabNext)
+                .join(', '),
             closeHint: _controller.keymap
                 .labelsFor(KeyActions.tabClose)
                 .join(', '),

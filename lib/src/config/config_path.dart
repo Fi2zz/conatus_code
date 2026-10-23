@@ -5,6 +5,8 @@ library;
 
 import 'dart:io';
 
+import '../read_only_paths.dart';
+
 /// 用户级配置目录名，放在系统默认位置（macOS 为 `$HOME`）下。
 const String kConfigDirName = '.nava';
 
@@ -32,8 +34,16 @@ String resolveConfigDir({Map<String, String>? env}) {
 /// 解析 OAuth 令牌目录：`<配置目录>/oauth`（缺省 `~/.nava/oauth`）。
 ///
 /// 令牌只写这里，绝不碰 `.opencode` / `~/.config/opencode`（只读兼容）。
-String resolveOAuthTokenDir({Map<String, String>? env}) =>
-    '${resolveConfigDir(env: env)}${Platform.pathSeparator}oauth';
+/// `NAVA_HOME` 指向只读目录（含符号链接别名）时直接抛 [StateError]：令牌
+/// 目录的派生阶段就拒绝，避免调用方先创建目录。
+String resolveOAuthTokenDir({Map<String, String>? env}) {
+  final String dir =
+      '${resolveConfigDir(env: env)}${Platform.pathSeparator}oauth';
+  if (readOnlyWritePath(dir)) {
+    throw StateError(kReadOnlyPathMessage);
+  }
+  return dir;
+}
 
 /// 解析配置文件路径：`--config` 参数优先，否则配置目录下的 [kConfigFileName]。
 String resolveConfigPath({String? explicit, Map<String, String>? env}) {

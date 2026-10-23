@@ -48,6 +48,26 @@ void main() {
       });
     }
 
+    test('父目录是符号链接指向 .opencode 时拒绝', () async {
+      final Directory protectedDir = Directory(
+        '${dir.path}${Platform.pathSeparator}.opencode',
+      )..createSync();
+      final String linkPath = '${dir.path}${Platform.pathSeparator}link';
+      Link(linkPath).createSync(protectedDir.path);
+      final String target = '$linkPath${Platform.pathSeparator}config.toml';
+
+      final int code = await run(<String>[
+        'add',
+        'docs',
+        '--url',
+        'https://example.com/mcp',
+      ], configPath: target);
+
+      expect(code, 2);
+      expect(File(target).existsSync(), isFalse);
+      expect(err.toString(), contains('只读'));
+    });
+
     test('相对路径 .opencode/config.toml 同样拒绝', () async {
       final int code = await run(<String>[
         'add',

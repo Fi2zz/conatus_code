@@ -46,9 +46,18 @@ class AgentProfileResolver implements SubAgentProfileResolver {
       tools: agent.tools,
       disabledTools: agent.disabledTools,
       permissions: agent.permissions,
-      llm: _llm(agent.id, agent.model),
+      llm: _llm(agent),
       permissionMode: _mode(agent),
     );
+  }
+
+  /// 预解析所有带 `model:` 的 Agent，让未知 / 非法模型在启动提示与
+  /// `/doctor` 里可见（否则要等到第一次 spawn 才产生告警）。
+  Future<void> validateModels() async {
+    for (final AgentDefinition agent in registry.all) {
+      if (agent.model == null) continue;
+      await resolve(agent.id);
+    }
   }
 
   /// 释放缓存中由本解析器构造的 provider。
@@ -66,19 +75,19 @@ class AgentProfileResolver implements SubAgentProfileResolver {
   };
 
   /// `provider/model` → 提供商注册表；失败记录 warning 并返回 `null`。
-  LlmProvider? _llm(String agentId, String? spec) {
-    final String? value = spec?.trim();
+  LlmProvider? _llm(AgentDefinition agent) {
+    final String? value = agent.model?.trim();
     if (value == null || value.isEmpty) return null;
     if (_llmCache.containsKey(value)) return _llmCache[value];
-    final LlmProvider? provider = _build(agentId, value);
+    final LlmProvider? provider = _build(agent, value);
     _llmCache[value] = provider;
     return provider;
   }
 
-  LlmProvider? _build(String agentId, String value) {
+  LlmProvider? _build(AgentDefinition agent, String value) {
     final ProviderRegistry? registry = providers;
     if (registry == null) {
-      _warn(agentId, value, '未装配 ProviderRegistry');
+      _warn(agent, value, '未装配 ProviderRegistry');
       return null;
     }
     final int slash = value.indexOf('/');
@@ -87,20 +96,23 @@ class AgentProfileResolver implements SubAgentProfileResolver {
         : value.substring(0, slash).trim();
     final String? model = slash < 0 ? null : value.substring(slash + 1).trim();
     if (provider.isEmpty || (model != null && model.isEmpty)) {
-      _warn(agentId, value, '模型标识不是 provider/model');
+      _warn(agent, value, '模型标识不是 provider/model');
       return null;
     }
     try {
       final LlmProvider? built = registry.buildLlm(provider, model: model);
-      if (built == null) _warn(agentId, value, '提供商或模型不可用');
+      if (built == null) _warn(agent, value, '提供商或模型不可用');
       return built;
     } on Object {
-      _warn(agentId, value, '构造模型失败');
+      _warn(agent, value, '构造模型失败');
       return null;
     }
   }
 
-  void _warn(String agentId, String spec, String reason) {
-    _warnings.add('Agent "$agentId" 的 model "$spec" 无法解析：$reason，回退宿主模型');
+  void _warn(AgentDefinition agent, String spec, String reason) {
+    _warnings.add(
+      'Agent "${agent.id}"（${agent.sourcePath}）的 model "$spec" '
+      '无法解析：$reason，回退宿主模型',
+    );
   }
 }

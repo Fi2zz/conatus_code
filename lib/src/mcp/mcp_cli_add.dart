@@ -22,7 +22,7 @@ Future<int> _add(List<String> args, String? configPath, McpCliDeps deps) async {
 
 int _writeAdd(_AddRequest request, String? configPath, McpCliDeps deps) {
   final String path = configPath ?? resolveConfigPath();
-  if (_protectedPath(path)) {
+  if (readOnlyWritePath(path)) {
     _err(deps).writeln(
       '拒绝写入只读的 .opencode / ~/.config/opencode：nava 只写 ~/.nava/config.toml。',
     );
@@ -86,7 +86,17 @@ _AddRequest? _parseAdd(List<String> args, McpCliDeps deps) {
   if (url == null && command == null) {
     return _badAdd(deps, '需要 --url <地址> 或 -- <命令...>。');
   }
+  if (url != null && !_validRemoteUrl(url)) {
+    return _badAdd(deps, '--url 必须是 http:// 或 https:// 地址。');
+  }
   return (name: name, url: url, command: command, oauth: oauth);
+}
+
+/// 远程 MCP 端点只接受 http / https：`file:`、`ftp:` 等不会被任何传输实现。
+bool _validRemoteUrl(String value) {
+  final Uri? uri = Uri.tryParse(value.trim());
+  if (uri == null || uri.host.isEmpty) return false;
+  return uri.scheme == 'http' || uri.scheme == 'https';
 }
 
 _AddRequest? _badAdd(McpCliDeps deps, String message) {

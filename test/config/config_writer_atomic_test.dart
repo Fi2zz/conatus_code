@@ -59,6 +59,63 @@ void main() {
     expect(File(path).statSync().mode & 0x1FF, 0x1A4);
   });
 
+  group('.opencode 只读', () {
+    test('字面路径拒绝且不创建父目录', () {
+      final String protectedPath =
+          '${dir.path}${Platform.pathSeparator}.opencode'
+          '${Platform.pathSeparator}config.toml';
+
+      expect(
+        () => writeFileAtomic(protectedPath, 'x'),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(File(protectedPath).existsSync(), isFalse);
+      expect(
+        Directory('${dir.path}${Platform.pathSeparator}.opencode').existsSync(),
+        isFalse,
+      );
+    });
+
+    test('父目录是符号链接指向 .opencode 时拒绝', () {
+      final Directory protectedDir = Directory(
+        '${dir.path}${Platform.pathSeparator}.opencode',
+      )..createSync();
+      final String linkPath = '${dir.path}${Platform.pathSeparator}link';
+      Link(linkPath).createSync(protectedDir.path);
+      final String target = '$linkPath${Platform.pathSeparator}config.toml';
+
+      expect(
+        () => writeFileAtomic(target, 'x'),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(File(target).existsSync(), isFalse);
+    });
+
+    test('NAVA_HOME 指向 .opencode：loadConfig 不初始化模板', () {
+      final String home = '${dir.path}${Platform.pathSeparator}.opencode';
+
+      expect(
+        () => loadConfig(env: <String, String>{kConfigHomeEnv: home}),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(
+        File('$home${Platform.pathSeparator}config.toml').existsSync(),
+        isFalse,
+      );
+    });
+
+    test('OAuth 令牌目录派生阶段就拒绝', () {
+      expect(
+        () => resolveOAuthTokenDir(
+          env: <String, String>{
+            kConfigHomeEnv: '${dir.path}${Platform.pathSeparator}.opencode',
+          },
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
   test('符号链接：写穿目标，不切断链接', () {
     final File real = File(
       '${dir.path}${Platform.pathSeparator}dotfiles-config.toml',

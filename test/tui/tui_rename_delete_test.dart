@@ -110,6 +110,19 @@ void main() {
     expect(fix.controller.sessionId, renameCurrentId);
   });
 
+  test('故事层关闭时仍删除遗留故事线日志', () async {
+    final RenameFixture fix = await buildRenameFixture(storyEnabled: false);
+    final File log = File(
+      '${fix.storyLogDir.path}${Platform.pathSeparator}$renameOtherId.jsonl',
+    );
+    log.parent.createSync(recursive: true);
+    log.writeAsStringSync('{"type":"doc/note"}\n');
+
+    expect(await fix.controller.deleteSession(renameOtherId), isTrue);
+
+    expect(log.existsSync(), isFalse);
+  });
+
   test('未知会话删除返回 false', () async {
     final RenameFixture fix = await buildRenameFixture();
 
@@ -127,6 +140,8 @@ void main() {
     );
 
     final Future<void> pending = fix.controller.deleteSelectedSession();
+    // 确认框在汇总清理范围（JSONL 大小 / 检查点 / 故事线）后弹出。
+    await Future<void>.delayed(Duration.zero);
     expect(fix.controller.choice.open, isTrue);
     expect(fix.controller.choice.request!.title, contains(renameOtherId));
 

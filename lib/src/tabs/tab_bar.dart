@@ -15,6 +15,7 @@ class TabBar extends StatelessComponent {
     super.key,
     required this.tabs,
     required this.active,
+    this.nextHint = 'ctrl+tab',
     this.closeHint = '<leader>w',
   });
 
@@ -23,6 +24,9 @@ class TabBar extends StatelessComponent {
 
   /// 活跃标签下标。
   final int active;
+
+  /// 切换标签的键位提示（来自 keymap，可被 `[keybinds]` 改写）。
+  final String nextHint;
 
   /// 关闭标签的键位提示。
   final String closeHint;
@@ -42,7 +46,11 @@ class TabBar extends StatelessComponent {
     final String close = closeHint.trim().isEmpty
         ? ''
         : ' · ${closeHint.trim()} 关闭';
-    final String hint = '[${tabs.length}/$kTabCap] +  (ctrl+tab 切换$close)';
+    final String next = nextHint.trim().isEmpty ? '' : '${nextHint.trim()} 切换';
+    final String switchHint = next.isEmpty && close.isEmpty
+        ? ''
+        : '  ($next$close)';
+    final String hint = '[${tabs.length}/$kTabCap] +$switchHint';
     return '${labels.join(' │ ')}  $hint';
   }
 

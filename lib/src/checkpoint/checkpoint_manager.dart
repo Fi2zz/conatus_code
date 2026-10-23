@@ -87,6 +87,10 @@ class CheckpointManager {
         ),
       );
 
+  /// 任意会话的检查点摘要（删除确认等只读场景用，不要求已绑定）。
+  List<CheckpointInfo> listFor(String sessionId) =>
+      enabled ? _store.list(sessionId) : const <CheckpointInfo>[];
+
   /// 可用检查点摘要（轮次升序，含有效文件数）。
   List<CheckpointInfo> list() {
     final String? id = _timeline.sessionId;
