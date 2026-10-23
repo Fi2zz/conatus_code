@@ -126,12 +126,14 @@ export 'src/config/config_schema.dart'
 export 'src/config/config_writer.dart'
     show
         ModelEntry,
+        appendMcpServerSection,
         appendModelSection,
         appendProviderSection,
         appendProviderToFile,
         deriveProviderName,
         upsertDefaultModel,
-        writeConfigFile;
+        writeConfigFile,
+        writeFileAtomic;
 export 'src/config/project_data_dir.dart'
     show defaultProjectDataDir, projectDirProtected, resolveProjectDataDir;
 export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;
@@ -210,6 +212,7 @@ export 'src/lint/linter.dart'
         kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
+export 'src/mcp/mcp_cli.dart' show McpCliDeps, runMcpCli;
 export 'src/mcp/mcp_oauth_runtime.dart' show McpOAuthRuntime;
 export 'src/mcp/mcp_prompt_commands.dart'
     show

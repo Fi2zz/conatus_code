@@ -57,8 +57,7 @@ const String kDefaultConfigToml = '''
 # BRAVE_API_KEY = "..."
 # FIRECRAWL_API_KEY = "fc-..."
 
-# MCP server：工具经 server__tool 前缀接入，高危按审批模式询问。
-# env / headers 支持 \${KEY} 占位符（经凭据服务解析）。
+# MCP server：工具经 server__tool 前缀接入；env / headers 支持 \${KEY} 占位符。
 # [mcp.servers.filesystem]
 # type = "stdio"           # stdio 用 command；http / sse 用 url
 # command = "npx"
@@ -67,6 +66,9 @@ const String kDefaultConfigToml = '''
 # type = "http"
 # url = "https://mcp.example.com/mcp"
 # headers = { Authorization = "Bearer \${REMOTE_TOKEN}" }
+# oauth = false             # 远程 server 缺省启用 OAuth；false 关闭
+# [mcp.servers.remote.oauth]
+# client_id = "..."         # 留空走动态注册（DCR）
 
 # 检查点：每轮收口后对工作区文件做快照，/rewind 一键回滚。
 [checkpoint]

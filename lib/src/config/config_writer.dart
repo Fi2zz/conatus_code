@@ -5,6 +5,12 @@ library;
 
 import 'dart:io';
 
+import 'config_atomic_write.dart';
+import 'config_toml.dart';
+
+export 'config_atomic_write.dart' show writeConfigFile, writeFileAtomic;
+export 'config_mcp_writer.dart' show appendMcpServerSection;
+
 /// 追加 `[providers.<name>]` 段，返回新内容。
 ///
 /// 名字只含 TOML 裸键字符（`A-Za-z0-9_-`）时用裸键，否则加双引号
@@ -22,13 +28,13 @@ String appendProviderSection(
   }
   buffer
     ..write('\n[providers.')
-    ..write(_tomlKey(name))
+    ..write(tomlKey(name))
     ..write(']\n');
   if (apiKey.isNotEmpty) {
-    buffer.write('api_key = "${_tomlString(apiKey)}"\n');
+    buffer.write('api_key = "${tomlString(apiKey)}"\n');
   }
   buffer
-    ..write('base_url = "${_tomlString(baseUrl)}"\n')
+    ..write('base_url = "${tomlString(baseUrl)}"\n')
     ..write('type = "$type"\n');
   return buffer.toString();
 }
@@ -45,12 +51,12 @@ String upsertDefaultModel(String toml, String value) {
     if (toml.isNotEmpty && !toml.endsWith('\n')) {
       buffer.write('\n');
     }
-    buffer.write('\n[llm]\ndefault_model = "${_tomlString(value)}"\n');
+    buffer.write('\n[llm]\ndefault_model = "${tomlString(value)}"\n');
     return buffer.toString();
   }
   final int sectionEnd = _sectionEnd(lines, sectionStart);
   final int existing = _defaultModelLine(lines, sectionStart, sectionEnd);
-  final String assignment = 'default_model = "${_tomlString(value)}"';
+  final String assignment = 'default_model = "${tomlString(value)}"';
   if (existing >= 0) {
     lines[existing] = assignment;
   } else {
@@ -100,11 +106,11 @@ String appendModelSection(
     buffer.write('\n');
   }
   buffer
-    ..write('\n[models."${_tomlString(qualified)}"]\n')
-    ..write('provider = "${_tomlString(provider)}"\n')
-    ..write('model = "${_tomlString(entry.id)}"\n');
+    ..write('\n[models."${tomlString(qualified)}"]\n')
+    ..write('provider = "${tomlString(provider)}"\n')
+    ..write('model = "${tomlString(entry.id)}"\n');
   if (entry.displayName.isNotEmpty) {
-    buffer.write('display_name = "${_tomlString(entry.displayName)}"\n');
+    buffer.write('display_name = "${tomlString(entry.displayName)}"\n');
   }
   if (entry.maxContextSize > 0) {
     buffer.write('max_context_size = ${entry.maxContextSize}\n');
@@ -113,22 +119,13 @@ String appendModelSection(
     if (entry.toolUse) 'tool_use',
     if (entry.thinking) 'thinking',
   ];
-  buffer.write('capabilities = [ ${capabilities.map((c) => '"$c"').join(', ')} ]\n');
+  buffer.write(
+    'capabilities = [ ${capabilities.map((c) => '"$c"').join(', ')} ]\n',
+  );
   if (entry.thinking) {
     buffer.write('reasoning_key = "reasoning_content"\n');
   }
   return buffer.toString();
-}
-
-/// 写入文件（父目录自动创建）；写入后收紧权限为 600（Windows 跳过），
-/// 避免明文 API Key 被同机其他用户读取。
-void writeConfigFile(String path, String content) {
-  final File file = File(path);
-  file.parent.createSync(recursive: true);
-  file.writeAsStringSync(content);
-  if (!Platform.isWindows) {
-    Process.runSync('chmod', <String>['600', path]);
-  }
 }
 
 /// 读 [path] → 追加 provider 段（[models] 非空时逐个写模型段）→ 设置
@@ -181,16 +178,6 @@ int _defaultModelLine(List<String> lines, int start, int end) {
   }
   return -1;
 }
-
-/// TOML 键：裸键字符集之外加双引号。
-String _tomlKey(String name) {
-  final bool bare = RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(name);
-  return bare ? name : '"${_tomlString(name)}"';
-}
-
-/// TOML 基本字符串转义（`\` 与 `"`）。
-String _tomlString(String value) =>
-    value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
 
 /// 从 base_url 推导 provider 名：取 host 的主域名段（倒数第二段）。
 ///

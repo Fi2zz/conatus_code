@@ -8,6 +8,10 @@ import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/tui.dart';
 
 Future<void> main(List<String> args) async {
+  // `nava mcp ...` 是独立子命令：在 TUI 选项解析前分流。
+  if (args.isNotEmpty && args.first == 'mcp') {
+    exit(await runMcpCli(args.sublist(1)));
+  }
   final TuiOptions options = TuiOptions.parse(args);
   if (options.helpRequested) {
     stdout.write(TuiOptions.usage);
