@@ -93,6 +93,37 @@ void main() {
       expect(rig.gate.requests, hasLength(1));
     });
 
+    test('rg 的搜索根越界也进入 external_directory', () async {
+      final Directory work = Directory.systemTemp.createTempSync('perm-work');
+      addTearDown(() => work.deleteSync(recursive: true));
+      final PermissionRig rig = assemblePermissionRig(
+        workdir: work.path,
+        scope: const PermissionScope(
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'external_directory',
+              resource: '*',
+              effect: PermissionEffect.ask,
+            ),
+          ],
+        ),
+      );
+
+      await rig.tools.call(
+        permissionCall('rg', <String, Object?>{'pattern': 'TODO', 'path': '/'}),
+      );
+      expect(rig.gate.requests.single.action, 'external_directory');
+      expect(rig.gate.requests.single.resources.single, '/*');
+
+      await rig.tools.call(
+        permissionCall('rg', <String, Object?>{
+          'pattern': 'TODO',
+          'path': work.path,
+        }),
+      );
+      expect(rig.gate.requests, hasLength(1));
+    });
+
     test('统一 diff 的旧路径参与 deny 与 external_directory', () async {
       final Directory work = Directory.systemTemp.createTempSync('perm-work');
       addTearDown(() => work.deleteSync(recursive: true));

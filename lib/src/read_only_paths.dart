@@ -45,7 +45,8 @@ List<String> defaultReadOnlyRoots(String workdir, {String? home}) {
   ];
 }
 
-/// 段级「相同或子孙」判定：`.opencode-backup` 不算 `.opencode`。///
+/// 段级「相同或子孙」判定：`.opencode-backup` 不算 `.opencode`。
+///
 /// macOS / Windows 默认文件系统大小写不敏感，统一按小写比较——
 /// `.OPENCODE/x` 在 APFS 上就是 `.opencode/x`，不能放过。代价是
 /// 大小写敏感卷上会略微多拒（`.OPENCODE` 也会被当成受保护），可接受。

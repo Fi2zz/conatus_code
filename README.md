@@ -193,7 +193,7 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 - `/undo` 与 `/redo` **都会先确认**：恢复是 rsync 语义，撤销后新建 / 修改的
   文件在重做时会被删除或覆盖，所以在动工作区之前弹一次确认。
 - 撤销点只在撤销后切过去的会话里有效：显式切会话（`/session`、会话面板、
-  `/new`）或 `/rewind` 会清掉它；在别的会话里 `/redo` 会被拒绝并要求先切回。
+  `/new`）或 `/rewind` 会清掉它；之后 `/redo` 会提示没有可重做的回滚（不会自动切回原会话）。
 - `[checkpoint] enabled = false`：只回滚对话（按 user/message 事件推算轮次边界），
   文件不动，并提示「checkpoint 已关闭」。
 - 轮次不够（`/undo N` 超过当前轮次或 prompt 数）或目标轮次已被 `keep` 裁剪：

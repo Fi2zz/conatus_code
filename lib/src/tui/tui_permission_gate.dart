@@ -258,7 +258,7 @@ class TuiPermissionGate implements Approval {
       return '仅本次会话有效：该调用没有可持久化的具体资源。';
     }
     final String patterns = rules
-        .map((PermissionRule rule) => '${rule.action} ${rule.resource}')
+        .map((PermissionRule rule) => '${rule.action} ${rule.displayResource}')
         .join('、');
     return '写入项目权限：$patterns（本次会话内也不再询问该工具）。';
   }

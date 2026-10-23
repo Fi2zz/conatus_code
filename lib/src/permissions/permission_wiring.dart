@@ -185,6 +185,7 @@ class PermissionWiring {
                   : resolvePermissionPath(rule.resource, workdir),
               effect: rule.effect,
               source: rule.source,
+              configuredResource: rule.displayResource,
             )
           : rule,
   ];
