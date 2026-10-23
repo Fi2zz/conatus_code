@@ -14,6 +14,7 @@ import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_harness/conatus_harness.dart';
 import 'package:conatus_llm/conatus_llm.dart';
+import 'package:conatus_memory/conatus_memory.dart';
 import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 
@@ -674,6 +675,7 @@ class ConatusTuiRuntime {
       ),
     );
     provideMemoryTools(app);
+    provideMemoryRecorder(app);
     provideCompaction(app);
     provideSkillLibrary(app);
     if (skills) {

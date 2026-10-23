@@ -648,7 +648,7 @@ void main() {
         center = provideTaskCenter(ctx, session: session);
         provideTaskTracking(ctx);
         expect(ctx.require<TaskCenter>('tasks'), same(center));
-        expect(ctx.require<AgentLoop>('agentLoop').turnTracker, isNotNull);
+        expect(ctx.require<AgentLoop>('agentLoop').turnTrackers, isNotEmpty);
       },
     );
 
