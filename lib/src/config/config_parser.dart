@@ -372,7 +372,12 @@ class ConfigParser extends ConfigValues {
       throw ConfigException('$source：mcp.servers.$name.oauth 必须是布尔值或表。');
     }
     final Map<String, dynamic> oauth = raw.cast<String, dynamic>();
+    final Object? enabled = oauth['enabled'];
+    if (enabled != null && enabled is! bool) {
+      throw ConfigException('$source：mcp.servers.$name.oauth.enabled 必须是布尔值。');
+    }
     return McpOAuthConfig(
+      enabled: enabled is bool ? enabled : true,
       clientId: _readOAuthString(oauth, name, 'client_id'),
       clientSecret: _readOAuthString(oauth, name, 'client_secret'),
       scope: _readOAuthString(oauth, name, 'scope'),
