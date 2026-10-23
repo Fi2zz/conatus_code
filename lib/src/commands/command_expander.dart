@@ -25,7 +25,7 @@ Future<String> expandCommand(
 }) async {
   final Future<String> Function(String)? executor = def.executor;
   if (executor != null) return executor(args);
-  final List<String> tokens = _tokenize(args);
+  final List<String> tokens = tokenizeCommandArguments(args);
   final String trimmed = args.trim();
   final bool placeholderPresent = _placeholder.hasMatch(def.template);
   final String result = await _expandTemplate(
@@ -75,7 +75,10 @@ String _token(List<String> tokens, int index) =>
     index <= tokens.length ? tokens[index - 1] : '';
 
 /// 按空白分词，支持单/双引号分组；未闭合引号吞到参数末尾。
-List<String> _tokenize(String args) => _argument
+///
+/// 动态命令（MCP prompt 等）按位置取参时复用同一套分词，保证 `"a b" 2` 的
+/// 解析与模板 `$1` 一致。
+List<String> tokenizeCommandArguments(String args) => _argument
     .allMatches(args)
     .map((RegExpMatch match) => _unquote(match.group(0)!))
     .toList();

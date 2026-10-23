@@ -13,6 +13,7 @@ import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_cron/conatus_cron.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
+import 'package:conatus_mcp/conatus_mcp.dart';
 import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 
@@ -29,6 +30,7 @@ import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
 import '../checkpoint/checkpoint_backend.dart';
 import '../checkpoint/checkpoint_manager.dart';
+import '../commands/command_definition.dart';
 import '../commands/command_registry.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
@@ -40,6 +42,7 @@ import '../instructions/instruction_prompt.dart';
 import '../instructions/instruction_wiring.dart';
 import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
+import '../mcp/mcp_prompt_commands.dart';
 import '../permissions/permission_wiring.dart';
 import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
@@ -153,6 +156,7 @@ class ConatusTuiRuntime {
   /// [fs] / [shell] / [credentials] 是能力接缝的注入点：缺省用本地实现
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
   /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
+  /// [mcpTransportFactory] 是 MCP 传输的测试注入点（缺省按配置分派）。
   /// [shellInteractive] 是用户直发命令（`!` shell 模式）的交互缝，缺省本地直执
   /// 不经命令白名单；模型发起的命令仍走 [shell]（沙箱照常）。
   /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
@@ -190,6 +194,7 @@ class ConatusTuiRuntime {
     ShellExecutor? shellInteractive,
     Credentials? credentials,
     List<McpServerSpec>? mcpServers,
+    McpTransport Function(McpServerConfig config)? mcpTransportFactory,
     bool interactive = true,
     String? workdir,
     CheckpointConfig? checkpoint,
@@ -397,11 +402,16 @@ class ConatusTuiRuntime {
 
     // ── MCP server（config.toml [mcp.servers.*]）─────────────────
     // 逐台挂载、单台失败跳过；工具经 server__tool 前缀进注册表，高危走审批。
-    await attachMcpServers(
+    final McpRegistry? mcpRegistry = await attachMcpServers(
       app,
       mcpServers ?? const <McpServerSpec>[],
       credentials: resolvedCredentials,
+      transportFactory: mcpTransportFactory,
     );
+    // 资源清单 / 读取是本地内置工具：挂上注册表即对模型可见（只读、低风险）。
+    if (mcpRegistry != null) {
+      provideMcpResourceTools(app, registry: mcpRegistry);
+    }
 
     // ── 模型 / 自省 / 子 Agent ─────────────────────────────────
     // `[models."provider/model"]`（kimi 格式）按 provider 名展开成模型 id 清单，
@@ -531,6 +541,16 @@ class ConatusTuiRuntime {
     final CommandRegistry commandRegistry = await CommandRegistry.load(
       workdir: resolvedWorkdir,
     );
+    // MCP prompt → `/<server>:<prompt>`；同名磁盘命令优先，不覆盖已发现定义。
+    if (mcpRegistry != null) {
+      for (final CommandDefinition def in await loadMcpPromptCommands(
+        mcpRegistry,
+      )) {
+        if (commandRegistry.byName(def.name) == null) {
+          commandRegistry.add(def);
+        }
+      }
+    }
     app.provide('commandRegistry', commandRegistry);
     final AgentProfileResolver agentProfiles = AgentProfileResolver(
       registry: agentRegistry,

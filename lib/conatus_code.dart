@@ -79,7 +79,7 @@ export 'src/checkpoint/shadow_git_runner.dart'
 export 'src/commands/command_definition.dart' show CommandDefinition;
 export 'src/commands/command_dispatcher.dart' show CommandDispatcher;
 export 'src/commands/command_expander.dart'
-    show expandCommand, kCommandShellOutputLimit;
+    show expandCommand, kCommandShellOutputLimit, tokenizeCommandArguments;
 export 'src/commands/command_parser.dart'
     show CommandParseResult, parseCommandDocument, parseCommandDocumentDetailed;
 export 'src/commands/command_registry.dart' show CommandRegistry;
@@ -209,6 +209,7 @@ export 'src/lint/linter.dart'
         kLintToolNames;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
+export 'src/mcp/mcp_prompt_commands.dart' show loadMcpPromptCommands;
 export 'src/permissions/permission_rule_pattern.dart'
     show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;
