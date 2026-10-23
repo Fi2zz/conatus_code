@@ -6,6 +6,8 @@ import 'dart:io';
 import 'package:conatus_code/conatus_code.dart';
 import 'package:test/test.dart';
 
+import 'command_test_support.dart';
+
 void main() {
   late Directory home;
   late Directory work;
@@ -18,12 +20,6 @@ void main() {
       work.deleteSync(recursive: true);
     });
   });
-
-  void writeCommand(Directory root, String name, String body) {
-    final File file = File('${root.path}/$name');
-    file.parent.createSync(recursive: true);
-    file.writeAsStringSync(body);
-  }
 
   Future<CommandRegistry> load() =>
       CommandRegistry.load(workdir: work.path, home: home.path);
@@ -104,9 +100,10 @@ void main() {
     expect(registry.byName('team/review')!.template, 'nested');
   });
 
-  test('只发现 .md 文件', () async {
+  test('只发现 .md 文件（扩展名大小写不敏感）', () async {
     final Directory root = Directory('${work.path}/.nava/commands');
     writeCommand(root, 'yes.md', 'yes');
+    writeCommand(root, 'upper.MD', 'upper');
     writeCommand(root, 'no.txt', 'no');
     writeCommand(root, 'nested/deep.md', 'deep');
 
@@ -114,11 +111,12 @@ void main() {
 
     expect(registry.all.map((CommandDefinition d) => d.name), <String>[
       'nested/deep',
+      'upper',
       'yes',
     ]);
   });
 
-  test('无效文件跳过且其余命令照常加载，并记录警告', () async {
+  test('无效文件跳过且其余命令照常加载，并记录原因', () async {
     final Directory root = Directory('${work.path}/.nava/commands');
     writeCommand(root, 'good.md', 'good');
     writeCommand(root, 'bad.md', '''
@@ -134,6 +132,7 @@ bad
     expect(registry.byName('bad'), isNull);
     expect(registry.warnings, hasLength(1));
     expect(registry.warnings.single, contains('bad.md'));
+    expect(registry.warnings.single, contains('必须是字符串'));
   });
 
   test('目录不存在时返回空注册表', () async {
@@ -174,27 +173,26 @@ bad
     ]);
   });
 
+  test('跟随符号链接的命令文件', () async {
+    final Directory root = Directory('${work.path}/.nava/commands')
+      ..createSync(recursive: true);
+    final File target = File('${work.path}/target.md')
+      ..writeAsStringSync('linked');
+    Link('${root.path}/linked.md').createSync(target.path);
+
+    final CommandRegistry registry = await load();
+
+    expect(registry.byName('linked')!.template, 'linked');
+  });
+
   test('加载不修改 .opencode（文件与内容保持不变）', () async {
     final Directory opencode = Directory('${work.path}/.opencode/commands');
     writeCommand(opencode, 'review.md', 'review body');
     writeCommand(opencode, 'team/deep.md', 'deep body');
-    final List<String> before = _snapshot(opencode);
+    final List<String> before = snapshotDirectory(opencode);
 
     await load();
 
-    expect(_snapshot(opencode), before);
+    expect(snapshotDirectory(opencode), before);
   });
-}
-
-/// 目录内相对路径 + 内容的稳定快照。
-List<String> _snapshot(Directory root) {
-  final List<String> entries = <String>[
-    for (final FileSystemEntity entity in root.listSync(
-      recursive: true,
-      followLinks: false,
-    ))
-      if (entity is File)
-        '${entity.path.substring(root.path.length)}:${entity.readAsStringSync()}',
-  ]..sort();
-  return entries;
 }

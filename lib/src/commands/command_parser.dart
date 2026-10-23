@@ -5,6 +5,21 @@ import 'package:conatus_skill/conatus_skill.dart';
 
 import 'command_definition.dart';
 
+/// 一次命令解析的结果；失败时 [error] 说明原因。
+class CommandParseResult {
+  /// 解析成功。
+  const CommandParseResult.success(this.definition) : error = null;
+
+  /// 解析失败，[error] 为可展示的原因。
+  const CommandParseResult.failure(this.error) : definition = null;
+
+  /// 成功时的命令定义。
+  final CommandDefinition? definition;
+
+  /// 失败原因；成功时为 `null`。
+  final String? error;
+}
+
 /// 解析一份命令 Markdown。
 ///
 /// 所有 frontmatter 字段都是可选的；完全没有 frontmatter 时整篇正文作为
@@ -14,22 +29,40 @@ CommandDefinition? parseCommandDocument(
   String text, {
   required String name,
   required String sourcePath,
+}) => parseCommandDocumentDetailed(
+  text,
+  name: name,
+  sourcePath: sourcePath,
+).definition;
+
+/// 与 [parseCommandDocument] 相同，但失败时给出可诊断的原因。
+CommandParseResult parseCommandDocumentDetailed(
+  String text, {
+  required String name,
+  required String sourcePath,
 }) {
-  if (name.trim().isEmpty) return null;
+  final String trimmedName = name.trim();
+  if (trimmedName.isEmpty) {
+    return const CommandParseResult.failure('命令名称为空');
+  }
   final FrontmatterDocument document = _document(text);
-  if (document.error != null) return null;
+  if (document.error != null) {
+    return CommandParseResult.failure('frontmatter 解析失败：${document.error}');
+  }
   try {
-    return CommandDefinition(
-      name: name,
-      description: _stringField(document.fields, 'description') ?? '',
-      template: document.body,
-      agent: _stringField(document.fields, 'agent'),
-      model: _stringField(document.fields, 'model'),
-      subagent: _boolField(document.fields, 'subagent'),
-      sourcePath: sourcePath,
+    return CommandParseResult.success(
+      CommandDefinition(
+        name: trimmedName,
+        description: _stringField(document.fields, 'description') ?? '',
+        template: document.body,
+        agent: _stringField(document.fields, 'agent'),
+        model: _stringField(document.fields, 'model'),
+        subagent: _boolField(document.fields, 'subagent'),
+        sourcePath: sourcePath,
+      ),
     );
-  } on FormatException {
-    return null;
+  } on FormatException catch (error) {
+    return CommandParseResult.failure(error.message);
   }
 }
 

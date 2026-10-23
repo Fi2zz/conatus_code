@@ -72,7 +72,8 @@ export 'src/checkpoint/shadow_git_runner.dart'
 export 'src/commands/command_definition.dart' show CommandDefinition;
 export 'src/commands/command_expander.dart'
     show expandCommand, kCommandShellOutputLimit;
-export 'src/commands/command_parser.dart' show parseCommandDocument;
+export 'src/commands/command_parser.dart'
+    show CommandParseResult, parseCommandDocument, parseCommandDocumentDetailed;
 export 'src/commands/command_registry.dart' show CommandRegistry;
 export 'src/config/config_credentials.dart' show ConfigCredentials;
 export 'src/config/config_loader.dart' show ConfigException, loadConfig;

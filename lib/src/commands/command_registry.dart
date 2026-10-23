@@ -59,9 +59,9 @@ class CommandRegistry {
     if (!await directory.exists()) return;
     final List<String> files = <String>[];
     try {
+      // 默认 followLinks: true，dotfile 管理器创建的符号链接命令也能发现。
       await for (final FileSystemEntity entity in directory.list(
         recursive: true,
-        followLinks: false,
       )) {
         if (entity is File && entity.path.toLowerCase().endsWith('.md')) {
           files.add(entity.path);
@@ -86,13 +86,14 @@ class CommandRegistry {
       _warnings.add('无法读取命令文件 $path: ${error.message}');
       return;
     }
-    final CommandDefinition? def = parseCommandDocument(
+    final CommandParseResult result = parseCommandDocumentDetailed(
       text,
       name: name,
       sourcePath: path,
     );
+    final CommandDefinition? def = result.definition;
     if (def == null) {
-      _warnings.add('跳过无效命令文件 $path');
+      _warnings.add('跳过命令文件 $path: ${result.error}');
       return;
     }
     _definitions[name] = def;
