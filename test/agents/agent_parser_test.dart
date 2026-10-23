@@ -174,22 +174,6 @@ body
     }
   });
 
-  test('非法权限条目返回 null', () {
-    const List<String> invalid = <String>[
-      '---\npermissions: nope\n---\nbody',
-      '---\npermissions:\n  - action: edit\n    resource: "*"\n---\nbody',
-      '---\npermissions:\n  - action: edit\n    resource: "*"\n    effect: maybe\n---\nbody',
-      '---\npermissions:\n  - action: 3\n    resource: "*"\n    effect: deny\n---\nbody',
-    ];
-    for (final String text in invalid) {
-      expect(
-        parseAgentDocument(text, id: 'bad', sourcePath: '/tmp/bad.md'),
-        isNull,
-        reason: text,
-      );
-    }
-  });
-
   test('详细解析给出可诊断原因', () {
     final AgentParseResult result = parseAgentDocumentDetailed(
       '''

@@ -32,6 +32,14 @@ void main() {
     expect(config.agent.defaultAgent, 'plan');
   });
 
+  test('default_agent 为空串时回退 build', () {
+    final ConatusCodeConfig config = loadConfigFromToml(
+      '[agent]\ndefault_agent = ""',
+    );
+
+    expect(config.agent.defaultAgent, 'build');
+  });
+
   test('default_agent 必须是字符串', () {
     expect(
       () => loadConfigFromToml('[agent]\ndefault_agent = 3'),

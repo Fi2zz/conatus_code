@@ -18,6 +18,7 @@ class AgentRegistry {
   final String? _defaultId;
   final Map<String, AgentDefinition> _agents = <String, AgentDefinition>{};
   final List<String> _warnings = <String>[];
+  bool _defaultWarningAdded = false;
 
   /// 加载内置 Agent 与四层 Agent 目录；单条损坏不影响其余 Agent。
   static Future<AgentRegistry> load({
@@ -36,7 +37,7 @@ class AgentRegistry {
   }
 
   /// 按 ID 精确查找；未命中返回 `null`（hidden Agent 同样可解析）。
-  AgentDefinition? byId(String id) => _agents[id];
+  AgentDefinition? byId(String id) => _agents[id.trim()];
 
   /// 选择器可见的 Agent（不含 hidden），按 ID 排序。
   List<AgentDefinition> get visible =>
@@ -50,18 +51,26 @@ class AgentRegistry {
     ),
   );
 
-  /// 新会话默认 Agent：配置值优先，未知值回退 `build`。
+  /// 新会话默认 Agent：配置值优先；不可作为主 Agent 时回退。
   AgentDefinition get defaultAgent {
     final String? requested = _defaultId?.trim();
     if (requested != null && requested.isNotEmpty) {
       final AgentDefinition? chosen = byId(requested);
-      if (chosen != null) return chosen;
+      if (chosen != null && chosen.mode != AgentMode.subagent) return chosen;
+      if (chosen != null) _warnSubagentDefault(requested);
     }
-    final AgentDefinition? fallback = byId('build');
-    if (fallback != null) return fallback;
-    final List<AgentDefinition> available = visible;
-    if (available.isEmpty) throw StateError('Agent 注册表为空');
-    return available.first;
+    final AgentDefinition? build = byId('build');
+    if (build != null && build.mode != AgentMode.subagent) return build;
+    for (final AgentDefinition agent in visible) {
+      if (agent.mode != AgentMode.subagent) return agent;
+    }
+    throw StateError('没有可用作主 Agent 的定义');
+  }
+
+  void _warnSubagentDefault(String id) {
+    if (_defaultWarningAdded) return;
+    _defaultWarningAdded = true;
+    _warnings.add('默认 Agent "$id" 是 subagent，已回退到可用的主 Agent');
   }
 
   /// 加载期间跳过的文件说明；供 TUI / `/doctor` 诊断。
@@ -69,8 +78,9 @@ class AgentRegistry {
 
   /// 注册或覆盖一个 Agent（内置与动态来源用）。
   void add(AgentDefinition agent) {
-    if (agent.id.trim().isEmpty) return;
-    _agents[agent.id] = agent;
+    final String id = agent.id.trim();
+    if (id.isEmpty) return;
+    _agents[id] = agent;
   }
 
   Future<void> _loadRoot(String root) async {
@@ -111,11 +121,14 @@ class AgentRegistry {
       sourcePath: path,
     );
     final AgentDefinition? agent = result.definition;
+    for (final String warning in result.warnings) {
+      _warnings.add('Agent 文件 $path: $warning');
+    }
     if (agent == null) {
       _warnings.add('跳过 Agent 文件 $path: ${result.error}');
       return;
     }
-    _agents[id] = agent;
+    _agents[agent.id] = agent;
   }
 }
 

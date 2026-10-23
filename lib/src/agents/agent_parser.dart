@@ -1,30 +1,35 @@
 /// Agent 文档解析：frontmatter 元数据 + 正文系统提示。
 library;
 
-import 'package:conatus_agent/conatus_agent.dart'
-    show
-        PermissionEffect,
-        PermissionRule,
-        normalizePermissionPath,
-        permissionActionFor,
-        permissionActionUsesPath;
 import 'package:conatus_skill/conatus_skill.dart';
 
 import 'agent_definition.dart';
+import 'agent_fields.dart';
 
 /// 一次 Agent 解析的结果；失败时 [error] 说明原因。
 class AgentParseResult {
-  /// 解析成功。
-  const AgentParseResult.success(this.definition) : error = null;
+  /// 解析成功；[definition] 必须非空。
+  const AgentParseResult.success(
+    AgentDefinition definition, {
+    List<String> warnings = const <String>[],
+  }) : this._(definition, null, warnings);
 
-  /// 解析失败，[error] 为可展示的原因。
-  const AgentParseResult.failure(this.error) : definition = null;
+  /// 解析失败；[message] 必须非空。
+  const AgentParseResult.failure(
+    String message, {
+    List<String> warnings = const <String>[],
+  }) : this._(null, message, warnings);
+
+  const AgentParseResult._(this.definition, this.error, this.warnings);
 
   /// 成功时的 Agent 定义。
   final AgentDefinition? definition;
 
   /// 失败原因；成功时为 `null`。
   final String? error;
+
+  /// 非致命提示（如未知权限动作、frontmatter 围栏格式异常）。
+  final List<String> warnings;
 }
 
 /// 解析一份 Agent Markdown。
@@ -48,53 +53,82 @@ AgentParseResult parseAgentDocumentDetailed(
   if (trimmedId.isEmpty) {
     return const AgentParseResult.failure('Agent 名称为空');
   }
-  final FrontmatterDocument document = _document(text);
+  final List<String> warnings = <String>[];
+  final FrontmatterDocument document = _document(text, warnings);
   if (document.error != null) {
-    return AgentParseResult.failure('frontmatter 解析失败：${document.error}');
+    return AgentParseResult.failure(
+      'frontmatter 解析失败：${document.error}',
+      warnings: _snapshot(warnings),
+    );
   }
   try {
     return AgentParseResult.success(
-      _definition(document, trimmedId, sourcePath),
+      _definition(document, trimmedId, sourcePath, warnings),
+      warnings: _snapshot(warnings),
     );
   } on FormatException catch (error) {
-    return AgentParseResult.failure(error.message);
+    return AgentParseResult.failure(
+      error.message,
+      warnings: _snapshot(warnings),
+    );
   }
 }
+
+List<String> _snapshot(List<String> warnings) =>
+    List<String>.unmodifiable(warnings);
 
 AgentDefinition _definition(
   FrontmatterDocument document,
   String id,
   String sourcePath,
+  List<String> warnings,
 ) {
   final Map<String, Object?> fields = document.fields;
-  final String? mode = _stringField(fields, 'mode');
+  final String? mode = agentStringField(fields, 'mode');
   return AgentDefinition(
     id: id,
     sourcePath: sourcePath,
-    description: _stringField(fields, 'description') ?? '',
+    description: agentStringField(fields, 'description') ?? '',
     mode: mode == null ? AgentMode.primary : AgentMode.parse(mode),
     system: document.body,
-    model: _stringField(fields, 'model'),
-    steps: _stepsField(fields),
-    tools: _toolsField(fields),
-    permissions: _permissionsField(fields),
-    hidden: _boolField(fields, 'hidden'),
-    color: _stringField(fields, 'color'),
+    model: agentStringField(fields, 'model'),
+    steps: agentStepsField(fields),
+    tools: agentToolsField(fields),
+    permissions: agentPermissionsField(fields, warnings),
+    hidden: agentBoolField(fields, 'hidden'),
+    color: agentStringField(fields, 'color'),
   );
 }
 
 /// 有围栏则交给通用解析器；没有围栏视作纯正文。
-FrontmatterDocument _document(String text) {
-  final String first = text.split('\n').first.replaceAll('\r', '');
+FrontmatterDocument _document(String text, List<String> warnings) {
+  final String normalized = _normalizeDocument(text);
+  final String first = normalized.split('\n').first.replaceAll('\r', '');
   if (first != '---') {
+    if (normalized.startsWith('---')) {
+      warnings.add('frontmatter 首行必须是独占一行的 ---，已按纯正文解析');
+    }
     return FrontmatterDocument(
       fields: const <String, Object?>{},
-      body: text.trim(),
+      body: normalized.trim(),
     );
   }
-  final FrontmatterDocument parsed = parseFrontmatter(text);
+  final FrontmatterDocument parsed = parseFrontmatter(normalized);
   if (parsed.error == null) return parsed;
-  return _emptyFrontmatter(text) ?? parsed;
+  return _emptyFrontmatter(normalized) ?? parsed;
+}
+
+/// 去掉 BOM 与前导空行，避免它们让 frontmatter 围栏失效。
+String _normalizeDocument(String text) {
+  final String withoutBom = text.startsWith('\uFEFF')
+      ? text.substring(1)
+      : text;
+  final List<String> lines = withoutBom.split('\n');
+  int start = 0;
+  while (start < lines.length && lines[start].trim().isEmpty) {
+    start++;
+  }
+  return lines.sublist(start).join('\n');
 }
 
 /// 只有围栏、没有字段的 frontmatter 等价于空映射。
@@ -109,90 +143,4 @@ FrontmatterDocument? _emptyFrontmatter(String text) {
     );
   }
   return null;
-}
-
-String? _stringField(Map<String, Object?> fields, String key) {
-  final Object? value = fields[key];
-  if (value == null) return null;
-  if (value is! String) {
-    throw FormatException('字段 $key 必须是字符串');
-  }
-  final String trimmed = value.trim();
-  return trimmed.isEmpty ? null : trimmed;
-}
-
-bool _boolField(Map<String, Object?> fields, String key) {
-  final Object? value = fields[key];
-  if (value == null) return false;
-  if (value is! bool) {
-    throw FormatException('字段 $key 必须是布尔值');
-  }
-  return value;
-}
-
-int? _stepsField(Map<String, Object?> fields) {
-  final Object? value = fields['steps'];
-  if (value == null) return null;
-  if (value is! int || value <= 0) {
-    throw const FormatException('字段 steps 必须是正整数');
-  }
-  return value;
-}
-
-List<String>? _toolsField(Map<String, Object?> fields) {
-  final Object? value = fields['tools'];
-  if (value == null) return null;
-  if (value is! List) {
-    throw const FormatException('字段 tools 必须是字符串数组');
-  }
-  return <String>[for (final Object? item in value) _toolEntry(item)];
-}
-
-String _toolEntry(Object? item) {
-  if (item is! String || item.trim().isEmpty) {
-    throw const FormatException('字段 tools 的元素必须是非空字符串');
-  }
-  return item.trim();
-}
-
-List<PermissionRule> _permissionsField(Map<String, Object?> fields) {
-  final Object? value = fields['permissions'];
-  if (value == null) return const <PermissionRule>[];
-  if (value is! List) {
-    throw const FormatException('字段 permissions 必须是表数组');
-  }
-  return <PermissionRule>[
-    for (final Object? item in value) _permissionRule(item),
-  ];
-}
-
-PermissionRule _permissionRule(Object? item) {
-  if (item is! Map) {
-    throw const FormatException('字段 permissions 的每一项必须是表');
-  }
-  final String action = permissionActionFor(_permissionField(item, 'action'));
-  final String resource = _permissionField(item, 'resource');
-  return PermissionRule(
-    action: action,
-    resource: permissionActionUsesPath(action)
-        ? normalizePermissionPath(resource)
-        : resource,
-    effect: _permissionEffect(_permissionField(item, 'effect')),
-    source: 'agent',
-  );
-}
-
-String _permissionField(Map<Object?, Object?> table, String key) {
-  final Object? value = table[key];
-  if (value is! String || value.trim().isEmpty) {
-    throw FormatException('权限字段 $key 不能为空');
-  }
-  return value.trim();
-}
-
-PermissionEffect _permissionEffect(String value) {
-  for (final PermissionEffect effect in PermissionEffect.values) {
-    if (effect.name == value) return effect;
-  }
-  throw const FormatException('权限字段 effect 必须是 allow/ask/deny');
 }

@@ -105,6 +105,7 @@ debounce_seconds = 10         # 去抖窗口（秒），防连续编辑连跑
 
 [agent]
 # workdir = "/path/to/your/project"
+# default_agent = "build"            # 新会话默认 Agent；未知 ID 回退 build
 max_steps = 8
 # subagent_permission = "inherit"   # 子代理默认权限：inherit/readonly/ask/auto
                                     # （模型可在 spawn_agent 里收紧，不能放宽）
