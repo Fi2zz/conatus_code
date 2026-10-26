@@ -10,7 +10,7 @@ library;
 class TurnBudget {
   const TurnBudget({
     this.maxDuration = const Duration(minutes: 10),
-    this.maxTokens = 200000,
+    this.maxTokens,
   });
 
   /// 上下文封顶相对模型窗口保留的比例：余下 1/4 留给模型输出与工具回填。

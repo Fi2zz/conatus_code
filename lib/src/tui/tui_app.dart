@@ -163,7 +163,7 @@ class ConatusTuiRuntime {
   /// [commandHome] 覆盖命令发现的家目录（测试注入假 home；缺省读环境变量）。
   /// [shellInteractive] 是用户直发命令（`!` shell 模式）的交互缝，缺省本地直执
   /// 不经命令白名单；模型发起的命令仍走 [shell]（沙箱照常）。
-  /// [turnBudget] 为每轮预算护栏（缺省宽松启用：10 分钟墙钟 + 20 万估算
+  /// [turnBudget] 为每轮预算护栏（缺省 10 分钟墙钟 + 模型窗口 75% 的估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
   /// [interactive] 为 `false` 时跳过人机交互件（浮层 / 审批服务 / `ask_user`
   /// 工具），供 headless 单轮执行使用。

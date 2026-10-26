@@ -217,7 +217,7 @@ class SandboxSettings {
 
 /// 预算护栏配置；对应 `[budget]` 表。
 class BudgetConfig {
-  const BudgetConfig({this.maxTurnSeconds = 600, this.maxTurnTokens = 200000});
+  const BudgetConfig({this.maxTurnSeconds = 600, this.maxTurnTokens});
 
   /// 单轮墙钟上限（秒）；`0` 表示不限。
   final int? maxTurnSeconds;

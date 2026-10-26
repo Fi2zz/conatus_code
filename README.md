@@ -133,7 +133,7 @@ max_output_bytes = 64000
 
 [budget]
 max_turn_seconds = 600        # 单轮墙钟上限（秒）；0 = 不限
-max_turn_tokens = 200000      # 单轮上下文 token 估算上限；0 = 不限
+# max_turn_tokens = 0        # 可选的更严上限；0 / 省略 = 按模型窗口的 75%
 
 [checkpoint]
 enabled = true                # 每轮收口后对工作区做文件快照（/rewind 回滚）
@@ -944,14 +944,14 @@ jail 继续生效。Layer 1 与 Layer 2 可独立关闭；`preset = "danger_full
 
 ## 预算护栏
 
-每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 上下文 token 护栏；
-超限时模型收到收口提示而非直接报错。估算按约 4 字符 1 token 的粗口径
+每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 模型窗口 75% 的上下文
+token 护栏；超限时模型收到收口提示而非直接报错，TUI 状态栏显示
+`⚠ 预算收口` 并提示可调的配置项。估算按约 4 字符 1 token 的粗口径
 （`estimateMessagesTokens`），**只作护栏，不用于计费**。
 
 **token 封顶跟模型窗口走**：已知窗口时取 `窗口 × 0.75`（余下 1/4 留给模型
-输出与工具回填）与 `[budget] max_turn_tokens` 的较小者。此前是一个写死的
-20 万——32k 窗口的模型永远等不到这条闸门（请求会先被 API 拒掉），1M 窗口的
-模型又在 20% 处过早收口。窗口来自 models.dev（见下）。
+输出与工具回填）与 `[budget] max_turn_tokens` 的较小者；省略或设为 `0` 时
+只按窗口。窗口来自 models.dev（见下）。
 
 ## 成本与上下文窗口（models.dev）
 

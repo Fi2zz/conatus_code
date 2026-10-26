@@ -81,10 +81,11 @@ class ConfigValues {
     return value;
   }
 
-  /// 取非负整数上限；缺失返回 [fallback]，`0` 表示不限（返回 null）。
+  /// 取非负整数上限；缺失返回 [fallback]（fallback 为 0 时按不限处理），
+  /// `0` 表示不限（返回 null）。
   int? readBudgetLimit(Map<String, dynamic> table, String key, int fallback) {
     final Object? value = table[key];
-    if (value == null) return fallback;
+    if (value == null) return fallback == 0 ? null : fallback;
     if (value is! int || value < 0) {
       throw ConfigException('$source：$key 必须是非负整数。');
     }

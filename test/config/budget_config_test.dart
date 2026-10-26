@@ -20,13 +20,13 @@ ConatusCodeConfig _load(String content) {
 
 void main() {
   group('budget 配置', () {
-    test('缺省：10 分钟墙钟 + 20 万估算 token', () {
+    test('缺省：10 分钟墙钟 + 按模型窗口的 token 封顶', () {
       final String sep = Platform.pathSeparator;
       final ConatusCodeConfig config =
           loadConfig(path: '${_tempDir().path}${sep}missing.toml');
 
       expect(config.budget.maxTurnSeconds, 600);
-      expect(config.budget.maxTurnTokens, 200000);
+      expect(config.budget.maxTurnTokens, isNull);
     });
 
     test('显式取值生效', () {

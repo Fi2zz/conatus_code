@@ -210,7 +210,7 @@ max_output_bytes = 64000
 
 [budget]
 max_turn_seconds = 600
-max_turn_tokens = 200000
+# max_turn_tokens = 0        # 0 / 省略 = 按模型窗口的 75%；显式值只能更严
 ''';
 
 /// 加载配置。

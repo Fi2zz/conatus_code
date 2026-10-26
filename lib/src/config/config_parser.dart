@@ -284,7 +284,7 @@ class ConfigParser extends ConfigValues {
     final Map<String, dynamic> table = readTable('budget');
     return BudgetConfig(
       maxTurnSeconds: readBudgetLimit(table, 'max_turn_seconds', 600),
-      maxTurnTokens: readBudgetLimit(table, 'max_turn_tokens', 200000),
+      maxTurnTokens: readBudgetLimit(table, 'max_turn_tokens', 0),
     );
   }
 

@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:conatus_agent/conatus_agent.dart';
+import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_cron/conatus_cron.dart';
@@ -162,6 +163,30 @@ void main() {
         .toList();
     expect(roles, <TuiRole>[TuiRole.user, TuiRole.assistant]);
     expect(controller.transcript.messages.last.text, '你好呀');
+    app.dispose();
+  });
+
+  test('预算收口标记最近一轮状态并写入提示', () async {
+    final (
+      ConatusTuiController controller,
+      Context app,
+    ) = await _build(<LlmResult>[
+      const LlmResult(
+        content: kBudgetExhaustedReply,
+        provider: 'scripted',
+        model: 'm',
+      ),
+    ]);
+
+    await controller.handleLine('继续');
+
+    expect(controller.recentTurnStatus, '⚠ 预算收口');
+    expect(
+      controller.transcript.messages.any(
+        (TuiMessage m) => m.role == TuiRole.system && m.text.contains('预算已达上限'),
+      ),
+      isTrue,
+    );
     app.dispose();
   });
 

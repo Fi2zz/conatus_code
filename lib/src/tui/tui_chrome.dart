@@ -149,7 +149,7 @@ class TuiStatusBar extends StatelessComponent {
   /// 最近一轮完成时长（完成后 15 秒内）。
   final Duration? recentTurnDuration;
 
-  /// 最近一轮状态：`✓ 完成` / `✗ 失败` / `⏹ 已中断`。
+  /// 最近一轮状态：`✓ 完成` / `✗ 失败` / `⏹ 已中断` / `⚠ 预算收口`。
   final String? recentTurnStatus;
 
   /// 当前模型标签（左段）。

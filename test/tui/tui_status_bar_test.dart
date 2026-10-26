@@ -197,6 +197,26 @@ void main() {
     expect(tester.terminalState, containsText('✓ 完成 12s'));
   });
 
+  test('预算收口显示 ⚠ 预算收口与时长', () async {
+    final NoctermTester tester = await NoctermTester.create(
+      size: const Size(120, 12),
+    );
+    addTearDown(tester.dispose);
+    await tester.pumpComponent(
+      const TuiStatusBar(
+        pickerOpen: false,
+        busy: false,
+        tick: 0,
+        recentTurnDuration: Duration(seconds: 24),
+        recentTurnStatus: '⚠ 预算收口',
+        modelLabel: 'mock',
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.terminalState, containsText('⚠ 预算收口 24s'));
+  });
+
   test('失败态显示 ✗ 失败与时长', () async {
     final NoctermTester tester = await NoctermTester.create(
       size: const Size(120, 12),

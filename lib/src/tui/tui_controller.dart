@@ -29,6 +29,7 @@ import '../agents/agent_registry.dart';
 import '../agents/agent_resolver.dart';
 import '../autonomous/autonomous_assembly.dart';
 import '../background/background_tasks.dart';
+import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
@@ -483,6 +484,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   Duration? _lastTurnDuration;
   bool _lastTurnOk = true;
   bool _lastTurnInterrupted = false;
+  bool _lastTurnBudget = false;
 
   /// 当前轮已运行时长；空闲时为 null。
   Duration? get turnElapsed => _turnStartedAt == null
@@ -509,10 +511,15 @@ class ConatusTuiController implements TuiUserPromptHost {
   String? get recentTurnStatus {
     if (recentTurnDuration == null) return null;
     if (_lastTurnInterrupted) return '⏹ 已中断';
+    if (_lastTurnBudget) return '⚠ 预算收口';
     return _lastTurnOk ? '✓ 完成' : '✗ 失败';
   }
 
-  void _endTurn({required bool ok, bool interrupted = false}) {
+  void _endTurn({
+    required bool ok,
+    bool interrupted = false,
+    bool budget = false,
+  }) {
     final DateTime now = DateTime.now();
     final DateTime? started = _turnStartedAt;
     _turnStartedAt = null;
@@ -520,6 +527,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     _lastTurnDuration = started == null ? null : now.difference(started);
     _lastTurnOk = ok;
     _lastTurnInterrupted = interrupted;
+    _lastTurnBudget = budget;
   }
 
   /// 排队中的用户输入（busy 时入队，收口后依次投递；上限 [kMessageQueueCap]）。
@@ -1257,6 +1265,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     await _checkpointBase;
     bool turnOk = true;
     bool interrupted = false;
+    bool budgetExhausted = false;
     String reply = '';
     try {
       final AgentTurn turn = await agent.run(
@@ -1265,6 +1274,15 @@ class ConatusTuiController implements TuiUserPromptHost {
         images: images,
       );
       reply = turn.reply;
+      budgetExhausted = reply == kBudgetExhaustedReply;
+      if (budgetExhausted) {
+        turnOk = false;
+        transcript.add(
+          TuiRole.system,
+          '本轮预算已达上限（累计 token 或墙钟），已收口；'
+          '可调 [budget] max_turn_tokens / max_turn_seconds。',
+        );
+      }
       if (turn.emptyReply) {
         turnOk = false;
         transcript.add(
@@ -1288,7 +1306,11 @@ class ConatusTuiController implements TuiUserPromptHost {
       // 运行记录已是终态。
       _settleCronRuns(ok: turnOk, reply: reply);
       busy = false;
-      _endTurn(ok: turnOk, interrupted: interrupted);
+      _endTurn(
+        ok: turnOk,
+        interrupted: interrupted,
+        budget: budgetExhausted,
+      );
       await _afterTurn();
       _refresh();
     }
@@ -2029,6 +2051,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     busy = true;
     bool turnOk = true;
     bool interrupted = false;
+    bool budgetExhausted = false;
     transcript.add(TuiRole.system, '命令 /$name 以前台子 Agent 执行，请稍候。');
     _refresh();
     try {
@@ -2052,7 +2075,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       // 取消 / 异常也写结果：assistant tool_calls 一旦落盘就必须闭合，
       // 否则会话在后续压缩时永久失衡。
       interrupted = cancel.cancelled;
-      turnOk = !interrupted && !result.isError;
+      budgetExhausted = result.content == kBudgetExhaustedReply;
+      turnOk = !interrupted && !result.isError && !budgetExhausted;
       session?.append(
         kToolResultEvent,
         data: <String, Object?>{
@@ -2073,7 +2097,11 @@ class ConatusTuiController implements TuiUserPromptHost {
       _foregroundInterrupt = null;
       _cancel = null;
       busy = false;
-      _endTurn(ok: turnOk, interrupted: interrupted);
+      _endTurn(
+        ok: turnOk,
+        interrupted: interrupted,
+        budget: budgetExhausted,
+      );
       await _afterTurn();
       _refresh();
     }
