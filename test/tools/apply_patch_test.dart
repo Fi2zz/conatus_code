@@ -170,13 +170,12 @@ void main() {
       expect(result.error!.code, 'PATCH_UNSUPPORTED');
     });
 
-    test('OpenCode *** 格式明确降级为 PATCH_UNSUPPORTED', () async {
+    test('OpenCode *** 格式：新增文件', () async {
       const String patch = '''
 *** Begin Patch
-*** Update File: a.txt
-@@
--old
-+new
+*** Add File: new.txt
++hello
++world
 *** End Patch
 ''';
 
@@ -184,9 +183,111 @@ void main() {
         _context(<String, Object?>{'patch': patch}),
       );
 
+      expect(result.isError, isFalse);
+      expect(File('${dir.path}/new.txt').readAsStringSync(), 'hello\nworld\n');
+      expect((result.value! as Map<String, Object?>)['files'], <String>[
+        'new.txt',
+      ]);
+    });
+
+    test('OpenCode *** 格式：上下文更新与多 hunk', () async {
+      File('${dir.path}/a.txt').writeAsStringSync('l1\nl2\nl3\nl4\n');
+      const String patch = '''
+*** Begin Patch
+*** Update File: a.txt
+@@
+-l1
++x1
+@@
+ l3
+-l4
++x4
+*** End Patch
+''';
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
+
+      expect(result.isError, isFalse);
+      expect(File('${dir.path}/a.txt').readAsStringSync(), 'x1\nl2\nl3\nx4\n');
+    });
+
+    test('OpenCode *** 格式：Delete 与 Move to', () async {
+      File('${dir.path}/old.txt').writeAsStringSync('a\nb\n');
+      File('${dir.path}/gone.txt').writeAsStringSync('x\n');
+      const String patch = '''
+*** Begin Patch
+*** Update File: old.txt
+@@
+-b
++c
+*** Move to: new.txt
+*** Delete File: gone.txt
+*** End Patch
+''';
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
+
+      expect(result.isError, isFalse);
+      expect(File('${dir.path}/old.txt').existsSync(), isFalse);
+      expect(File('${dir.path}/new.txt').readAsStringSync(), 'a\nc\n');
+      expect(File('${dir.path}/gone.txt').existsSync(), isFalse);
+    });
+
+    test('OpenCode *** 格式：Add 已存在 / Update 不存在 / 上下文不匹配', () async {
+      File('${dir.path}/exists.txt').writeAsStringSync('x\n');
+      File('${dir.path}/a.txt').writeAsStringSync('aaa\n');
+
+      final ToolResult add = await tool.call(
+        _context(<String, Object?>{
+          'patch': '*** Add File: exists.txt\n+y\n',
+        }),
+      );
+      final ToolResult missing = await tool.call(
+        _context(<String, Object?>{
+          'patch': '*** Update File: nope.txt\n@@\n-a\n+b\n',
+        }),
+      );
+      final ToolResult mismatch = await tool.call(
+        _context(<String, Object?>{
+          'patch': '*** Update File: a.txt\n@@\n-wrong\n+right\n',
+        }),
+      );
+
+      expect(add.error!.code, 'PATCH_EXISTS');
+      expect(missing.error!.code, 'PATCH_NOT_FOUND');
+      expect(mismatch.error!.code, 'PATCH_CONTEXT');
+    });
+
+    test('OpenCode *** 格式：@@ 锚点帮助定位', () async {
+      File('${dir.path}/a.txt').writeAsStringSync('head\nfind me\ntail\n');
+      const String patch = '''
+*** Update File: a.txt
+@@ find me
+-find me
++found me
+''';
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
+
+      expect(result.isError, isFalse);
+      expect(File('${dir.path}/a.txt').readAsStringSync(), 'head\nfound me\ntail\n');
+    });
+
+    test('OpenCode *** 格式：未知头 → PATCH_INVALID', () async {
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{
+          'patch': '*** Nope File: x\n+y\n',
+        }),
+      );
+
       expect(result.isError, isTrue);
-      expect(result.error!.code, 'PATCH_UNSUPPORTED');
-      expect(result.error!.message, contains('unified'));
+      expect(result.error!.code, 'PATCH_INVALID');
     });
   });
 }

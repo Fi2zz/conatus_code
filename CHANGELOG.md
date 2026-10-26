@@ -28,9 +28,9 @@
   映射为 `McpServerSpec`（stdio / http / sse、env / headers / oauth）；
   `[mcp.servers.*]` 同名优先，坏条目告警跳过。`nava mcp list` / `auth` 与
   运行时装配都走同一份合并结果。
-- **Agent 工具名映射补 `question` → `ask_user`**；`apply_patch` 遇到
-  OpenCode `*** Begin Patch` 系列格式时明确返回 `PATCH_UNSUPPORTED`，不再
-  误报 `PATCH_INVALID`。
+- **Agent 工具名映射补 `question` → `ask_user`**；`apply_patch` 支持
+  OpenCode `*** Begin Patch` 格式（Add / Update / Delete / Move to、
+  `@@` 锚点与上下文匹配），不再返回 `PATCH_UNSUPPORTED`。
 
 - **会话标签 / 主题 / 键位**：标签栏（`ctrl+tab` / `ctrl+shift+tab` 切换、
   `<leader>w` 关闭，提示取自 keymap）、`/theme`（default / dark / light /

@@ -4,8 +4,11 @@ import '../diff/apply.dart';
 import '../diff/diff_model.dart';
 import '../diff/diff_parse.dart';
 import '../diff/diff_types.dart';
+import 'opencode_patch.dart';
+import 'opencode_patch_apply.dart';
 
-/// 应用统一格式（unified）diff 补丁的工具。
+/// 应用补丁的工具：支持统一格式（unified）diff 与 OpenCode / Codex
+/// `*** Begin Patch` 两种格式。
 ///
 /// 逐文件按 hunk 倒序应用：上下文行（' ' 与 '-' 前缀）必须与现有内容逐行
 /// 相等，任一文件失败立即返回失败（已应用的其它文件不回滚，靠版本守卫兜底）。
@@ -18,7 +21,7 @@ class ApplyPatchTool extends Tool {
   String get name => 'apply_patch';
 
   @override
-  String get description => '应用统一格式（unified）diff 补丁到文件。';
+  String get description => '应用 unified diff 或 OpenCode *** 补丁到文件。';
 
   @override
   ToolRisk get riskLevel => ToolRisk.high;
@@ -26,14 +29,7 @@ class ApplyPatchTool extends Tool {
   @override
   Future<ToolResult> call(ToolContext ctx) async {
     final String patch = ctx.str('patch');
-    if (_openCodePatch(patch)) {
-      const String message =
-          'OpenCode *** 补丁格式暂不支持，请改用 unified diff（---/+++）';
-      return ToolResult.failure(
-        message,
-        error: const ToolError('PATCH_UNSUPPORTED', message),
-      );
-    }
+    if (_openCodePatch(patch)) return _applyOpenCode(patch);
     final List<FileDiff> files = parseUnifiedDiff(patch);
     if (files.isEmpty) {
       return ToolResult.failure(
@@ -72,6 +68,40 @@ class ApplyPatchTool extends Tool {
     );
   }
 
+  /// 应用 OpenCode / Codex `***` 补丁。
+  Future<ToolResult> _applyOpenCode(String patch) async {
+    final List<OpenCodePatchOp> ops;
+    try {
+      ops = parseOpenCodePatch(patch);
+    } on FormatException catch (error) {
+      return ToolResult.failure(
+        '无法解析 patch：${error.message}',
+        error: ToolError('PATCH_INVALID', error.message),
+      );
+    }
+    final List<String> applied = <String>[];
+    try {
+      for (final OpenCodePatchOp op in ops) {
+        await applyOpenCodeOps(_fs, <OpenCodePatchOp>[op]);
+        applied.add(op.path);
+      }
+    } on OpenCodePatchException catch (error) {
+      return ToolResult.failure(
+        error.message,
+        error: ToolError(error.code, error.message),
+      );
+    } on FsError catch (error) {
+      return ToolResult.failure(
+        error.message,
+        error: ToolError(error.code.code, error.message),
+      );
+    }
+    return ToolResult.success(
+      '已应用 ${applied.length} 个文件：${applied.join(', ')}',
+      value: <String, Object?>{'files': applied, 'diff': patch},
+    );
+  }
+
   /// 二进制 / 仅元数据变更没有可应用的 hunk；空文件新增（added + 无 hunk）
   /// 仍要物化，故不能一律跳过。
   bool _applicable(FileDiff file) {
@@ -97,7 +127,7 @@ class ApplyPatchTool extends Tool {
   }
 }
 
-/// OpenCode / Codex 的 `***` 补丁头；目前明确降级，不尝试按 unified diff 解析。
+/// OpenCode / Codex 的 `***` 补丁头；命中后走专用解析器。
 const List<String> _openCodeMarkers = <String>[
   '*** Begin Patch',
   '*** Add File:',
