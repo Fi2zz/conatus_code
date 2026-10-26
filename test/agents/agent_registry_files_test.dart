@@ -29,6 +29,21 @@ void main() {
   Future<AgentRegistry> load() =>
       AgentRegistry.load(workdir: work.path, home: home.path);
 
+  test('reload 发现新增 / 删除文件并保留内置 Agent', () async {
+    final Directory root = Directory('${work.path}/.nava/agents');
+    final AgentRegistry registry = await load();
+
+    writeAgent(root, 'late.md', body: 'late body');
+    await registry.reload();
+    expect(registry.byId('late')!.system, 'late body');
+    expect(registry.byId('build'), isNotNull);
+
+    File('${root.path}/late.md').deleteSync();
+    await registry.reload();
+    expect(registry.byId('late'), isNull);
+    expect(registry.byId('build'), isNotNull);
+  });
+
   test('无效文件跳过且其余 Agent 照常加载，并记录原因', () async {
     writeAgent(Directory('${work.path}/.nava/agents'), 'good.md', body: 'good');
     writeAgent(

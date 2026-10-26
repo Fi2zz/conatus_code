@@ -57,6 +57,7 @@ import '../tabs/tab_manager.dart';
 import '../tools/update_plan.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
+import 'definition_watcher.dart';
 import 'keymap/keymap.dart';
 import 'keymap/keymap_view.dart';
 import 'session_exporter.dart';
@@ -259,6 +260,13 @@ class ConatusTuiController implements TuiUserPromptHost {
       _app.get<TuiChoicePrompt>('tuiChoice') ?? TuiChoicePrompt();
 
   late final TuiPermissionGate? _gate;
+
+  /// 定义目录监听；`/reload` 与自动重载共用。
+  bool _definitionsDirty = false;
+  late final DefinitionWatcher _definitionWatcher = DefinitionWatcher(
+    roots: _app.get<List<String>>('definitionRoots') ?? const <String>[],
+    onInvalidate: _onDefinitionsChanged,
+  );
 
   /// 会话自身没有 `permission/mode` 记录时采用的权限模式（来自配置）。
   ///
@@ -647,6 +655,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 回填当前模型的上下文窗口（来自 models.dev 档案，未就绪则稍后补）。
     seedModelContextLength();
     _watchModelProfiles();
+    _definitionWatcher.start();
     if (_app.get<bool>('providerSetupNeeded') ?? false) {
       final ProviderRegistry? registry = _app.providers;
       if (registry != null) {
@@ -749,6 +758,46 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 新会话的 Agent：`[agent] default_agent`（注册表已处理未知 / subagent 回退）。
   String _defaultAgentId() => _agentRegistry?.defaultAgent.id ?? 'build';
 
+  /// 目录变更：空闲时立即重载，忙时排队到本轮结束。
+  void _onDefinitionsChanged() {
+    if (busy || _revertInFlight) {
+      _definitionsDirty = true;
+      showSystemNotice('Agent / 命令定义已变更，当前操作结束后自动重载。');
+      return;
+    }
+    unawaited(reloadDefinitions());
+  }
+
+  /// 重新发现 Agent / 命令定义，并按需重绑当前 Agent。
+  Future<void> reloadDefinitions({bool announce = true}) async {
+    final AgentRegistry? agents = _agentRegistry;
+    final CommandRegistry? commands = _commandRegistry;
+    if (agents == null || commands == null) {
+      showSystemNotice('Agent / 命令注册表未装配，无法重载定义。');
+      return;
+    }
+    if (busy || _revertInFlight) {
+      _definitionsDirty = true;
+      if (announce) showSystemNotice('有操作进行中，结束后自动重载定义。');
+      return;
+    }
+    await agents.reload();
+    await commands.reload();
+    _definitionsDirty = false;
+    if (ready) {
+      final AgentDefinition? current = agents.byId(_agentId);
+      final bool removed = current == null || current.mode == AgentMode.subagent;
+      final String target = removed ? agents.defaultAgent.id : current.id;
+      await _activateAgent(
+        target,
+        announce: removed,
+        syncPlanMode: false,
+      );
+    }
+    if (announce) showSystemNotice('已重载 Agent / 命令定义。');
+    _refresh();
+  }
+
   /// 会话记录的 Agent；无记录、未知或仅子 Agent 时用 [fallback]。
   String _sessionAgentId(Session session, String fallback) {
     final String? recorded = restoreAgentId(session);
@@ -820,6 +869,7 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 释放当前会话绑定（幂等）。
   void dispose() {
+    _definitionWatcher.stop();
     _unbind();
     // 提示订阅跨会话存活（换会话不该丢「正在重试」的可见性），只在控制器
     // 真正销毁时取消。
@@ -1681,6 +1731,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         }
       case 'tools':
         _showTools();
+      case 'reload':
+        await reloadDefinitions();
       case 'mcp':
         _showMcp();
       case 'model':
@@ -3437,6 +3489,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 自定义命令的 Agent / 模型覆盖只作用于这一轮：收口后先还原，再投递排队
     // 消息，避免覆盖泄漏到下一条输入。
     await _restoreTurnOverride();
+    if (_definitionsDirty && !busy) {
+      _definitionsDirty = false;
+      await reloadDefinitions(announce: false);
+    }
     // 消息队列：收口后投递下一条排队输入（一次一条，依次衔接）。
     // 多数时候队列已被 steering 取空（轮内注入），这里是兜底路径。
     if (_queue.isNotEmpty && !busy) {

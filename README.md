@@ -366,6 +366,10 @@ Agent 之外。
 （相对 workdir / 绝对路径 / `~`）；`merge_all_available_skills = true` 会把
 `disable-model-invocation` 的技能也放进模型可见目录（缺省 `false`）。
 
+**定义热重载**：`.nava` / `.opencode` 的 `agents/`、`commands/` 目录发生变更
+后，会在 250ms 防抖后自动重载；也可 `/reload` 手动触发。当前 Agent 被删除时
+回退到 `[agent] default_agent`；配置文件变更仍需重启 nava（避免半套服务重建）。
+
 **MCP CLI**：`nava mcp add <名字> --url <http(s) 地址>` / `-- <命令...>`、
 `list`、`auth`、`logout`；`--config` / `NAVA_HOME` 可覆盖配置位置。写路径统一
 经 `.opencode` 只读闸门（字面路径、`NAVA_HOME`、符号链接父目录都拒绝，见下节）。

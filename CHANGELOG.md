@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **定义热重载**：Agent / 命令目录变更 250ms 防抖后自动重载，也可 `/reload`
+  手动触发；当前 Agent 被删除时回退 `[agent] default_agent`。`CommandRegistry`
+  的 MCP prompt 动态命令在重载后保留，磁盘命令仍优先。配置文件变更仍需重启。
+
 - **`read_file` 支持图片与 PDF**：png/jpg/gif/webp 以 `ToolImage` 附件返回，
   PDF 以 `ToolFile` 返回（上限 20 MiB）；图片进入下一轮模型消息。PDF 在
   Anthropic / OpenAI Responses 走文件块，Chat 协议降级为文本提示。文本读取

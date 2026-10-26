@@ -12,9 +12,13 @@ import 'command_parser.dart';
 
 /// 命令注册表：解析后的命令按名称索引。
 class CommandRegistry {
-  CommandRegistry._();
+  CommandRegistry._(this._workdir, this._home);
 
+  final String _workdir;
+  final String? _home;
   final Map<String, CommandDefinition> _definitions =
+      <String, CommandDefinition>{};
+  final Map<String, CommandDefinition> _dynamic =
       <String, CommandDefinition>{};
   final List<String> _warnings = <String>[];
 
@@ -23,16 +27,35 @@ class CommandRegistry {
     required String workdir,
     String? home,
   }) async {
-    final CommandRegistry registry = CommandRegistry._();
-    for (final String root in _commandRoots(workdir: workdir, home: home)) {
-      await registry._loadRoot(root);
-    }
+    final CommandRegistry registry = CommandRegistry._(workdir, home);
+    await registry._load();
     return registry;
   }
 
+  /// 重新发现磁盘命令；动态注册（MCP prompt 等）保留。
+  Future<void> reload() async {
+    _definitions.clear();
+    _warnings.clear();
+    await _load();
+  }
+
+  Future<void> _load() async {
+    for (final String root in _commandRoots(workdir: _workdir, home: _home)) {
+      await _loadRoot(root);
+    }
+  }
+
+  /// 注册表使用的四层目录（供文件监听复用）。
+  static List<String> roots({required String workdir, String? home}) =>
+      _commandRoots(workdir: workdir, home: home);
+
   /// 全部命令，按名称稳定排序。
   List<CommandDefinition> get all {
-    final List<CommandDefinition> commands = _definitions.values.toList(
+    final Map<String, CommandDefinition> merged = <String, CommandDefinition>{
+      ..._dynamic,
+      ..._definitions,
+    };
+    final List<CommandDefinition> commands = merged.values.toList(
       growable: false,
     );
     commands.sort(
@@ -46,12 +69,13 @@ class CommandRegistry {
   List<String> get warnings => List<String>.unmodifiable(_warnings);
 
   /// 精确名称查找；未命中返回 `null`。
-  CommandDefinition? byName(String name) => _definitions[name];
+  CommandDefinition? byName(String name) =>
+      _definitions[name] ?? _dynamic[name];
 
   /// 注册或覆盖一条命令（动态命令、内置桥接用）。
   void add(CommandDefinition def) {
     if (def.name.trim().isEmpty) return;
-    _definitions[def.name] = def;
+    _dynamic[def.name] = def;
   }
 
   Future<void> _loadRoot(String root) async {

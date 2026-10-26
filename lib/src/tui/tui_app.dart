@@ -569,6 +569,10 @@ class ConatusTuiRuntime {
       );
     }
     app.provide('commandRegistry', commandRegistry);
+    app.provide('definitionRoots', <String>[
+      ...AgentRegistry.roots(workdir: resolvedWorkdir, home: commandHome),
+      ...CommandRegistry.roots(workdir: resolvedWorkdir, home: commandHome),
+    ]);
     final AgentProfileResolver agentProfiles = AgentProfileResolver(
       registry: agentRegistry,
       providers: registry,

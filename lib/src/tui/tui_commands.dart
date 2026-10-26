@@ -45,6 +45,10 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   ),
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(
+    name: 'reload',
+    description: '重新加载 Agent / 命令定义（不重启）',
+  ),
+  TuiCommand(
     name: 'mcp',
     description: '列出已接入的 MCP server（就绪状态 / 工具数）',
   ),

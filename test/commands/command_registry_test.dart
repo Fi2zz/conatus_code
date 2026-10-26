@@ -24,6 +24,26 @@ void main() {
   Future<CommandRegistry> load() =>
       CommandRegistry.load(workdir: work.path, home: home.path);
 
+  test('reload 发现新增 / 删除文件，动态命令保留', () async {
+    final Directory root = Directory('${work.path}/.nava/commands');
+    final CommandRegistry registry = await load();
+    registry.add(const CommandDefinition(
+      name: 'dyn',
+      template: 'dynamic',
+      sourcePath: 'dynamic',
+    ));
+
+    writeCommand(root, 'late.md', 'late template');
+    await registry.reload();
+    expect(registry.byName('late')!.template, 'late template');
+    expect(registry.byName('dyn')!.template, 'dynamic');
+
+    File('${root.path}/late.md').deleteSync();
+    await registry.reload();
+    expect(registry.byName('late'), isNull);
+    expect(registry.byName('dyn')!.template, 'dynamic');
+  });
+
   test('优先级：项目 .nava 覆盖全局 .opencode', () async {
     writeCommand(
       Directory('${home.path}/.config/opencode/commands'),

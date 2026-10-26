@@ -328,6 +328,7 @@ export 'src/tools/list_files.dart' show ListFilesTool;
 export 'src/tools/run_command.dart' show RunCommandTool;
 export 'src/tools/run_tests.dart' show RunTestsTool;
 export 'src/tools/update_plan.dart' show UpdatePlanTool, provideUpdatePlanTool;
+export 'src/tui/definition_watcher.dart' show DefinitionWatcher;
 export 'src/tui/project_context.dart'
     show kProjectContextMaxChars, loadProjectContext;
 export 'src/tui/recent_session.dart' show findRecentSessionId;

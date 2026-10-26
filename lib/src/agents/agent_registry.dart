@@ -13,9 +13,11 @@ import 'agent_parser.dart';
 
 /// Agent 注册表：解析后的定义按 ID 索引。
 class AgentRegistry {
-  AgentRegistry._(this._defaultId);
+  AgentRegistry._(this._defaultId, this._workdir, this._home);
 
   final String? _defaultId;
+  final String _workdir;
+  final String? _home;
   final Map<String, AgentDefinition> _agents = <String, AgentDefinition>{};
   final List<String> _warnings = <String>[];
   bool _defaultWarningAdded = false;
@@ -26,15 +28,31 @@ class AgentRegistry {
     String? home,
     String? defaultId,
   }) async {
-    final AgentRegistry registry = AgentRegistry._(defaultId);
-    for (final AgentDefinition agent in kBuiltinAgents) {
-      registry.add(agent);
-    }
-    for (final String root in _agentRoots(workdir: workdir, home: home)) {
-      await registry._loadRoot(root);
-    }
+    final AgentRegistry registry = AgentRegistry._(defaultId, workdir, home);
+    await registry._load();
     return registry;
   }
+
+  /// 重新发现自定义 Agent（内置保留）；用于定义热重载。
+  Future<void> reload() async {
+    _agents.clear();
+    _warnings.clear();
+    _defaultWarningAdded = false;
+    await _load();
+  }
+
+  Future<void> _load() async {
+    for (final AgentDefinition agent in kBuiltinAgents) {
+      add(agent);
+    }
+    for (final String root in _agentRoots(workdir: _workdir, home: _home)) {
+      await _loadRoot(root);
+    }
+  }
+
+  /// 注册表使用的四层目录（供文件监听复用）。
+  static List<String> roots({required String workdir, String? home}) =>
+      _agentRoots(workdir: workdir, home: home);
 
   /// 按 ID 精确查找；未命中返回 `null`（hidden Agent 同样可解析）。
   AgentDefinition? byId(String id) => _agents[id.trim()];
