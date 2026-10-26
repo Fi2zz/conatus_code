@@ -5,14 +5,14 @@
 library;
 
 import '../config/config_schema.dart';
+import 'opencode_import_command_defs.dart';
+import 'opencode_import_definitions.dart';
 import 'opencode_import_mcp.dart';
 import 'opencode_import_permissions.dart';
 import 'opencode_import_source.dart';
 import 'opencode_import_types.dart';
 
 const List<String> _ignoredKeys = <String>[
-  'agents',
-  'commands',
   'providers',
   'plugins',
   'lsp',
@@ -29,6 +29,8 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
   final List<ImportedPermission> permissions = <ImportedPermission>[];
   final List<String> instructions = <String>[];
   final Set<String> ignored = <String>{};
+  final Map<String, ImportedAgent> agents = <String, ImportedAgent>{};
+  final Map<String, ImportedCommand> commands = <String, ImportedCommand>{};
   String? model;
   String? defaultAgent;
   bool skillsRequested = false;
@@ -45,6 +47,22 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     instructions.addAll(
       _instructions(values['instructions'], document.path, warnings),
     );
+    for (final ImportedAgent agent in mapOpenCodeAgents(
+      values['agents'],
+      document.path,
+      document.global,
+      warnings,
+    )) {
+      agents[agent.id] = agent;
+    }
+    for (final ImportedCommand command in mapOpenCodeCommands(
+      values['commands'],
+      document.path,
+      document.global,
+      warnings,
+    )) {
+      commands[command.name] = command;
+    }
     ignored.addAll(_ignoredKeys.where(values.containsKey));
     skillsRequested = skillsRequested || values.containsKey('skills');
   }
@@ -64,6 +82,8 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     mcpServers: mcp.values.toList(growable: false),
     permissions: List<ImportedPermission>.unmodifiable(permissions),
     instructions: List<String>.unmodifiable(instructions),
+    agents: agents.values.toList(growable: false),
+    commands: commands.values.toList(growable: false),
     warnings: List<String>.unmodifiable(warnings),
   );
 }

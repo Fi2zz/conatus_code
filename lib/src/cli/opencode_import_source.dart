@@ -12,13 +12,20 @@ import 'jsonc.dart';
 
 /// 一份已解析的 OpenCode 配置。
 class OpenCodeDocument {
-  const OpenCodeDocument({required this.path, required this.values});
+  const OpenCodeDocument({
+    required this.path,
+    required this.values,
+    this.global = false,
+  });
 
   /// 文件路径。
   final String path;
 
   /// 顶层对象。
   final Map<String, Object?> values;
+
+  /// 是否来自全局 `~/.config/opencode`（用于决定物化到用户级还是项目级目录）。
+  final bool global;
 }
 
 /// 发现结果：[documents] 按优先级从低到高排列。
@@ -42,14 +49,20 @@ OpenCodeSources loadOpenCodeSources({
   Map<String, String>? env,
 }) {
   final List<String> warnings = <String>[];
+  final List<String> globalFiles = includeGlobal
+      ? _jsonFiles(_globalConfigDir(homeDir, env), warnings)
+      : const <String>[];
   final List<String> files = <String>[
-    if (includeGlobal)
-      ..._jsonFiles(_globalConfigDir(homeDir, env), warnings),
+    ...globalFiles,
     if (includeProject) ..._projectFiles(workdir, warnings),
   ];
   final List<OpenCodeDocument> documents = <OpenCodeDocument>[];
-  for (final String path in files) {
-    final OpenCodeDocument? document = _load(path, warnings);
+  for (int index = 0; index < files.length; index++) {
+    final OpenCodeDocument? document = _load(
+      files[index],
+      warnings,
+      global: index < globalFiles.length,
+    );
     if (document != null) documents.add(document);
   }
   return OpenCodeSources(documents: documents, warnings: warnings);
@@ -99,7 +112,11 @@ List<String> _jsonFiles(
   return found;
 }
 
-OpenCodeDocument? _load(String path, List<String> warnings) {
+OpenCodeDocument? _load(
+  String path,
+  List<String> warnings, {
+  required bool global,
+}) {
   try {
     final Object? decoded = decodeJsonc(File(path).readAsStringSync());
     if (decoded is! Map) {
@@ -109,6 +126,7 @@ OpenCodeDocument? _load(String path, List<String> warnings) {
     return OpenCodeDocument(
       path: path,
       values: Map<String, Object?>.from(decoded),
+      global: global,
     );
   } on FormatException catch (error) {
     warnings.add('$path 解析失败：${error.message}');

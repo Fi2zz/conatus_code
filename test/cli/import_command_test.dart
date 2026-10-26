@@ -207,4 +207,86 @@ void main() {
     expect(File(protected).existsSync(), isFalse);
     expect(fixture.err.toString(), contains('写入失败'));
   });
+
+  test('JSON agents / commands 物化为 .nava 定义并被注册表发现', () async {
+    final _Fixture fixture = _Fixture();
+    _write(
+      _path(fixture.project, 'opencode.json'),
+      '''
+{
+  "agents": {
+    "reviewer": {
+      "description": "Review changes",
+      "mode": "subagent",
+      "system": "Review the diff.",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+      ],
+    },
+  },
+  "commands": {
+    "audit": {
+      "description": "Audit",
+      "template": "Audit the current changes.",
+    },
+  },
+}
+''',
+    );
+
+    final int code = await fixture.run(<String>[
+      ...fixture.baseArgs(),
+      '--project-only',
+      '--write',
+    ]);
+
+    expect(code, 0);
+    final String agentPath = _path(
+      fixture.project,
+      '.nava/agents/reviewer.md',
+    );
+    final String commandPath = _path(
+      fixture.project,
+      '.nava/commands/audit.md',
+    );
+    expect(File(agentPath).existsSync(), isTrue);
+    expect(File(commandPath).existsSync(), isTrue);
+
+    final AgentRegistry agents = await AgentRegistry.load(
+      workdir: fixture.project.path,
+      home: fixture.home.path,
+    );
+    final AgentDefinition? reviewer = agents.byId('reviewer');
+    expect(reviewer, isNotNull);
+    expect(reviewer!.system, 'Review the diff.');
+    expect(reviewer.mode, AgentMode.subagent);
+    expect(reviewer.permissions.single.action, 'edit');
+
+    final CommandRegistry commands = await CommandRegistry.load(
+      workdir: fixture.project.path,
+      home: fixture.home.path,
+    );
+    expect(commands.byName('audit')!.template, 'Audit the current changes.');
+  });
+
+  test('定义文件 dry-run 不落盘，但打印目标与内容', () async {
+    final _Fixture fixture = _Fixture();
+    _write(
+      _path(fixture.project, 'opencode.json'),
+      '{"agents":{"reviewer":{"system":"Review the diff."}}}',
+    );
+
+    final int code = await fixture.run(<String>[
+      ...fixture.baseArgs(),
+      '--project-only',
+    ]);
+
+    expect(code, 0);
+    expect(
+      File(_path(fixture.project, '.nava/agents/reviewer.md')).existsSync(),
+      isFalse,
+    );
+    expect(fixture.out.toString(), contains('.nava/agents/reviewer.md'));
+    expect(fixture.out.toString(), contains('Review the diff.'));
+  });
 }

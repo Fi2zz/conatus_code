@@ -24,6 +24,8 @@ class OpenCodeImport {
     this.mcpServers = const <McpServerSpec>[],
     this.permissions = const <ImportedPermission>[],
     this.instructions = const <String>[],
+    this.agents = const <ImportedAgent>[],
+    this.commands = const <ImportedCommand>[],
     this.warnings = const <String>[],
   });
 
@@ -32,6 +34,8 @@ class OpenCodeImport {
   final List<McpServerSpec> mcpServers;
   final List<ImportedPermission> permissions;
   final List<String> instructions;
+  final List<ImportedAgent> agents;
+  final List<ImportedCommand> commands;
   final List<String> warnings;
 
   bool get isEmpty =>
@@ -39,5 +43,51 @@ class OpenCodeImport {
       defaultAgent == null &&
       mcpServers.isEmpty &&
       permissions.isEmpty &&
-      instructions.isEmpty;
+      instructions.isEmpty &&
+      agents.isEmpty &&
+      commands.isEmpty;
+}
+
+/// OpenCode JSON 里定义的一个 Agent，待物化为 `.nava/agents/<id>.md`。
+class ImportedAgent {
+  const ImportedAgent({
+    required this.id,
+    required this.system,
+    required this.global,
+    this.description,
+    this.mode,
+    this.model,
+    this.steps,
+    this.permissions = const <ImportedPermission>[],
+  });
+
+  final String id;
+  final String system;
+  final bool global;
+  final String? description;
+  final String? mode;
+  final String? model;
+  final int? steps;
+  final List<ImportedPermission> permissions;
+}
+
+/// OpenCode JSON 里定义的一条命令，待物化为 `.nava/commands/<name>.md`。
+class ImportedCommand {
+  const ImportedCommand({
+    required this.name,
+    required this.template,
+    required this.global,
+    this.description,
+    this.agent,
+    this.model,
+    this.subagent,
+  });
+
+  final String name;
+  final String template;
+  final bool global;
+  final String? description;
+  final String? agent;
+  final String? model;
+  final bool? subagent;
 }
