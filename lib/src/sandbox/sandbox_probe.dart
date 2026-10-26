@@ -3,12 +3,27 @@ library;
 
 import 'dart:io';
 
-/// 沙箱后端（sandbox-exec）的位置信息。
-class SandboxBackend {
-  const SandboxBackend({required this.sandboxExecPath});
+/// 沙箱后端类型。
+enum SandboxBackendKind {
+  /// macOS Seatbelt（sandbox-exec）。
+  seatbelt,
 
-  /// 系统 sandbox-exec 的绝对路径（macOS 自带）。
+  /// Linux bubblewrap。
+  bubblewrap,
+}
+
+/// 沙箱后端的位置信息。
+class SandboxBackend {
+  const SandboxBackend({
+    required this.sandboxExecPath,
+    this.kind = SandboxBackendKind.seatbelt,
+  });
+
+  /// 后端可执行文件的绝对路径（sandbox-exec 或 bwrap）。
   final String sandboxExecPath;
+
+  /// 后端类型。
+  final SandboxBackendKind kind;
 }
 
 /// 沙箱不可用时的异常。
@@ -29,13 +44,55 @@ SandboxBackend probeSandboxBackend({
   Map<String, String>? env,
   bool checkRosetta = true,
 }) {
-  if (!Platform.isMacOS) {
-    throw const SandboxException('本阶段仅支持 macOS');
+  if (Platform.isMacOS) {
+    const String execPath = '/usr/bin/sandbox-exec';
+    _requireSandboxExec(execPath);
+    _probeLaunch(execPath);
+    return const SandboxBackend(sandboxExecPath: execPath);
   }
-  const String execPath = '/usr/bin/sandbox-exec';
-  _requireSandboxExec(execPath);
-  _probeLaunch(execPath);
-  return const SandboxBackend(sandboxExecPath: execPath);
+  if (Platform.isLinux) return _probeBubblewrap();
+  throw const SandboxException('OS 沙箱仅支持 macOS（Seatbelt）与 Linux（bubblewrap）');
+}
+
+/// 探测 Linux bubblewrap：先找二进制，再试跑最小只读沙箱。
+SandboxBackend _probeBubblewrap() {
+  final String? path = _findBubblewrap();
+  if (path == null) {
+    throw const SandboxException('未找到 bwrap（bubblewrap），沙箱不可用');
+  }
+  final ProcessResult result = Process.runSync(
+    path,
+    <String>['--ro-bind', '/', '/', '--', '/bin/sh', '-c', 'echo sb-ok'],
+  );
+  final bool ok =
+      result.exitCode == 0 && result.stdout.toString().contains('sb-ok');
+  if (!ok) {
+    throw SandboxException(
+      'bwrap 试跑失败（exit ${result.exitCode}），bubblewrap 不可用',
+    );
+  }
+  return SandboxBackend(
+    sandboxExecPath: path,
+    kind: SandboxBackendKind.bubblewrap,
+  );
+}
+
+String? _findBubblewrap() {
+  for (final String path in <String>[
+    '/usr/bin/bwrap',
+    '/bin/bwrap',
+    '/usr/local/bin/bwrap',
+  ]) {
+    if (File(path).existsSync()) return path;
+  }
+  try {
+    final ProcessResult result = Process.runSync('which', <String>['bwrap']);
+    final String found = result.stdout.toString().trim();
+    if (result.exitCode == 0 && found.isNotEmpty) return found;
+  } on ProcessException {
+    // 没有 which 时只能依赖常见路径。
+  }
+  return null;
 }
 
 /// 校验系统自带 sandbox-exec；缺失说明 Seatbelt 不可用。

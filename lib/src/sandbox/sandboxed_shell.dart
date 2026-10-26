@@ -10,7 +10,9 @@ import 'dart:math' as math;
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
+import 'bubblewrap_args.dart';
 import 'command_policy.dart';
+import 'sandbox_probe.dart';
 import 'sandboxed_launcher.dart';
 import 'sandboxed_shell_options.dart';
 import 'sandboxed_shell_process.dart';
@@ -149,6 +151,21 @@ class SandboxedShellExecutor implements ShellExecutor {
     final bool networkAllowed = _networkAllowed(spec.command);
     final List<String> writable = _writableRoots();
     final List<String> protected = _protectedRoots();
+    if (_options.backend.kind == SandboxBackendKind.bubblewrap) {
+      return Process.start(
+        _options.backend.sandboxExecPath,
+        buildBubblewrapArgs(
+          root: _options.root,
+          workdir: spec.workdir,
+          writablePaths: writable.toSet(),
+          protectedPaths: protected.toSet(),
+          networkAllowed: networkAllowed,
+          command: spec.command,
+        ),
+        environment: _minimalEnv(),
+        workingDirectory: spec.workdir,
+      );
+    }
     final List<String> args = <String>[
       '-p',
       buildSeatbeltProfile(

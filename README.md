@@ -905,16 +905,19 @@ nava --harness harnesses/std.json      # 本次运行装配（TUI 与 -p 共用�
   `JailedFileSystem` 把 conatus `FileSystem` 接上 `dart_io_sandbox` 的 bound
   jail，读写限定在沙箱根内，越界映射为 `sandboxDenied`。纯应用层防误操作，
   **不依赖 OS 后端**，任何平台可用。
-- **Layer 2 · OS 级沙箱**（`enabled`，默认开启，仅 macOS）：
+- **Layer 2 · OS 级沙箱**（`enabled`，默认开启，macOS / Linux）：
   `CommandPolicy` 裁决命令形状（管道 / 重定向放行；`&&`、`;`、`$()` 触发
   review，TUI 内经人工复核裁决、headless 按拒绝），再由
-  `SandboxedShellExecutor` 直调系统
-  `/usr/bin/sandbox-exec` + 自建的 Seatbelt profile 执行：deny-default 基线、
-  可写根经 `-D` 参数注入（工作区、/tmp 真实路径、常用 HOME 缓存、`writable_paths`），
-  `/dev/null` 按字符设备放行，mach-lookup 收敛为系统服务白名单，最小环境变量、
-  不继承父进程环境。设计对齐 OpenAI Codex CLI / Claude Code 的 seatbelt 方案。
+  `SandboxedShellExecutor` 调用平台后端：
+  - **macOS**：`/usr/bin/sandbox-exec` + 自建 Seatbelt profile，deny-default
+    基线、可写根经 `-D` 参数注入、mach-lookup 收敛为系统服务白名单；
+  - **Linux**：`bwrap`（bubblewrap），`--unshare-all` 断网（按命令放行时
+    `--share-net`）、`--ro-bind / /` 只读根、工作区与缓存 `--bind` 可写、
+    `.opencode` 等受保护路径 `--ro-bind-try`。
+  两者都使用最小环境变量、不继承父进程环境。设计对齐 OpenAI Codex CLI /
+  Claude Code 的 seatbelt 方案。
 
-**fail-closed 只作用于 Layer 2 后端**：sandbox-exec / Seatbelt 不可用时，
+**fail-closed 只作用于 Layer 2 后端**：sandbox-exec / bwrap 不可用时，
 命令执行被拒斥执行器禁用（不降级为本地 shell），应用照常启动、Layer 1 文件
 jail 继续生效。Layer 1 与 Layer 2 可独立关闭；`preset = "danger_full_access"`
 显式关闭 OS 沙箱回本地直执（Layer 1 与命令策略仍生效）。
@@ -924,15 +927,18 @@ jail 继续生效。Layer 1 与 Layer 2 可独立关闭；`preset = "danger_full
 - `sandbox-exec` 在 macOS 上标记 deprecated 但系统自带可用；启动预检会 smoke
   试跑，失败时命令执行禁用（stderr 会提示，可在 config.toml 设
   `[sandbox] enabled = false` 关闭 Layer 2，保留 Layer 1 文件 jail）。
+- Linux 需要安装 `bwrap`，且内核允许非特权 user namespace；预检试跑失败时
+  命令执行禁用（fail-closed）。容器内常因 seccomp 禁用 userns，需要显式
+  调整或关闭 Layer 2。
 - 沙箱定位是防 LLM 乱跑命令的**护栏**：写默认限定在工作区 + 缓存目录，网络
   默认拒绝，读不限面（与 Codex / Claude Code 同姿态）；对抗决心攻击者不是其目标。
 - mach-lookup 白名单是维护点：个别工具若因缺服务报错，按报错扩展
   `seatbeltMachAllowlist` 即可（TLS 所需的 trustd/ocspd 已内置）。
 - CommandPolicy 的 REVIEW 已接线人工复核：TUI 内经选项浮层征询（NeverAsk
-  视同放行），批准后在 seatbelt 内照常执行；headless 无浮层，REVIEW 仍按
+  视同放行），批准后在平台沙箱内照常执行；headless 无浮层，REVIEW 仍按
   拒绝处理（fail-closed）。白名单/路径越界这类确定性违规不受复核豁免，
   优先按 deny 拒绝。
-- Layer 2 仅支持 macOS：其他平台命令执行会禁用，请显式设
+- Layer 2 支持 macOS / Linux；Windows 命令执行会禁用，请显式设
   `[sandbox] enabled = false`。
 
 ## 预算护栏
@@ -1002,9 +1008,8 @@ Loop、工具系统、技能沉淀等底座；coding 相关能力（终端 UI、
 ## CI
 
 `.github/workflows/test.yml` 在每次 push / PR 跑：静态检查（`--fatal-infos`）
-→ 全部测试 → 打包二进制。跑在 `macos-latest`——沙箱 Layer 2 只在 macOS 可用，
-`test/sandbox/` 下两个测试文件没有跳过保护，放到 ubuntu 上要么必红、要么被迫
-跳过最有价值的那批。
+→ 全部测试 → 打包二进制。跑在 `macos-latest`——Seatbelt 集成测试需要 macOS；
+Linux `bwrap` 后端当前只有参数单测，未在 CI 真跑。
 
 CI 验的是**独立形态**：checkout 拿到的是提交态 pubspec（`resolution:
 workspace` 被 git filter 注释掉，依赖经 git 拉 conatus master），也就是

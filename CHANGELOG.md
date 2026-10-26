@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- **Linux Layer 2 沙箱**：`probeSandboxBackend` 在 Linux 上探测 `bwrap` 并
+  smoke 试跑；`SandboxedShellExecutor` 用 bubblewrap 构造 deny-by-default
+  沙箱（`--unshare-all`、只读根、工作区/缓存可写、`.opencode` 只读保护）。
+  不可用时仍 fail-closed（命令执行禁用）。
+
 - **OpenCode `references` 导入**：本地目录（字符串 `.` / `/` / `~` 开头，或
   `{path, description}`）映射为 `[references.*]`；git reference 告警跳过。
 

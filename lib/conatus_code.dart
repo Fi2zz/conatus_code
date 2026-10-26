@@ -260,6 +260,7 @@ export 'src/references/references.dart'
 export 'src/revert/revert_service.dart' show RevertService;
 export 'src/revert/revert_stage.dart'
     show RedoResult, RevertException, RevertStage, UndoResult;
+export 'src/sandbox/bubblewrap_args.dart' show buildBubblewrapArgs;
 export 'src/sandbox/command_policy.dart'
     show
         CommandDecision,

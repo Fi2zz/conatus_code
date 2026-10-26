@@ -77,13 +77,16 @@ void main() {
 
   String home() => Platform.environment['HOME'] ?? '';
 
-  test('probeSandboxBackend 定位 sandbox-exec', () {
+  test('probeSandboxBackend 定位平台后端', () {
     final SandboxBackend? found = backend;
     if (found == null) {
       markTestSkipped('沙箱后端不可用，跳过集成测试');
       return;
     }
-    expect(found.sandboxExecPath, endsWith('sandbox-exec'));
+    expect(
+      found.sandboxExecPath,
+      endsWith(Platform.isMacOS ? 'sandbox-exec' : 'bwrap'),
+    );
   });
 
   test('echo hello：exit 0', () async {
