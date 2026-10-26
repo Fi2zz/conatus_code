@@ -158,7 +158,7 @@ void main() {
     expect(tester.terminalState, isNot(containsText('ctx ')));
   });
 
-  test('运行中只显示时长与 esc interrupt', () async {
+  test('运行中显示方块、时长与 esc interrupt', () async {
     final NoctermTester tester = await NoctermTester.create(
       size: const Size(120, 12),
     );
@@ -174,7 +174,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(tester.terminalState, containsText('7s'));
+    expect(tester.terminalState, containsText('■■····· 7s'));
     expect(tester.terminalState, isNot(containsText('运行中')));
     expect(tester.terminalState, containsText('esc interrupt'));
   });

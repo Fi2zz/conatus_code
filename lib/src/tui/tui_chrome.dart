@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:nocterm/nocterm.dart';
 import 'theme/nava_theme.dart';
 import 'tui_shell_mode.dart';
-import 'tui_views.dart';
 
 BorderSide get borderSode => BorderSide(color: NavaTheme.palette.inputBorder);
 
@@ -113,6 +112,7 @@ class TuiInputBar extends StatelessComponent {
 /// 状态栏：左（权限 + 模型）/ 中（操作提示）/ 右（目录 + 分支 + 上下文用量）。
 /// 状态栏三段之间保留的最小空隙（列）。
 const int _kSegmentGap = 2;
+const String _blockStrip = '■■■■■■■';
 
 class TuiStatusBar extends StatelessComponent {
   const TuiStatusBar({
@@ -215,7 +215,7 @@ class TuiStatusBar extends StatelessComponent {
     } else if (menuOpen) {
       return '[↑↓] 选择命令 | [Enter] 运行 | [Tab] 补全 | [Esc] 关闭';
     } else if (busy) {
-      return '■■■····  esc interrupt';
+      return 'esc interrupt';
     } else if (hasSelection) {
       return Platform.isMacOS
           ? '已自动复制到系统剪贴板 | /help 命令'
@@ -248,16 +248,7 @@ class TuiStatusBar extends StatelessComponent {
       children: <Component>[
         Row(
           children: <Component>[
-            Text(
-              _statusText,
-              maxLines: 1,
-              softWrap: false,
-              style: TextStyle(
-                color: busy
-                    ? NavaTheme.palette.warning
-                    : NavaTheme.palette.muted,
-              ),
-            ),
+            _leftStatus(),
             if (permissionLabel.isNotEmpty)
               Text(
                 '   $permissionLabel',
@@ -278,16 +269,12 @@ class TuiStatusBar extends StatelessComponent {
                   padding: EdgeInsets.symmetric(
                     horizontal: _kSegmentGap.toDouble(),
                   ),
-                  child: busy
-                      ? _runningIndicator()
-                      : Text(
-                          hint,
-                          maxLines: 1,
-                          softWrap: false,
-                          style: TextStyle(
-                            color: NavaTheme.palette.muted,
-                          ),
-                        ),
+                  child: Text(
+                    hint,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(color: NavaTheme.palette.muted),
+                  ),
                 )
               : const SizedBox(),
         ),
@@ -308,9 +295,34 @@ class TuiStatusBar extends StatelessComponent {
     return '$_statusText$permission   $modelLabel';
   }
 
-  /// 当前运行状态：忙碌时只显示时长；完成 15 秒内显示状态与时长；否则等待输入。
+  /// 左段运行状态：忙碌时是方块扫描 + 时长，空闲时是文字状态。
+  Component _leftStatus() {
+    if (!busy) {
+      return Text(
+        _statusText,
+        maxLines: 1,
+        softWrap: false,
+        style: TextStyle(color: NavaTheme.palette.muted),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Component>[
+        _blockScan(),
+        Text(
+          ' ${_elapsed(turnElapsed)}',
+          maxLines: 1,
+          softWrap: false,
+          style: TextStyle(color: NavaTheme.palette.warning),
+        ),
+      ],
+    );
+  }
+
+  /// 当前运行状态：忙碌时显示方块动画 + 时长；完成 15 秒内显示状态与时长；
+  /// 否则等待输入。
   String get _statusText {
-    if (busy) return '${tuiSpinner(tick)} ${_elapsed(turnElapsed)}';
+    if (busy) return '$_blockStrip ${_elapsed(turnElapsed)}';
     final Duration? recent = recentTurnDuration;
     if (recent != null) {
       return '${recentTurnStatus ?? '✓ 完成'} ${_elapsed(recent)}';
@@ -318,8 +330,8 @@ class TuiStatusBar extends StatelessComponent {
     return '○ 等待输入';
   }
 
-  /// 忙时的方块扫描动画 + `esc interrupt`。
-  Component _runningIndicator() {
+  /// 方块扫描动画（忙时放在时长之前）。
+  Component _blockScan() {
     const int cells = 7;
     final int phase = (tick ~/ 3) % (cells * 2);
     final int center = phase < cells ? phase : cells * 2 - phase - 1;
@@ -337,10 +349,6 @@ class TuiStatusBar extends StatelessComponent {
                       : NavaTheme.palette.faint,
             ),
           ),
-        Text(
-          '  esc interrupt',
-          style: TextStyle(color: NavaTheme.palette.muted),
-        ),
       ],
     );
   }
