@@ -481,6 +481,8 @@ class ConatusTuiController implements TuiUserPromptHost {
   DateTime? _turnStartedAt;
   DateTime? _turnFinishedAt;
   Duration? _lastTurnDuration;
+  bool _lastTurnOk = true;
+  bool _lastTurnInterrupted = false;
 
   /// 当前轮已运行时长；空闲时为 null。
   Duration? get turnElapsed => _turnStartedAt == null
@@ -503,12 +505,21 @@ class ConatusTuiController implements TuiUserPromptHost {
     _lastTurnDuration = null;
   }
 
-  void _endTurn() {
+  /// 最近一轮的状态标签；完成后 15 秒内返回。
+  String? get recentTurnStatus {
+    if (recentTurnDuration == null) return null;
+    if (_lastTurnInterrupted) return '⏹ 已中断';
+    return _lastTurnOk ? '✓ 完成' : '✗ 失败';
+  }
+
+  void _endTurn({required bool ok, bool interrupted = false}) {
     final DateTime now = DateTime.now();
     final DateTime? started = _turnStartedAt;
     _turnStartedAt = null;
     _turnFinishedAt = now;
     _lastTurnDuration = started == null ? null : now.difference(started);
+    _lastTurnOk = ok;
+    _lastTurnInterrupted = interrupted;
   }
 
   /// 排队中的用户输入（busy 时入队，收口后依次投递；上限 [kMessageQueueCap]）。
@@ -1245,6 +1256,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 界面此时已就绪，用户能看到历史并排队，这里只是把首轮延后。
     await _checkpointBase;
     bool turnOk = true;
+    bool interrupted = false;
     String reply = '';
     try {
       final AgentTurn turn = await agent.run(
@@ -1253,8 +1265,16 @@ class ConatusTuiController implements TuiUserPromptHost {
         images: images,
       );
       reply = turn.reply;
+      if (turn.emptyReply) {
+        turnOk = false;
+        transcript.add(
+          TuiRole.system,
+          '模型返回了空回复（输出可能被截断），请重试或换模型。',
+        );
+      }
     } on AgentCancelled {
       turnOk = false;
+      interrupted = true;
       transcript.add(TuiRole.system, '已打断这一轮。');
     } on LlmException catch (error) {
       turnOk = false;
@@ -1268,7 +1288,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       // 运行记录已是终态。
       _settleCronRuns(ok: turnOk, reply: reply);
       busy = false;
-      _endTurn();
+      _endTurn(ok: turnOk, interrupted: interrupted);
       await _afterTurn();
       _refresh();
     }
@@ -2007,6 +2027,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     };
     _beginTurn();
     busy = true;
+    bool turnOk = true;
+    bool interrupted = false;
     transcript.add(TuiRole.system, '命令 /$name 以前台子 Agent 执行，请稍候。');
     _refresh();
     try {
@@ -2029,7 +2051,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       }
       // 取消 / 异常也写结果：assistant tool_calls 一旦落盘就必须闭合，
       // 否则会话在后续压缩时永久失衡。
-      final bool interrupted = cancel.cancelled;
+      interrupted = cancel.cancelled;
+      turnOk = !interrupted && !result.isError;
       session?.append(
         kToolResultEvent,
         data: <String, Object?>{
@@ -2050,7 +2073,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       _foregroundInterrupt = null;
       _cancel = null;
       busy = false;
-      _endTurn();
+      _endTurn(ok: turnOk, interrupted: interrupted);
       await _afterTurn();
       _refresh();
     }

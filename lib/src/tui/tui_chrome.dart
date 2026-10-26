@@ -122,6 +122,7 @@ class TuiStatusBar extends StatelessComponent {
     required this.tick,
     this.turnElapsed,
     this.recentTurnDuration,
+    this.recentTurnStatus,
     required this.modelLabel,
     this.shellMode = false,
     this.location = '',
@@ -147,6 +148,9 @@ class TuiStatusBar extends StatelessComponent {
 
   /// 最近一轮完成时长（完成后 15 秒内）。
   final Duration? recentTurnDuration;
+
+  /// 最近一轮状态：`✓ 完成` / `✗ 失败` / `⏹ 已中断`。
+  final String? recentTurnStatus;
 
   /// 当前模型标签（左段）。
   final String modelLabel;
@@ -308,7 +312,9 @@ class TuiStatusBar extends StatelessComponent {
   String get _statusText {
     if (busy) return '${tuiSpinner(tick)} 运行中 ${_elapsed(turnElapsed)}';
     final Duration? recent = recentTurnDuration;
-    if (recent != null) return '✓ 完成 ${_elapsed(recent)}';
+    if (recent != null) {
+      return '${recentTurnStatus ?? '✓ 完成'} ${_elapsed(recent)}';
+    }
     return '○ 等待输入';
   }
 

@@ -1033,6 +1033,7 @@ class _AgentTuiState extends State<AgentTui> {
             tick: _tick,
             turnElapsed: _controller.turnElapsed,
             recentTurnDuration: _controller.recentTurnDuration,
+            recentTurnStatus: _controller.recentTurnStatus,
             modelLabel: _controller.modelLabel,
             location: _location,
             contextText: formatContextUsage(
