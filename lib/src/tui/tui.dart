@@ -91,7 +91,8 @@ class _AgentTuiState extends State<AgentTui> {
     });
     _input.addListener(_onInputChanged);
     _spin = Timer.periodic(const Duration(milliseconds: 120), (_) {
-      if (_controller.busy && mounted) {
+      if (!mounted) return;
+      if (_controller.busy || _controller.recentTurnDuration != null) {
         setState(() => _tick++);
       }
     });
@@ -1030,6 +1031,8 @@ class _AgentTuiState extends State<AgentTui> {
             pickerOpen: _controller.picker.open || _controller.agentPicker.open,
             busy: _controller.busy,
             tick: _tick,
+            turnElapsed: _controller.turnElapsed,
+            recentTurnDuration: _controller.recentTurnDuration,
             modelLabel: _controller.modelLabel,
             location: _location,
             contextText: formatContextUsage(

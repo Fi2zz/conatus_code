@@ -85,5 +85,6 @@ void main() {
     await tester.pump();
 
     expect(tester.terminalState, containsText('运行中'));
+    expect(tester.terminalState, containsText('esc interrupt'));
   });
 }

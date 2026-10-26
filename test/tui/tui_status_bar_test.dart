@@ -88,7 +88,7 @@ void main() {
 
   test('状态栏三段：权限+模型 / 提示 / 位置+上下文', () async {
     final NoctermTester tester = await NoctermTester.create(
-      size: const Size(140, 24),
+      size: const Size(160, 24),
     );
     addTearDown(tester.dispose);
     await tester.pumpComponent(
@@ -106,7 +106,7 @@ void main() {
 
     expect(
       tester.terminalState,
-      containsText('○   ask_when_needed   doubao-seed-x'),
+      containsText('○ 等待输入   ask_when_needed   doubao-seed-x'),
     );
     expect(tester.terminalState, containsText('~/REPO/conatus master'));
     expect(tester.terminalState, containsText('ctx 299k/1M (30%)'));
@@ -136,7 +136,7 @@ void main() {
     expect(tester.terminalState, containsText('再按一次 Ctrl+C 退出'));
     expect(
       tester.terminalState,
-      containsText('○   Ask When Needed   mock'),
+      containsText('○ 等待输入   Ask When Needed   mock'),
     );
   });
 
@@ -153,8 +153,47 @@ void main() {
     );
     await tester.pump();
 
-    expect(tester.terminalState, containsText('mock'));
+    expect(tester.terminalState, containsText('○ 等待输入   mock'));
     expect(tester.terminalState, isNot(containsText('权限：')));
     expect(tester.terminalState, isNot(containsText('ctx ')));
+  });
+
+  test('运行中显示秒数与 esc interrupt', () async {
+    final NoctermTester tester = await NoctermTester.create(
+      size: const Size(120, 12),
+    );
+    addTearDown(tester.dispose);
+    await tester.pumpComponent(
+      const TuiStatusBar(
+        pickerOpen: false,
+        busy: true,
+        tick: 0,
+        turnElapsed: Duration(seconds: 7),
+        modelLabel: 'mock',
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.terminalState, containsText('运行中 7s'));
+    expect(tester.terminalState, containsText('esc interrupt'));
+  });
+
+  test('完成后显示 ✓ 完成与时长', () async {
+    final NoctermTester tester = await NoctermTester.create(
+      size: const Size(120, 12),
+    );
+    addTearDown(tester.dispose);
+    await tester.pumpComponent(
+      const TuiStatusBar(
+        pickerOpen: false,
+        busy: false,
+        tick: 0,
+        recentTurnDuration: Duration(seconds: 12),
+        modelLabel: 'mock',
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.terminalState, containsText('✓ 完成 12s'));
   });
 }

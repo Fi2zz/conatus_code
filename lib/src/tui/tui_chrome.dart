@@ -59,7 +59,7 @@ class TuiInputBar extends StatelessComponent {
   /// 占位提示：排队反馈 / 思考中可输入 / shell 模式 / 普通输入。
   String _placeholder() {
     if (busy && queuedCount > 0) return '已排队 $queuedCount 条，回车继续排队';
-    if (busy) return '思考中…可继续输入，回车排队';
+    if (busy) return '模型运行中…可继续输入，回车排队';
     return shellMode
         ? shellInputPlaceholder()
         : '输入消息，/help 查看命令（Shift+Enter 换行）';
@@ -120,6 +120,8 @@ class TuiStatusBar extends StatelessComponent {
     required this.pickerOpen,
     required this.busy,
     required this.tick,
+    this.turnElapsed,
+    this.recentTurnDuration,
     required this.modelLabel,
     this.shellMode = false,
     this.location = '',
@@ -139,6 +141,12 @@ class TuiStatusBar extends StatelessComponent {
 
   /// 动画帧计数。
   final int tick;
+
+  /// 当前轮已运行时长（busy 时）。
+  final Duration? turnElapsed;
+
+  /// 最近一轮完成时长（完成后 15 秒内）。
+  final Duration? recentTurnDuration;
 
   /// 当前模型标签（左段）。
   final String modelLabel;
@@ -203,7 +211,7 @@ class TuiStatusBar extends StatelessComponent {
     } else if (menuOpen) {
       return '[↑↓] 选择命令 | [Enter] 运行 | [Tab] 补全 | [Esc] 关闭';
     } else if (busy) {
-      return '${tuiSpinner(tick)} 模型运行中${tuiDots(tick)} | 可继续输入排队 | Esc 打断';
+      return '■■■····  esc interrupt';
     } else if (hasSelection) {
       return Platform.isMacOS
           ? '已自动复制到系统剪贴板 | /help 命令'
@@ -266,16 +274,16 @@ class TuiStatusBar extends StatelessComponent {
                   padding: EdgeInsets.symmetric(
                     horizontal: _kSegmentGap.toDouble(),
                   ),
-                  child: Text(
-                    hint,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(
-                      color: busy
-                          ? NavaTheme.palette.warning
-                          : NavaTheme.palette.muted,
-                    ),
-                  ),
+                  child: busy
+                      ? _runningIndicator()
+                      : Text(
+                          hint,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: NavaTheme.palette.muted,
+                          ),
+                        ),
                 )
               : const SizedBox(),
         ),
@@ -296,9 +304,46 @@ class TuiStatusBar extends StatelessComponent {
     return '$_statusText$permission   $modelLabel';
   }
 
-  /// 当前运行状态：空闲显示 `○`，运行中显示 spinner + 「运行中」。
-  String get _statusText =>
-      busy ? '${tuiSpinner(tick)} 运行中' : '○';
+  /// 当前运行状态：运行中带秒数；完成 15 秒内显示时长；否则等待输入。
+  String get _statusText {
+    if (busy) return '${tuiSpinner(tick)} 运行中 ${_elapsed(turnElapsed)}';
+    final Duration? recent = recentTurnDuration;
+    if (recent != null) return '✓ 完成 ${_elapsed(recent)}';
+    return '○ 等待输入';
+  }
+
+  /// 忙时的方块扫描动画 + `esc interrupt`。
+  Component _runningIndicator() {
+    const int cells = 7;
+    final int phase = (tick ~/ 3) % (cells * 2);
+    final int center = phase < cells ? phase : cells * 2 - phase - 1;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Component>[
+        for (int index = 0; index < cells; index++)
+          Text(
+            (index - center).abs() <= 1 ? '■' : '·',
+            style: TextStyle(
+              color: (index - center).abs() == 0
+                  ? NavaTheme.palette.danger
+                  : (index - center).abs() == 1
+                      ? NavaTheme.palette.error
+                      : NavaTheme.palette.faint,
+            ),
+          ),
+        Text(
+          '  esc interrupt',
+          style: TextStyle(color: NavaTheme.palette.muted),
+        ),
+      ],
+    );
+  }
+
+  String _elapsed(Duration? duration) {
+    final int seconds = duration?.inSeconds ?? 0;
+    if (seconds < 60) return '${seconds}s';
+    return '${seconds ~/ 60}m ${seconds % 60}s';
+  }
 
   /// 右段：目录 + 分支 + 上下文用量。
   String _rightText() {

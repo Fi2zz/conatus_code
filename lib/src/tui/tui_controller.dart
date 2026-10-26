@@ -478,6 +478,39 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 是否有在途轮次。
   bool busy = false;
 
+  DateTime? _turnStartedAt;
+  DateTime? _turnFinishedAt;
+  Duration? _lastTurnDuration;
+
+  /// 当前轮已运行时长；空闲时为 null。
+  Duration? get turnElapsed => _turnStartedAt == null
+      ? null
+      : DateTime.now().difference(_turnStartedAt!);
+
+  /// 最近一轮的完成时长；只在完成后 15 秒内返回（用于状态栏「✓ 完成」）。
+  Duration? get recentTurnDuration {
+    final DateTime? finished = _turnFinishedAt;
+    if (finished == null) return null;
+    if (DateTime.now().difference(finished) > const Duration(seconds: 15)) {
+      return null;
+    }
+    return _lastTurnDuration;
+  }
+
+  void _beginTurn() {
+    _turnStartedAt = DateTime.now();
+    _turnFinishedAt = null;
+    _lastTurnDuration = null;
+  }
+
+  void _endTurn() {
+    final DateTime now = DateTime.now();
+    final DateTime? started = _turnStartedAt;
+    _turnStartedAt = null;
+    _turnFinishedAt = now;
+    _lastTurnDuration = started == null ? null : now.difference(started);
+  }
+
   /// 排队中的用户输入（busy 时入队，收口后依次投递；上限 [kMessageQueueCap]）。
   final List<(String, List<TuiAttachment>)> _queue =
       <(String, List<TuiAttachment>)>[];
@@ -1204,6 +1237,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 新 prompt 即提交：撤销点与待回填内容作废（/redo 不再可用）。
     _revertStage = null;
     _prefill = null;
+    _beginTurn();
     busy = true;
     _refresh();
     // 等 turn 0 基线落盘再开跑：快照边写边读工作区，飞行中被工具改动会
@@ -1234,6 +1268,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       // 运行记录已是终态。
       _settleCronRuns(ok: turnOk, reply: reply);
       busy = false;
+      _endTurn();
       await _afterTurn();
       _refresh();
     }
@@ -1970,6 +2005,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       cancel.cancel();
       if (tool is SpawnAgentTool) tool.interrupt();
     };
+    _beginTurn();
     busy = true;
     transcript.add(TuiRole.system, '命令 /$name 以前台子 Agent 执行，请稍候。');
     _refresh();
@@ -2014,6 +2050,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       _foregroundInterrupt = null;
       _cancel = null;
       busy = false;
+      _endTurn();
       await _afterTurn();
       _refresh();
     }
