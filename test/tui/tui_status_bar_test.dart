@@ -106,7 +106,7 @@ void main() {
 
     expect(
       tester.terminalState,
-      containsText('ask_when_needed   doubao-seed-x'),
+      containsText('○   ask_when_needed   doubao-seed-x'),
     );
     expect(tester.terminalState, containsText('~/REPO/conatus master'));
     expect(tester.terminalState, containsText('ctx 299k/1M (30%)'));
@@ -134,7 +134,10 @@ void main() {
     await tester.pump();
 
     expect(tester.terminalState, containsText('再按一次 Ctrl+C 退出'));
-    expect(tester.terminalState, containsText('Ask When Needed   mock'));
+    expect(
+      tester.terminalState,
+      containsText('○   Ask When Needed   mock'),
+    );
   });
 
   test('状态栏缺省：无权限/位置/上下文时不显示对应段', () async {

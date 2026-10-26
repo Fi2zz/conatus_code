@@ -203,7 +203,7 @@ class TuiStatusBar extends StatelessComponent {
     } else if (menuOpen) {
       return '[↑↓] 选择命令 | [Enter] 运行 | [Tab] 补全 | [Esc] 关闭';
     } else if (busy) {
-      return '${tuiSpinner(tick)} 思考中${tuiDots(tick)}';
+      return '${tuiSpinner(tick)} 模型运行中${tuiDots(tick)} | 可继续输入排队 | Esc 打断';
     } else if (hasSelection) {
       return Platform.isMacOS
           ? '已自动复制到系统剪贴板 | /help 命令'
@@ -236,15 +236,25 @@ class TuiStatusBar extends StatelessComponent {
       children: <Component>[
         Row(
           children: <Component>[
+            Text(
+              _statusText,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                color: busy
+                    ? NavaTheme.palette.warning
+                    : NavaTheme.palette.muted,
+              ),
+            ),
             if (permissionLabel.isNotEmpty)
               Text(
-                permissionLabel,
+                '   $permissionLabel',
                 maxLines: 1,
                 softWrap: false,
                 style: TextStyle(color: NavaTheme.palette.warning),
               ),
             Text(
-              permissionLabel.isEmpty ? modelLabel : '   $modelLabel',
+              '   $modelLabel',
               maxLines: 1,
               softWrap: false,
             ),
@@ -279,12 +289,16 @@ class TuiStatusBar extends StatelessComponent {
     );
   }
 
-  /// 左段：权限模式 + 模型标签。
+  /// 左段：运行状态 + 权限模式 + 模型标签。
   String _leftText() {
-    return permissionLabel.isEmpty
-        ? modelLabel
-        : '$permissionLabel   $modelLabel';
+    final String permission =
+        permissionLabel.isEmpty ? '' : '   $permissionLabel';
+    return '$_statusText$permission   $modelLabel';
   }
+
+  /// 当前运行状态：空闲显示 `○`，运行中显示 spinner + 「运行中」。
+  String get _statusText =>
+      busy ? '${tuiSpinner(tick)} 运行中' : '○';
 
   /// 右段：目录 + 分支 + 上下文用量。
   String _rightText() {
