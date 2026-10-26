@@ -6,6 +6,7 @@
 library;
 
 import 'dart:io' as io;
+import 'dart:typed_data';
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:dart_io_sandbox/dart_io_sandbox.dart';
@@ -55,6 +56,18 @@ class JailedFileSystem implements FileSystem {
     } on FormatException {
       throw FsError(FsErrorCode.notText,
           'invalid UTF-8: "${target.displayPath}"');
+    } on io.FileSystemException catch (e) {
+      throw mapFsException(e, target);
+    }
+  }
+
+  @override
+  Future<Uint8List> readBytes(FsTarget target) async {
+    checkWithinRoot(_root, target);
+    try {
+      return await _jail.file(target.targetKey).readAsBytes();
+    } on SandboxError catch (e) {
+      throw FsError(FsErrorCode.sandboxDenied, e.toString());
     } on io.FileSystemException catch (e) {
       throw mapFsException(e, target);
     }

@@ -14,6 +14,7 @@
 library;
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
@@ -61,6 +62,9 @@ class ReadOnlyPathGuard implements FileSystem {
 
   @override
   Future<String> readText(FsTarget target) => inner.readText(target);
+
+  @override
+  Future<Uint8List> readBytes(FsTarget target) => inner.readBytes(target);
 
   @override
   Future<List<FsDirEntry>> listDir(FsTarget target) => inner.listDir(target);

@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+- **`read_file` 支持图片与 PDF**：png/jpg/gif/webp 以 `ToolImage` 附件返回，
+  PDF 以 `ToolFile` 返回（上限 20 MiB）；图片进入下一轮模型消息。PDF 在
+  Anthropic / OpenAI Responses 走文件块，Chat 协议降级为文本提示。文本读取
+  行为不变；二进制读取经受 `FileSystem.readBytes` 接缝，jail / `.opencode`
+  只读闸门同样生效。
+
 - **`extra_skill_dirs` / `merge_all_available_skills` 接线**：额外技能目录现在
   真正进入 `provideSkillFilesystem`（相对 workdir / `~` / 绝对路径，rank 300）；
   `merge_all_available_skills = true` 会把 `disable-model-invocation` 的技能
