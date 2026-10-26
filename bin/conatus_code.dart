@@ -125,10 +125,16 @@ Future<void> main(List<String> args) async {
       stderr.writeln('OS 沙箱后端不可用（命令执行将禁用）：${error.message}');
     }
   }
+  final List<ResolvedReference> references = resolveReferences(
+    config.references,
+    workdir: workdir,
+    onWarning: stderr.writeln,
+  );
   final SandboxLayers layers = resolveSandboxLayers(
     root: canonicalRoot,
     settings: config.sandbox,
     backend: backend,
+    readOnlyPaths: <String>[for (final ResolvedReference ref in references) ref.path],
   );
 
   final String? defaultModel = config.llm.defaultModel;
@@ -186,6 +192,7 @@ Future<void> main(List<String> args) async {
     approvalMode: config.approval.mode,
     instructions: config.instructions,
     configWarnings: config.deprecations,
+    references: references,
     harness: harness,
   );
 

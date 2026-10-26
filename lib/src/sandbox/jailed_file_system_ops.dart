@@ -14,6 +14,14 @@ void checkWithinRoot(String root, FsTarget target) {
   }
 }
 
+/// 读取路径可命中多个根中的任意一个；写入仍只走单根检查。
+void checkWithinAnyRoot(List<String> roots, FsTarget target) {
+  for (final String root in roots) {
+    if (withinRoot(root, target.targetKey)) return;
+  }
+  throw FsError(FsErrorCode.sandboxDenied, '路径越界：${target.displayPath}');
+}
+
 bool withinRoot(String root, String path) =>
     path == root || path.startsWith('$root/');
 

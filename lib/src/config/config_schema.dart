@@ -381,6 +381,24 @@ class CustomToolConfig {
   bool get isCommand => command != null;
 }
 
+/// 一个命名外部目录；对应 `[references.<别名>]`。
+class ReferenceConfig {
+  const ReferenceConfig({
+    required this.name,
+    required this.path,
+    this.description = '',
+  });
+
+  /// 别名（模型看到的引用名）。
+  final String name;
+
+  /// 目录路径（相对 `[agent] workdir` / 绝对路径 / `~`）。
+  final String path;
+
+  /// 给模型的用途说明。
+  final String description;
+}
+
 /// 检查点存储后端。
 enum CheckpointBackend {
   /// 有 git 用影子仓库，没有就用自研归档（缺省）。
@@ -561,6 +579,7 @@ class ConatusCodeConfig {
     this.credentials = const <String, String>{},
     this.mcp = const McpConfig(),
     this.tools = const <CustomToolConfig>[],
+    this.references = const <ReferenceConfig>[],
     this.checkpoint = const CheckpointConfig(),
     this.xerj = const XerjConfig(),
     this.hooks = const HooksConfig(),
@@ -601,6 +620,9 @@ class ConatusCodeConfig {
 
   /// 顶层 `[[tools]]`：声明式 CLI / HTTP 自定义工具。
   final List<CustomToolConfig> tools;
+
+  /// `[references.<别名>]`：命名的外部只读目录。
+  final List<ReferenceConfig> references;
 
   /// `[checkpoint]` 表。
   final CheckpointConfig checkpoint;

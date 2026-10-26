@@ -136,6 +136,7 @@ export 'src/config/config_schema.dart'
         PermissionConfig,
         ProviderConfig,
         ProviderType,
+        ReferenceConfig,
         RetrySettings,
         SandboxPreset,
         SandboxSettings,
@@ -247,6 +248,14 @@ export 'src/mcp/mcp_prompt_commands.dart'
 export 'src/permissions/permission_rule_pattern.dart'
     show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;
+export 'src/references/references.dart'
+    show
+        ResolvedReference,
+        kReferenceSectionName,
+        kReferenceSectionOrder,
+        provideReferencePrompt,
+        renderReferences,
+        resolveReferences;
 export 'src/revert/revert_service.dart' show RevertService;
 export 'src/revert/revert_stage.dart'
     show RedoResult, RevertException, RevertStage, UndoResult;

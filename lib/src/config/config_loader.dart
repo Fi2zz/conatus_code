@@ -49,6 +49,11 @@ const String kDefaultConfigToml = '''
 # capabilities = [ "always_thinking", "tool_use" ]
 # max_context_size = 1000000
 
+# 命名外部目录（只读）：相对 [agent] workdir / 绝对路径 / ~。
+# [references.docs]
+# path = "../product-docs"
+# description = "产品文档，用于术语与行为说明"
+
 # 额外技能目录（可选）：相对 [agent] workdir 或绝对路径 / ~。
 # extra_skill_dirs = ["/path/to/skills"]
 # true = 把 disable-model-invocation 的技能也放进模型可见目录（缺省 false）。

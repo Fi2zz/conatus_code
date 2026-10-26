@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **命名外部目录（`[references.*]`）**：`path` / `description` 注入 system prompt，
+  模型可按绝对路径读取；JailedFileSystem 把 references 加入只读读允许面，
+  写入 / 编辑 / 删除一律拒绝。只支持本地目录，git reference 配置会报错。
+
 - **全局 Claude Desktop MCP**：运行时读取
   `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）、
   `~/.config/Claude/` 或 `%APPDATA%/Claude/`；同名优先级低于

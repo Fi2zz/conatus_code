@@ -197,6 +197,23 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
 - `--write` 走 `writeConfigFile`：原子写、权限 0600；写入前先校验合并结果仍是
   合法 TOML。
 
+## 命名外部目录（`[references.*]`）
+
+把工作区外的目录以别名暴露给模型，用于产品文档、共享库、另一个仓库等：
+
+```toml
+[references.docs]
+path = "../product-docs"      # 相对 [agent] workdir / 绝对路径 / ~
+description = "产品文档，用于术语与行为说明"
+```
+
+- 启动时解析为真实路径；目录不存在只告警跳过。
+- 别名、绝对路径与说明注入 system prompt，模型用 `read_file` / `rg` / `glob`
+  按绝对路径读取。
+- **只读**：references 不进入可写面；`write_file` / `edit_file` / `apply_patch`
+  / 删除对它们一律拒绝。
+- 只支持本地目录；`repository` 形式的 git reference 暂不支持（配置会报错）。
+
 ## 检查点与回滚（`/rewind`）
 
 每轮收口后对工作区文件做快照：**turn 0 全量 base + 各轮相对 base 的差量**

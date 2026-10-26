@@ -49,6 +49,24 @@ void main() {
     expect(File('${root.path}/b.txt').readAsStringSync(), 'content');
   });
 
+  test('references：外部目录可读，写入 / 删除被拒', () async {
+    final Directory reference = Directory.systemTemp.createTempSync('cc-ref-');
+    addTearDown(() {
+      if (reference.existsSync()) reference.deleteSync(recursive: true);
+    });
+    File('${reference.path}/doc.md').writeAsStringSync('ref content');
+    final JailedFileSystem withRef = JailedFileSystem(
+      root: root.path,
+      readOnlyPaths: <String>[reference.path],
+    );
+
+    final FsTarget target = await withRef.resolve('${reference.path}/doc.md');
+    expect(await withRef.readText(target), 'ref content');
+    _expectDenied(() async => withRef.writeText(target, 'x'));
+    _expectDenied(() async => withRef.remove(target));
+    expect(File('${reference.path}/doc.md').readAsStringSync(), 'ref content');
+  });
+
   test('写根内尚未创建的深层路径（中间目录不存在）成功', () async {
     // root 取自 Directory.systemTemp：macOS 上是 /var/... 别名，真实路径为
     // /private/var/...。目标父链不存在时 LocalFileSystem 给不出 realpath，

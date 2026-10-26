@@ -20,13 +20,19 @@ class JailedFileSystem implements FileSystem {
     required String root,
     SandboxPolicy? policy,
     SandboxAccessHook? onAccess,
+    List<String> readOnlyPaths = const <String>[],
   })  : _root = io.Directory(root).resolveSymbolicLinksSync(),
-        _policy = policy ?? const SandboxPolicy(),
+        _readRoots = _readRootsFor(root, readOnlyPaths),
+        _policy = _policyFor(root, readOnlyPaths, policy),
         _onAccess = onAccess,
         _raw = LocalFileSystem(cwd: root);
 
   /// 规范化后的沙箱根（真实路径）。
   final String _root;
+
+  /// 读取允许的根：沙箱根 + 只读 references。
+  final List<String> _readRoots;
+
   final SandboxPolicy _policy;
   final SandboxAccessHook? _onAccess;
 
@@ -42,13 +48,14 @@ class JailedFileSystem implements FileSystem {
   @override
   Future<FsTarget> resolve(String path, {String? cwd}) async {
     final FsTarget target = await _raw.resolve(path, cwd: cwd);
-    checkWithinRoot(_root, target);
+    checkWithinAnyRoot(_readRoots, target);
     return target;
   }
 
   @override
   Future<String> readText(FsTarget target) async {
-    checkWithinRoot(_root, target);
+    checkWithinAnyRoot(_readRoots, target);
+    if (!withinRoot(_root, target.targetKey)) return _raw.readText(target);
     try {
       return await _jail.file(target.targetKey).readAsString();
     } on SandboxError catch (e) {
@@ -63,7 +70,8 @@ class JailedFileSystem implements FileSystem {
 
   @override
   Future<Uint8List> readBytes(FsTarget target) async {
-    checkWithinRoot(_root, target);
+    checkWithinAnyRoot(_readRoots, target);
+    if (!withinRoot(_root, target.targetKey)) return _raw.readBytes(target);
     try {
       return await _jail.file(target.targetKey).readAsBytes();
     } on SandboxError catch (e) {
@@ -75,7 +83,8 @@ class JailedFileSystem implements FileSystem {
 
   @override
   Future<List<FsDirEntry>> listDir(FsTarget target) async {
-    checkWithinRoot(_root, target);
+    checkWithinAnyRoot(_readRoots, target);
+    if (!withinRoot(_root, target.targetKey)) return _raw.listDir(target);
     return listDirFor(_jail, _raw, target);
   }
 
@@ -140,7 +149,7 @@ class JailedFileSystem implements FileSystem {
 
   @override
   Future<FsInfo?> stat(FsTarget target) async {
-    checkWithinRoot(_root, target);
+    checkWithinAnyRoot(_readRoots, target);
     return _raw.stat(target);
   }
 
@@ -172,4 +181,41 @@ class JailedFileSystem implements FileSystem {
       throw mapFsException(e, target);
     }
   }
+}
+
+List<String> _readRootsFor(String root, List<String> readOnlyPaths) {
+  final List<String> roots = <String>[
+    io.Directory(root).resolveSymbolicLinksSync(),
+  ];
+  for (final String path in readOnlyPaths) {
+    final io.Directory directory = io.Directory(path);
+    if (!directory.existsSync()) continue;
+    try {
+      roots.add(directory.resolveSymbolicLinksSync());
+    } on io.FileSystemException {
+      // 无法解析的 path 不进入读允许面；调用方已在上层告警。
+    }
+  }
+  return roots;
+}
+
+SandboxPolicy _policyFor(
+  String root,
+  List<String> readOnlyPaths,
+  SandboxPolicy? policy,
+) {
+  if (readOnlyPaths.isEmpty) return policy ?? const SandboxPolicy();
+  final SandboxPolicy base = policy ?? const SandboxPolicy();
+  return SandboxPolicy(
+    readOnly: base.readOnly,
+    allowProcess: base.allowProcess,
+    allowNetwork: base.allowNetwork,
+    allowedPaths: <String>[
+      ...base.allowedPaths,
+      root,
+      ...readOnlyPaths,
+    ],
+    deniedPaths: base.deniedPaths,
+    allowedExecutables: base.allowedExecutables,
+  );
 }

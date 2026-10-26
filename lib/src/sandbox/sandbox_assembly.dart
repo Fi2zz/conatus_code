@@ -34,9 +34,11 @@ SandboxLayers resolveSandboxLayers({
   required String root,
   required SandboxSettings settings,
   SandboxBackend? backend,
+  List<String> readOnlyPaths = const <String>[],
 }) {
-  final FileSystem? fs =
-      settings.fsJail ? JailedFileSystem(root: root) : null;
+  final FileSystem? fs = settings.fsJail
+      ? JailedFileSystem(root: root, readOnlyPaths: readOnlyPaths)
+      : null;
   if (!settings.enabled) return SandboxLayers(fs: fs);
   if (settings.preset == SandboxPreset.dangerFullAccess) {
     // 显式无 OS 沙箱：shell 为 null 表示回本地直执；Layer 1 与命令策略不受影响。

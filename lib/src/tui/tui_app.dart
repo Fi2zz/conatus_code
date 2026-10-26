@@ -45,6 +45,7 @@ import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
 import '../mcp/mcp_prompt_commands.dart';
 import '../permissions/permission_wiring.dart';
+import '../references/references.dart';
 import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
@@ -215,6 +216,7 @@ class ConatusTuiRuntime {
     ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
     List<String> instructions = const <String>[],
     List<String> configWarnings = const <String>[],
+    List<ResolvedReference> references = const <ResolvedReference>[],
     String? instructionHome,
     HarnessManifest? harness,
   }) async {
@@ -759,6 +761,7 @@ class ConatusTuiRuntime {
       );
     }
     provideTimePrompt(app);
+    provideReferencePrompt(app, references);
     provideMemory(
       app,
       backend: JsonMemoryBackend(

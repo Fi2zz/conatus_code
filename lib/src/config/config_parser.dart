@@ -31,6 +31,7 @@ class ConfigParser extends ConfigValues {
     credentials: _readCredentials(),
     mcp: _readMcp(),
     tools: _readTools(),
+    references: _readReferences(),
     checkpoint: _readCheckpoint(),
     xerj: _readXerj(),
     hooks: _readHooks(),
@@ -327,6 +328,34 @@ class ConfigParser extends ConfigValues {
   /// 顶层 `[[tools]]`：声明式 CLI / HTTP 工具。
   List<CustomToolConfig> _readTools() =>
       ToolConfigParser(raw, source).parse();
+
+  /// `[references.<别名>]`：本地目录；git 引用暂不支持。
+  List<ReferenceConfig> _readReferences() {
+    final Map<String, dynamic> table = readTable('references');
+    return <ReferenceConfig>[
+      for (final MapEntry<String, dynamic> entry in table.entries)
+        _readReference(entry.key, entry.value),
+    ];
+  }
+
+  ReferenceConfig _readReference(String name, Object? raw) {
+    if (raw is! Map) {
+      throw ConfigException('$source：references.$name 必须是表。');
+    }
+    final Map<String, dynamic> table = raw.cast<String, dynamic>();
+    final String? path = readString(table, 'path');
+    if (path == null) {
+      if (table['repository'] != null) {
+        throw ConfigException('$source：references.$name 的 git 引用暂不支持，请用 path。');
+      }
+      throw ConfigException('$source：references.$name.path 不能为空。');
+    }
+    return ReferenceConfig(
+      name: name,
+      path: path,
+      description: readString(table, 'description') ?? '',
+    );
+  }
 
   McpConfig _readMcp() {    final Map<String, dynamic> table = readTable('mcp');
     final Object? servers = table['servers'];
