@@ -225,6 +225,31 @@ void main() {
     expect(result.warnings.join('\n'), contains('oauth-only'));
   });
 
+  test('references：本地路径与 git 跳过', () {
+    final OpenCodeImport result = _build(<Map<String, Object?>>[
+      <String, Object?>{
+        'references': <String, Object?>{
+          'docs': '../product-docs',
+          'team': <String, Object?>{
+            'path': './team-docs',
+            'description': '团队文档',
+          },
+          'remote': <String, Object?>{'repository': 'acme/docs'},
+          'short-git': 'acme/docs',
+        },
+      },
+    ]);
+
+    expect(result.references, hasLength(2));
+    expect(result.references[0].name, 'docs');
+    expect(result.references[0].path, contains('product-docs'));
+    expect(result.references[1].name, 'team');
+    expect(result.references[1].path, contains('team-docs'));
+    expect(result.references[1].description, '团队文档');
+    expect(result.warnings.join('\n'), contains('remote'));
+    expect(result.warnings.join('\n'), contains('short-git'));
+  });
+
   test('instructions 追加；skills 本地目录保留，agents / commands 告警跳过', () {
     final OpenCodeImport result = _build(<Map<String, Object?>>[
       <String, Object?>{

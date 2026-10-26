@@ -71,6 +71,12 @@ OpenCodeImportPlan planOpenCodeImport({
     added,
     skipped,
   );
+  final List<ImportedReference> references = _planReferences(
+    import.references,
+    existing,
+    added,
+    skipped,
+  );
   final String updated = applyOpenCodeImport(
     toml,
     model: model,
@@ -80,6 +86,7 @@ OpenCodeImportPlan planOpenCodeImport({
     instructions: instructions,
     skillDirs: skillDirs,
     providers: providers,
+    references: references,
   );
   ensureImportParseable(updated);
   return OpenCodeImportPlan(
@@ -93,6 +100,7 @@ OpenCodeImportPlan planOpenCodeImport({
       instructions: instructions,
       skillDirs: skillDirs,
       providers: providers,
+      references: references,
     ).trim(),
     added: List<String>.unmodifiable(added),
     skipped: List<String>.unmodifiable(skipped),
@@ -211,8 +219,7 @@ List<ImportedProvider> _planProviders(
   Map<String, Object?> existing,
   List<String> added,
   List<String> skipped,
-) {
-  final List<ImportedProvider> result = <ImportedProvider>[];
+) {  final List<ImportedProvider> result = <ImportedProvider>[];
   for (final ImportedProvider provider in providers) {
     if (_hasPath(existing, <String>['providers', provider.name])) {
       skipped.add('provider ${provider.name}（已有）');
@@ -239,6 +246,24 @@ List<ImportedProvider> _planProviders(
       ),
     );
     added.add('provider ${provider.name}');
+  }
+  return result;
+}
+
+List<ImportedReference> _planReferences(
+  List<ImportedReference> references,
+  Map<String, Object?> existing,
+  List<String> added,
+  List<String> skipped,
+) {
+  final List<ImportedReference> result = <ImportedReference>[];
+  for (final ImportedReference reference in references) {
+    if (_hasPath(existing, <String>['references', reference.name])) {
+      skipped.add('reference ${reference.name}（已有）');
+      continue;
+    }
+    result.add(reference);
+    added.add('reference ${reference.name}');
   }
   return result;
 }

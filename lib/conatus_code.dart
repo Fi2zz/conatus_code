@@ -96,6 +96,7 @@ export 'src/cli/opencode_import_types.dart'
         ImportedModel,
         ImportedPermission,
         ImportedProvider,
+        ImportedReference,
         OpenCodeImport;
 export 'src/commands/command_definition.dart' show CommandDefinition;
 export 'src/commands/command_dispatcher.dart' show CommandDispatcher;

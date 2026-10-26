@@ -19,10 +19,14 @@ String applyOpenCodeImport(
   List<String> instructions = const <String>[],
   List<String> skillDirs = const <String>[],
   List<ImportedProvider> providers = const <ImportedProvider>[],
+  List<ImportedReference> references = const <ImportedReference>[],
 }) {
   String out = base;
   if (model != null) out = upsertDefaultModel(out, model);
   if (agent != null) out = _upsertAgentDefault(out, agent);
+  for (final ImportedReference reference in references) {
+    out = _append(out, _renderReference(reference));
+  }
   for (final ImportedProvider provider in providers) {
     out = appendProviderSection(
       out,
@@ -69,6 +73,17 @@ void ensureImportParseable(String toml) {
   } on TomlException catch (error) {
     throw FormatException('合并后的配置不是合法 TOML：$error');
   }
+}
+
+String _renderReference(ImportedReference reference) {
+  final StringBuffer buffer = StringBuffer(
+    '[references.${tomlKey(reference.name)}]\n',
+  );
+  buffer.write('path = "${tomlString(reference.path)}"\n');
+  if (reference.description.isNotEmpty) {
+    buffer.write('description = "${tomlString(reference.description)}"\n');
+  }
+  return buffer.toString();
 }
 
 String _upsertAgentDefault(String toml, String value) {

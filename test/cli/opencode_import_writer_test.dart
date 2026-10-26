@@ -177,6 +177,29 @@ type = "openai"
     expect(plan.skipped.join('\n'), contains('acme'));
   });
 
+  test('references 写入并可解析', () {
+    const OpenCodeImport imported = OpenCodeImport(
+      references: <ImportedReference>[
+        ImportedReference(
+          name: 'docs',
+          path: '/tmp/product-docs',
+          description: '产品文档',
+        ),
+      ],
+    );
+
+    final OpenCodeImportPlan plan = planOpenCodeImport(
+      toml: '',
+      import: imported,
+    );
+
+    _expectParseable(plan.updatedToml);
+    expect(plan.updatedToml, contains('[references.docs]'));
+    expect(plan.updatedToml, contains('path = "/tmp/product-docs"'));
+    expect(plan.updatedToml, contains('description = "产品文档"'));
+    expect(plan.added, <String>['reference docs']);
+  });
+
   test('非法 TOML 抛 FormatException', () {
     expect(
       () => planOpenCodeImport(toml: '[bad', import: _import()),

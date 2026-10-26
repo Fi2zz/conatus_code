@@ -26,6 +26,7 @@ class OpenCodeImport {
     this.instructions = const <String>[],
     this.skillDirs = const <String>[],
     this.providers = const <ImportedProvider>[],
+    this.references = const <ImportedReference>[],
     this.agents = const <ImportedAgent>[],
     this.commands = const <ImportedCommand>[],
     this.warnings = const <String>[],
@@ -38,6 +39,7 @@ class OpenCodeImport {
   final List<String> instructions;
   final List<String> skillDirs;
   final List<ImportedProvider> providers;
+  final List<ImportedReference> references;
   final List<ImportedAgent> agents;
   final List<ImportedCommand> commands;
   final List<String> warnings;
@@ -50,8 +52,22 @@ class OpenCodeImport {
       instructions.isEmpty &&
       skillDirs.isEmpty &&
       providers.isEmpty &&
+      references.isEmpty &&
       agents.isEmpty &&
       commands.isEmpty;
+}
+
+/// OpenCode `references.<name>` 里的一个本地目录。
+class ImportedReference {
+  const ImportedReference({
+    required this.name,
+    required this.path,
+    this.description = '',
+  });
+
+  final String name;
+  final String path;
+  final String description;
 }
 
 /// OpenCode `providers.<name>` 里可导入的一个提供商。
@@ -74,8 +90,7 @@ class ImportedProvider {
 }
 
 /// 提供商下的一个模型元数据。
-class ImportedModel {
-  const ImportedModel({
+class ImportedModel {  const ImportedModel({
     required this.model,
     this.displayName = '',
     this.maxContext = 0,

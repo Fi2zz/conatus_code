@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **OpenCode `references` 导入**：本地目录（字符串 `.` / `/` / `~` 开头，或
+  `{path, description}`）映射为 `[references.*]`；git reference 告警跳过。
+
 - **命名外部目录（`[references.*]`）**：`path` / `description` 注入 system prompt，
   模型可按绝对路径读取；JailedFileSystem 把 references 加入只读读允许面，
   写入 / 编辑 / 删除一律拒绝。只支持本地目录，git reference 配置会报错。

@@ -184,7 +184,8 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
   `skills`（本地目录 → `extra_skill_dirs`，HTTP catalog 告警跳过）、
   `providers`（`settings.baseURL` + `apiKey` / `{env:NAME}` 导入为
   `[providers.*]`，模型元数据导入为 `[models.*]`；只有 OAuth 登录态、没有
-  可读密钥的 provider 告警跳过）。
+  可读密钥的 provider 告警跳过）、`references`（本地目录 → `[references.*]`，
+  git reference 告警跳过）。
 - **JSON agents / commands 物化为 Markdown**：`agents.<id>` 写到
   `~/.nava/agents/<id>.md`（全局）或 `<workdir>/.nava/agents/<id>.md`（项目），
   `commands.<name>` 同理写到 `.nava/commands/`；现有 Agent / Command 注册表
@@ -192,7 +193,7 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
 - **不覆盖已有配置**：已有 `default_model` / `default_agent` / 同名 MCP /
   重复 permission 会跳过；顶层 `instructions` / `extra_skill_dirs` 已存在时
   整项跳过（不合并数组）。
-- `plugins` / `lsp` / `references` / `policies` / `formatter` / `tools`
+- `plugins` / `lsp` / `policies` / `formatter` / `tools`
   暂不支持，逐项告警。
 - `--write` 走 `writeConfigFile`：原子写、权限 0600；写入前先校验合并结果仍是
   合法 TOML。

@@ -254,6 +254,36 @@ void main() {
     expect(model.maxContext, 128000);
   });
 
+  test('references 导入后 loadConfig 可解析', () async {
+    final _Fixture fixture = _Fixture();
+    _write(
+      _path(fixture.project, 'opencode.json'),
+      '''
+{
+  "references": {
+    "docs": {
+      "path": "../product-docs",
+      "description": "产品文档",
+    },
+  },
+}
+''',
+    );
+
+    final int code = await fixture.run(<String>[
+      ...fixture.baseArgs(),
+      '--project-only',
+      '--write',
+    ]);
+
+    expect(code, 0);
+    final ConatusCodeConfig config = loadConfig(path: fixture.config);
+    final ReferenceConfig reference = config.references.single;
+    expect(reference.name, 'docs');
+    expect(reference.path, contains('product-docs'));
+    expect(reference.description, '产品文档');
+  });
+
   test('JSON agents / commands 物化为 .nava 定义并被注册表发现', () async {
     final _Fixture fixture = _Fixture();
     _write(
