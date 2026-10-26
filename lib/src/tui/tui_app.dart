@@ -49,6 +49,7 @@ import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
 import '../tools/code_tools.dart';
+import '../tools/custom_tools.dart';
 import 'ask_user_tool.dart';
 import 'system_notifier.dart';
 import 'tui_choice.dart';
@@ -196,6 +197,7 @@ class ConatusTuiRuntime {
     ShellExecutor? shellInteractive,
     Credentials? credentials,
     List<McpServerSpec>? mcpServers,
+    List<CustomToolConfig> customTools = const <CustomToolConfig>[],
     McpTransport Function(McpServerConfig config)? mcpTransportFactory,
     String? commandHome,
     bool interactive = true,
@@ -402,6 +404,17 @@ class ConatusTuiRuntime {
     if (webTools) {
       provideSearch(app, credentials: resolvedCredentials);
       provideWebTools(app, credentials: resolvedCredentials);
+    }
+
+    // ── 声明式自定义工具（[[tools]]）────────────────────────────
+    // 用户显式配置的 CLI / HTTP 受信端；默认 high 风险，进审批。
+    if (customTools.isNotEmpty) {
+      provideCustomTools(
+        app,
+        tools: customTools,
+        workdir: resolvedWorkdir,
+        credentials: resolvedCredentials,
+      );
     }
 
     // ── MCP server（config.toml [mcp.servers.*]）─────────────────

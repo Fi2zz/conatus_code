@@ -67,9 +67,12 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     skillsRequested = skillsRequested || values.containsKey('skills');
   }
   for (final String key in _ignoredKeys) {
-    if (ignored.contains(key)) {
-      warnings.add('opencode 的 $key 暂不支持，已忽略。');
+    if (!ignored.contains(key)) continue;
+    if (key == 'plugins') {
+      warnings.add('opencode 的 plugins 暂不支持（自定义工具请用 [[tools]] 或 MCP 包装）。');
+      continue;
     }
+    warnings.add('opencode 的 $key 暂不支持，已忽略。');
   }
   if (skillsRequested) {
     warnings.add(

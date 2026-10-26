@@ -11,6 +11,7 @@ import 'package:conatus_agent/conatus_agent.dart'
 import 'package:conatus_mcp/conatus_mcp.dart' show McpOAuthConfig;
 
 import 'config_schema.dart';
+import 'config_tools_parser.dart';
 import 'config_values.dart';
 
 /// 结构映射：逐表读取，字段缺失即用默认值，取值非法即抛 [ConfigException]。
@@ -31,6 +32,7 @@ class ConfigParser extends ConfigValues {
     thinking: _readThinking(),
     services: _readServices(),
     mcp: _readMcp(),
+    tools: _readTools(),
     checkpoint: _readCheckpoint(),
     xerj: _readXerj(),
     hooks: _readHooks(),
@@ -183,8 +185,7 @@ class ConfigParser extends ConfigValues {
   }
 
   /// 顶层 `[[permissions]]`：`action` / `resource` / `effect` 三项必填。
-  PermissionConfig _readPermissions() {
-    final List<Map<String, dynamic>> tables = readTableList('permissions');
+  PermissionConfig _readPermissions() {    final List<Map<String, dynamic>> tables = readTableList('permissions');
     return PermissionConfig(
       rules: <PermissionRule>[
         for (final Map<String, dynamic> table in tables) _readPermission(table),
@@ -326,8 +327,11 @@ class ConfigParser extends ConfigValues {
     );
   }
 
-  McpConfig _readMcp() {
-    final Map<String, dynamic> table = readTable('mcp');
+  /// 顶层 `[[tools]]`：声明式 CLI / HTTP 工具。
+  List<CustomToolConfig> _readTools() =>
+      ToolConfigParser(raw, source).parse();
+
+  McpConfig _readMcp() {    final Map<String, dynamic> table = readTable('mcp');
     final Object? servers = table['servers'];
     if (servers == null) return const McpConfig();
     if (servers is! Map) {

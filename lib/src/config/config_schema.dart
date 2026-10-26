@@ -2,6 +2,8 @@
 library;
 
 import 'package:conatus_agent/conatus_agent.dart' show PermissionRule;
+import 'package:conatus_foundation/conatus_foundation.dart'
+    show ParamSpec, ToolRisk;
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_mcp/conatus_mcp.dart' show McpOAuthConfig;
 
@@ -378,6 +380,67 @@ class McpConfig {
   final List<McpServerSpec> servers;
 }
 
+/// 一条声明式自定义工具；对应顶层 `[[tools]]`。
+///
+/// 后端二选一：`command`（子进程，JSON 走 stdin/stdout）或 `url`（HTTP，
+/// JSON 走请求体/响应体）。声明式工具是**用户显式配置的受信端**，默认风险
+/// `high`（进审批），与 MCP server 同姿态。
+class CustomToolConfig {
+  const CustomToolConfig({
+    required this.name,
+    required this.description,
+    this.command,
+    this.args = const <String>[],
+    this.url,
+    this.method = 'POST',
+    this.headers = const <String, String>{},
+    this.env = const <String, String>{},
+    this.cwd,
+    this.timeoutMs = 30000,
+    this.risk = ToolRisk.high,
+    this.params = const <ParamSpec>[],
+  });
+
+  /// 工具名（注册表键，也是模型看到的函数名）。
+  final String name;
+
+  /// 面向模型的说明。
+  final String description;
+
+  /// CLI 后端可执行文件；与 [url] 二选一。
+  final String? command;
+
+  /// CLI 参数。
+  final List<String> args;
+
+  /// HTTP 后端地址；与 [command] 二选一。
+  final String? url;
+
+  /// HTTP 方法（缺省 POST）。
+  final String method;
+
+  /// HTTP 请求头；值支持 `${KEY}` 凭据占位符。
+  final Map<String, String> headers;
+
+  /// CLI 子进程环境变量；值支持 `${KEY}` 凭据占位符。
+  final Map<String, String> env;
+
+  /// CLI 工作目录（相对 `[agent] workdir`，`~` 可展开）。
+  final String? cwd;
+
+  /// 单次调用超时（毫秒）。
+  final int timeoutMs;
+
+  /// 风险等级：low / medium / high。
+  final ToolRisk risk;
+
+  /// 参数声明（模型 schema 与参数校验共用）。
+  final List<ParamSpec> params;
+
+  /// 是否 CLI 后端。
+  bool get isCommand => command != null;
+}
+
 /// 检查点存储后端。
 enum CheckpointBackend {
   /// 有 git 用影子仓库，没有就用自研归档（缺省）。
@@ -577,6 +640,7 @@ class ConatusCodeConfig {
     this.thinking = const ThinkingConfig(),
     this.services = const <ServiceConfig>[],
     this.mcp = const McpConfig(),
+    this.tools = const <CustomToolConfig>[],
     this.checkpoint = const CheckpointConfig(),
     this.xerj = const XerjConfig(),
     this.hooks = const HooksConfig(),
@@ -622,6 +686,9 @@ class ConatusCodeConfig {
 
   /// `[mcp]` 表。
   final McpConfig mcp;
+
+  /// 顶层 `[[tools]]`：声明式 CLI / HTTP 自定义工具。
+  final List<CustomToolConfig> tools;
 
   /// `[checkpoint]` 表。
   final CheckpointConfig checkpoint;

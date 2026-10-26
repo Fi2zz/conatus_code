@@ -544,6 +544,43 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
 - 接入第三方插件（Markdown 技能包 / MCP server / CLI 脚本 / 纯库）的分档指南：
   [docs/plugin-integration.md](docs/plugin-integration.md)。
 
+## 声明式自定义工具（`[[tools]]`）
+
+nava 是 AOT 二进制，**不运行 OpenCode / Claude 的 JS 插件**。要把自定义工具接进来，
+用声明式 `[[tools]]` 把它包成 CLI 子进程或 HTTP 端点——脚本本身可以是 Node、Python、
+Go、shell，只要能读写 JSON。
+
+```toml
+[[tools]]
+name = "deploy"
+description = "Deploy a service to an environment"
+command = "node"
+args = ["tools/deploy.mjs"]
+risk = "high"             # low / medium / high；缺省 high
+timeout_ms = 30000
+cwd = "tools"             # 相对 [agent] workdir
+env = { TOKEN = "${TOKEN}" }
+
+[[tools.params]]
+name = "environment"
+type = "string"           # string / integer / number / boolean / enum
+required = true
+description = "target environment"
+```
+
+- **CLI 协议**：模型参数以 `{"name":"deploy","arguments":{...}}` 从 stdin 传入；
+  stdout 返回 `{"content":"..."}`、`{"error":{"code":"...","message":"..."}}`、
+  `{"value":...}` 或纯文本。非零退出码 → `TOOL_EXIT`，超时 → `TOOL_TIMEOUT`。
+- **HTTP 协议**：同样的 JSON 作为请求体发到 `url`（`method` 缺省 `POST`），
+  2xx 响应按同一条输出协议解析；非 2xx → `TOOL_HTTP`。`headers` / `env`
+  支持 `${KEY}` 凭据占位符。
+- **参数 schema** 用 `[[tools.params]]` 显式声明，模型据此调用；支持
+  `string` / `integer` / `number` / `boolean` / `enum`。
+- **安全**：自定义工具是用户显式配置的受信端，CLI 子进程**不走** Layer 2 沙箱，
+  HTTP 请求也不受命令沙箱约束；缺省 `high` 风险，走审批。只接你信任的脚本/端点。
+- OpenCode 插件里的 `ctx.tool.transform` 自定义工具无法自动转换；把它的入口
+  写成 CLI（读 stdin JSON、写 stdout JSON）或用 MCP 包装即可复用。
+
 ## 模型提供商（`/provider` / `/model`）
 
 提供商在 `~/.nava/config.toml` 的 `[providers.<名字>]` 表里定义

@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+- **声明式自定义工具（`[[tools]]`）**：CLI（JSON stdin/stdout）或 HTTP（JSON
+  body）后端，`[[tools.params]]` 显式声明 string / integer / number / boolean /
+  enum 参数；默认 `high` 风险进审批，支持 `${KEY}` 凭据占位符、cwd、env、
+  timeout。CLI 非零退出码 → `TOOL_EXIT`，超时 → `TOOL_TIMEOUT`，HTTP 非 2xx
+  → `TOOL_HTTP`。OpenCode JS 插件工具可用 CLI/HTTP 包装层接入。
+
 - **`nava import opencode`**：显式导入 `opencode.json(c)`（全局 + 项目祖先 +
   `.opencode`，JSONC），映射 `model` / `default_agent` / `mcp.servers` /
   `permissions` / `instructions` 到 nava config.toml；JSON `agents` / `commands`

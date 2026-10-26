@@ -44,8 +44,39 @@ void main() {
     await runtime.dispose();
   });
 
-  test('装配后 system 带日期锚点，get_time 返回带偏移的时刻', () async {
+  test('[[tools]] 装配后进入工具表并带参数 schema', () async {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String sep = Platform.pathSeparator;
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      customTools: <CustomToolConfig>[
+        CustomToolConfig(
+          name: 'custom_echo',
+          description: 'Echo a value',
+          command: 'true',
+          params: <ParamSpec>[
+            ParamSpec.string('value', required: true),
+          ],
+        ),
+      ],
+    );
+
+    expect(runtime.tools.names, contains('custom_echo'));
+    final Map<String, Object?> schema =
+        runtime.tools.describeOne('custom_echo')!;
+    expect(schema['description'], 'Echo a value');
+    expect(schema['parameters'], containsPair('type', 'object'));
+
+    await runtime.dispose();
+  });
+
+  test('装配后 system 带日期锚点，get_time 返回带偏移的时刻', () async {    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));
     final String sep = Platform.pathSeparator;
     final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(

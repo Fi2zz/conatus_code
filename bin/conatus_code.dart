@@ -166,6 +166,7 @@ Future<void> main(List<String> args) async {
     fs: layers.fs,
     shell: layers.shell,
     mcpServers: mcpServers,
+    customTools: config.tools,
     interactive: !headless,
     workdir: workdir,
     checkpoint: config.checkpoint,

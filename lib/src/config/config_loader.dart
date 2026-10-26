@@ -57,6 +57,39 @@ const String kDefaultConfigToml = '''
 # BRAVE_API_KEY = "..."
 # FIRECRAWL_API_KEY = "fc-..."
 
+# 声明式自定义工具（可选）：CLI 或 HTTP 后端，参数 schema 显式声明。
+# CLI：模型参数以 JSON 从 stdin 传入；stdout 支持 {"content": "..."} 或纯文本。
+# 自定义工具是用户显式配置的受信端，默认 risk = "high"（进审批）。
+# [[tools]]
+# name = "deploy"
+# description = "Deploy a service to an environment"
+# command = "node"
+# args = ["tools/deploy.mjs"]
+# risk = "high"             # low / medium / high
+# timeout_ms = 30000
+# cwd = "tools"             # 相对 [agent] workdir
+# env = { TOKEN = "\${TOKEN}" }
+#
+# [[tools.params]]
+# name = "environment"
+# type = "string"           # string / integer / number / boolean / enum
+# required = true
+# description = "target environment"
+#
+# [[tools.params]]
+# name = "level"
+# type = "enum"
+# values = ["low", "high"]
+# default = "low"
+#
+# HTTP 后端：url + method + headers（JSON body 与响应）。
+# [[tools]]
+# name = "lookup"
+# description = "Look up a record"
+# url = "https://tools.example.com/lookup"
+# method = "POST"
+# headers = { Authorization = "Bearer \${TOKEN}" }
+
 # MCP server：工具经 server__tool 前缀接入；env / headers 支持 \${KEY} 占位符。
 # 项目根 .mcp.json（Claude Code / OpenCode 的 mcpServers）也会自动读取，
 # 同名 [mcp.servers.*] 优先；.mcp.json 是项目文件，stdio 子进程不经沙箱。

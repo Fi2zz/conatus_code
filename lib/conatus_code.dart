@@ -118,6 +118,7 @@ export 'src/config/config_schema.dart'
         BudgetConfig,
         CheckpointConfig,
         ConatusCodeConfig,
+        CustomToolConfig,
         FormatterConfig,
         HooksConfig,
         LintConfig,
@@ -318,6 +319,7 @@ export 'src/subagent/swarm_member.dart'
     show SwarmMember, SwarmProjection, SwarmSink;
 export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
+export 'src/tools/custom_tools.dart' show CustomTool, provideCustomTools;
 export 'src/tools/git_tools.dart'
     show GitCommitTool, GitDiffTool, GitRun, GitStatusTool, gitQuote, runGit;
 export 'src/tools/git_write_tools.dart'

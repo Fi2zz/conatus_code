@@ -25,11 +25,12 @@ Claude Code 插件仓库的目录形态——够用，缺的只是挂接点。�
 这个插件是什么形态？
 ├─ 纯 Markdown 技能包（SKILL.md 目录）      → 形态一：挂载到技能发现根
 ├─ MCP server（JS / Python / 任何语言）     → 形态二：[mcp.servers.*] 配置
-├─ CLI 或可执行脚本                          → 形态三：run_command 或 hooks
+├─ CLI 或可执行脚本                          → 形态三：run_command / hooks / [[tools]]
+├─ 能读 JSON、写 JSON 的脚本或 HTTP 服务     → 形态五：[[tools]] 声明式自定义工具
 └─ 纯库（只暴露编程 API，无进程接口）         → 形态四：写一个 MCP 适配壳
 ```
 
-四种形态覆盖当前 agent 生态插件的绝大部分，且全部落在 nava 现有机制上。
+五个形态覆盖当前 agent 生态插件的绝大部分，且全部落在 nava 现有机制上。
 
 ## 形态一：纯 Markdown 技能包
 
@@ -214,6 +215,33 @@ args = ["/home/you/.nava/wrappers/thing/server.mjs"]
 
 适配壳是一次性成本，在你这边；对 nava 来说它只是一个普通的 MCP server。
 
+## 形态五：声明式自定义工具（`[[tools]]`）
+
+插件是一个能读 JSON、写 JSON 的脚本或 HTTP 服务，但不想写 MCP 适配壳时，
+直接用 `[[tools]]` 把它包成 nava 工具：
+
+```toml
+[[tools]]
+name = "deploy"
+description = "Deploy a service to an environment"
+command = "node"
+args = ["tools/deploy.mjs"]
+risk = "high"
+timeout_ms = 30000
+
+[[tools.params]]
+name = "environment"
+type = "string"
+required = true
+```
+
+CLI 从 stdin 收 `{"name":"deploy","arguments":{...}}`，stdout 返回
+`{"content":"..."}`、`{"error":{"code":"...","message":"..."}}`、`{"value":...}`
+或纯文本；HTTP 用同样的 JSON 作为请求体。这是 **OpenCode JS 插件工具**最容易的
+移植方式：把 `ctx.tool.transform` 的 `execute` 抽成一个读 stdin / 写 stdout 的
+入口，再用 `[[tools]]` 指过去。参数 schema 在 `[[tools.params]]` 里显式声明
+（string / integer / number / boolean / enum）。
+
 ## 信任边界速查
 
 | 机制 | 信任级别 | 沙箱 |
@@ -222,6 +250,8 @@ args = ["/home/you/.nava/wrappers/thing/server.mjs"]
 | MCP stdio server | 等同安装本地程序 | **不走 Layer 2** |
 | MCP http/sse server | 远端端点，凭据经 headers | n/a |
 | hooks | 等同你本人跑 shell | **直连，不经沙箱** |
+| `[[tools]]` CLI | 等同安装本地程序 | **不走 Layer 2** |
+| `[[tools]]` HTTP | 远端端点，凭据经 headers | n/a |
 | 形态三 `run_command` | 模型发起的命令 | 走 Layer 2 + 审批 |
 
 原则：凡是你写进配置的受信端（MCP / hooks），nava 按你的显式声明放行；
