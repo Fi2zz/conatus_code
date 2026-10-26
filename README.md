@@ -156,6 +156,12 @@ keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不�
 # headers = { Authorization = "Bearer ${REMOTE_TOKEN}" }
 ```
 
+已废弃但兼容的键（`[thinking]`、`[services]`、`[loop_control]`、
+`default_plan_mode`、`telemetry`，以及 `[models.*]` 的
+`max_output_size` / `reasoning_key` / `support_efforts` / `default_effort` /
+`off_effort` / `protocol` / `base_url`）仍会被接受，但载入时只写入告警；
+启动提示与 `/doctor` 的“配置废弃项”会列出来，不再静默 no-op。
+
 ## 从 OpenCode 导入配置（`nava import opencode`）
 
 nava **不会在启动时自动合并**项目 `opencode.json(c)`：项目文件可以声明 MCP

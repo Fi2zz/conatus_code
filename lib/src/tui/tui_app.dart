@@ -214,6 +214,7 @@ class ConatusTuiRuntime {
     PermissionConfig? permissions,
     ApprovalMode approvalMode = ApprovalMode.askWhenNeeded,
     List<String> instructions = const <String>[],
+    List<String> configWarnings = const <String>[],
     String? instructionHome,
     HarnessManifest? harness,
   }) async {
@@ -722,6 +723,7 @@ class ConatusTuiRuntime {
     // 重新装配，工具的嵌套发现因此下一轮即生效；注入 `'workdir'` 服务供
     // `/init` 等命令定位仓库根。
     app.provide('workdir', resolvedWorkdir);
+    app.provide('configWarnings', configWarnings);
     final InstructionLoader instructionLoader = provideInstructionLoader(
       app,
       workdir: resolvedWorkdir,

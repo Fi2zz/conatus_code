@@ -60,6 +60,7 @@ List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
   _fsCheck(app),
   _permissionCheck(app),
   _discoveryCheck(app),
+  _configDeprecationCheck(app),
   DoctorCheck(name: 'rg', ok: _rgAvailable(), hint: 'PATH 里没有 rg（搜索工具会降级/报错）'),
 ];
 
@@ -82,6 +83,24 @@ DoctorCheck _discoveryCheck(Context app) {
       : '';
   return DoctorCheck(
     name: 'Agent / 命令发现',
+    ok: false,
+    warning: true,
+    hint: '$head$more',
+  );
+}
+
+DoctorCheck _configDeprecationCheck(Context app) {
+  final List<String> warnings =
+      app.get<List<String>>('configWarnings') ?? const <String>[];
+  if (warnings.isEmpty) {
+    return const DoctorCheck(name: '配置废弃项', ok: true, hint: '无');
+  }
+  final String head = warnings.take(3).join('；');
+  final String more = warnings.length > 3
+      ? '（另有 ${warnings.length - 3} 条）'
+      : '';
+  return DoctorCheck(
+    name: '配置废弃项',
     ok: false,
     warning: true,
     hint: '$head$more',

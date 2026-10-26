@@ -727,6 +727,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       ...?_agentRegistry?.warnings,
       ...?_commandRegistry?.warnings,
       ...?_app.get<AgentProfileResolver>('agentProfiles')?.warnings,
+      ...?_app.get<List<String>>('configWarnings'),
     ];
     for (final String warning in warnings.take(5)) {
       transcript.add(TuiRole.system, warning);

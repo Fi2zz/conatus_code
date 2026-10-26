@@ -14,10 +14,8 @@ void main() {
       // 顶层
       expect(config.llm.defaultModel, 'volcengine-coding-plan/deepseek-v4-flash');
       expect(config.approval.mode, ApprovalMode.neverAsk); // yolo
-      expect(config.defaultPlanMode, isTrue);
       expect(config.extraSkillDirs, <String>['/Users/fitz/.trae/skills']);
       expect(config.mergeAllSkills, isTrue);
-      expect(config.telemetry, isFalse);
 
       // [models.*]
       expect(config.models, hasLength(4));
@@ -28,19 +26,9 @@ void main() {
       expect(glm.maxContext, 1000000);
       expect(glm.capabilities,
           <String>['image_in', 'video_in', 'always_thinking', 'tool_use']);
-      expect(glm.reasoningKey, 'reasoning_content');
-      expect(glm.supportEfforts, <String>['low', 'high', 'max']);
-      expect(glm.protocol, isEmpty);
-
-      final ModelConfig m3 = config.models
-          .firstWhere((ModelConfig m) => m.model == 'minimax-m3');
-      expect(m3.protocol, 'anthropic');
-      expect(m3.baseUrl, 'https://opencode.ai/zen/go');
 
       final ModelConfig k3 = config.models
           .firstWhere((ModelConfig m) => m.model == 'k3');
-      expect(k3.defaultEffort, 'high');
-      expect(k3.maxOutputSize, 0); // 未填
       expect(k3.provider, 'managed:kimi-code');
 
       // [providers.*]（含 oauth.storage）
@@ -52,22 +40,20 @@ void main() {
       expect(config.providers.firstWhere((ProviderConfig p) => p.name == 'deepseek').baseUrl,
           'https://api.deepseek.com/v1');
 
-      // [thinking]
-      expect(config.thinking.enabled, isTrue);
-      expect(config.thinking.effort, 'high');
-
-      // [services.*]（含 oauth）
-      expect(config.services, hasLength(1));
-      final ServiceConfig search = config.services.first;
-      expect(search.name, 'moonshot_search');
-      expect(search.baseUrl, 'https://api.kimi.com/coding/v1/search');
-      expect(search.oauthKey, 'oauth/kimi-code');
-
-      // [background] / [loop_control]
+      // [background]
       expect(config.background.keepAliveOnExit, isFalse);
       expect(config.background.maxRunningTasks, 4);
-      expect(config.loopControl.compactionTriggerRatio, 0.85);
-      expect(config.loopControl.maxStepsPerTurn, 200);
+
+      // 已废弃但仍被接受：启动警告 + /doctor 可见
+      final String deprecated = config.deprecations.join('\n');
+      expect(deprecated, contains('thinking'));
+      expect(deprecated, contains('services'));
+      expect(deprecated, contains('loop_control'));
+      expect(deprecated, contains('default_plan_mode'));
+      expect(deprecated, contains('telemetry'));
+      expect(deprecated, contains('reasoning_key'));
+      expect(deprecated, contains('support_efforts'));
+      expect(deprecated, contains('protocol'));
     });
 
     test('顶层 default_model 优先于 [llm]；兼容旧格式', () {

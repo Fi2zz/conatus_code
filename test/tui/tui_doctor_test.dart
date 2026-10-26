@@ -82,6 +82,20 @@ void main() {
     expect(tuiCommands.any((TuiCommand c) => c.name == 'doctor'), isTrue);
   });
 
+  test('配置废弃项进入 /doctor', () async {
+    final (ConatusTuiController controller, Context app) = await _build();
+    addTearDown(app.dispose);
+    app.provide('configWarnings', <String>[
+      'config.toml：thinking 已废弃（当前无效果）。',
+    ]);
+
+    await controller.handleLine('/doctor');
+
+    final String text = controller.transcript.messages.last.text;
+    expect(text, contains('配置废弃项'));
+    expect(text, contains('thinking'));
+  });
+
   test('Agent / 命令发现告警进入 /doctor，带来源文件与原因', () async {
     final (ConatusTuiController controller, Context app) = await _build();
     addTearDown(app.dispose);

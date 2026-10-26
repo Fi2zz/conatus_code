@@ -123,7 +123,6 @@ export 'src/config/config_schema.dart'
         HooksConfig,
         LintConfig,
         LlmConfig,
-        LoopControlConfig,
         McpConfig,
         McpServerSpec,
         McpServerType,
@@ -134,9 +133,7 @@ export 'src/config/config_schema.dart'
         RetrySettings,
         SandboxPreset,
         SandboxSettings,
-        ServiceConfig,
         StoryConfig,
-        ThinkingConfig,
         TuiConfig,
         XerjConfig;
 export 'src/config/config_writer.dart'

@@ -29,8 +29,6 @@ class ConfigParser extends ConfigValues {
     sandbox: _readSandbox(),
     budget: _readBudget(),
     credentials: _readCredentials(),
-    thinking: _readThinking(),
-    services: _readServices(),
     mcp: _readMcp(),
     tools: _readTools(),
     checkpoint: _readCheckpoint(),
@@ -40,14 +38,12 @@ class ConfigParser extends ConfigValues {
     formatter: _readFormatter(),
     story: _readStory(),
     background: _readBackground(),
-    loopControl: _readLoopControl(),
     tui: _readTui(),
     keybinds: _readKeybinds(),
-    defaultPlanMode: readBool(raw, 'default_plan_mode', false),
     extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
     mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
-    telemetry: readBool(raw, 'telemetry', false),
     instructions: _readInstructions(),
+    deprecations: _readDeprecations(),
   );
 
   /// 顶层 `instructions`：路径 / glob / URL 字符串数组；空串过滤掉。
@@ -55,6 +51,49 @@ class ConfigParser extends ConfigValues {
     for (final String entry in readStringList(raw, 'instructions'))
       if (entry.trim().isNotEmpty) entry.trim(),
   ];
+
+  static const List<String> _deprecatedTopLevel = <String>[
+    'thinking',
+    'services',
+    'loop_control',
+    'default_plan_mode',
+    'telemetry',
+  ];
+
+  static const List<String> _deprecatedModelFields = <String>[
+    'max_output_size',
+    'reasoning_key',
+    'support_efforts',
+    'default_effort',
+    'off_effort',
+    'protocol',
+    'base_url',
+  ];
+
+  /// 已废弃但仍被接受的配置键：启动上屏 + `/doctor` 可见。
+  List<String> _readDeprecations() {
+    final List<String> warnings = <String>[];
+    for (final String key in _deprecatedTopLevel) {
+      if (raw.containsKey(key)) {
+        warnings.add('$source：$key 已废弃（当前无效果）。');
+      }
+    }
+    final Object? models = raw['models'];
+    if (models is Map) {
+      for (final MapEntry<Object?, Object?> entry in models.entries) {
+        final Object? value = entry.value;
+        if (value is! Map) continue;
+        for (final String key in _deprecatedModelFields) {
+          if (value.containsKey(key)) {
+            warnings.add(
+              '$source：models."${entry.key}" 的 $key 已废弃（当前无效果）。',
+            );
+          }
+        }
+      }
+    }
+    return warnings;
+  }
 
   /// 顶层 `default_model`（kimi 风格）优先，回退 `[llm] default_model`。
   LlmConfig _readLlm() {
@@ -282,48 +321,6 @@ class ConfigParser extends ConfigValues {
       displayName: readString(table, 'display_name') ?? '',
       capabilities: readStringList(table, 'capabilities'),
       maxContext: readNonNegativeInt(table, 'max_context_size', 0),
-      maxOutputSize: readNonNegativeInt(table, 'max_output_size', 0),
-      reasoningKey: readString(table, 'reasoning_key') ?? '',
-      supportEfforts: readStringList(table, 'support_efforts'),
-      defaultEffort: readString(table, 'default_effort') ?? '',
-      offEffort: readString(table, 'off_effort') ?? '',
-      protocol: readString(table, 'protocol') ?? '',
-      baseUrl: readString(table, 'base_url') ?? '',
-    );
-  }
-
-  ThinkingConfig _readThinking() {
-    final Map<String, dynamic> table = readTable('thinking');
-    return ThinkingConfig(
-      enabled: readBool(table, 'enabled', true),
-      effort: readString(table, 'effort') ?? '',
-    );
-  }
-
-  List<ServiceConfig> _readServices() {
-    final Map<String, dynamic> table = readTable('services');
-    return <ServiceConfig>[
-      for (final MapEntry<String, dynamic> entry in table.entries)
-        _readService(entry.key, entry.value),
-    ];
-  }
-
-  ServiceConfig _readService(String name, Object? raw) {
-    if (raw is! Map) {
-      throw ConfigException('$source：services.$name 必须是表。');
-    }
-    final Map<String, dynamic> table = raw.cast<String, dynamic>();
-    final Object? oauth = table['oauth'];
-    String? oauthKey;
-    if (oauth is Map) {
-      final Object? key = oauth['key'];
-      oauthKey = key is String ? key : null;
-    }
-    return ServiceConfig(
-      name: name,
-      baseUrl: readString(table, 'base_url') ?? '',
-      apiKey: readString(table, 'api_key') ?? '',
-      oauthKey: oauthKey,
     );
   }
 
@@ -511,23 +508,6 @@ class ConfigParser extends ConfigValues {
     return BackgroundConfig(
       keepAliveOnExit: readBool(table, 'keep_alive_on_exit', false),
       maxRunningTasks: readPositiveInt(table, 'max_running_tasks', 4),
-    );
-  }
-
-  LoopControlConfig _readLoopControl() {
-    final Map<String, dynamic> table = readTable('loop_control');
-    return LoopControlConfig(
-      compactionTriggerRatio: readDouble(
-        table,
-        'compaction_trigger_ratio',
-        0.85,
-      ),
-      maxStepsPerTurn: readPositiveInt(table, 'max_steps_per_turn', 200),
-      reservedContextSize: readPositiveInt(
-        table,
-        'reserved_context_size',
-        50000,
-      ),
     );
   }
 

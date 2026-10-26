@@ -4,6 +4,14 @@
 
 ## [未发布]
 
+- **配置面审计**：移除/废弃一批“解析了但运行时没消费”的键——
+  `[thinking]`、`[services]`、`[loop_control]`、`default_plan_mode`、
+  `telemetry`，以及 `[models.*]` 的 `max_output_size` / `reasoning_key` /
+  `support_efforts` / `default_effort` / `off_effort` / `protocol` / `base_url`。
+  这些键仍被接受，但载入时写入 `deprecations`，启动上屏并在 `/doctor` 的
+  “配置废弃项”里列出；模型元数据只保留 `display_name` / `capabilities` /
+  `max_context_size`。
+
 - **定义热重载**：Agent / 命令目录变更 250ms 防抖后自动重载，也可 `/reload`
   手动触发；当前 Agent 被删除时回退 `[agent] default_agent`。`CommandRegistry`
   的 MCP prompt 动态命令在重载后保留，磁盘命令仍优先。配置文件变更仍需重启。

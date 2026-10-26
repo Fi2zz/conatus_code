@@ -227,8 +227,9 @@ class BudgetConfig {
 }
 
 /// 一个模型的定义；对应 `[models."<provider>/<model>"]` 表（kimi-code-config
-/// 格式：capabilities / display_name / max_context_size / reasoning_key /
-/// support_efforts 等）。
+/// 模型元数据；对应 `[models."<provider>/<model>"]` 表。
+///
+/// 只保留运行时真正消费的字段：展示名、能力标记与上下文窗口。
 class ModelConfig {
   const ModelConfig({
     required this.provider,
@@ -236,13 +237,6 @@ class ModelConfig {
     this.displayName = '',
     this.capabilities = const <String>[],
     this.maxContext = 0,
-    this.maxOutputSize = 0,
-    this.reasoningKey = '',
-    this.supportEfforts = const <String>[],
-    this.defaultEffort = '',
-    this.offEffort = '',
-    this.protocol = '',
-    this.baseUrl = '',
   });
 
   /// 所属提供商（`[providers.<name>]` 的键）。
@@ -259,60 +253,6 @@ class ModelConfig {
 
   /// 上下文窗口（token）；`0` 表示未知。
   final int maxContext;
-
-  /// 最大输出（token）；`0` 表示未知。
-  final int maxOutputSize;
-
-  /// 推理内容字段名（如 `reasoning_content`）。
-  final String reasoningKey;
-
-  /// 支持的努力级别（`low` / `high` / `max` 等）。
-  final List<String> supportEfforts;
-
-  /// 默认努力级别。
-  final String defaultEffort;
-
-  /// 关闭推理时的努力级别（如 `none`）。
-  final String offEffort;
-
-  /// 请求协议（`openai` / `anthropic`）。
-  final String protocol;
-
-  /// 模型级端点覆盖（可空，缺省用 provider 的 `base_url`）。
-  final String baseUrl;
-}
-
-/// 推理行为；对应 `[thinking]` 表。
-class ThinkingConfig {
-  const ThinkingConfig({this.enabled = true, this.effort = ''});
-
-  /// 是否启用推理。
-  final bool enabled;
-
-  /// 推理努力级别（如 `high`）；空表示用模型默认。
-  final String effort;
-}
-
-/// 一个外部服务；对应 `[services.<名字>]` 表（搜索 / 抓取等工具的端点）。
-class ServiceConfig {
-  const ServiceConfig({
-    required this.name,
-    this.baseUrl = '',
-    this.apiKey = '',
-    this.oauthKey,
-  });
-
-  /// 服务名（`[services.<名字>]` 的键）。
-  final String name;
-
-  /// 端点地址。
-  final String baseUrl;
-
-  /// API Key。
-  final String apiKey;
-
-  /// `oauth` 子表的 `key`（保留字段）。
-  final String? oauthKey;
 }
 
 /// MCP server 传输类型；对应 `[mcp.servers.<name>].type`。
@@ -596,24 +536,6 @@ class BackgroundConfig {
   final int maxRunningTasks;
 }
 
-/// 循环控制；对应 `[loop_control]` 表（解析保留，供未来压缩/步数消费）。
-class LoopControlConfig {
-  const LoopControlConfig({
-    this.compactionTriggerRatio = 0.85,
-    this.maxStepsPerTurn = 200,
-    this.reservedContextSize = 50000,
-  });
-
-  /// 压缩触发比例。
-  final double compactionTriggerRatio;
-
-  /// 单轮最大步数。
-  final int maxStepsPerTurn;
-
-  /// 预留上下文（token）。
-  final int reservedContextSize;
-}
-
 /// TUI 外观配置；对应 `[tui]` 表。
 class TuiConfig {
   const TuiConfig({this.theme = 'default', this.animations = true});
@@ -637,8 +559,6 @@ class ConatusCodeConfig {
     this.sandbox = const SandboxSettings(),
     this.budget = const BudgetConfig(),
     this.credentials = const <String, String>{},
-    this.thinking = const ThinkingConfig(),
-    this.services = const <ServiceConfig>[],
     this.mcp = const McpConfig(),
     this.tools = const <CustomToolConfig>[],
     this.checkpoint = const CheckpointConfig(),
@@ -648,14 +568,12 @@ class ConatusCodeConfig {
     this.formatter = const FormatterConfig(),
     this.story = const StoryConfig(),
     this.background = const BackgroundConfig(),
-    this.loopControl = const LoopControlConfig(),
     this.tui = const TuiConfig(),
     this.keybinds = const <String, String>{},
-    this.defaultPlanMode = false,
     this.extraSkillDirs = const <String>[],
     this.mergeAllSkills = false,
-    this.telemetry = false,
     this.instructions = const <String>[],
+    this.deprecations = const <String>[],
   });
 
   final LlmConfig llm;
@@ -677,12 +595,6 @@ class ConatusCodeConfig {
 
   /// `[credentials]` 表：任意键值，作为凭据来源（环境变量优先）。
   final Map<String, String> credentials;
-
-  /// `[thinking]` 表。
-  final ThinkingConfig thinking;
-
-  /// `[services.<名字>]` 表。
-  final List<ServiceConfig> services;
 
   /// `[mcp]` 表。
   final McpConfig mcp;
@@ -711,9 +623,6 @@ class ConatusCodeConfig {
   /// `[background]` 表。
   final BackgroundConfig background;
 
-  /// `[loop_control]` 表。
-  final LoopControlConfig loopControl;
-
   /// `[tui]` 表。
   final TuiConfig tui;
 
@@ -723,9 +632,6 @@ class ConatusCodeConfig {
   /// 关闭该动作。未知动作与冲突由 `Keymap` 在启动时告警。
   final Map<String, String> keybinds;
 
-  /// 顶层 `default_plan_mode`：启动时默认进入 Plan Mode。
-  final bool defaultPlanMode;
-
   /// 顶层 `extra_skill_dirs`：额外技能目录。
   final List<String> extraSkillDirs;
 
@@ -733,10 +639,10 @@ class ConatusCodeConfig {
   /// `disable-model-invocation` 的技能也放进模型可见目录。
   final bool mergeAllSkills;
 
-  /// 顶层 `telemetry`：遥测开关。
-  final bool telemetry;
-
   /// 顶层 `instructions`：额外指令来源（路径 / glob / URL），按书写顺序追加在
   /// 项目 `AGENTS.md` 之后；相对路径以工作目录为基准，`~` 展开家目录。
   final List<String> instructions;
+
+  /// 已废弃但仍在配置文件里出现的键（启动时上屏，`/doctor` 可见）。
+  final List<String> deprecations;
 }

@@ -48,8 +48,6 @@ const String kDefaultConfigToml = '''
 # [models."deepseek/deepseek-chat"]
 # capabilities = [ "always_thinking", "tool_use" ]
 # max_context_size = 1000000
-# reasoning_key = "reasoning_content"
-# support_efforts = [ "low", "high", "max" ]
 
 # 额外技能目录（可选）：相对 [agent] workdir 或绝对路径 / ~。
 # extra_skill_dirs = ["/path/to/skills"]
