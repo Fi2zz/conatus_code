@@ -5,7 +5,49 @@ library;
 import 'package:conatus_code/tui.dart';
 import 'package:test/test.dart';
 
+class _BusyHarness extends StatefulComponent {
+  const _BusyHarness({super.key, required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  State<_BusyHarness> createState() => _BusyHarnessState();
+}
+
+class _BusyHarnessState extends State<_BusyHarness> {
+  bool busy = true;
+
+  void setBusy(bool value) => setState(() => busy = value);
+
+  @override
+  Component build(BuildContext context) => TuiInputBar(
+        controller: component.controller,
+        focused: true,
+        busy: busy,
+        onSubmitted: (_) {},
+      );
+}
+
 void main() {
+  test('busy 结束后占位提示恢复为普通输入', () async {
+    final NoctermTester tester = await NoctermTester.create(
+      size: const Size(80, 12),
+    );
+    addTearDown(tester.dispose);
+    final GlobalKey<_BusyHarnessState> key = GlobalKey<_BusyHarnessState>();
+    await tester.pumpComponent(
+      _BusyHarness(key: key, controller: TextEditingController()),
+    );
+    await tester.pump();
+    expect(tester.terminalState, containsText('模型运行中'));
+
+    key.currentState!.setBusy(false);
+    await tester.pump();
+
+    expect(tester.terminalState, isNot(containsText('模型运行中')));
+    expect(tester.terminalState, containsText('输入消息'));
+  });
+
   test('busy 时输入框可输入、回车触发提交（排队）', () async {
     final NoctermTester tester = await NoctermTester.create(
       size: const Size(80, 12),

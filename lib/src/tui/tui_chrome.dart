@@ -92,7 +92,10 @@ class TuiInputBar extends StatelessComponent {
             ),
           ),
           Expanded(
+            // nocterm 的 RenderTextField 在 placeholder 变化时只 markNeedsPaint，
+            // 复用同一实例会继续画旧布局；用 key 强制重建，保证忙碌结束后占位刷新。
             child: TextField(
+              key: ValueKey<String>(_placeholder()),
               controller: controller,
               focused: focused,
               minLines: 1,
