@@ -152,6 +152,38 @@ void main() {
       expect(lines[1], 'fs\tstdio\tnpx server-filesystem');
     });
 
+    test('list 包含全局 Claude Desktop 配置（开启时）', () async {
+      final Directory home = Directory.systemTemp.createTempSync('nava-mcp-home-');
+      addTearDown(() => home.deleteSync(recursive: true));
+      final File desktop = File(
+        '${home.path}${Platform.pathSeparator}Library'
+        '${Platform.pathSeparator}Application Support'
+        '${Platform.pathSeparator}Claude'
+        '${Platform.pathSeparator}claude_desktop_config.json',
+      )..parent.createSync(recursive: true);
+      desktop.writeAsStringSync(
+        '{"mcpServers":{"desktop":{"command":"npx","args":["desktop"]}}}',
+      );
+      File(path).writeAsStringSync('''
+[mcp.servers.local]
+command = "npx"
+''');
+
+      final int code = await run(
+        <String>['list'],
+        overrides: McpCliDeps(
+          out: out,
+          err: err,
+          env: <String, String>{'HOME': home.path},
+          includeClaudeDesktop: true,
+        ),
+      );
+
+      expect(code, 0);
+      expect(out.toString(), contains('local\tstdio\tnpx'));
+      expect(out.toString(), contains('desktop\tstdio\tnpx desktop'));
+    });
+
     test('合并项目 .mcp.json，TOML 同名优先', () async {
       File(path).writeAsStringSync('''
 [agent]

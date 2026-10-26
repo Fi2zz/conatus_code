@@ -25,7 +25,8 @@ class ReadFileTool extends Tool {
   String get name => 'read_file';
 
   @override
-  String get description => '读取文件内容。支持分页（offset / limit），默认带行号。';
+  String get description =>
+      '读取文件或目录；文本支持分页（offset / limit），图片/PDF 返回附件，单行超 2000 字符会截断。';
 
   @override
   ToolRisk get riskLevel => ToolRisk.low;
@@ -49,6 +50,9 @@ class ReadFileTool extends Tool {
       final FsInfo? info = await _fs.stat(target);
       if (info == null) {
         return _error('FS_NOT_FOUND', '文件不存在："$path"');
+      }
+      if (info.type == FsFileType.directory) {
+        return _listDirectory(target, path);
       }
       if (info.type != FsFileType.file) {
         return _error('FS_NOT_REGULAR_FILE', '不是普通文件："$path"');
@@ -85,13 +89,62 @@ class ReadFileTool extends Tool {
   }
 
   /// 拼接读取片段；带行号时每行前缀 `%6d\t`（对齐 DSH）。
+  /// 单行超过 2000 字符时截断并标记，避免一行占满上下文。
   String _format(List<String> lines, int startLine, bool withNumbers) {
-    if (!withNumbers) return lines.join('\n');
+    final List<String> clipped = <String>[
+      for (final String line in lines) _clipLine(line),
+    ];
+    if (!withNumbers) return clipped.join('\n');
     final StringBuffer buffer = StringBuffer();
-    for (var i = 0; i < lines.length; i++) {
-      buffer.writeln('${(startLine + i).toString().padLeft(6)}\t${lines[i]}');
+    for (var i = 0; i < clipped.length; i++) {
+      buffer.writeln(
+        '${(startLine + i).toString().padLeft(6)}\t${clipped[i]}',
+      );
     }
     return buffer.toString();
+  }
+
+  String _clipLine(String line) {
+    const int max = 2000;
+    if (line.length <= max) return line;
+    final Runes runes = line.runes;
+    if (runes.length <= max) return line;
+    return '${String.fromCharCodes(runes.take(max))}…';
+  }
+
+  /// 目录列举（非递归）：OpenCode `read` 的目录行为。
+  Future<ToolResult> _listDirectory(FsTarget target, String path) async {
+    final List<FsDirEntry> entries = await _fs.listDir(target);
+    entries.sort((FsDirEntry a, FsDirEntry b) => a.name.compareTo(b.name));
+    final StringBuffer buffer = StringBuffer(
+      '目录 "$path"（${entries.length} 项）：\n',
+    );
+    for (final FsDirEntry entry in entries) {
+      final String mark = switch (entry.type) {
+        FsFileType.directory => 'd',
+        FsFileType.symlink => 'l',
+        FsFileType.file => 'f',
+        FsFileType.other => '?',
+      };
+      buffer.writeln(
+        '$mark ${entry.name}${entry.type == FsFileType.directory ? '/' : ''}',
+      );
+    }
+    return ToolResult.success(
+      buffer.toString(),
+      value: <String, Object?>{
+        'path': target.displayPath,
+        'type': 'directory',
+        'entries': <Map<String, Object?>>[
+          for (final FsDirEntry entry in entries)
+            <String, Object?>{
+              'name': entry.name,
+              'type': entry.type.name,
+              if (entry.size != null) 'size': entry.size,
+            },
+        ],
+      },
+    );
   }
 
   /// 读取图片并作为附件返回；超过 20 MiB 或二进制后端不支持时明确报错。

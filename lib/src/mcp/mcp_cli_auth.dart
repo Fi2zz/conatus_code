@@ -11,6 +11,8 @@ Future<int> _auth(
     name,
     configPath,
     onWarning: (String message) => _err(deps).writeln(message),
+    env: deps.env,
+    includeClaudeDesktop: deps.includeClaudeDesktop,
   );
   final McpServerSpec? spec = resolved.spec;
   if (spec == null) {
@@ -71,23 +73,34 @@ McpOAuthStore? _oauthStore(McpCliDeps deps) {
 List<McpServerSpec> _loadEffectiveMcp(
   String path, {
   void Function(String message)? onWarning,
+  Map<String, String>? env,
+  bool includeClaudeDesktop = false,
 }) {
   final ConatusCodeConfig config = File(path).existsSync()
       ? ConfigParser(decodeToml(File(path)), path).parse()
       : const ConatusCodeConfig();
-  return loadEffectiveMcpServers(config: config, onWarning: onWarning);
+  return loadEffectiveMcpServers(
+    config: config,
+    env: env,
+    includeClaudeDesktop: includeClaudeDesktop,
+    onWarning: onWarning,
+  );
 }
 
 ({McpServerSpec? spec, String? error}) _findServer(
   String name,
   String? configPath, {
   void Function(String message)? onWarning,
+  Map<String, String>? env,
+  bool includeClaudeDesktop = false,
 }) {
   final String path = configPath ?? resolveConfigPath();
   try {
     for (final McpServerSpec spec in _loadEffectiveMcp(
       path,
       onWarning: onWarning,
+      env: env,
+      includeClaudeDesktop: includeClaudeDesktop,
     )) {
       if (spec.name == name) return (spec: spec, error: null);
     }

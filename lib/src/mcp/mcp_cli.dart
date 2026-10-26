@@ -32,6 +32,7 @@ class McpCliDeps {
     this.oauthStore,
     this.openUrl,
     this.env,
+    this.includeClaudeDesktop = false,
   });
 
   /// 正常输出目标。
@@ -51,6 +52,9 @@ class McpCliDeps {
 
   /// 解析令牌目录用的环境变量；缺省 [Platform.environment]（测试注入用）。
   final Map<String, String>? env;
+
+  /// 是否把全局 Claude Desktop 配置也纳入 list/auth（真实 CLI 打开，测试默认关）。
+  final bool includeClaudeDesktop;
 }
 
 typedef _AddRequest = ({

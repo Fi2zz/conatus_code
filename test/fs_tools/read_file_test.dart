@@ -115,11 +115,32 @@ void main() {
       expect(result.error!.code, 'FS_NOT_FOUND');
     });
 
-    test('目录 → FS_NOT_REGULAR_FILE', () async {
+    test('目录 → 非递归列举', () async {
+      File('${dir.path}/a.txt').writeAsStringSync('x');
+      Directory('${dir.path}/sub').createSync();
+
       final ToolResult result =
           await tool.call(_context(<String, Object?>{'path': '.'}));
 
-      expect(result.error!.code, 'FS_NOT_REGULAR_FILE');
+      expect(result.isError, isFalse);
+      expect(result.content, contains('目录 "."（2 项）'));
+      expect(result.content, contains('f a.txt'));
+      expect(result.content, contains('d sub/'));
+      final Map<String, Object?> value = result.value! as Map<String, Object?>;
+      expect(value['type'], 'directory');
+      expect(value['entries'], hasLength(2));
+    });
+
+    test('超长行截断到 2000 字符', () async {
+      File('${dir.path}/long.txt').writeAsStringSync('a' * 2500);
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'path': 'long.txt'}),
+      );
+
+      expect(result.isError, isFalse);
+      expect(result.content, contains('${'a' * 2000}…'));
+      expect(result.content, isNot(contains('a' * 2001)));
     });
 
     test('通过注册表调用时参数校验生效', () async {

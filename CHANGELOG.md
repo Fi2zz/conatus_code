@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+- **`read_file` 目录与长行**：目录返回非递归列举（`d `/`f `/`l `），文本单行
+  超过 2000 字符截断并标记；与 OpenCode `read` 的目录行为对齐。
+
+- **`nava mcp list` 纳入全局 Claude Desktop**：真实 CLI 的 list/auth 会读取
+  `claude_desktop_config.json`；测试默认关闭该来源，避免读到开发机配置。
+
 - **Linux Layer 2 沙箱**：`probeSandboxBackend` 在 Linux 上探测 `bwrap` 并
   smoke 试跑；`SandboxedShellExecutor` 用 bubblewrap 构造 deny-by-default
   沙箱（`--unshare-all`、只读根、工作区/缓存可写、`.opencode` 只读保护）。

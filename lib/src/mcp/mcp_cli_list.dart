@@ -12,6 +12,8 @@ Future<int> _list(
     servers = _loadEffectiveMcp(
       path,
       onWarning: (String message) => _err(deps).writeln(message),
+      env: deps.env,
+      includeClaudeDesktop: deps.includeClaudeDesktop,
     );
   } on ConfigException catch (error) {
     _err(deps).writeln('配置错误：${error.message}');

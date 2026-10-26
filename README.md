@@ -11,7 +11,7 @@
 ## 特性
 
 - 🖥️ 终端交互（内置 TUI，入口 `lib/tui.dart`；Enter 提交，Shift+Enter / Ctrl+J 换行）
-- 🔍 文件读写与搜索（read_file / write_file / edit_file / rg / glob；read_file 支持 png/jpg/gif/webp 图片与 PDF 附件）
+- 🔍 文件读写与搜索（read_file / write_file / edit_file / rg / glob；read_file 支持目录列举、png/jpg/gif/webp 图片与 PDF 附件）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
 - 🔒 审批与沙箱（高危操作走审批；默认 Seatbelt 进程沙箱 + 文件 jail）
@@ -566,7 +566,8 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
 - **全局 Claude Desktop 配置**：运行时还会读取
   `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）、
   `~/.config/Claude/claude_desktop_config.json` 或 `%APPDATA%/Claude/...`；
-  优先级低于 `config.toml` 与项目 `.mcp.json`。`nava mcp list` 仍只列前两者。
+  优先级低于 `config.toml` 与项目 `.mcp.json`。`nava mcp list` 同样会列出
+  全局项。
 - 远程 server **缺省尝试 OAuth**：令牌存 `~/.nava/oauth/<server>.json`（文件 0600、
   目录 0700，含 DCR `client_id` 以便新进程刷新），过期前 60 秒自动刷新；没有令牌
   时先按未鉴权连接，服务端真返回 401 才标记 `needs_auth` 并只跳过该 server。
