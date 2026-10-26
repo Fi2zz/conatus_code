@@ -208,6 +208,52 @@ void main() {
     expect(fixture.err.toString(), contains('写入失败'));
   });
 
+  test('providers 导入后 loadConfig 可解析', () async {
+    final _Fixture fixture = _Fixture();
+    _write(
+      _path(fixture.project, 'opencode.json'),
+      '''
+{
+  "providers": {
+    "acme": {
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://acme.example/v1",
+        "apiKey": "{env:ACME_KEY}",
+      },
+      "models": {
+        "gpt-x": {
+          "modelID": "gpt-x-2025",
+          "name": "GPT X",
+          "limit": { "context": 128000 },
+        },
+      },
+    },
+  },
+}
+''',
+    );
+
+    final int code = await fixture.run(<String>[
+      ...fixture.baseArgs(),
+      '--project-only',
+      '--write',
+    ]);
+
+    expect(code, 0);
+    final ConatusCodeConfig config = loadConfig(path: fixture.config);
+    final ProviderConfig provider = config.providers.single;
+    expect(provider.name, 'acme');
+    expect(provider.baseUrl, 'https://acme.example/v1');
+    expect(provider.credentialKey, 'ACME_KEY');
+    expect(provider.type, ProviderType.openai);
+    final ModelConfig model = config.models.single;
+    expect(model.provider, 'acme');
+    expect(model.model, 'gpt-x-2025');
+    expect(model.displayName, 'GPT X');
+    expect(model.maxContext, 128000);
+  });
+
   test('JSON agents / commands 物化为 .nava 定义并被注册表发现', () async {
     final _Fixture fixture = _Fixture();
     _write(

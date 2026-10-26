@@ -178,6 +178,53 @@ void main() {
     expect(result.warnings.join('\n'), contains('lsp'));
   });
 
+  test('providers：baseURL / 密钥 / 类型 / 模型元数据', () {
+    final OpenCodeImport result = _build(<Map<String, Object?>>[
+      <String, Object?>{
+        'providers': <String, Object?>{
+          'acme': <String, Object?>{
+            'package': '@opencode/ai/providers/openai-compatible',
+            'settings': <String, Object?>{
+              'baseURL': 'https://acme.example/v1',
+              'apiKey': '{env:ACME_KEY}',
+            },
+            'models': <String, Object?>{
+              'gpt-x': <String, Object?>{
+                'modelID': 'gpt-x-2025',
+                'name': 'GPT X',
+                'limit': <String, Object?>{'context': 128000},
+              },
+            },
+          },
+          'claude': <String, Object?>{
+            'package': '@opencode/ai/providers/anthropic',
+            'settings': <String, Object?>{
+              'baseURL': 'https://api.anthropic.com/v1',
+              'apiKey': 'sk-ant',
+            },
+          },
+          'oauth-only': <String, Object?>{'settings': <String, Object?>{}},
+        },
+      },
+    ]);
+
+    expect(result.providers, hasLength(2));
+    final ImportedProvider acme = result.providers[0];
+    expect(acme.name, 'acme');
+    expect(acme.baseUrl, 'https://acme.example/v1');
+    expect(acme.credentialKey, 'ACME_KEY');
+    expect(acme.apiKey, isNull);
+    expect(acme.type, 'openai');
+    expect(acme.models.single.model, 'gpt-x-2025');
+    expect(acme.models.single.displayName, 'GPT X');
+    expect(acme.models.single.maxContext, 128000);
+
+    final ImportedProvider claude = result.providers[1];
+    expect(claude.type, 'anthropic');
+    expect(claude.apiKey, 'sk-ant');
+    expect(result.warnings.join('\n'), contains('oauth-only'));
+  });
+
   test('instructions 追加；skills 本地目录保留，agents / commands 告警跳过', () {
     final OpenCodeImport result = _build(<Map<String, Object?>>[
       <String, Object?>{

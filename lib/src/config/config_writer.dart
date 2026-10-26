@@ -21,6 +21,7 @@ String appendProviderSection(
   required String baseUrl,
   required String apiKey,
   required String type,
+  String credentialKey = '',
 }) {
   final StringBuffer buffer = StringBuffer(toml);
   if (toml.isNotEmpty && !toml.endsWith('\n')) {
@@ -32,6 +33,9 @@ String appendProviderSection(
     ..write(']\n');
   if (apiKey.isNotEmpty) {
     buffer.write('api_key = "${tomlString(apiKey)}"\n');
+  }
+  if (credentialKey.isNotEmpty) {
+    buffer.write('credential_key = "${tomlString(credentialKey)}"\n');
   }
   buffer
     ..write('base_url = "${tomlString(baseUrl)}"\n')

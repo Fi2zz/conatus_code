@@ -276,7 +276,7 @@ CLI 从 stdin 收 `{"name":"deploy","arguments":{...}}`，stdout 返回
 | Skills | SKILL.md + frontmatter，`.opencode/skills` / `.agents/skills` / `.claude/skills` | 三类目录都是默认发现根，frontmatter 兼容 | ✅ 零差距 |
 | Claude Code 插件 | 仓库含 `skills/` `commands/` `agents/` `hooks/` | `skills/` 直接可读；`commands/*.md` 软链或按散落 `.md` 技能读；`agents/`、`hooks/` 无对应 | ○ 主体可用；SessionStart hook 是缺口 |
 | MCP | `mcpServers` JSON（`.mcp.json` / `claude_desktop_config.json`） | 项目 `.mcp.json` 直接读取并映射进 `[mcp.servers.*]`；同名 TOML 优先 | ✅ 项目级零差距；全局 `claude_desktop_config.json` 仍建议转 TOML |
-| OpenCode 配置 | `opencode.json(c)`（JSONC） | `nava import opencode` 显式导入 model / default_agent / mcp.servers / permissions / instructions；agents / commands 物化为 `.nava` Markdown | ○ 默认不自动合并；providers / plugins / lsp 等暂不支持 |
+| OpenCode 配置 | `opencode.json(c)`（JSONC） | `nava import opencode` 显式导入 model / default_agent / providers / mcp.servers / permissions / instructions；agents / commands 物化为 `.nava` Markdown | ○ 默认不自动合并；OAuth 登录态与 plugins / lsp 等暂不支持 |
 | Hooks | Claude `settings.json` 结构化 hooks（matcher 等） | `[hooks]` 命令列表，事件名对照兼容 | ○ 手工改写，不做自动映射 |
 | superpowers | 技能目录软链 + SessionStart 注入 | 技能软链 ✅ | ⚠️ bootstrap 强制注入缺口（见形态一） |
 

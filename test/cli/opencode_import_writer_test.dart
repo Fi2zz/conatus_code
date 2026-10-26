@@ -118,6 +118,65 @@ effect = "ask"
     expect(count, 1);
   });
 
+  test('providers / models 写入并可解析', () {
+    const OpenCodeImport imported = OpenCodeImport(
+      providers: <ImportedProvider>[
+        ImportedProvider(
+          name: 'acme',
+          baseUrl: 'https://acme.example/v1',
+          type: 'openai',
+          credentialKey: 'ACME_KEY',
+          models: <ImportedModel>[
+            ImportedModel(
+              model: 'gpt-x',
+              displayName: 'GPT X',
+              maxContext: 128000,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final OpenCodeImportPlan plan = planOpenCodeImport(
+      toml: '',
+      import: imported,
+    );
+
+    _expectParseable(plan.updatedToml);
+    expect(plan.updatedToml, contains('[providers.acme]'));
+    expect(plan.updatedToml, contains('base_url = "https://acme.example/v1"'));
+    expect(plan.updatedToml, contains('credential_key = "ACME_KEY"'));
+    expect(plan.updatedToml, contains('[models."acme/gpt-x"]'));
+    expect(plan.updatedToml, contains('max_context_size = 128000'));
+    expect(plan.added, hasLength(2));
+  });
+
+  test('已有同名 provider 时整组跳过', () {
+    const String existing = '''
+[providers.acme]
+base_url = "https://old.example/v1"
+type = "openai"
+''';
+
+    final OpenCodeImportPlan plan = planOpenCodeImport(
+      toml: existing,
+      import: const OpenCodeImport(
+        providers: <ImportedProvider>[
+          ImportedProvider(
+            name: 'acme',
+            baseUrl: 'https://new.example/v1',
+            type: 'openai',
+            apiKey: 'x',
+          ),
+        ],
+      ),
+    );
+
+    expect(plan.updatedToml, contains('https://old.example/v1'));
+    expect(plan.updatedToml, isNot(contains('new.example')));
+    expect(plan.skipped.join('\n'), contains('acme'));
+  });
+
   test('非法 TOML 抛 FormatException', () {
     expect(
       () => planOpenCodeImport(toml: '[bad', import: _import()),

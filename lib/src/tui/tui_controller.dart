@@ -2076,9 +2076,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     final int slash = spec.indexOf('/');
     final String provider = (slash < 0 ? spec : spec.substring(0, slash))
         .trim();
-    final String? typedModel = slash < 0
+    final String? rawModel = slash < 0
         ? null
         : spec.substring(slash + 1).trim();
+    final String? typedModel =
+        rawModel == null ? null : stripModelVariant(rawModel);
     final ProviderProfile? profile = registry.byName(provider);
     if (profile == null) return '未知提供商：$provider';
     final String label = (typedModel != null && typedModel.isNotEmpty)

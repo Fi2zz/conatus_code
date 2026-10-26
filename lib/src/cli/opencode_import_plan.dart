@@ -65,6 +65,12 @@ OpenCodeImportPlan planOpenCodeImport({
     added,
     skipped,
   );
+  final List<ImportedProvider> providers = _planProviders(
+    import.providers,
+    existing,
+    added,
+    skipped,
+  );
   final String updated = applyOpenCodeImport(
     toml,
     model: model,
@@ -73,6 +79,7 @@ OpenCodeImportPlan planOpenCodeImport({
     permissions: permissions,
     instructions: instructions,
     skillDirs: skillDirs,
+    providers: providers,
   );
   ensureImportParseable(updated);
   return OpenCodeImportPlan(
@@ -85,6 +92,7 @@ OpenCodeImportPlan planOpenCodeImport({
       permissions: permissions,
       instructions: instructions,
       skillDirs: skillDirs,
+      providers: providers,
     ).trim(),
     added: List<String>.unmodifiable(added),
     skipped: List<String>.unmodifiable(skipped),
@@ -196,6 +204,43 @@ List<String> _planSkillDirs(
   }
   added.add('extra_skill_dirs');
   return skillDirs;
+}
+
+List<ImportedProvider> _planProviders(
+  List<ImportedProvider> providers,
+  Map<String, Object?> existing,
+  List<String> added,
+  List<String> skipped,
+) {
+  final List<ImportedProvider> result = <ImportedProvider>[];
+  for (final ImportedProvider provider in providers) {
+    if (_hasPath(existing, <String>['providers', provider.name])) {
+      skipped.add('provider ${provider.name}（已有）');
+      continue;
+    }
+    final List<ImportedModel> models = <ImportedModel>[];
+    for (final ImportedModel model in provider.models) {
+      final String qualified = '${provider.name}/${model.model}';
+      if (_hasPath(existing, <String>['models', qualified])) {
+        skipped.add('model $qualified（已有）');
+        continue;
+      }
+      models.add(model);
+      added.add('model $qualified');
+    }
+    result.add(
+      ImportedProvider(
+        name: provider.name,
+        baseUrl: provider.baseUrl,
+        type: provider.type,
+        apiKey: provider.apiKey,
+        credentialKey: provider.credentialKey,
+        models: List<ImportedModel>.unmodifiable(models),
+      ),
+    );
+    added.add('provider ${provider.name}');
+  }
+  return result;
 }
 
 Set<String> _existingPermissions(Map<String, Object?> existing) {

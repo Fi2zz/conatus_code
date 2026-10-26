@@ -11,11 +11,11 @@ import 'opencode_import_command_defs.dart';
 import 'opencode_import_definitions.dart';
 import 'opencode_import_mcp.dart';
 import 'opencode_import_permissions.dart';
+import 'opencode_import_providers.dart';
 import 'opencode_import_source.dart';
 import 'opencode_import_types.dart';
 
 const List<String> _ignoredKeys = <String>[
-  'providers',
   'plugins',
   'lsp',
   'references',
@@ -32,6 +32,7 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
   final List<String> instructions = <String>[];
   final List<String> skillDirs = <String>[];
   final Set<String> seenSkillDirs = <String>{};
+  final Map<String, ImportedProvider> providers = <String, ImportedProvider>{};
   final Set<String> ignored = <String>{};
   final Map<String, ImportedAgent> agents = <String, ImportedAgent>{};
   final Map<String, ImportedCommand> commands = <String, ImportedCommand>{};
@@ -76,6 +77,13 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
       commands[command.name] = command;
     }
     ignored.addAll(_ignoredKeys.where(values.containsKey));
+    for (final ImportedProvider provider in mapOpenCodeProviders(
+      values['providers'],
+      document.path,
+      warnings,
+    )) {
+      providers[provider.name] = provider;
+    }
   }
   for (final String key in _ignoredKeys) {
     if (!ignored.contains(key)) continue;
@@ -92,6 +100,7 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     permissions: List<ImportedPermission>.unmodifiable(permissions),
     instructions: List<String>.unmodifiable(instructions),
     skillDirs: List<String>.unmodifiable(skillDirs),
+    providers: providers.values.toList(growable: false),
     agents: agents.values.toList(growable: false),
     commands: commands.values.toList(growable: false),
     warnings: List<String>.unmodifiable(warnings),

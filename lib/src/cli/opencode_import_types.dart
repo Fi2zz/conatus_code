@@ -25,6 +25,7 @@ class OpenCodeImport {
     this.permissions = const <ImportedPermission>[],
     this.instructions = const <String>[],
     this.skillDirs = const <String>[],
+    this.providers = const <ImportedProvider>[],
     this.agents = const <ImportedAgent>[],
     this.commands = const <ImportedCommand>[],
     this.warnings = const <String>[],
@@ -36,6 +37,7 @@ class OpenCodeImport {
   final List<ImportedPermission> permissions;
   final List<String> instructions;
   final List<String> skillDirs;
+  final List<ImportedProvider> providers;
   final List<ImportedAgent> agents;
   final List<ImportedCommand> commands;
   final List<String> warnings;
@@ -47,13 +49,45 @@ class OpenCodeImport {
       permissions.isEmpty &&
       instructions.isEmpty &&
       skillDirs.isEmpty &&
+      providers.isEmpty &&
       agents.isEmpty &&
       commands.isEmpty;
 }
 
+/// OpenCode `providers.<name>` 里可导入的一个提供商。
+class ImportedProvider {
+  const ImportedProvider({
+    required this.name,
+    required this.baseUrl,
+    required this.type,
+    this.apiKey,
+    this.credentialKey,
+    this.models = const <ImportedModel>[],
+  });
+
+  final String name;
+  final String baseUrl;
+  final String type;
+  final String? apiKey;
+  final String? credentialKey;
+  final List<ImportedModel> models;
+}
+
+/// 提供商下的一个模型元数据。
+class ImportedModel {
+  const ImportedModel({
+    required this.model,
+    this.displayName = '',
+    this.maxContext = 0,
+  });
+
+  final String model;
+  final String displayName;
+  final int maxContext;
+}
+
 /// OpenCode JSON 里定义的一个 Agent，待物化为 `.nava/agents/<id>.md`。
-class ImportedAgent {
-  const ImportedAgent({
+class ImportedAgent {  const ImportedAgent({
     required this.id,
     required this.system,
     required this.global,

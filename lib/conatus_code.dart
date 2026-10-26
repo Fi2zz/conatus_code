@@ -90,7 +90,13 @@ export 'src/cli/opencode_import_plan.dart'
 export 'src/cli/opencode_import_source.dart'
     show OpenCodeDocument, OpenCodeSources, loadOpenCodeSources;
 export 'src/cli/opencode_import_types.dart'
-    show ImportedAgent, ImportedCommand, ImportedPermission, OpenCodeImport;
+    show
+        ImportedAgent,
+        ImportedCommand,
+        ImportedModel,
+        ImportedPermission,
+        ImportedProvider,
+        OpenCodeImport;
 export 'src/commands/command_definition.dart' show CommandDefinition;
 export 'src/commands/command_dispatcher.dart' show CommandDispatcher;
 export 'src/commands/command_expander.dart'

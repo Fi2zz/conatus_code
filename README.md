@@ -181,7 +181,10 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
 - 映射：`model`（去掉不支持的 `#variant`）、`default_agent`、`mcp.servers`
   （local / remote、`environment` / `headers` / `oauth`、`{env:NAME}` 占位符）、
   `permissions`（OpenCode 动作名归一为 nava 动作）、`instructions`、
-  `skills`（本地目录 → `extra_skill_dirs`，HTTP catalog 告警跳过）。
+  `skills`（本地目录 → `extra_skill_dirs`，HTTP catalog 告警跳过）、
+  `providers`（`settings.baseURL` + `apiKey` / `{env:NAME}` 导入为
+  `[providers.*]`，模型元数据导入为 `[models.*]`；只有 OAuth 登录态、没有
+  可读密钥的 provider 告警跳过）。
 - **JSON agents / commands 物化为 Markdown**：`agents.<id>` 写到
   `~/.nava/agents/<id>.md`（全局）或 `<workdir>/.nava/agents/<id>.md`（项目），
   `commands.<name>` 同理写到 `.nava/commands/`；现有 Agent / Command 注册表
@@ -189,8 +192,8 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
 - **不覆盖已有配置**：已有 `default_model` / `default_agent` / 同名 MCP /
   重复 permission 会跳过；顶层 `instructions` / `extra_skill_dirs` 已存在时
   整项跳过（不合并数组）。
-- `providers` / `plugins` / `lsp` / `references` / `policies` / `formatter` /
-  `tools` 暂不支持，逐项告警。
+- `plugins` / `lsp` / `references` / `policies` / `formatter` / `tools`
+  暂不支持，逐项告警。
 - `--write` 走 `writeConfigFile`：原子写、权限 0600；写入前先校验合并结果仍是
   合法 TOML。
 
@@ -624,6 +627,8 @@ type = "openai"         # openai→chat/completions；kimi→responses（缺省 
 
 - `type` 决定请求形态：`openai` 走 `chat/completions`，`kimi` 走 `responses`，
   `anthropic` 走 Anthropic Messages（`/messages`）。
+- `provider/model#variant` 写法可接受：variant 在构造 provider 前被去掉；
+  具体 variant 的请求参数（reasoning effort 等）因 provider 而异，暂不自动映射。
 - `oauth` 子表：字段保留（`key`）但**不实现** OAuth 调用；配了 `oauth.key` 且
   未配 `api_key` 的提供商启动时提示不可用，其余照常。
 

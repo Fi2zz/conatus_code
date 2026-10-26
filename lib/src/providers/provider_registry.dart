@@ -5,6 +5,7 @@ import 'package:conatus_credentials/conatus_credentials.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:http/http.dart' as http;
 
+import 'model_variant.dart';
 import 'opencode_session.dart';
 import 'provider_profile.dart';
 
@@ -85,7 +86,8 @@ class ProviderRegistry {
   /// Key 解析顺序：配置内 `apiKey` → 注入的 [Credentials]。
   LlmProvider? buildLlm(String name, {String? model}) {
     final ProviderProfile? profile = byName(name);
-    final String resolvedModel = model ?? profile?.defaultModel ?? '';
+    final String resolvedModel =
+        stripModelVariant(model ?? profile?.defaultModel ?? '');
     if (profile == null || resolvedModel.isEmpty) {
       return null;
     }

@@ -18,10 +18,32 @@ String applyOpenCodeImport(
   List<ImportedPermission> permissions = const <ImportedPermission>[],
   List<String> instructions = const <String>[],
   List<String> skillDirs = const <String>[],
+  List<ImportedProvider> providers = const <ImportedProvider>[],
 }) {
   String out = base;
   if (model != null) out = upsertDefaultModel(out, model);
   if (agent != null) out = _upsertAgentDefault(out, agent);
+  for (final ImportedProvider provider in providers) {
+    out = appendProviderSection(
+      out,
+      name: provider.name,
+      baseUrl: provider.baseUrl,
+      apiKey: provider.apiKey ?? '',
+      credentialKey: provider.credentialKey ?? '',
+      type: provider.type,
+    );
+    for (final ImportedModel item in provider.models) {
+      out = appendModelSection(
+        out,
+        provider: provider.name,
+        entry: ModelEntry(
+          id: item.model,
+          displayName: item.displayName,
+          maxContextSize: item.maxContext,
+        ),
+      );
+    }
+  }
   for (final McpServerSpec spec in mcp) {
     out = _append(out, renderMcpSection(spec));
   }

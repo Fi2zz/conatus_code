@@ -4,6 +4,15 @@
 
 ## [未发布]
 
+- **`provider/model#variant`**：模型引用接受 `#variant` 后缀，构造 provider 前
+  去掉；variant 的 reasoning effort 等请求参数因 provider 而异，暂不自动映射。
+
+- **OpenCode `providers` 导入**：`nava import opencode` 现在把
+  `settings.baseURL` + `apiKey` / `{env:NAME}` 映射为 `[providers.*]`，
+  `models` 的 `modelID` / `name` / `limit.context` 映射为 `[models.*]`；
+  只有 OAuth 登录态、没有可读密钥的 provider 会告警跳过。已有同名
+  provider / model 不覆盖。
+
 - **配置面审计**：移除/废弃一批“解析了但运行时没消费”的键——
   `[thinking]`、`[services]`、`[loop_control]`、`default_plan_mode`、
   `telemetry`，以及 `[models.*]` 的 `max_output_size` / `reasoning_key` /

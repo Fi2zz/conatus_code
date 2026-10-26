@@ -15,6 +15,8 @@ export 'src/providers/model_catalog.dart'
     show ModelCapability, ModelSpec, ProviderPreset, kProviderPresets;
 export 'src/providers/model_profile.dart'
     show ModelProfile, ModelProfileStore;
+export 'src/providers/model_variant.dart'
+    show modelVariant, stripModelVariant;
 export 'src/providers/models_dev.dart'
     show ModelsDevClient, ModelsDevException, ModelsDevModel, keepForCoding;
 export 'src/providers/opencode_session.dart'
