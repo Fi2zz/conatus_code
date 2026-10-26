@@ -8,6 +8,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:conatus_foundation/conatus_foundation.dart' show resolveHomeDir;
 import 'package:conatus_mcp/conatus_mcp.dart' show McpOAuthConfig;
 
 import 'config_schema.dart';
@@ -21,6 +22,56 @@ List<McpServerSpec> loadMcpJsonSpecs({
   void Function(String message)? onWarning,
 }) {
   final File file = File(_path(_projectRoot(workdir), '.mcp.json'));
+  return _loadSpecs(file, onWarning, sourceLabel: '项目 .mcp.json');
+}
+
+/// 读取全局 Claude Desktop 的 `claude_desktop_config.json`。
+///
+/// 查找顺序（后者覆盖前者同名 server）：macOS `~/Library/Application Support/
+/// Claude/`、`~/.config/Claude/`、`~/.config/claude/`，以及 `%APPDATA%/Claude/`。
+List<McpServerSpec> loadClaudeDesktopMcpSpecs({
+  String? homeDir,
+  Map<String, String>? env,
+  void Function(String message)? onWarning,
+}) {
+  final Map<String, String> source = env ?? Platform.environment;
+  final String home = homeDir ??
+      (source['HOME']?.trim().isNotEmpty == true
+          ? source['HOME']!.trim()
+          : resolveHomeDir());
+  final Map<String, McpServerSpec> merged = <String, McpServerSpec>{};
+  for (final String path in _claudePaths(home, source)) {
+    final File file = File(path);
+    if (!file.existsSync()) continue;
+    for (final McpServerSpec spec in _loadSpecs(
+      file,
+      onWarning,
+      sourceLabel: 'Claude Desktop 配置',
+    )) {
+      merged[spec.name] = spec;
+    }
+  }
+  return merged.values.toList(growable: false);
+}
+
+List<String> _claudePaths(String home, Map<String, String> env) {
+  final List<String> paths = <String>[
+    _path(home, 'Library/Application Support/Claude/claude_desktop_config.json'),
+    _path(home, '.config/Claude/claude_desktop_config.json'),
+    _path(home, '.config/claude/claude_desktop_config.json'),
+  ];
+  final String? appData = env['APPDATA']?.trim();
+  if (appData != null && appData.isNotEmpty) {
+    paths.add(_path(appData, 'Claude/claude_desktop_config.json'));
+  }
+  return paths;
+}
+
+List<McpServerSpec> _loadSpecs(
+  File file,
+  void Function(String message)? onWarning, {
+  required String sourceLabel,
+}) {
   if (!file.existsSync()) return const <McpServerSpec>[];
   final Object? decoded = _decode(file, onWarning);
   if (decoded is! Map) return const <McpServerSpec>[];
@@ -38,7 +89,7 @@ List<McpServerSpec> loadMcpJsonSpecs({
   if (specs.isNotEmpty) {
     _warn(
       onWarning,
-      '${file.path}：从项目 .mcp.json 加载 ${specs.length} 台 MCP server'
+      '${file.path}：从 $sourceLabel 加载 ${specs.length} 台 MCP server'
       '（stdio 子进程不经沙箱，请确认来源可信）。',
     );
   }
@@ -50,6 +101,8 @@ List<McpServerSpec> mergeMcpServerSpecs(
   List<McpServerSpec> primary,
   List<McpServerSpec> fallback, {
   void Function(String message)? onWarning,
+  String primaryLabel = 'config.toml',
+  String fallbackLabel = '.mcp.json',
 }) {
   final Set<String> names = <String>{};
   final List<McpServerSpec> merged = <McpServerSpec>[];
@@ -64,7 +117,8 @@ List<McpServerSpec> mergeMcpServerSpecs(
     }
     _warn(
       onWarning,
-      'MCP server ${spec.name} 在 config.toml 与 .mcp.json 重复，使用 config.toml。',
+      'MCP server ${spec.name} 在 $primaryLabel 与 $fallbackLabel 重复，'
+      '使用 $primaryLabel。',
     );
   }
   return merged;
@@ -74,6 +128,9 @@ List<McpServerSpec> mergeMcpServerSpecs(
 List<McpServerSpec> loadEffectiveMcpServers({
   required ConatusCodeConfig config,
   String? workdir,
+  String? homeDir,
+  Map<String, String>? env,
+  bool includeClaudeDesktop = false,
   void Function(String message)? onWarning,
 }) {
   final String dir = workdir ?? config.agent.workdir ?? Directory.current.path;
@@ -81,10 +138,23 @@ List<McpServerSpec> loadEffectiveMcpServers({
     workdir: dir,
     onWarning: onWarning,
   );
-  return mergeMcpServerSpecs(
+  final List<McpServerSpec> merged = mergeMcpServerSpecs(
     config.mcp.servers,
     external,
     onWarning: onWarning,
+  );
+  if (!includeClaudeDesktop) return merged;
+  final List<McpServerSpec> desktop = loadClaudeDesktopMcpSpecs(
+    homeDir: homeDir,
+    env: env,
+    onWarning: onWarning,
+  );
+  return mergeMcpServerSpecs(
+    merged,
+    desktop,
+    onWarning: onWarning,
+    primaryLabel: 'config.toml / .mcp.json',
+    fallbackLabel: 'claude_desktop_config.json',
   );
 }
 

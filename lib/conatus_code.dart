@@ -154,7 +154,11 @@ export 'src/config/config_writer.dart'
         writeConfigFile,
         writeFileAtomic;
 export 'src/config/mcp_json.dart'
-    show loadEffectiveMcpServers, loadMcpJsonSpecs, mergeMcpServerSpecs;
+    show
+        loadClaudeDesktopMcpSpecs,
+        loadEffectiveMcpServers,
+        loadMcpJsonSpecs,
+        mergeMcpServerSpecs;
 export 'src/config/project_data_dir.dart'
     show defaultProjectDataDir, projectDirProtected, resolveProjectDataDir;
 export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;

@@ -4,6 +4,11 @@
 
 ## [未发布]
 
+- **全局 Claude Desktop MCP**：运行时读取
+  `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）、
+  `~/.config/Claude/` 或 `%APPDATA%/Claude/`；同名优先级低于
+  `config.toml` 与项目 `.mcp.json`。`nava mcp list` 仍只列前两者。
+
 - **`provider/model#variant`**：模型引用接受 `#variant` 后缀，构造 provider 前
   去掉；variant 的 reasoning effort 等请求参数因 provider 而异，暂不自动映射。
 

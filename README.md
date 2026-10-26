@@ -545,6 +545,10 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
   `headers` / `oauth`）；同名 `[mcp.servers.*]` 优先，坏条目只告警跳过，
   `nava mcp list` 与 `/mcp` 都会包含它们。`.mcp.json` 是**项目文件**，stdio
   子进程不经沙箱，启动时会提示来源——只在你信任该仓库时使用。
+- **全局 Claude Desktop 配置**：运行时还会读取
+  `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）、
+  `~/.config/Claude/claude_desktop_config.json` 或 `%APPDATA%/Claude/...`；
+  优先级低于 `config.toml` 与项目 `.mcp.json`。`nava mcp list` 仍只列前两者。
 - 远程 server **缺省尝试 OAuth**：令牌存 `~/.nava/oauth/<server>.json`（文件 0600、
   目录 0700，含 DCR `client_id` 以便新进程刷新），过期前 60 秒自动刷新；没有令牌
   时先按未鉴权连接，服务端真返回 401 才标记 `needs_auth` 并只跳过该 server。

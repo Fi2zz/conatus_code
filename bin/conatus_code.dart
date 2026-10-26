@@ -143,6 +143,7 @@ Future<void> main(List<String> args) async {
   final List<McpServerSpec> mcpServers = loadEffectiveMcpServers(
     config: config,
     workdir: workdir,
+    includeClaudeDesktop: true,
     onWarning: stderr.writeln,
   );
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(

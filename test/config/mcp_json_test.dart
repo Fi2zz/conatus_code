@@ -208,4 +208,61 @@ command = "npx"
       'json-server',
     ]);
   });
+
+  test('全局 Claude Desktop 配置：读取与优先级', () {
+    final Directory home = _temp();
+    final Directory work = _temp();
+    final File desktop = File(
+      _path(
+        home,
+        'Library/Application Support/Claude/claude_desktop_config.json',
+      ),
+    )..parent.createSync(recursive: true);
+    desktop.writeAsStringSync(
+      '{"mcpServers":{"desktop":{"command":"npx"},"shared":{"command":"desktop"}}}',
+    );
+    _writeJson(work, <String, Object?>{
+      'mcpServers': <String, Object?>{
+        'project': <String, Object?>{'command': 'npx'},
+        'shared': <String, Object?>{'command': 'project'},
+      },
+    });
+    final File config = File(_path(work, 'config.toml'));
+    config.writeAsStringSync('''
+[agent]
+workdir = "${work.path}"
+
+[mcp.servers.toml]
+command = "npx"
+
+[mcp.servers.shared]
+command = "toml"
+''');
+    final ConatusCodeConfig loaded = loadConfig(path: config.path);
+
+    final List<McpServerSpec> global = loadClaudeDesktopMcpSpecs(
+      homeDir: home.path,
+    );
+    expect(global.map((McpServerSpec spec) => spec.name), <String>[
+      'desktop',
+      'shared',
+    ]);
+
+    final List<McpServerSpec> merged = loadEffectiveMcpServers(
+      config: loaded,
+      workdir: work.path,
+      homeDir: home.path,
+      includeClaudeDesktop: true,
+    );
+    expect(merged.map((McpServerSpec spec) => spec.name), <String>[
+      'toml',
+      'shared',
+      'project',
+      'desktop',
+    ]);
+    expect(
+      merged.firstWhere((McpServerSpec spec) => spec.name == 'shared').command,
+      'toml',
+    );
+  });
 }
