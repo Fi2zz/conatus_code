@@ -308,9 +308,9 @@ class TuiStatusBar extends StatelessComponent {
     return '$_statusText$permission   $modelLabel';
   }
 
-  /// 当前运行状态：运行中带秒数；完成 15 秒内显示时长；否则等待输入。
+  /// 当前运行状态：忙碌时只显示时长；完成 15 秒内显示状态与时长；否则等待输入。
   String get _statusText {
-    if (busy) return '${tuiSpinner(tick)} 运行中 ${_elapsed(turnElapsed)}';
+    if (busy) return '${tuiSpinner(tick)} ${_elapsed(turnElapsed)}';
     final Duration? recent = recentTurnDuration;
     if (recent != null) {
       return '${recentTurnStatus ?? '✓ 完成'} ${_elapsed(recent)}';

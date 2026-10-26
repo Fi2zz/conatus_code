@@ -69,7 +69,7 @@ void main() {
     expect(tester.terminalState, containsText('已排队 2 条'));
   });
 
-  test('busy 时「运行中」动画保留在状态栏（不阻塞输入）', () async {
+  test('busy 时时长保留在状态栏（不阻塞输入）', () async {
     final NoctermTester tester = await NoctermTester.create(
       size: const Size(120, 12),
     );
@@ -84,7 +84,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(tester.terminalState, containsText('运行中'));
+    expect(tester.terminalState, containsText('0s'));
     expect(tester.terminalState, containsText('esc interrupt'));
   });
 }
