@@ -47,11 +47,15 @@ Future<String> _expandTemplate(
   List<String> tokens,
   Future<String> Function(String) runShell,
 ) async {
+  // 最高位只看文本片段：shell 块里的 `$1` 原样执行，不参与展开。
+  final int highest = _highestPlaceholder(
+    template.replaceAll(_shellBlock, ''),
+  );
   final StringBuffer output = StringBuffer();
   int last = 0;
   for (final RegExpMatch match in _shellBlock.allMatches(template)) {
     final String text = template.substring(last, match.start);
-    output.write(_substitute(text, arguments, tokens));
+    output.write(_substitute(text, arguments, tokens, highest));
     final String command = match.group(1)!.trim();
     if (command.isNotEmpty) {
       output.write(_truncate((await runShell(command)).trim()));
@@ -59,20 +63,43 @@ Future<String> _expandTemplate(
     last = match.end;
   }
   final String tail = template.substring(last);
-  output.write(_substitute(tail, arguments, tokens));
+  output.write(_substitute(tail, arguments, tokens, highest));
   return output.toString();
 }
 
+/// 模板里最高的数字占位符下标；没有数字占位符时返回 0。
+int _highestPlaceholder(String template) {
+  int highest = 0;
+  for (final RegExpMatch match in _placeholder.allMatches(template)) {
+    final String key = match.group(1)!;
+    if (key == 'ARGUMENTS') continue;
+    final int index = int.parse(key);
+    if (index > highest) highest = index;
+  }
+  return highest;
+}
+
 /// 占位符单遍替换，避免参数内容里的 `$1` 被二次展开。
-String _substitute(String template, String arguments, List<String> tokens) =>
+///
+/// 与 OpenCode 一致：**最高位**占位符吃掉从它开始的所有 token（空格连接），
+/// 其余位置只取单个 token；越界为空串。
+String _substitute(
+  String template,
+  String arguments,
+  List<String> tokens,
+  int highest,
+) =>
     template.replaceAllMapped(_placeholder, (Match match) {
       final String key = match.group(1)!;
       if (key == 'ARGUMENTS') return arguments;
-      return _token(tokens, int.parse(key));
+      return _token(tokens, int.parse(key), highest);
     });
 
-String _token(List<String> tokens, int index) =>
-    index <= tokens.length ? tokens[index - 1] : '';
+String _token(List<String> tokens, int index, int highest) {
+  if (index > tokens.length) return '';
+  if (index == highest) return tokens.sublist(index - 1).join(' ');
+  return tokens[index - 1];
+}
 
 /// 按空白分词，支持单/双引号分组；未闭合引号吞到参数末尾。
 ///

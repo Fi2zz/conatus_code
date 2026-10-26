@@ -45,6 +45,55 @@ void main() {
     expect(await expandCommand(def, "'a b' c", runShell: runNothing), 'a b|c');
   });
 
+  test(r'最高位 $N 吃掉剩余参数（OpenCode 语义）', () async {
+    const CommandDefinition def = CommandDefinition(
+      name: 'x',
+      template: 'Compare \$1 with \$2.',
+      sourcePath: '',
+    );
+
+    expect(
+      await expandCommand(def, 'api stable branch', runShell: runNothing),
+      'Compare api with stable branch.',
+    );
+  });
+
+  test(r'$1 是最高位时吃掉全部参数', () async {
+    const CommandDefinition def = CommandDefinition(
+      name: 'x',
+      template: '\$1',
+      sourcePath: '',
+    );
+
+    expect(
+      await expandCommand(def, 'a "b c" d', runShell: runNothing),
+      'a b c d',
+    );
+  });
+
+  test(r'非最高位 $N 仍只取单个 token', () async {
+    const CommandDefinition def = CommandDefinition(
+      name: 'x',
+      template: '\$1|\$3',
+      sourcePath: '',
+    );
+
+    expect(
+      await expandCommand(def, 'a b c d', runShell: runNothing),
+      'a|c d',
+    );
+  });
+
+  test(r'最高位越界时为空串', () async {
+    const CommandDefinition def = CommandDefinition(
+      name: 'x',
+      template: '[\$3]',
+      sourcePath: '',
+    );
+
+    expect(await expandCommand(def, 'a b', runShell: runNothing), '[]');
+  });
+
   test('无占位符时非空参数追加到末尾（空行分隔）', () async {
     const CommandDefinition def = CommandDefinition(
       name: 'x',

@@ -57,6 +57,7 @@ const Map<String, String> _openCodeTools = <String, String>{
   'glob': 'glob',
   'webfetch': 'fetch_url',
   'websearch': 'web_search',
+  'question': 'ask_user',
   'subagent': 'spawn_agent',
   'task': 'spawn_agent',
   'list': 'list_files',

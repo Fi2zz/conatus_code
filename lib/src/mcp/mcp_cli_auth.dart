@@ -10,6 +10,7 @@ Future<int> _auth(
   final ({McpServerSpec? spec, String? error}) resolved = _findServer(
     name,
     configPath,
+    onWarning: (String message) => _err(deps).writeln(message),
   );
   final McpServerSpec? spec = resolved.spec;
   if (spec == null) {
@@ -67,19 +68,27 @@ McpOAuthStore? _oauthStore(McpCliDeps deps) {
   }
 }
 
-McpConfig _loadMcp(String path) =>
-    ConfigParser(decodeToml(File(path)), path).parse().mcp;
+List<McpServerSpec> _loadEffectiveMcp(
+  String path, {
+  void Function(String message)? onWarning,
+}) {
+  final ConatusCodeConfig config = File(path).existsSync()
+      ? ConfigParser(decodeToml(File(path)), path).parse()
+      : const ConatusCodeConfig();
+  return loadEffectiveMcpServers(config: config, onWarning: onWarning);
+}
 
 ({McpServerSpec? spec, String? error}) _findServer(
   String name,
-  String? configPath,
-) {
+  String? configPath, {
+  void Function(String message)? onWarning,
+}) {
   final String path = configPath ?? resolveConfigPath();
-  if (!File(path).existsSync()) {
-    return (spec: null, error: '找不到 MCP server $name（$path 不存在）。');
-  }
   try {
-    for (final McpServerSpec spec in _loadMcp(path).servers) {
+    for (final McpServerSpec spec in _loadEffectiveMcp(
+      path,
+      onWarning: onWarning,
+    )) {
       if (spec.name == name) return (spec: spec, error: null);
     }
     return (spec: null, error: '找不到 MCP server $name（$path）。');

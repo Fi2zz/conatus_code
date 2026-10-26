@@ -7,22 +7,21 @@ Future<int> _list(
 ) async {
   if (args.isNotEmpty) return _usageError(deps, 'list 不接受参数。');
   final String path = configPath ?? resolveConfigPath();
-  if (!File(path).existsSync()) {
-    _out(deps).writeln('没有配置 MCP server。');
-    return 0;
-  }
-  final McpConfig mcp;
+  final List<McpServerSpec> servers;
   try {
-    mcp = _loadMcp(path);
+    servers = _loadEffectiveMcp(
+      path,
+      onWarning: (String message) => _err(deps).writeln(message),
+    );
   } on ConfigException catch (error) {
     _err(deps).writeln('配置错误：${error.message}');
     return 2;
   }
-  if (mcp.servers.isEmpty) {
+  if (servers.isEmpty) {
     _out(deps).writeln('没有配置 MCP server。');
     return 0;
   }
-  for (final McpServerSpec spec in mcp.servers) {
+  for (final McpServerSpec spec in servers) {
     _out(deps).writeln(_describeServer(spec));
   }
   return 0;

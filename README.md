@@ -310,18 +310,27 @@ leader = "ctrl+x"
 
 **自定义命令**：`.opencode/commands/**/*.md`（只读兼容）与
 `.nava/commands/**/*.md`（项目 / 全局）发现为 `/<相对路径>`。正文是 prompt，
-`$ARGUMENTS` 展开用户参数；frontmatter 支持 `agent:`、`model:` 与
+`$ARGUMENTS` 展开完整参数，`$1..$9` 按位置取参且**最高位吃掉剩余 token**
+（与 OpenCode 一致）；`` !`命令` `` 块先执行再把输出插进提示词。frontmatter
+支持 `agent:`、`model:` 与
 `subagent: true`（前台跑 `spawn_agent`，命令与结果作为 `user/message` /
 `tool/result` 进会话）。`subagent: true` 的 `model:` 不生效（模型由 agent 定义
 决定），会明确提示。
 
 **自定义 Agent**：`.opencode/agents/**/*.md` 与 `.nava/agents/**/*.md`；同名覆盖
 内置 `build` / `plan` / `general` / `explore`。frontmatter 支持 `mode`
-（`primary` / `subagent` / `all`）、`model`、`steps`、`tools` 白名单 / 开关与
-`permission`。`[agent] default_agent` 决定新会话默认值。内置 `general` 显式列出
+（`primary` / `subagent` / `all`）、`model`、`steps`、`tools` 白名单 / 开关、
+V2 的 `permissions` 数组与 V1 的 `permission` 映射；OpenCode 工具名会归一
+（`question`→`ask_user`、`todowrite`→`update_plan` 等）。`[agent] default_agent`
+决定新会话默认值。内置 `general` 显式列出
 可写工具白名单（read / write / edit / git 读写 / web），但 high 风险工具
 （`run_command`、`run_tests`、`git_commit`）与 `spawn_agent` 仍被框架挡在子
 Agent 之外。
+
+**技能发现**：项目 `.conatus/skills` → `.opencode/skills` → `.agents/skills` →
+`.claude/skills`，用户 `~/.nava/skills` → `~/.config/opencode/skills` →
+`~/.agents/skills` → `~/.claude/skills`；同名由前者胜出。OpenCode / Claude
+的技能目录无需软链即可直接读取。
 
 **MCP CLI**：`nava mcp add <名字> --url <http(s) 地址>` / `-- <命令...>`、
 `list`、`auth`、`logout`；`--config` / `NAVA_HOME` 可覆盖配置位置。写路径统一
@@ -484,6 +493,11 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
 风险映射后按当前权限模式走审批；`/mcp` 查看已接入的 server（就绪状态 / 工具数）。
 
 - `type`：`stdio`（本地子进程，`command` + `args`）/ `http` / `sse`（远程端点 `url`）。
+- **项目根 `.mcp.json` 直接兼容**：Claude Code / OpenCode 生态的 `mcpServers`
+  形状会被读取并映射成同样的声明（`command` / `args` / `env` / `url` /
+  `headers` / `oauth`）；同名 `[mcp.servers.*]` 优先，坏条目只告警跳过，
+  `nava mcp list` 与 `/mcp` 都会包含它们。`.mcp.json` 是**项目文件**，stdio
+  子进程不经沙箱，启动时会提示来源——只在你信任该仓库时使用。
 - 远程 server **缺省尝试 OAuth**：令牌存 `~/.nava/oauth/<server>.json`（文件 0600、
   目录 0700，含 DCR `client_id` 以便新进程刷新），过期前 60 秒自动刷新；没有令牌
   时先按未鉴权连接，服务端真返回 401 才标记 `needs_auth` 并只跳过该 server。

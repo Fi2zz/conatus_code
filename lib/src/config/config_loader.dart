@@ -58,6 +58,8 @@ const String kDefaultConfigToml = '''
 # FIRECRAWL_API_KEY = "fc-..."
 
 # MCP server：工具经 server__tool 前缀接入；env / headers 支持 \${KEY} 占位符。
+# 项目根 .mcp.json（Claude Code / OpenCode 的 mcpServers）也会自动读取，
+# 同名 [mcp.servers.*] 优先；.mcp.json 是项目文件，stdio 子进程不经沙箱。
 # [mcp.servers.filesystem]
 # type = "stdio"           # stdio 用 command；http / sse 用 url
 # command = "npx"

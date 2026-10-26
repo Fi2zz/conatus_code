@@ -152,6 +152,29 @@ void main() {
       expect(lines[1], 'fs\tstdio\tnpx server-filesystem');
     });
 
+    test('合并项目 .mcp.json，TOML 同名优先', () async {
+      File(path).writeAsStringSync('''
+[agent]
+workdir = "${dir.path}"
+
+[mcp.servers.toml]
+command = "npx"
+''');
+      File('${dir.path}${Platform.pathSeparator}.mcp.json').writeAsStringSync(
+        '{"mcpServers":{"json":{"command":"node","args":["server.js"]},'
+        '"toml":{"command":"ignored"}}}',
+      );
+      out.clear();
+
+      final int code = await run(<String>['list']);
+
+      expect(code, 0);
+      expect(out.toString(), contains('toml\tstdio\tnpx'));
+      expect(out.toString(), contains('json\tstdio\tnode server.js'));
+      expect(out.toString(), isNot(contains('ignored')));
+      expect(err.toString(), contains('toml'));
+    });
+
     test('带空白的命令参数加引号', () async {
       await run(<String>[
         'add',

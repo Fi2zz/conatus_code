@@ -26,6 +26,14 @@ class ApplyPatchTool extends Tool {
   @override
   Future<ToolResult> call(ToolContext ctx) async {
     final String patch = ctx.str('patch');
+    if (_openCodePatch(patch)) {
+      const String message =
+          'OpenCode *** 补丁格式暂不支持，请改用 unified diff（---/+++）';
+      return ToolResult.failure(
+        message,
+        error: const ToolError('PATCH_UNSUPPORTED', message),
+      );
+    }
     final List<FileDiff> files = parseUnifiedDiff(patch);
     if (files.isEmpty) {
       return ToolResult.failure(
@@ -88,3 +96,13 @@ class ApplyPatchTool extends Tool {
     }
   }
 }
+
+/// OpenCode / Codex 的 `***` 补丁头；目前明确降级，不尝试按 unified diff 解析。
+const List<String> _openCodeMarkers = <String>[
+  '*** Begin Patch',
+  '*** Add File:',
+  '*** Update File:',
+  '*** Delete File:',
+];
+
+bool _openCodePatch(String patch) => _openCodeMarkers.any(patch.contains);

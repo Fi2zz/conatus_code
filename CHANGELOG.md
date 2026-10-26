@@ -4,6 +4,21 @@
 
 ## [未发布]
 
+- **OpenCode / Claude 技能发现根**：`defaultSkillRoots` 新增项目
+  `.opencode/skills`（150）、`.claude/skills`（275）与用户
+  `~/.config/opencode/skills`（450）、`~/.claude/skills`（550）；nava 原生
+  `.conatus/skills` 仍最优先。默认根组装移到 `skill_default_roots.dart`，
+  文件不再越过行数约束。
+- **OpenCode 命令位置参数**：最高位 `$N` 吃掉剩余 token（`$1` 单独出现即
+  全部参数），其余位置仍只取单个 token，与 OpenCode 语义一致。
+- **MCP `.mcp.json`**：读取项目根（最近含 `.git` 的祖先）的 `mcpServers`，
+  映射为 `McpServerSpec`（stdio / http / sse、env / headers / oauth）；
+  `[mcp.servers.*]` 同名优先，坏条目告警跳过。`nava mcp list` / `auth` 与
+  运行时装配都走同一份合并结果。
+- **Agent 工具名映射补 `question` → `ask_user`**；`apply_patch` 遇到
+  OpenCode `*** Begin Patch` 系列格式时明确返回 `PATCH_UNSUPPORTED`，不再
+  误报 `PATCH_INVALID`。
+
 - **会话标签 / 主题 / 键位**：标签栏（`ctrl+tab` / `ctrl+shift+tab` 切换、
   `<leader>w` 关闭，提示取自 keymap）、`/theme`（default / dark / light /
   tokyonight）与 `[keybinds]` 可配置动作（含冲突与未知动作告警）。每个标签

@@ -133,6 +133,11 @@ Future<void> main(List<String> args) async {
     model = defaultModel.substring(slash + 1);
   }
   final HarnessManifest? harness = _loadHarness(options.harnessPath);
+  final List<McpServerSpec> mcpServers = loadEffectiveMcpServers(
+    config: config,
+    workdir: workdir,
+    onWarning: stderr.writeln,
+  );
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
     baseDir: projectDataDir,
     configPath: resolveConfigPath(explicit: options.configPath),
@@ -156,7 +161,7 @@ Future<void> main(List<String> args) async {
     credentials: ConfigCredentials(config),
     fs: layers.fs,
     shell: layers.shell,
-    mcpServers: config.mcp.servers,
+    mcpServers: mcpServers,
     interactive: !headless,
     workdir: workdir,
     checkpoint: config.checkpoint,

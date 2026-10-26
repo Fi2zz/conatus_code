@@ -169,5 +169,24 @@ void main() {
       expect(result.isError, isTrue);
       expect(result.error!.code, 'PATCH_UNSUPPORTED');
     });
+
+    test('OpenCode *** 格式明确降级为 PATCH_UNSUPPORTED', () async {
+      const String patch = '''
+*** Begin Patch
+*** Update File: a.txt
+@@
+-old
++new
+*** End Patch
+''';
+
+      final ToolResult result = await tool.call(
+        _context(<String, Object?>{'patch': patch}),
+      );
+
+      expect(result.isError, isTrue);
+      expect(result.error!.code, 'PATCH_UNSUPPORTED');
+      expect(result.error!.message, contains('unified'));
+    });
   });
 }

@@ -56,6 +56,19 @@ body
     expect(def.disabledTools, isEmpty);
   });
 
+  test('question 工具名映射为 ask_user', () {
+    final AgentDefinition def = parse('''
+---
+tools:
+  - question
+  - todowrite
+---
+body
+''');
+
+    expect(def.tools, <String>['ask_user', 'update_plan']);
+  });
+
   test('tools: [] 表示禁止所有工具', () {
     final AgentDefinition def = parse('''
 ---

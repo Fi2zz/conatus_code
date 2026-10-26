@@ -42,17 +42,21 @@ Claude Code 插件仓库的目录形态——够用，缺的只是挂接点。�
 | 层级 | 路径 | rank |
 |---|---|---|
 | 项目 | `<项目根>/.conatus/skills/` | 100 |
+| 项目 | `<项目根>/.opencode/skills/` | 150 |
 | 项目 | `<项目根>/.agents/skills/` | 200 |
+| 项目 | `<项目根>/.claude/skills/` | 275 |
 | 用户 | `$CONATUS_HOME/skills/`（缺省 `~/.conatus/skills/`） | 400 |
+| 用户 | `~/.config/opencode/skills/` | 450 |
 | 用户 | `$CONATUS_AGENTS_HOME/skills/`（缺省 `~/.agents/skills/`） | 500 |
+| 用户 | `~/.claude/skills/` | 550 |
 
 项目根 = 最近的含 `.git` 的祖先目录。frontmatter 支持
 `name` / `description` / `whenToUse` / `disable-model-invocation`，
 与主流技能格式兼容。
 
-**`.agents/skills` 是跨宿主约定**：Claude Code、Codex 等都认这个目录，
-项目级技能放这里对所有宿主同时生效。Claude 侧独有的 `.claude/skills/`
-不在默认发现根，软链即可接入（是否要把它加进默认根，见文末兼容性矩阵）。
+**`.opencode/skills` / `.agents/skills` / `.claude/skills` 都已是默认发现根**：
+OpenCode 项目技能、跨宿主 `.agents` 约定与 Claude 侧技能目录都能直接读取，
+不需要软链；nava 自己的 `.conatus/skills` 排在最前，同名时优先。
 
 ### 兼容细节：commands/*.md 直接可读
 
@@ -128,10 +132,12 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${KEY} 经凭据服务解析
 ### 与生态标准配置形状的关系
 
 生态里 MCP 的标准配置形状是 `mcpServers` JSON（Claude Desktop 的
-`claude_desktop_config.json`、项目级的 `.mcp.json`）。nava 目前只认
-config.toml 的 `[mcp.servers.*]`——形状等价但格式不同。支持直接读取项目级
-`.mcp.json` 是个小改动（解析后映射进现有 `McpServerSpec` 装配，不新增
-机制），属于兼容性矩阵里的待办项。
+`claude_desktop_config.json`、项目级的 `.mcp.json`）。nava 现在**直接读取项目根
+的 `.mcp.json`**（最近的含 `.git` 的祖先目录），把 `mcpServers` 映射进现有
+`McpServerSpec` 装配；同名 `[mcp.servers.*]` 优先，坏条目只告警跳过。
+`.mcp.json` 是项目文件，stdio 子进程不经 Layer 2 沙箱，启动时会提示来源——
+只在你信任该仓库时使用。全局 `claude_desktop_config.json` 仍建议转成
+config.toml（或放到项目 `.mcp.json`）。
 
 ### 注意事项
 
@@ -237,9 +243,9 @@ args = ["/home/you/.nava/wrappers/thing/server.mjs"]
 
 | 现有体系 | 约定 | nava 现状 | 差距 |
 |---|---|---|---|
-| Skills | SKILL.md + frontmatter，`.agents/skills` | 发现根含项目/用户级 `.agents/skills`，frontmatter 兼容 | ✅ 基本零差距；`.claude/skills` 软链可入 |
-| Claude Code 插件 | 仓库含 `skills/` `commands/` `agents/` `hooks/` | `skills/`、`commands/` 软链可入（`commands/*.md` 按散落 `.md` 技能直接读）；`agents/`、`hooks/` 无对应 | ○ 主体可用；SessionStart hook 是缺口 |
-| MCP | `mcpServers` JSON（`.mcp.json` / `claude_desktop_config.json`） | 自有 TOML `[mcp.servers.*]`，形状等价 | ⚠️ 待支持读取 `.mcp.json`（小改动） |
+| Skills | SKILL.md + frontmatter，`.opencode/skills` / `.agents/skills` / `.claude/skills` | 三类目录都是默认发现根，frontmatter 兼容 | ✅ 零差距 |
+| Claude Code 插件 | 仓库含 `skills/` `commands/` `agents/` `hooks/` | `skills/` 直接可读；`commands/*.md` 软链或按散落 `.md` 技能读；`agents/`、`hooks/` 无对应 | ○ 主体可用；SessionStart hook 是缺口 |
+| MCP | `mcpServers` JSON（`.mcp.json` / `claude_desktop_config.json`） | 项目 `.mcp.json` 直接读取并映射进 `[mcp.servers.*]`；同名 TOML 优先 | ✅ 项目级零差距；全局 `claude_desktop_config.json` 仍建议转 TOML |
 | Hooks | Claude `settings.json` 结构化 hooks（matcher 等） | `[hooks]` 命令列表，事件名对照兼容 | ○ 手工改写，不做自动映射 |
 | superpowers | 技能目录软链 + SessionStart 注入 | 技能软链 ✅ | ⚠️ bootstrap 强制注入缺口（见形态一） |
 

@@ -15,6 +15,7 @@ import '../config/config_mcp_writer.dart';
 import '../config/config_parser.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
+import '../config/mcp_json.dart';
 import '../read_only_paths.dart';
 
 part 'mcp_cli_add.dart';
