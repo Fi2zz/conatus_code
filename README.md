@@ -174,15 +174,17 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
   （全局 → 项目直接配置 → `.opencode`，后者覆盖前者）。
 - 映射：`model`（去掉不支持的 `#variant`）、`default_agent`、`mcp.servers`
   （local / remote、`environment` / `headers` / `oauth`、`{env:NAME}` 占位符）、
-  `permissions`（OpenCode 动作名归一为 nava 动作）、`instructions`。
+  `permissions`（OpenCode 动作名归一为 nava 动作）、`instructions`、
+  `skills`（本地目录 → `extra_skill_dirs`，HTTP catalog 告警跳过）。
 - **JSON agents / commands 物化为 Markdown**：`agents.<id>` 写到
   `~/.nava/agents/<id>.md`（全局）或 `<workdir>/.nava/agents/<id>.md`（项目），
   `commands.<name>` 同理写到 `.nava/commands/`；现有 Agent / Command 注册表
   直接发现，不需要新的运行时接口。已有同名文件不覆盖。
 - **不覆盖已有配置**：已有 `default_model` / `default_agent` / 同名 MCP /
-  重复 permission 会跳过；顶层 `instructions` 已存在时整项跳过（不合并数组）。
+  重复 permission 会跳过；顶层 `instructions` / `extra_skill_dirs` 已存在时
+  整项跳过（不合并数组）。
 - `providers` / `plugins` / `lsp` / `references` / `policies` / `formatter` /
-  `tools` / `skills` 暂不支持，逐项告警。
+  `tools` 暂不支持，逐项告警。
 - `--write` 走 `writeConfigFile`：原子写、权限 0600；写入前先校验合并结果仍是
   合法 TOML。
 
@@ -360,7 +362,9 @@ Agent 之外。
 **技能发现**：项目 `.conatus/skills` → `.opencode/skills` → `.agents/skills` →
 `.claude/skills`，用户 `~/.nava/skills` → `~/.config/opencode/skills` →
 `~/.agents/skills` → `~/.claude/skills`；同名由前者胜出。OpenCode / Claude
-的技能目录无需软链即可直接读取。
+的技能目录无需软链即可直接读取。顶层 `extra_skill_dirs` 可追加额外目录
+（相对 workdir / 绝对路径 / `~`）；`merge_all_available_skills = true` 会把
+`disable-model-invocation` 的技能也放进模型可见目录（缺省 `false`）。
 
 **MCP CLI**：`nava mcp add <名字> --url <http(s) 地址>` / `-- <命令...>`、
 `list`、`auth`、`logout`；`--config` / `NAVA_HOME` 可覆盖配置位置。写路径统一

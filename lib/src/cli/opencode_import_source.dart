@@ -30,10 +30,17 @@ class OpenCodeDocument {
 
 /// 发现结果：[documents] 按优先级从低到高排列。
 class OpenCodeSources {
-  const OpenCodeSources({required this.documents, required this.warnings});
+  const OpenCodeSources({
+    required this.documents,
+    required this.warnings,
+    this.workdir = '.',
+  });
 
   final List<OpenCodeDocument> documents;
   final List<String> warnings;
+
+  /// 项目发现起点；`skills` 里的相对路径按它解析。
+  final String workdir;
 
   bool get isEmpty => documents.isEmpty;
 }
@@ -65,7 +72,11 @@ OpenCodeSources loadOpenCodeSources({
     );
     if (document != null) documents.add(document);
   }
-  return OpenCodeSources(documents: documents, warnings: warnings);
+  return OpenCodeSources(
+    documents: documents,
+    warnings: warnings,
+    workdir: workdir,
+  );
 }
 
 String _globalConfigDir(String? homeDir, Map<String, String>? env) {

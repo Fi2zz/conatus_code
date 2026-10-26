@@ -31,6 +31,7 @@ OpenCodeImport _import() => const OpenCodeImport(
     ),
   ],
   instructions: <String>['CONTRIBUTING.md'],
+  skillDirs: <String>['/tmp/team-skills'],
 );
 
 void _expectParseable(String toml) {
@@ -53,8 +54,9 @@ void main() {
     expect(plan.updatedToml, contains(r'env = { TOKEN = "${TOKEN}" }'));
     expect(plan.updatedToml, contains('[[permissions]]'));
     expect(plan.updatedToml, contains('instructions = [ "CONTRIBUTING.md" ]'));
+    expect(plan.updatedToml, contains('extra_skill_dirs = [ "/tmp/team-skills" ]'));
     expect(plan.snippet, contains('[mcp.servers.fs]'));
-    expect(plan.added, hasLength(6));
+    expect(plan.added, hasLength(7));
     expect(plan.skipped, isEmpty);
   });
 

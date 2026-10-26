@@ -4,6 +4,8 @@
 /// 等先告警跳过，避免写出运行时不生效的配置。
 library;
 
+import 'dart:io';
+
 import '../config/config_schema.dart';
 import 'opencode_import_command_defs.dart';
 import 'opencode_import_definitions.dart';
@@ -28,12 +30,13 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
   final Map<String, McpServerSpec> mcp = <String, McpServerSpec>{};
   final List<ImportedPermission> permissions = <ImportedPermission>[];
   final List<String> instructions = <String>[];
+  final List<String> skillDirs = <String>[];
+  final Set<String> seenSkillDirs = <String>{};
   final Set<String> ignored = <String>{};
   final Map<String, ImportedAgent> agents = <String, ImportedAgent>{};
   final Map<String, ImportedCommand> commands = <String, ImportedCommand>{};
   String? model;
   String? defaultAgent;
-  bool skillsRequested = false;
   for (final OpenCodeDocument document in sources.documents) {
     final Map<String, Object?> values = document.values;
     model = _model(values['model'], document.path, warnings) ?? model;
@@ -46,6 +49,15 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     );
     instructions.addAll(
       _instructions(values['instructions'], document.path, warnings),
+    );
+    skillDirs.addAll(
+      _skillDirs(
+        values['skills'],
+        sources.workdir,
+        document.path,
+        warnings,
+        seenSkillDirs,
+      ),
     );
     for (final ImportedAgent agent in mapOpenCodeAgents(
       values['agents'],
@@ -64,7 +76,6 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
       commands[command.name] = command;
     }
     ignored.addAll(_ignoredKeys.where(values.containsKey));
-    skillsRequested = skillsRequested || values.containsKey('skills');
   }
   for (final String key in _ignoredKeys) {
     if (!ignored.contains(key)) continue;
@@ -74,17 +85,13 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     }
     warnings.add('opencode 的 $key 暂不支持，已忽略。');
   }
-  if (skillsRequested) {
-    warnings.add(
-      'opencode 的 skills 数组暂不支持；请把技能放到 .opencode/skills 或 .agents/skills。',
-    );
-  }
   return OpenCodeImport(
     model: model,
     defaultAgent: defaultAgent,
     mcpServers: mcp.values.toList(growable: false),
     permissions: List<ImportedPermission>.unmodifiable(permissions),
     instructions: List<String>.unmodifiable(instructions),
+    skillDirs: List<String>.unmodifiable(skillDirs),
     agents: agents.values.toList(growable: false),
     commands: commands.values.toList(growable: false),
     warnings: List<String>.unmodifiable(warnings),
@@ -127,6 +134,42 @@ void _mcp(
     );
     if (spec != null) target[name] = spec;
   }
+}
+
+List<String> _skillDirs(
+  Object? raw,
+  String workdir,
+  String source,
+  List<String> warnings,
+  Set<String> seen,
+) {
+  if (raw == null) return const <String>[];
+  if (raw is! List) {
+    warnings.add('$source: skills 必须是数组，已忽略。');
+    return const <String>[];
+  }
+  final List<String> result = <String>[];
+  for (final Object? item in raw) {
+    if (item is! String) continue;
+    final String value = item.trim();
+    if (value.isEmpty) continue;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      warnings.add('$source: HTTP 技能目录暂不支持，已跳过：$value');
+      continue;
+    }
+    String relative = value;
+    while (relative.startsWith('./')) {
+      relative = relative.substring(2);
+    }
+    if (relative.isEmpty) continue;
+    final String path = value.startsWith('/') || value.startsWith('~')
+        ? value
+        : '$workdir${Platform.pathSeparator}'
+            '${relative.replaceAll('/', Platform.pathSeparator)}';
+    if (!seen.add(path)) continue;
+    result.add(path);
+  }
+  return result;
 }
 
 List<String> _instructions(

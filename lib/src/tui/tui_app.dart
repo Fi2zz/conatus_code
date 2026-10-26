@@ -180,6 +180,8 @@ class ConatusTuiRuntime {
     String? configPath,
     bool webTools = true,
     bool skills = true,
+    List<String> extraSkillDirs = const <String>[],
+    bool mergeAllSkills = false,
     List<ProviderConfig>? providers,
     List<ModelConfig>? models,
     String? provider,
@@ -763,9 +765,12 @@ class ConatusTuiRuntime {
     provideSkillLibrary(app);
     if (skills) {
       await provideSkillRegistry(app);
-      provideSkillCatalog(app);
-      provideSkillTool(app);
-      await provideSkillFilesystem(app);
+      provideSkillCatalog(app, includeAll: mergeAllSkills);
+      provideSkillTool(app, includeAll: mergeAllSkills);
+      await provideSkillFilesystem(
+        app,
+        roots: _skillRoots(resolvedWorkdir, extraSkillDirs),
+      );
     }
 
     // ── 恢复：数据库（JSON 后端，集中在 baseDir）+ 快照服务 ─────────
@@ -892,4 +897,33 @@ class _UnconfiguredProvider implements LlmProvider {
 
   @override
   void close() {}
+}
+
+/// 默认发现根 + 配置里的 `extra_skill_dirs`（相对 workdir / `~` 展开）。
+List<SkillRoot> _skillRoots(String workdir, List<String> extra) {
+  final List<SkillRoot> roots = defaultSkillRoots(
+    projectRoot: findProjectRoot(from: workdir),
+  );
+  final Set<String> seen = <String>{
+    for (final SkillRoot root in roots) root.path,
+  };
+  for (final String raw in extra) {
+    final String? path = _extraSkillDir(raw, workdir);
+    if (path == null || !seen.add(path)) continue;
+    roots.add(
+      SkillRoot(path: path, source: kSkillSourceCustom, rank: 300),
+    );
+  }
+  return roots;
+}
+
+String? _extraSkillDir(String raw, String workdir) {
+  final String value = raw.trim();
+  if (value.isEmpty) return null;
+  if (value == '~') return resolveHomeDir();
+  if (value.startsWith('~/')) {
+    return '${resolveHomeDir()}/${value.substring(2)}';
+  }
+  if (value.startsWith('/')) return value;
+  return '$workdir${Platform.pathSeparator}$value';
 }

@@ -147,6 +147,8 @@ Future<void> main(List<String> args) async {
     configPath: resolveConfigPath(explicit: options.configPath),
     providers: config.providers,
     models: config.models,
+    extraSkillDirs: config.extraSkillDirs,
+    mergeAllSkills: config.mergeAllSkills,
     provider: provider,
     model: model,
     maxSteps: config.agent.maxSteps,

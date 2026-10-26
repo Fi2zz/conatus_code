@@ -51,6 +51,11 @@ const String kDefaultConfigToml = '''
 # reasoning_key = "reasoning_content"
 # support_efforts = [ "low", "high", "max" ]
 
+# 额外技能目录（可选）：相对 [agent] workdir 或绝对路径 / ~。
+# extra_skill_dirs = ["/path/to/skills"]
+# true = 把 disable-model-invocation 的技能也放进模型可见目录（缺省 false）。
+# merge_all_available_skills = false
+
 # 非模型 Key（搜索等）仍走 [credentials]
 [credentials]
 # TAVILY_API_KEY = "tvly-..."

@@ -59,6 +59,12 @@ OpenCodeImportPlan planOpenCodeImport({
     added,
     skipped,
   );
+  final List<String> skillDirs = _planSkillDirs(
+    import.skillDirs,
+    existing,
+    added,
+    skipped,
+  );
   final String updated = applyOpenCodeImport(
     toml,
     model: model,
@@ -66,6 +72,7 @@ OpenCodeImportPlan planOpenCodeImport({
     mcp: mcp,
     permissions: permissions,
     instructions: instructions,
+    skillDirs: skillDirs,
   );
   ensureImportParseable(updated);
   return OpenCodeImportPlan(
@@ -77,6 +84,7 @@ OpenCodeImportPlan planOpenCodeImport({
       mcp: mcp,
       permissions: permissions,
       instructions: instructions,
+      skillDirs: skillDirs,
     ).trim(),
     added: List<String>.unmodifiable(added),
     skipped: List<String>.unmodifiable(skipped),
@@ -173,6 +181,21 @@ List<String> _planInstructions(
   }
   added.add('instructions');
   return instructions;
+}
+
+List<String> _planSkillDirs(
+  List<String> skillDirs,
+  Map<String, Object?> existing,
+  List<String> added,
+  List<String> skipped,
+) {
+  if (skillDirs.isEmpty) return const <String>[];
+  if (existing.containsKey('extra_skill_dirs')) {
+    skipped.add('skills（已有 extra_skill_dirs，未合并）');
+    return const <String>[];
+  }
+  added.add('extra_skill_dirs');
+  return skillDirs;
 }
 
 Set<String> _existingPermissions(Map<String, Object?> existing) {

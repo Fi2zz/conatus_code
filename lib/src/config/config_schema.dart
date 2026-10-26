@@ -729,7 +729,8 @@ class ConatusCodeConfig {
   /// 顶层 `extra_skill_dirs`：额外技能目录。
   final List<String> extraSkillDirs;
 
-  /// 顶层 `merge_all_available_skills`：合并全部可用技能。
+  /// 顶层 `merge_all_available_skills`：为 true 时把
+  /// `disable-model-invocation` 的技能也放进模型可见目录。
   final bool mergeAllSkills;
 
   /// 顶层 `telemetry`：遥测开关。

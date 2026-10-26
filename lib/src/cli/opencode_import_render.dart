@@ -41,7 +41,11 @@ String renderPermissionBlock(ImportedPermission rule) =>
 
 /// 顶层 `instructions = [...]` 行。
 String renderInstructionsLine(List<String> values) =>
-    'instructions = [ ${_strings(values)} ]';
+    renderStringArrayLine('instructions', values);
+
+/// 任意顶层字符串数组行。
+String renderStringArrayLine(String key, List<String> values) =>
+    '$key = [ ${_strings(values)} ]';
 
 void _writeOAuth(StringBuffer buffer, McpServerSpec spec) {
   final oauth = spec.oauth;

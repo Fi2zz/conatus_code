@@ -76,6 +76,72 @@ void main() {
     await runtime.dispose();
   });
 
+  test('extra_skill_dirs 的额外目录进入技能目录', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    final Directory extra = Directory.systemTemp.createTempSync('conatus-skill');
+    addTearDown(() {
+      dir.deleteSync(recursive: true);
+      extra.deleteSync(recursive: true);
+    });
+    final String sep = Platform.pathSeparator;
+    File('${extra.path}${sep}extra-skill${sep}SKILL.md')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(
+        '---\nname: extra-skill\ndescription: 额外目录里的技能。\n---\n正文\n',
+      );
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      extraSkillDirs: <String>[extra.path],
+      workdir: dir.path,
+    );
+
+    final SystemPrompt prompt = runtime.app.require<SystemPrompt>(
+      'systemPrompt',
+    );
+    final String system = prompt.render(prompt.assemble());
+
+    expect(system, contains('extra-skill'));
+    await runtime.dispose();
+  });
+
+  test('merge_all_available_skills 把隐藏技能放进目录', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    final Directory extra = Directory.systemTemp.createTempSync('conatus-skill');
+    addTearDown(() {
+      dir.deleteSync(recursive: true);
+      extra.deleteSync(recursive: true);
+    });
+    final String sep = Platform.pathSeparator;
+    File('${extra.path}${sep}quiet${sep}SKILL.md')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(
+        '---\nname: quiet\ndescription: 默认隐藏。\n'
+        'disable-model-invocation: true\n---\n正文\n',
+      );
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      extraSkillDirs: <String>[extra.path],
+      mergeAllSkills: true,
+      workdir: dir.path,
+    );
+
+    final SystemPrompt prompt = runtime.app.require<SystemPrompt>(
+      'systemPrompt',
+    );
+    final String system = prompt.render(prompt.assemble());
+
+    expect(system, contains('quiet'));
+    await runtime.dispose();
+  });
+
   test('装配后 system 带日期锚点，get_time 返回带偏移的时刻', () async {    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));
     final String sep = Platform.pathSeparator;

@@ -178,19 +178,20 @@ void main() {
     expect(result.warnings.join('\n'), contains('lsp'));
   });
 
-  test('instructions 追加；skills / agents / commands 告警跳过', () {
+  test('instructions 追加；skills 本地目录保留，agents / commands 告警跳过', () {
     final OpenCodeImport result = _build(<Map<String, Object?>>[
       <String, Object?>{
         'instructions': <Object?>['CONTRIBUTING.md', 'docs/*.md'],
-        'skills': <Object?>['./team-skills'],
+        'skills': <Object?>['./team-skills', 'https://example.com/skills'],
         'agents': <String, Object?>{'reviewer': <String, Object?>{}},
         'commands': <String, Object?>{'review': <String, Object?>{}},
       },
     ]);
 
     expect(result.instructions, <String>['CONTRIBUTING.md', 'docs/*.md']);
+    expect(result.skillDirs.single, contains('team-skills'));
     final String warnings = result.warnings.join('\n');
-    expect(warnings, contains('skills'));
+    expect(warnings, contains('HTTP 技能目录'));
     expect(warnings, contains('agents'));
     expect(warnings, contains('commands'));
   });

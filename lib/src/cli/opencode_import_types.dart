@@ -24,6 +24,7 @@ class OpenCodeImport {
     this.mcpServers = const <McpServerSpec>[],
     this.permissions = const <ImportedPermission>[],
     this.instructions = const <String>[],
+    this.skillDirs = const <String>[],
     this.agents = const <ImportedAgent>[],
     this.commands = const <ImportedCommand>[],
     this.warnings = const <String>[],
@@ -34,6 +35,7 @@ class OpenCodeImport {
   final List<McpServerSpec> mcpServers;
   final List<ImportedPermission> permissions;
   final List<String> instructions;
+  final List<String> skillDirs;
   final List<ImportedAgent> agents;
   final List<ImportedCommand> commands;
   final List<String> warnings;
@@ -44,6 +46,7 @@ class OpenCodeImport {
       mcpServers.isEmpty &&
       permissions.isEmpty &&
       instructions.isEmpty &&
+      skillDirs.isEmpty &&
       agents.isEmpty &&
       commands.isEmpty;
 }

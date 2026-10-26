@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+- **`extra_skill_dirs` / `merge_all_available_skills` 接线**：额外技能目录现在
+  真正进入 `provideSkillFilesystem`（相对 workdir / `~` / 绝对路径，rank 300）；
+  `merge_all_available_skills = true` 会把 `disable-model-invocation` 的技能
+  也放进模型可见目录并允许 `skill` 工具加载。`nava import opencode` 的 `skills`
+  数组（本地目录）导入为 `extra_skill_dirs`，HTTP catalog 告警跳过。
+
 - **声明式自定义工具（`[[tools]]`）**：CLI（JSON stdin/stdout）或 HTTP（JSON
   body）后端，`[[tools.params]]` 显式声明 string / integer / number / boolean /
   enum 参数；默认 `high` 风险进审批，支持 `${KEY}` 凭据占位符、cwd、env、

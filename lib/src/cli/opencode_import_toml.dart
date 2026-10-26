@@ -17,6 +17,7 @@ String applyOpenCodeImport(
   List<McpServerSpec> mcp = const <McpServerSpec>[],
   List<ImportedPermission> permissions = const <ImportedPermission>[],
   List<String> instructions = const <String>[],
+  List<String> skillDirs = const <String>[],
 }) {
   String out = base;
   if (model != null) out = upsertDefaultModel(out, model);
@@ -29,6 +30,12 @@ String applyOpenCodeImport(
   }
   if (instructions.isNotEmpty) {
     out = _insertTopLevelArray(out, renderInstructionsLine(instructions));
+  }
+  if (skillDirs.isNotEmpty) {
+    out = _insertTopLevelArray(
+      out,
+      renderStringArrayLine('extra_skill_dirs', skillDirs),
+    );
   }
   return base.trim().isEmpty ? out.trimLeft() : out;
 }
