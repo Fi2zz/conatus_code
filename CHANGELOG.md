@@ -4,6 +4,12 @@
 
 ## [未发布]
 
+- **`nava import opencode`**：显式导入 `opencode.json(c)`（全局 + 项目祖先 +
+  `.opencode`，JSONC），映射 `model` / `default_agent` / `mcp.servers` /
+  `permissions` / `instructions` 到 nava config.toml。默认 dry-run，`--write`
+  才原子落盘；已有同名配置跳过，不覆盖。`agents` / `commands` / `providers`
+  等暂不支持，逐项告警。
+
 - **OpenCode / Claude 技能发现根**：`defaultSkillRoots` 新增项目
   `.opencode/skills`（150）、`.claude/skills`（275）与用户
   `~/.config/opencode/skills`（450）、`~/.claude/skills`（550）；nava 原生

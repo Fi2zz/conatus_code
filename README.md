@@ -156,6 +156,32 @@ keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不�
 # headers = { Authorization = "Bearer ${REMOTE_TOKEN}" }
 ```
 
+## 从 OpenCode 导入配置（`nava import opencode`）
+
+nava **不会在启动时自动合并**项目 `opencode.json(c)`：项目文件可以声明 MCP
+命令与权限，自动生效等于克隆一个仓库就能拉起进程或改写工具权限。需要迁移时
+显式运行：
+
+```bash
+nava import opencode                 # dry-run：打印将新增的 TOML 片段
+nava import opencode --write         # 原子写入 ~/.nava/config.toml
+nava import opencode --project-only  # 只读项目 / 祖先目录
+nava import opencode --global-only   # 只读 ~/.config/opencode
+```
+
+- 读取全局 `~/.config/opencode/opencode.json(c)` 与项目祖先的
+  `opencode.json(c)` / `.opencode/opencode.json(c)`，顺序与 OpenCode 一致
+  （全局 → 项目直接配置 → `.opencode`，后者覆盖前者）。
+- 映射：`model`（去掉不支持的 `#variant`）、`default_agent`、`mcp.servers`
+  （local / remote、`environment` / `headers` / `oauth`、`{env:NAME}` 占位符）、
+  `permissions`（OpenCode 动作名归一为 nava 动作）、`instructions`。
+- **不覆盖已有配置**：已有 `default_model` / `default_agent` / 同名 MCP /
+  重复 permission 会跳过；顶层 `instructions` 已存在时整项跳过（不合并数组）。
+- `agents` / `commands` / `providers` / `plugins` / `lsp` / `references` /
+  `policies` / `formatter` / `tools` / `skills` 暂不支持，逐项告警。
+- `--write` 走 `writeConfigFile`：原子写、权限 0600；写入前先校验合并结果仍是
+  合法 TOML。
+
 ## 检查点与回滚（`/rewind`）
 
 每轮收口后对工作区文件做快照：**turn 0 全量 base + 各轮相对 base 的差量**

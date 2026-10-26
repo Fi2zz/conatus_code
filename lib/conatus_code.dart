@@ -77,6 +77,15 @@ export 'src/checkpoint/global_git_ignore.dart' show resolveGlobalGitIgnore;
 export 'src/checkpoint/shadow_git_runner.dart'
     show GitResult, GitRunner, ProcessGitRunner, UnavailableGitRunner;
 export 'src/cli/harness_command.dart' show kHarnessUsage, runHarnessCommand;
+export 'src/cli/import_command.dart' show kImportUsage, runImportCli;
+export 'src/cli/jsonc.dart' show decodeJsonc, stripJsonc;
+export 'src/cli/opencode_import_map.dart' show buildOpenCodeImport;
+export 'src/cli/opencode_import_plan.dart'
+    show OpenCodeImportPlan, planOpenCodeImport;
+export 'src/cli/opencode_import_source.dart'
+    show OpenCodeDocument, OpenCodeSources, loadOpenCodeSources;
+export 'src/cli/opencode_import_types.dart'
+    show ImportedPermission, OpenCodeImport;
 export 'src/commands/command_definition.dart' show CommandDefinition;
 export 'src/commands/command_dispatcher.dart' show CommandDispatcher;
 export 'src/commands/command_expander.dart'

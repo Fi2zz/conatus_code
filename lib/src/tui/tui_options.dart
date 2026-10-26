@@ -79,6 +79,7 @@ class TuiOptions {
       '[--session <id>] [--config <路径>]\n'
       '       nava -p <任务文本> [--output-format text|json] [--session <id>]\n'
       '       nava mcp <add|list|auth|logout> [--config <路径>]\n'
+      '       nava import opencode [--write] [--global-only|--project-only]\n'
       '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
       '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n'
       '  -p, --print <任务>  headless 单轮执行：跑完即退出，不启动 TUI\n'

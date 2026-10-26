@@ -14,6 +14,10 @@ Future<void> main(List<String> args) async {
   if (args.isNotEmpty && args.first == 'mcp') {
     exit(await runMcpCli(args.sublist(1)));
   }
+  // 显式导入 OpenCode 配置：`nava import opencode [--write]`。
+  if (args.isNotEmpty && args.first == 'import') {
+    exit(await runImportCli(args.sublist(1)));
+  }
   // 子命令先于选项解析：`harness` 是动词，不是选项值。
   if (args.isNotEmpty && args.first == 'harness') {
     exit(await runHarnessCommand(args.sublist(1)));
