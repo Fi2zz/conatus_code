@@ -251,16 +251,17 @@ class TuiStatusBar extends StatelessComponent {
       children: <Component>[
         Row(
           children: <Component>[
-            _leftStatus(),
+            if (_statusText.isNotEmpty) _leftStatus(),
             if (permissionLabel.isNotEmpty)
               Text(
-                '   $permissionLabel',
+                '${_statusText.isEmpty ? '' : '   '}$permissionLabel',
                 maxLines: 1,
                 softWrap: false,
                 style: TextStyle(color: NavaTheme.palette.warning),
               ),
             Text(
-              '   $modelLabel',
+              '${_statusText.isEmpty && permissionLabel.isEmpty ? '' : '   '}'
+              '$modelLabel',
               maxLines: 1,
               softWrap: false,
             ),
@@ -291,11 +292,15 @@ class TuiStatusBar extends StatelessComponent {
     );
   }
 
-  /// 左段：运行状态 + 权限模式 + 模型标签。
+  /// 左段：运行状态 + 权限模式 + 模型标签；空闲时状态为空，不占显示位。
   String _leftText() {
-    final String permission =
-        permissionLabel.isEmpty ? '' : '   $permissionLabel';
-    return '$_statusText$permission   $modelLabel';
+    final String status = _statusText;
+    final List<String> segments = <String>[
+      if (status.isNotEmpty) status,
+      if (permissionLabel.isNotEmpty) permissionLabel,
+      modelLabel,
+    ];
+    return segments.join('   ');
   }
 
   /// 左段运行状态：忙碌时是方块扫描 + 时长，空闲时是文字状态。
@@ -323,14 +328,14 @@ class TuiStatusBar extends StatelessComponent {
   }
 
   /// 当前运行状态：忙碌时显示方块动画 + 时长；完成 15 秒内显示状态与时长；
-  /// 否则等待输入。
+  /// 空闲时为空（不显示“等待输入”）。
   String get _statusText {
     if (busy) return '$_blockStrip ${_elapsed(turnElapsed)}';
     final Duration? recent = recentTurnDuration;
     if (recent != null) {
       return '${recentTurnStatus ?? '✓ 完成'} ${_elapsed(recent)}';
     }
-    return '○ 等待输入';
+    return '';
   }
 
   /// 方块扫描动画（忙时放在时长之前）。

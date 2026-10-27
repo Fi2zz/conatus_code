@@ -106,7 +106,7 @@ void main() {
 
     expect(
       tester.terminalState,
-      containsText('○ 等待输入   ask_when_needed   doubao-seed-x'),
+      containsText('ask_when_needed   doubao-seed-x'),
     );
     expect(tester.terminalState, containsText('~/REPO/conatus master'));
     expect(tester.terminalState, containsText('ctx 299k/1M (30%)'));
@@ -136,11 +136,11 @@ void main() {
     expect(tester.terminalState, containsText('再按一次 Ctrl+C 退出'));
     expect(
       tester.terminalState,
-      containsText('○ 等待输入   Ask When Needed   mock'),
+      containsText('Ask When Needed   mock'),
     );
   });
 
-  test('状态栏缺省：无权限/位置/上下文时不显示对应段', () async {
+  test('状态栏缺省：空闲不显示状态/权限/位置/上下文', () async {
     final NoctermTester tester = await NoctermTester.create();
     addTearDown(tester.dispose);
     await tester.pumpComponent(
@@ -153,7 +153,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(tester.terminalState, containsText('○ 等待输入   mock'));
+    expect(tester.terminalState, containsText('mock'));
     expect(tester.terminalState, isNot(containsText('权限：')));
     expect(tester.terminalState, isNot(containsText('ctx ')));
   });
