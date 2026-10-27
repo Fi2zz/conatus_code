@@ -59,7 +59,12 @@ export PATH="$PWD/dist:$PATH"
 
 首次运行会读取 `~/.nava/config.toml`（`NAVA_HOME` / `--config` 可覆盖路径）。
 **文件不存在时自动生成模板，并弹出 provider 面板引导添加**（会话内 `/provider`
-也可随时新增，写回 config.toml）。示例：
+也可随时新增，写回 config.toml）。
+
+`~/.nava/projects/` 与 config.toml 同级，但它是**运行数据目录，不是配置**：
+每个子目录对应一个工作区，目录名是该工作区绝对路径的 URL 编码（如
+`%2FUsers%2F...%2Flifts`），存放会话、记忆、检查点、权限与导出文件；用编码
+而不是随机名是为了可反查、无碰撞。示例：
 
 ```toml
 [credentials]

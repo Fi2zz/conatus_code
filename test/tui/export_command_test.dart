@@ -64,6 +64,12 @@ void main() {
     provideShellLocal(app);
     provideLlm(app, llm: FallbackLlm(<LlmProvider>[_EchoProvider()]));
     if (workdir != null) app.provide('workdir', workdir);
+    // 项目数据目录固定到临时工作区，避免测试把 exports 写进真实
+    // ~/.nava/projects/<编码临时路径>，留下大量一次性目录。
+    app.provide(
+      'projectDir',
+      '${dir.path}${Platform.pathSeparator}project-data',
+    );
     return app;
   }
 
@@ -119,9 +125,9 @@ void main() {
     final (ConatusTuiController controller, _) = await _launch(app, sessions);
 
     // 拿一个已存在的目录当文件写，必失败。
-    final Directory occupied =
-        Directory('${dir.path}${Platform.pathSeparator}blocked')
-          ..createSync();
+    final Directory occupied = Directory(
+      '${dir.path}${Platform.pathSeparator}blocked',
+    )..createSync();
     await controller.handleLine('/export ${occupied.path}');
 
     expect(controller.transcript.messages.last.text, contains('导出失败'));
