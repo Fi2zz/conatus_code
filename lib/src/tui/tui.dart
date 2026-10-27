@@ -975,10 +975,10 @@ class _AgentTuiState extends State<AgentTui> {
             tabs: _controller.tabs.tabs,
             active: _controller.tabs.active,
             nextHint: _controller.keymap
-                .labelsFor(KeyActions.tabNext)
+                .displayLabelsFor(KeyActions.tabNext)
                 .join(', '),
             closeHint: _controller.keymap
-                .labelsFor(KeyActions.tabClose)
+                .displayLabelsFor(KeyActions.tabClose)
                 .join(', '),
           ),
           Expanded(

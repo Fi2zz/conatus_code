@@ -13,7 +13,7 @@ String renderKeybinds(Keymap keymap) {
     '${keymap.leader?.label ?? '（未绑定）'}',
   );
   for (final String action in KeyActions.ordered) {
-    final List<String> labels = keymap.labelsFor(action);
+    final List<String> labels = keymap.displayLabelsFor(action);
     buffer.writeln(
       '  ${action.padRight(_kActionWidth)}'
       '${labels.isEmpty ? '（未绑定）' : labels.join(', ')}',
@@ -21,6 +21,9 @@ String renderKeybinds(Keymap keymap) {
   }
   _writeConflicts(buffer, keymap.conflicts);
   buffer.writeln('视图内按键（浮层 / diff / Ctrl+T / Ctrl+O）保持内置，不支持配置。');
+  buffer.writeln(
+    '“ctrl+x 再 n”表示先按 ctrl+x，松开再按 n。',
+  );
   buffer.writeln(
     'Ctrl+Tab / Ctrl+Shift+Tab 是可配置的 tab.next / tab.previous；团队视图用 /team。',
   );

@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **两段式键位提示可读性**：界面与 `/keybinds` 把 `<leader>n` 展开为
+  `ctrl+x 再 n`，不再要求用户先理解 `<leader>` 是什么。
+
 - **Terminal.app 标签切换**：macOS Terminal 不区分 Ctrl+Tab 与 Tab（都发
   `0x09`）；普通输入态下单独 Tab / Shift+Tab 兜底切标签，单标签时隐藏
   切换提示，不再显示按了没反应的 `ctrl+tab 切换`。

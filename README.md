@@ -367,7 +367,8 @@ leader = "ctrl+x"
 "tab.close" = "<leader>w"
 ```
 
-`/keybinds` 展示当前生效值与冲突告警；未知动作 / 非法键位会在启动时提示。
+`/keybinds` 展示当前生效值与冲突告警；界面里的两段式提示会展开成
+`ctrl+x 再 n`，不再直接显示 `<leader>n`。未知动作 / 非法键位会在启动时提示。
 
 **自定义命令**：`.opencode/commands/**/*.md`（只读兼容）与
 `.nava/commands/**/*.md`（项目 / 全局）发现为 `/<相对路径>`。正文是 prompt，

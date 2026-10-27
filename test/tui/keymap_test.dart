@@ -119,6 +119,21 @@ void main() {
       });
       expect(keymap.labelsFor(KeyActions.clear), <String>['m']);
       expect(keymap.labelsFor(KeyActions.modelList), <String>['<leader>m']);
+      expect(
+        keymap.displayLabelsFor(KeyActions.modelList),
+        <String>['ctrl+x 再 m'],
+      );
+    });
+
+    test('展示标签跟随自定义 leader', () {
+      final Keymap keymap = Keymap.fromConfig(<String, String>{
+        'leader': 'ctrl+space',
+        'session.new': '<leader>n',
+      });
+      expect(
+        keymap.displayLabelsFor(KeyActions.sessionNew),
+        <String>['ctrl+space 再 n'],
+      );
     });
 
     test('leader 不可用时 <leader> 动作被忽略', () {

@@ -114,6 +114,21 @@ class Keymap {
   List<String> labelsFor(String action) =>
       List<String>.unmodifiable(_labels[action] ?? const <String>[]);
 
+  /// 面向界面的展示形式：把 `<leader>x` 展开成 `ctrl+x 再 x`。
+  ///
+  /// `labelsFor` 保留配置里的原始写法，供解析与测试使用；界面提示用这个，
+  /// 避免用户还要先理解 `<leader>` 是什么。
+  List<String> displayLabelsFor(String action) {
+    final String? leaderLabel = leader?.label;
+    return <String>[
+      for (final String label in labelsFor(action))
+        if (leaderLabel != null && label.startsWith(kLeaderPrefix))
+          '$leaderLabel 再 ${label.substring(kLeaderPrefix.length)}'
+        else
+          label,
+    ];
+  }
+
   /// 启动告警（未知动作 / 非法键位 / 冲突），按发现顺序。
   List<String> get warnings => List<String>.unmodifiable(_warnings);
 

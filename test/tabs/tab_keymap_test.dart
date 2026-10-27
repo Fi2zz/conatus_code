@@ -16,5 +16,9 @@ void main() {
     expect(keymap.actionFor(_tab()), KeyActions.tabNext);
     expect(keymap.actionFor(_tab(shift: true)), KeyActions.tabPrevious);
     expect(keymap.labelsFor(KeyActions.tabClose), <String>['<leader>w']);
+    expect(
+      keymap.displayLabelsFor(KeyActions.tabClose),
+      <String>['ctrl+x 再 w'],
+    );
   });
 }

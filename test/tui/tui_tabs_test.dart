@@ -144,7 +144,7 @@ void main() {
     expect(tester.terminalState, containsText('1/8'));
     expect(tester.terminalState, containsText('▸'));
     expect(tester.terminalState, containsText('+'));
-    expect(tester.terminalState, containsText('<leader>w'));
+    expect(tester.terminalState, containsText('ctrl+x 再 w'));
 
     await fix.controller.handleLine('/new');
     await tester.pump();

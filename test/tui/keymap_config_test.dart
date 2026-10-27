@@ -79,7 +79,7 @@ session.new = "<leader>n"
     expect(text, contains('app.exit'));
     expect(text, contains('ctrl+c, ctrl+d'));
     expect(text, contains('session.new'));
-    expect(text, contains('<leader>n'));
+    expect(text, contains('ctrl+x 再 n'));
     expect(text, contains('键位冲突'));
     expect(text, contains('视图内按键'));
   });

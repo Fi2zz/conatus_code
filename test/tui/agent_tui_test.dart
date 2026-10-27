@@ -98,6 +98,7 @@ void main() {
       await controller.handleLine('/new');
       await tester.pump();
       expect(controller.tabs.tabs.length, 2);
+      expect(tester.terminalState, containsText('ctrl+x 再 w 关闭'));
       final int before = controller.tabs.active;
 
       await tester.sendTab();
