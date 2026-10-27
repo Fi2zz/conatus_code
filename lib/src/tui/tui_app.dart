@@ -240,7 +240,7 @@ class ConatusTuiRuntime {
       projectRegistryService = projectRegistry ?? ProjectRegistry.open();
       projectInfo = projectRegistryService.resolve(
         resolvedWorkdir,
-        dataDirOverride: _absoluteProjectDir(projectDir, resolvedWorkdir),
+        dataDirOverride: projectDir,
       );
       resolvedBaseDir = projectInfo.dataDir;
     }
@@ -931,15 +931,6 @@ class _UnconfiguredProvider implements LlmProvider {
   void close() {}
 }
 
-/// 把 `[agent] project_dir` 的相对形式固定到 workdir；绝对路径原样返回。
-String? _absoluteProjectDir(String? projectDir, String workdir) {
-  final String? value = projectDir?.trim();
-  if (value == null || value.isEmpty) return null;
-  if (value.startsWith('/') || RegExp(r'^[A-Za-z]:[/\\]').hasMatch(value)) {
-    return value;
-  }
-  return '$workdir${Platform.pathSeparator}$value';
-}
 
 /// 默认发现根 + 配置里的 `extra_skill_dirs`（相对 workdir / `~` 展开）。
 List<SkillRoot> _skillRoots(String workdir, List<String> extra) {

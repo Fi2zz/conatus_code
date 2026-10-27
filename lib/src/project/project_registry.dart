@@ -65,6 +65,7 @@ class ProjectRegistry {
   /// 解析并登记 [workdir]；[dataDirOverride] 用于显式 `project_dir`。
   WorkspaceInfo resolve(String workdir, {String? dataDirOverride}) {
     final ProjectIdentity identity = resolveProjectIdentity(workdir);
+    final String launchDir = _canonical(workdir);
     final ProjectRecord? existingProject = database.project(identity.projectId);
     final String projectName = existingProject?.name ?? identity.name;
     if (existingProject == null) {
@@ -95,10 +96,7 @@ class ProjectRegistry {
       dirName: dirName,
     );
 
-    final String dataDir = _absoluteOverride(
-          dataDirOverride,
-          identity.worktreePath,
-        ) ??
+    final String dataDir = _absoluteOverride(dataDirOverride, launchDir) ??
         '$workspacesDir${Platform.pathSeparator}$dirName';
     Directory(dataDir).createSync(recursive: true);
     if (!Platform.isWindows) {
@@ -130,13 +128,21 @@ class ProjectRegistry {
 
   void close() => database.close();
 
-  String? _absoluteOverride(String? override, String worktreePath) {
+  String? _absoluteOverride(String? override, String launchDir) {
     if (override == null || override.trim().isEmpty) return null;
     final String value = override.trim();
     if (value.startsWith('/') || RegExp(r'^[A-Za-z]:[/\\]').hasMatch(value)) {
       return value;
     }
-    return '$worktreePath${Platform.pathSeparator}$value';
+    return '$launchDir${Platform.pathSeparator}$value';
+  }
+
+  String _canonical(String path) {
+    try {
+      return Directory(path).resolveSymbolicLinksSync();
+    } on FileSystemException {
+      return Directory(path).absolute.path;
+    }
   }
 
   String _allocateDirName(String basename, String worktreeId) {

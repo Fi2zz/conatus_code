@@ -166,6 +166,26 @@ void main() {
     );
   });
 
+  test('相对 project_dir 以启动目录为基准，而不是 git 根', () {
+    final Directory home = _tempDir();
+    final Directory repo = _tempDir();
+    _initRepo(repo);
+    final Directory sub = Directory('${repo.path}/sub')..createSync();
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+
+    final WorkspaceInfo info = registry.resolve(
+      sub.path,
+      dataDirOverride: '.conatus',
+    );
+
+    expect(
+      info.dataDir,
+      '${Directory(sub.path).resolveSymbolicLinksSync()}'
+      '${Platform.pathSeparator}.conatus',
+    );
+  });
+
   test('12 位目录名冲突时扩展到 16 位', () {
     final Directory home = _tempDir();
     final Directory work = _tempDir();
