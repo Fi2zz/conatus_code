@@ -98,16 +98,36 @@ void main() {
     expect(db.project('p1')!.vcs, 'git');
   });
 
+  test('transaction 成功提交、异常回滚', () {
+    final ProjectDatabase db = ProjectDatabase.open(_dbPath(_tempDir()));
+    addTearDown(db.close);
+
+    db.transaction(() {
+      db.saveProject(id: 'p1', name: 'lifts');
+    });
+    expect(db.project('p1'), isNotNull);
+
+    expect(
+      () => db.transaction(() {
+        db.saveProject(id: 'p2', name: 'other');
+        throw StateError('boom');
+      }),
+      throwsA(isA<StateError>()),
+    );
+    expect(db.project('p2'), isNull);
+  });
+
   test('数据库 / WAL / SHM 权限收紧到 0600', () {
     if (Platform.isWindows) return;
     final Directory dir = _tempDir();
     final String path = _dbPath(dir);
     final ProjectDatabase db = ProjectDatabase.open(path);
     addTearDown(db.close);
+    db.saveProject(id: 'p1', name: 'lifts');
 
     for (final String suffix in <String>['', '-wal', '-shm']) {
       final File file = File('$path$suffix');
-      if (!file.existsSync()) continue;
+      expect(file.existsSync(), isTrue, reason: file.path);
       expect(
         file.statSync().mode & 0x1FF,
         0x180,

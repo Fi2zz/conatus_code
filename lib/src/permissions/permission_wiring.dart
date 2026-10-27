@@ -24,7 +24,7 @@ class PermissionWiring {
     List<PermissionRule> configRules = const <PermissionRule>[],
   }) : configRules = _normalizeRules(configRules, workdir);
 
-  /// 项目级持久化存储（`~/.nava/projects/<hash>/permissions.json`）。
+  /// 项目级持久化存储（`~/.nava/workspaces/<basename>-<hash>/permissions.json`）。
   final PermissionStore store;
 
   /// 工作区根（规则相对路径的解析基准）；`null` 时只做词法规范化。

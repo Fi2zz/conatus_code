@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **项目注册表加固**：项目/工作区写入改为单事务并支持唯一冲突重试；
+  DB/WAL/SHM 权限统一收紧；打开或迁移失败时释放 SQLite handle。
+
 - **项目注册表与新的工作区目录**：项目/工作区元数据进 `~/.nava/projects.db`，
   数据改落 `~/.nava/workspaces/<basename>-<短哈希>/`；同一 git remote 共享项目、
   按 worktree 隔离数据；新增 `/project` 与 `/project rename`。旧 `~/.nava/projects/`

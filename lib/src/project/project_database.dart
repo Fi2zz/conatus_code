@@ -45,7 +45,7 @@ class ProjectDatabase {
   factory ProjectDatabase.open(String path) {
     final Directory parent = File(path).parent;
     parent.createSync(recursive: true);
-    Database db;
+    Database? db;
     try {
       db = sqlite3.open(path);
       db.execute('PRAGMA journal_mode = WAL');
@@ -53,10 +53,13 @@ class ProjectDatabase {
       db.execute('PRAGMA busy_timeout = 5000');
       _migrate(db, path);
     } on SqliteException catch (error) {
+      db?.dispose();
       throw StateError('项目数据库无法打开或已损坏：$path（${error.message}）');
     } on StateError {
+      db?.dispose();
       rethrow;
     } catch (error) {
+      db?.dispose();
       throw StateError('项目数据库无法打开或已损坏：$path（$error）');
     }
     _restrictArtifacts(path);
@@ -100,6 +103,31 @@ class ProjectDatabase {
     return rows.isEmpty ? null : _worktreeFrom(rows.first);
   });
 
+  /// 在单个事务内执行 [action]；异常时回滚并原样抛出。
+  T transaction<T>(T Function() action) {
+    try {
+      _db.execute('BEGIN IMMEDIATE');
+    } on SqliteException catch (error) {
+      throw StateError('项目数据库操作失败：$path（${error.message}）');
+    }
+    try {
+      final T result = action();
+      _db.execute('COMMIT');
+      _restrictArtifacts(path);
+      return result;
+    } catch (error) {
+      try {
+        _db.execute('ROLLBACK');
+      } on SqliteException {
+        // 回滚失败不覆盖原始异常。
+      }
+      if (error is SqliteException) {
+        throw StateError('项目数据库操作失败：$path（${error.message}）');
+      }
+      rethrow;
+    }
+  }
+
   void saveProject({
     required String id,
     required String name,
@@ -119,6 +147,7 @@ ON CONFLICT(id) DO UPDATE SET
 ''',
         <Object?>[id, name, vcs, remote, now, now],
       );
+      _restrictArtifacts(path);
     });
   }
 
@@ -145,6 +174,7 @@ ON CONFLICT(id) DO UPDATE SET
 ''',
         <Object?>[id, projectId, path, name, dirName, now, now],
       );
+      _restrictArtifacts(path);
     });
   }
 
@@ -154,6 +184,7 @@ ON CONFLICT(id) DO UPDATE SET
         'UPDATE project SET name = ?, time_updated = ? WHERE id = ?',
         <Object?>[name, DateTime.now().millisecondsSinceEpoch, id],
       );
+      _restrictArtifacts(path);
     });
   }
 

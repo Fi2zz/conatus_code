@@ -167,6 +167,9 @@ class ConatusTuiRuntime {
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
   /// [interactive] 为 `false` 时跳过人机交互件（浮层 / 审批服务 / `ask_user`
   /// 工具），供 headless 单轮执行使用。
+  ///
+  /// 显式 [baseDir] 会绕过项目注册表；若同时传入 [projectRegistry]，该
+  /// registry 被忽略且由调用方负责关闭。
   /// [defaultAgent] 是新会话默认 Agent（`[agent] default_agent`）；未知或仅子
   /// Agent 的定义回退到注册表默认的 `build`。
   /// [instructions] 是顶层 `instructions` 的额外来源（路径 / glob / URL），

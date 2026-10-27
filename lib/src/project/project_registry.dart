@@ -66,24 +66,57 @@ class ProjectRegistry {
   WorkspaceInfo resolve(String workdir, {String? dataDirOverride}) {
     final ProjectIdentity identity = resolveProjectIdentity(workdir);
     final String launchDir = _canonical(workdir);
+    final String? override = _absoluteOverride(dataDirOverride, launchDir);
+    if (override != null && readOnlyWritePath(override)) {
+      throw StateError(kReadOnlyPathMessage);
+    }
+    final ({String projectName, String dirName}) registration =
+        _registerWithRetry(identity);
+    final String dataDir =
+        override ??
+        '$workspacesDir${Platform.pathSeparator}${registration.dirName}';
+    if (readOnlyWritePath(dataDir)) {
+      throw StateError(kReadOnlyPathMessage);
+    }
+    Directory(dataDir).createSync(recursive: true);
+    if (!Platform.isWindows) {
+      Process.runSync('chmod', <String>['700', dataDir]);
+    }
+    return WorkspaceInfo(
+      projectId: identity.projectId,
+      projectName: registration.projectName,
+      worktreeId: identity.worktreeId,
+      worktreePath: identity.worktreePath,
+      dataDir: dataDir,
+    );
+  }
+
+  ({String projectName, String dirName}) _registerWithRetry(
+    ProjectIdentity identity,
+  ) {
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        return database.transaction(() => _register(identity));
+      } on StateError catch (error) {
+        if (attempt == 0 &&
+            error.message.contains('UNIQUE constraint failed')) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+    throw StateError('项目注册表写入冲突，请重试');
+  }
+
+  ({String projectName, String dirName}) _register(ProjectIdentity identity) {
     final ProjectRecord? existingProject = database.project(identity.projectId);
     final String projectName = existingProject?.name ?? identity.name;
-    if (existingProject == null) {
-      database.saveProject(
-        id: identity.projectId,
-        name: projectName,
-        vcs: identity.vcs,
-        remote: identity.remote,
-      );
-    } else {
-      database.saveProject(
-        id: identity.projectId,
-        name: existingProject.name,
-        vcs: identity.vcs,
-        remote: identity.remote,
-      );
-    }
-
+    database.saveProject(
+      id: identity.projectId,
+      name: projectName,
+      vcs: identity.vcs,
+      remote: identity.remote,
+    );
     final WorktreeRecord? existing = database.worktreeAt(identity.worktreePath);
     final String dirName =
         existing?.dirName ??
@@ -95,23 +128,7 @@ class ProjectRegistry {
       name: identity.name,
       dirName: dirName,
     );
-
-    final String dataDir = _absoluteOverride(dataDirOverride, launchDir) ??
-        '$workspacesDir${Platform.pathSeparator}$dirName';
-    if (readOnlyWritePath(dataDir)) {
-      throw StateError(kReadOnlyPathMessage);
-    }
-    Directory(dataDir).createSync(recursive: true);
-    if (!Platform.isWindows) {
-      Process.runSync('chmod', <String>['700', dataDir]);
-    }
-    return WorkspaceInfo(
-      projectId: identity.projectId,
-      projectName: projectName,
-      worktreeId: identity.worktreeId,
-      worktreePath: identity.worktreePath,
-      dataDir: dataDir,
-    );
+    return (projectName: projectName, dirName: dirName);
   }
 
   /// 重命名项目；只改数据库显示名。
