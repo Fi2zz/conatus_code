@@ -65,9 +65,9 @@ void main() {
     provideLlm(app, llm: FallbackLlm(<LlmProvider>[_EchoProvider()]));
     if (workdir != null) app.provide('workdir', workdir);
     // 项目数据目录固定到临时工作区，避免测试把 exports 写进真实
-    // ~/.nava/projects/<编码临时路径>，留下大量一次性目录。
+    // ~/.nava 数据目录，留下大量一次性目录。
     app.provide(
-      'projectDir',
+      'projectDataDir',
       '${dir.path}${Platform.pathSeparator}project-data',
     );
     return app;

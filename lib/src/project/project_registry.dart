@@ -87,8 +87,11 @@ class ProjectRegistry {
       dirName: dirName,
     );
 
-    final String dataDir =
-        dataDirOverride ?? '$workspacesDir${Platform.pathSeparator}$dirName';
+    final String dataDir = _absoluteOverride(
+          dataDirOverride,
+          identity.worktreePath,
+        ) ??
+        '$workspacesDir${Platform.pathSeparator}$dirName';
     Directory(dataDir).createSync(recursive: true);
     if (!Platform.isWindows) {
       Process.runSync('chmod', <String>['700', dataDir]);
@@ -118,6 +121,15 @@ class ProjectRegistry {
   }
 
   void close() => database.close();
+
+  String? _absoluteOverride(String? override, String worktreePath) {
+    if (override == null || override.trim().isEmpty) return null;
+    final String value = override.trim();
+    if (value.startsWith('/') || RegExp(r'^[A-Za-z]:[/\\]').hasMatch(value)) {
+      return value;
+    }
+    return '$worktreePath${Platform.pathSeparator}$value';
+  }
 
   String _allocateDirName(String basename, String worktreeId) {
     for (final int length in <int>[12, 16, 20, 40]) {

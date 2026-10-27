@@ -148,6 +148,24 @@ void main() {
     expect(Directory(override.path).existsSync(), isTrue);
   });
 
+  test('相对 dataDirOverride 基于 worktree 根', () {
+    final Directory home = _tempDir();
+    final Directory work = _tempDir();
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+
+    final WorkspaceInfo info = registry.resolve(
+      work.path,
+      dataDirOverride: 'relative-data',
+    );
+
+    expect(
+      info.dataDir,
+      '${Directory(work.path).resolveSymbolicLinksSync()}'
+      '${Platform.pathSeparator}relative-data',
+    );
+  });
+
   test('12 位目录名冲突时扩展到 16 位', () {
     final Directory home = _tempDir();
     final Directory work = _tempDir();

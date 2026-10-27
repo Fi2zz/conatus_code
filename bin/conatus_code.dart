@@ -90,15 +90,29 @@ Future<void> main(List<String> args) async {
   final String workdir = config.agent.workdir ?? Directory.current.path;
   final String sep = Platform.pathSeparator;
 
-  // 项目数据目录：缺省在 ~/.nava/projects/<编码工作区路径>（不污染工作区）；
-  // 显式 [agent] project_dir 时才相对工作区。
-  final String projectDataDir = resolveProjectDataDir(
-    workdir: workdir,
-    projectDir: config.agent.projectDir,
-  );
+  // 项目注册表：项目/工作区元数据进 ~/.nava/projects.db，数据落
+  // ~/.nava/workspaces/<basename>-<hash>/。显式 [agent] project_dir 仍优先。
   final String? configuredProjectDir = config.agent.projectDir;
-  if (configuredProjectDir != null &&
-      projectDirProtected(workdir, configuredProjectDir)) {
+  final bool protectedProjectDir =
+      configuredProjectDir != null &&
+      projectDirProtected(workdir, configuredProjectDir);
+  final String? projectDirOverride = protectedProjectDir
+      ? null
+      : configuredProjectDir;
+  final ProjectRegistry projectRegistry;
+  final WorkspaceInfo workspace;
+  try {
+    projectRegistry = ProjectRegistry.open();
+    workspace = projectRegistry.resolve(
+      workdir,
+      dataDirOverride: projectDirOverride,
+    );
+  } catch (error) {
+    stderr.writeln('项目注册表错误：$error');
+    exit(2);
+  }
+  final String projectDataDir = workspace.dataDir;
+  if (protectedProjectDir) {
     stderr.writeln(
       '配置提示：[agent] project_dir 不能落在 .opencode（只读目录），'
       '已改用缺省数据目录 $projectDataDir。',
@@ -156,7 +170,8 @@ Future<void> main(List<String> args) async {
     onWarning: stderr.writeln,
   );
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
-    baseDir: projectDataDir,
+    projectRegistry: projectRegistry,
+    projectDir: projectDirOverride,
     configPath: resolveConfigPath(explicit: options.configPath),
     providers: config.providers,
     models: config.models,

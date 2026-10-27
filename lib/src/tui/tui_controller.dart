@@ -2515,6 +2515,8 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 项目数据目录：`workdir` 服务在时由它与 `project_dir` 推出。
   String _projectDataDir() {
+    final String? resolved = _app.get<String>('projectDataDir');
+    if (resolved != null) return resolved;
     final String? workdir = _app.get<String>('workdir');
     if (workdir == null) {
       return resolveConfigDir();

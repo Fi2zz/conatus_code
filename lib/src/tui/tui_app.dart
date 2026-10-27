@@ -35,7 +35,6 @@ import '../checkpoint/checkpoint_manager.dart';
 import '../commands/command_registry.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
-import '../config/project_data_dir.dart';
 import '../format/formatter_service.dart';
 import '../hooks/hooks.dart';
 import '../instructions/instruction_loader.dart';
@@ -45,6 +44,7 @@ import '../lint/linter.dart';
 import '../mcp/mcp_assembly.dart';
 import '../mcp/mcp_prompt_commands.dart';
 import '../permissions/permission_wiring.dart';
+import '../project/project_registry.dart';
 import '../references/references.dart';
 import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
@@ -178,6 +178,8 @@ class ConatusTuiRuntime {
     String? sessionDir,
     String? memoryFile,
     String? baseDir,
+    ProjectRegistry? projectRegistry,
+    String? projectDir,
     String? configPath,
     bool webTools = true,
     bool skills = true,
@@ -227,8 +229,21 @@ class ConatusTuiRuntime {
     // 规范化形式：与 bin 传给 fs jail 的根保持同一拼写。解析失败（如目录不存在）
     // 时退回原值——后续 fs 操作会给出更具体的报错。
     final String canonicalWorkdir = _canonicalize(resolvedWorkdir);
-    final String resolvedBaseDir =
-        baseDir ?? resolveProjectDataDir(workdir: resolvedWorkdir);
+    final String resolvedBaseDir;
+    final WorkspaceInfo? projectInfo;
+    final ProjectRegistry? projectRegistryService;
+    if (baseDir != null) {
+      resolvedBaseDir = baseDir;
+      projectInfo = null;
+      projectRegistryService = null;
+    } else {
+      projectRegistryService = projectRegistry ?? ProjectRegistry.open();
+      projectInfo = projectRegistryService.resolve(
+        resolvedWorkdir,
+        dataDirOverride: _absoluteProjectDir(projectDir, resolvedWorkdir),
+      );
+      resolvedBaseDir = projectInfo.dataDir;
+    }
 
     // ── 工具：时间 / 回显 / 文件读取 / 联网（可选）──────────────
     provideTools(app, timeout: const Duration(seconds: 30));
@@ -725,6 +740,14 @@ class ConatusTuiRuntime {
     // 重新装配，工具的嵌套发现因此下一轮即生效；注入 `'workdir'` 服务供
     // `/init` 等命令定位仓库根。
     app.provide('workdir', resolvedWorkdir);
+    app.provide('projectDataDir', resolvedBaseDir);
+    if (projectInfo != null) {
+      app.provide('projectInfo', projectInfo);
+    }
+    if (projectRegistryService != null) {
+      app.provide('projectRegistry', projectRegistryService);
+      app.onDispose(projectRegistryService.close);
+    }
     app.provide('configWarnings', configWarnings);
     final InstructionLoader instructionLoader = provideInstructionLoader(
       app,
@@ -906,6 +929,16 @@ class _UnconfiguredProvider implements LlmProvider {
 
   @override
   void close() {}
+}
+
+/// 把 `[agent] project_dir` 的相对形式固定到 workdir；绝对路径原样返回。
+String? _absoluteProjectDir(String? projectDir, String workdir) {
+  final String? value = projectDir?.trim();
+  if (value == null || value.isEmpty) return null;
+  if (value.startsWith('/') || RegExp(r'^[A-Za-z]:[/\\]').hasMatch(value)) {
+    return value;
+  }
+  return '$workdir${Platform.pathSeparator}$value';
 }
 
 /// 默认发现根 + 配置里的 `extra_skill_dirs`（相对 workdir / `~` 展开）。
