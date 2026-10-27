@@ -231,6 +231,27 @@ void main() {
     );
   });
 
+  test('拒绝 projectDir 落在 .opencode', () {
+    final Directory home = _tempDir();
+    final Directory work = _tempDir();
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+
+    expect(
+      () => registry.resolve(
+        work.path,
+        dataDirOverride: '${work.path}/.opencode/state',
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (StateError error) => error.message,
+          'message',
+          contains('.opencode'),
+        ),
+      ),
+    );
+  });
+
   test('损坏 DB 冒泡路径', () {
     final Directory home = _tempDir();
     final Directory work = _tempDir();

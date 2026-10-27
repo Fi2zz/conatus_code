@@ -98,6 +98,9 @@ class ProjectRegistry {
 
     final String dataDir = _absoluteOverride(dataDirOverride, launchDir) ??
         '$workspacesDir${Platform.pathSeparator}$dirName';
+    if (readOnlyWritePath(dataDir)) {
+      throw StateError(kReadOnlyPathMessage);
+    }
     Directory(dataDir).createSync(recursive: true);
     if (!Platform.isWindows) {
       Process.runSync('chmod', <String>['700', dataDir]);
