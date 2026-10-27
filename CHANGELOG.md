@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **Terminal.app 标签切换**：macOS Terminal 不区分 Ctrl+Tab 与 Tab（都发
+  `0x09`）；普通输入态下单独 Tab / Shift+Tab 兜底切标签，单标签时隐藏
+  切换提示，不再显示按了没反应的 `ctrl+tab 切换`。
+
 - **输入框占位刷新**：轮次结束或排队数变化后立即切回普通占位，不再残留
   「模型运行中…」；nocterm 的 `TextField` 复用实例时 placeholder 不会重新
   布局，改为按占位文本重建输入框。

@@ -43,13 +43,12 @@ class TabBar extends StatelessComponent {
       final String mark = index == active ? '▸' : ' ';
       labels.add('$mark${index + 1}:${_label(tabs[index])}');
     }
-    final String close = closeHint.trim().isEmpty
-        ? ''
-        : ' · ${closeHint.trim()} 关闭';
-    final String next = nextHint.trim().isEmpty ? '' : '${nextHint.trim()} 切换';
-    final String switchHint = next.isEmpty && close.isEmpty
-        ? ''
-        : '  ($next$close)';
+    final List<String> hints = <String>[
+      if (tabs.length > 1 && nextHint.trim().isNotEmpty)
+        '${nextHint.trim()} 切换',
+      if (closeHint.trim().isNotEmpty) '${closeHint.trim()} 关闭',
+    ];
+    final String switchHint = hints.isEmpty ? '' : '  (${hints.join(' · ')})';
     final String hint = '[${tabs.length}/$kTabCap] +$switchHint';
     return '${labels.join(' │ ')}  $hint';
   }

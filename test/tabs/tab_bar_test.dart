@@ -16,7 +16,7 @@ void main() {
       TabBar(tabs: tabs.tabs, active: 0, closeHint: ''),
     );
 
-    expect(tester.terminalState, containsText('ctrl+tab 切换)'));
+    expect(tester.terminalState, isNot(containsText('ctrl+tab')));
     expect(tester.terminalState, isNot(containsText('· 关闭')));
   });
 
@@ -25,7 +25,9 @@ void main() {
       size: const Size(80, 8),
     );
     addTearDown(tester.dispose);
-    final TabManager tabs = TabManager()..open('session_one', title: 'Alpha');
+    final TabManager tabs = TabManager()
+      ..open('session_one', title: 'Alpha')
+      ..open('session_two', title: 'Beta');
 
     await tester.pumpComponent(
       TabBar(

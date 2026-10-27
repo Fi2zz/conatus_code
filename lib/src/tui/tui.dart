@@ -325,6 +325,37 @@ class _AgentTuiState extends State<AgentTui> {
     return file.writeAsBytes(base64Decode(image.base64Data));
   }
 
+  /// macOS Terminal.app 不区分 Ctrl+Tab 与 Tab（都发 0x09）；在普通输入态
+  /// 把单独的 Tab / Shift+Tab 当作标签切换兜底。菜单/浮层打开时不处理，
+  /// 避免抢占补全与表单切换。
+  bool _onTabFallback(KeyboardEvent event) {
+    if (event.logicalKey != LogicalKey.tab) return false;
+    if (event.isControlPressed || event.isAltPressed || event.isMetaPressed) {
+      return false;
+    }
+    if (_menu.open ||
+        _atMenu.open ||
+        _controller.picker.open ||
+        _controller.agentPicker.open ||
+        _controller.choice.open ||
+        _controller.formPrompt.open ||
+        _controller.modelPrompt.open ||
+        _controller.providerPrompt.open ||
+        _controller.renamePrompt.open ||
+        _controller.themePrompt.open ||
+        _controller.planPrompt.open ||
+        _controller.permissionPrompt.open ||
+        _controller.diffOpen) {
+      return false;
+    }
+    unawaited(
+      event.isShiftPressed
+          ? _controller.activatePreviousTab()
+          : _controller.activateNextTab(),
+    );
+    return true;
+  }
+
   /// 全局键位：先问 dispatcher；leader 前缀或已被吞掉的第二段返回 true。
   bool _onGlobalKey(KeyboardEvent event) {
     final bool pendingBefore = _keys.leaderPending;
@@ -812,6 +843,9 @@ class _AgentTuiState extends State<AgentTui> {
     // Esc 兜底（choice/picker 的 Esc 已在上方处理）：关闭菜单、关闭帮助弹出、
     // 团队视图返回，无面板时打断在飞轮次（busy 时输入框 readOnly 不经
     // _onInputKey，靠这里兜底）。
+    if (_onTabFallback(event)) {
+      return true;
+    }
     if (event.logicalKey == LogicalKey.escape) {
       if (_menu.open) {
         _menu.close();

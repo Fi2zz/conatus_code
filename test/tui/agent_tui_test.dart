@@ -91,6 +91,34 @@ void main() {
     }
   });
 
+  test('单独 Tab 兜底切换标签（Terminal.app 不区分 Ctrl+Tab）', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      await controller.handleLine('/new');
+      await tester.pump();
+      expect(controller.tabs.tabs.length, 2);
+      final int before = controller.tabs.active;
+
+      await tester.sendTab();
+      await tester.pump();
+
+      expect(controller.tabs.active, isNot(before));
+
+      // 支持修饰键的终端仍走 ctrl+tab 原生绑定。
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.tab,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+      expect(controller.tabs.active, before);
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('Esc 关闭团队视图返回对话', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();

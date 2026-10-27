@@ -347,7 +347,9 @@ busy 时输入不再被拒：自动排队（上限 20 条），当前轮收口�
 
 **会话标签**：每个标签是一个独立会话（JSONL + 检查点 + 权限模式 + Agent）。
 `ctrl+tab` / `ctrl+shift+tab` 切换，`<leader>w` 关闭（只移除视图，不删数据）；
-上限 8 个，标签栏的切换 / 关闭提示取自当前 keymap。`/new` 新会话使用
+macOS Terminal.app 不区分 Ctrl+Tab 与 Tab（都发 `0x09`），此时单独
+`Tab` / `Shift+Tab` 也会切换标签（菜单/浮层打开时除外）。只有一个标签时
+标签栏不显示切换提示。上限 8 个，标签栏的切换 / 关闭提示取自当前 keymap。`/new` 新会话使用
 `[agent] default_agent`，不继承上一个标签的 Agent——切回旧标签会恢复它自己的
 `agent/selected` 记录。
 
