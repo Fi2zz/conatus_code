@@ -43,6 +43,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '重命名当前会话（缺省打开输入框；面板里 r 也可重命名）',
     argHint: '[标题]',
   ),
+  TuiCommand(
+    name: 'project',
+    description: '查看/重命名当前项目',
+    argHint: '[rename <名字>]',
+  ),
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(
     name: 'reload',

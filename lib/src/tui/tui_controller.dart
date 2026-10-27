@@ -44,6 +44,7 @@ import '../diff/diff_model.dart';
 import '../diff/diff_source.dart';
 import '../hooks/hooks.dart';
 import '../permissions/permission_wiring.dart';
+import '../project/project_registry.dart';
 import '../revert/revert_compensate.dart';
 import '../revert/revert_service.dart';
 import '../revert/revert_stage.dart';
@@ -1799,6 +1800,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         openAgentPicker();
       case 'sessions':
         await openPicker();
+      case 'project':
+        _handleProject(arg);
       case 'rename':
         await _handleRename(arg);
       case 'session':
@@ -2510,6 +2513,46 @@ class ConatusTuiController implements TuiUserPromptHost {
     } on FileSystemException catch (error) {
       transcript.add(TuiRole.system, '导出失败：${error.message}（${error.path}）');
       return null;
+    }
+  }
+
+  /// `/project` 重命名后的内存显示名；持久值在 SQLite 里。
+  String? _projectName;
+
+  void _handleProject(String arg) {
+    final WorkspaceInfo? info = _app.get<WorkspaceInfo>('projectInfo');
+    final ProjectRegistry? registry =
+        _app.get<ProjectRegistry>('projectRegistry');
+    if (info == null || registry == null) {
+      transcript.add(TuiRole.system, '项目注册表未启用。');
+      return;
+    }
+    final String rest = arg.trim();
+    if (rest.isEmpty) {
+      transcript.add(
+        TuiRole.system,
+        '项目：${_projectName ?? info.projectName}\n'
+        'ID：${info.projectShortId}\n'
+        'worktree：${info.worktreePath}\n'
+        '数据目录：${info.dataDir}',
+      );
+      return;
+    }
+    if (rest != 'rename' && !rest.startsWith('rename ')) {
+      transcript.add(TuiRole.system, '用法：/project [rename <名字>]');
+      return;
+    }
+    final String name = rest.substring('rename'.length).trim();
+    if (name.isEmpty) {
+      transcript.add(TuiRole.system, '用法：/project rename <名字>');
+      return;
+    }
+    try {
+      registry.rename(info.projectId, name);
+      _projectName = name;
+      transcript.add(TuiRole.system, '项目已重命名为「$name」。');
+    } on ArgumentError catch (error) {
+      transcript.add(TuiRole.system, '重命名失败：${error.message}');
     }
   }
 
