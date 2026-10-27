@@ -98,6 +98,24 @@ void main() {
     expect(db.project('p1')!.vcs, 'git');
   });
 
+  test('数据库 / WAL / SHM 权限收紧到 0600', () {
+    if (Platform.isWindows) return;
+    final Directory dir = _tempDir();
+    final String path = _dbPath(dir);
+    final ProjectDatabase db = ProjectDatabase.open(path);
+    addTearDown(db.close);
+
+    for (final String suffix in <String>['', '-wal', '-shm']) {
+      final File file = File('$path$suffix');
+      if (!file.existsSync()) continue;
+      expect(
+        file.statSync().mode & 0x1FF,
+        0x180,
+        reason: file.path,
+      );
+    }
+  });
+
   test('重新打开保留记录', () {
     final String path = _dbPath(_tempDir());
     final ProjectDatabase first = ProjectDatabase.open(path);

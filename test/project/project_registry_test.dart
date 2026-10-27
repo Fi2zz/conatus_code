@@ -195,6 +195,22 @@ void main() {
     expect(info.dataDir, endsWith(identity.worktreeId.substring(0, 16)));
   });
 
+  test('拒绝 .opencode 下的注册表路径', () {
+    final Directory home = _tempDir();
+    expect(
+      () => ProjectRegistry.open(
+        env: <String, String>{'HOME': '${home.path}/.opencode'},
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (StateError error) => error.message,
+          'message',
+          contains('.opencode'),
+        ),
+      ),
+    );
+  });
+
   test('损坏 DB 冒泡路径', () {
     final Directory home = _tempDir();
     final Directory work = _tempDir();

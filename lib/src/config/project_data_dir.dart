@@ -1,6 +1,7 @@
-/// 项目数据目录解析（会话 / 记忆 / 技能 / 检查点的存放根）。
+/// 项目数据目录解析（legacy 显式 project_dir 路径；runtime 默认已改走
+/// `ProjectRegistry` / `~/.nava/workspaces`）。
 ///
-/// 缺省放**用户配置目录**下（`$NAVA_HOME/projects/<编码后的规范工作区路径>`），
+/// 显式路径放**用户配置目录**下（`$NAVA_HOME/projects/<编码后的规范工作区路径>`），
 /// 不在工作区里建 `.conatus`；显式配置 `[agent] project_dir` 时才保持旧语义
 /// `<workdir>/<project_dir>`（相对工作区）。编码用 [Uri.encodeComponent]，
 /// 单级目录、可逆、无碰撞。

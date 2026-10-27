@@ -61,10 +61,17 @@ export PATH="$PWD/dist:$PATH"
 **文件不存在时自动生成模板，并弹出 provider 面板引导添加**（会话内 `/provider`
 也可随时新增，写回 config.toml）。
 
-`~/.nava/projects/` 与 config.toml 同级，但它是**运行数据目录，不是配置**：
-每个子目录对应一个工作区，目录名是该工作区绝对路径的 URL 编码（如
-`%2FUsers%2F...%2Flifts`），存放会话、记忆、检查点、权限与导出文件；用编码
-而不是随机名是为了可反查、无碰撞。示例：
+`~/.nava/projects.db` 是运行数据索引，不是配置；每个工作区的文件放在
+`~/.nava/workspaces/<basename>-<短哈希>/`，例如 `lifts-3f9a2c1b7d4e/`，
+存放会话、记忆、检查点、权限与导出文件。SQLite `project` / `worktree` 表记录
+工作区路径、项目显示名和 worktree 隔离关系；同一 git remote 的多个 clone
+共享项目，但各有独立数据目录。旧 `~/.nava/projects/` 不再读取，可直接删除。
+
+`/project` 查看当前项目名、短 ID、worktree 与数据目录；`/project rename <名字>`
+只改 SQLite 里的显示名，不改目录。SQLite 使用系统库：macOS/Linux 通常自带；
+Windows 需要另行提供 `sqlite3.dll`，且 nava 的 Windows 命令执行本来默认禁用。
+
+示例：
 
 ```toml
 [credentials]
@@ -92,7 +99,7 @@ max_steps = 8                 # 单轮最大模型步数
 workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
 # subagent_permission = "inherit"  # 子代理默认权限：inherit/readonly/ask/auto（模型只能收紧）
 # project_dir = ".conatus"    # 项目数据目录（会话/记忆/数据库/检查点）；缺省不放工作区，
-                              # 落 ~/.nava/projects/<编码工作区路径>；显式设置才
+                              # 落 ~/.nava/workspaces/<basename>-<短哈希>；显式设置才
                               # 相对工作目录（旧行为，工作区会出现该目录）。
                               # 不允许指向 .opencode / ~/.config/opencode（只读），
                               # 否则回落到缺省目录并在 stderr 提示
@@ -225,7 +232,7 @@ description = "产品文档，用于术语与行为说明"
 每轮收口后对工作区文件做快照：**turn 0 全量 base + 各轮相对 base 的差量**
 （只打包变化/新增文件，删除记入清单），**每个检查点压缩成单个无扩展名归档
 文件**（`<项目数据目录>/checkpoints/<会话>/<sha256 哈希名>`**——项目数据目录
-缺省是 `~/.nava/projects/<编码工作区路径>`（不在工作区建目录），**文件名不可读、
+缺省是 `~/.nava/workspaces/<basename>-<短哈希>`（不在工作区建目录），**文件名不可读、
 无 `.gz` 扩展名、不暴露轮次时间线**，轮次只记录在归档头与会话级 gzip `index`
 里；内容非明文、不保留目录结构；`dart:io` 内置 GZipCodec 自定义容器格式，零新
 依赖；旧版目录树检查点读时兼容、索引缺失自动重建）。清单记录快照时刻的对话
@@ -328,7 +335,7 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 `fork`。
 
 默认关闭，关闭时行为与普通编码会话完全一致。数据落在
-`~/.nava/projects/<编码工作区路径>/story-log/`。完整语义、冲突处理与已知边界见
+`~/.nava/workspaces/<basename>-<短哈希>/story-log/`。完整语义、冲突处理与已知边界见
 [docs/story.md](docs/story.md)。
 
 ## 后台任务（`/background`）

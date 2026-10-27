@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 
 import '../config/config_path.dart';
+import '../read_only_paths.dart';
 import 'project_database.dart';
 import 'project_identity.dart';
 import 'project_paths.dart';
@@ -40,9 +41,16 @@ class ProjectRegistry {
   }) {
     final String home = resolveConfigDir(env: env);
     final String sep = Platform.pathSeparator;
+    final String resolvedDbPath = dbPath ?? '$home${sep}projects.db';
+    final String resolvedWorkspaces =
+        workspacesDir ?? '$home${sep}workspaces';
+    if (readOnlyWritePath(resolvedDbPath) ||
+        readOnlyWritePath(resolvedWorkspaces)) {
+      throw StateError(kReadOnlyPathMessage);
+    }
     final ProjectRegistry registry = ProjectRegistry(
-      database: ProjectDatabase.open(dbPath ?? '$home${sep}projects.db'),
-      workspacesDir: workspacesDir ?? '$home${sep}workspaces',
+      database: ProjectDatabase.open(resolvedDbPath),
+      workspacesDir: resolvedWorkspaces,
     );
     Directory(registry.workspacesDir).createSync(recursive: true);
     if (!Platform.isWindows) {

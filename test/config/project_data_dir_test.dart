@@ -21,7 +21,7 @@ void main() {
 
   Map<String, String> env() => <String, String>{'HOME': home.path};
 
-  test('缺省：用户配置目录 projects/<编码工作区>（工作区零写入）', () {
+  test('legacy 缺省：用户配置目录 projects/<编码工作区>（工作区零写入）', () {
     final String dir = resolveProjectDataDir(workdir: work.path, env: env());
 
     final String expectedLeaf = Uri.encodeComponent(

@@ -142,8 +142,8 @@ class ConatusTuiRuntime {
   /// 装配一个默认运行时。
   ///
   /// [sessionDir] / [memoryFile] / cron 任务与运行历史缺省落在 [baseDir]
-  /// （缺省 `$NAVA_HOME/projects/<编码工作区路径>`，即 `~/.nava/...`，不在工作区
-  /// 内）下；[webTools] 为 true 时按 `kDefaultSearchOrder`
+  /// （缺省由项目注册表解析到 `$NAVA_HOME/workspaces/<basename>-<hash>`，
+  /// 不在工作区内）下；[webTools] 为 true 时按 `kDefaultSearchOrder`
   /// 装配搜索源（缺 Key 的自动跳过，见 `conatus_search`）；[skills] 为 true 时
   /// 从 `.conatus/skills` 等目录
   /// 发现技能，注入目录段并注册 `skill` 工具。
@@ -768,7 +768,7 @@ class ConatusTuiRuntime {
       ),
     );
     // 检查点：每轮收口后快照工作区（见 checkpoint_manager.dart）。数据目录
-    // 取 baseDir（缺省 ~/.nava/projects/<编码工作区>，不在工作区内），快照/
+    // 取 baseDir（缺省 ~/.nava/workspaces/<basename>-<hash>，不在工作区内），快照/
     // 恢复走 dart:io 直连。
     if (checkpoint != null) {
       app.provide(

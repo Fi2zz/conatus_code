@@ -242,8 +242,8 @@ void main() {
     });
 
     // 缺省落点是 <projectDataDir>/exports/。真实运行里 projectDataDir 由
-    // resolveProjectDataDir 解析成 ~/.nava/projects/<编码工作区>（那条不变量由
-    // project_data_dir_test 守），所以导出不会落进用户的代码仓库。
+    // 显式 projectDataDir 由控制器服务提供；runtime 默认由项目注册表解析到
+    // ~/.nava/workspaces/<basename>-<hash>，导出不会落进用户的代码仓库。
     test('缺省落点是 <projectDataDir>/exports/', () async {
       final String path = await _export().write(projectDataDir: dir.path);
 

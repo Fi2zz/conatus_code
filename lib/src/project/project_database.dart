@@ -59,9 +59,7 @@ class ProjectDatabase {
     } catch (error) {
       throw StateError('项目数据库无法打开或已损坏：$path（$error）');
     }
-    if (!Platform.isWindows) {
-      Process.runSync('chmod', <String>['600', path]);
-    }
+    _restrictArtifacts(path);
     return ProjectDatabase._(path, db);
   }
 
@@ -170,6 +168,16 @@ ON CONFLICT(id) DO UPDATE SET
       return action();
     } on SqliteException catch (error) {
       throw StateError('项目数据库操作失败：$path（${error.message}）');
+    }
+  }
+
+  static void _restrictArtifacts(String path) {
+    if (Platform.isWindows) return;
+    for (final String suffix in <String>['', '-wal', '-shm']) {
+      final File file = File('$path$suffix');
+      if (file.existsSync()) {
+        Process.runSync('chmod', <String>['600', file.path]);
+      }
     }
   }
 
