@@ -1,4 +1,4 @@
-/// conatus_code 入口的命令行选项：解析 `--session` / `--config` / `--help`。
+/// conatus_code 入口的命令行选项：解析 `--session` / `--config` / `--workdir` / `--help`。
 ///
 /// 从入口 `main` 里提出来，调用方（自己的 `main` 或别的入口）因此能复用同一套
 /// 解析与用法文案，不必再抄一遍。
