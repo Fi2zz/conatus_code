@@ -25,7 +25,7 @@ class LspServerStatus {
 }
 
 /// 按配置管理多个 LSP server。
-class LspManager {
+class LspManager implements LspDiagnosticsSource {
   LspManager({
     required this.config,
     required this.workdir,
@@ -62,12 +62,16 @@ class LspManager {
   }
 
   /// 对 [path] 取诊断；未配置/失败返回空列表。
+  @override
   Future<List<LspDiagnostic>> diagnose(String path) async {
-    final LspServerConfig? server = serverFor(path);
+    final String absolute = File(path).isAbsolute
+        ? path
+        : '$workdir${Platform.pathSeparator}$path';
+    final LspServerConfig? server = serverFor(absolute);
     if (server == null) return const <LspDiagnostic>[];
     try {
       final LspClient client = await _clientFor(server);
-      final List<LspDiagnostic> diagnostics = await client.diagnose(path);
+      final List<LspDiagnostic> diagnostics = await client.diagnose(absolute);
       _counts[server.name] = diagnostics.length;
       _errors.remove(server.name);
       return diagnostics;

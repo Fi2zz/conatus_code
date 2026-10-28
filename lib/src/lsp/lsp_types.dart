@@ -28,3 +28,8 @@ class LspDiagnostic {
     return '$path:$line:$column ${severity.name}$codeText $message';
   }
 }
+
+/// 供工具/中间件消费的诊断来源。
+abstract interface class LspDiagnosticsSource {
+  Future<List<LspDiagnostic>> diagnose(String path);
+}
