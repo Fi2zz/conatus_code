@@ -10,7 +10,9 @@
 - **项目注册表与新的工作区目录**：项目/工作区元数据进 `~/.nava/projects.db`，
   数据改落 `~/.nava/workspaces/<basename>-<短哈希>/`；同一 git remote 共享项目、
   按 worktree 隔离数据；新增 `/project`、`/project list` 与 `/project rename`；
-  状态栏右段显示项目名。每个工作区写 `workspace.json` sidecar，DB 丢失/损坏时
+  状态栏右段显示项目名。`/project open` 通过退出当前进程、在目标 worktree 启动
+  新 nava 完成切换（新会话）；新增 `--workdir` 覆盖工作目录。每个工作区写
+  `workspace.json` sidecar，DB 丢失/损坏时
   可用 `nava project repair` 重建（损坏 DB 先备份）。旧 `~/.nava/projects/`
   不迁移、不再读取，可直接删除。
 

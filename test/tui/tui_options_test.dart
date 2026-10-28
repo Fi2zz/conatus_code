@@ -32,6 +32,16 @@ void main() {
     expect(options.configPath, '/tmp/a.toml');
   });
 
+  test('解析 --workdir', () {
+    final TuiOptions options = TuiOptions.parse(const <String>[
+      '--workdir',
+      '/tmp/project',
+    ]);
+
+    expect(options.workdir, '/tmp/project');
+    expect(TuiOptions.parse(const <String>[]).workdir, isNull);
+  });
+
   test('未给 --config 时 configPath 为 null', () {
     expect(TuiOptions.parse(const <String>[]).configPath, isNull);
     // 尾值缺失：`--config` 后面没有取值，保持缺省。

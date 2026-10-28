@@ -16,9 +16,32 @@ Directory _tempDir() {
   return dir;
 }
 
+void _initRepo(Directory dir) {
+  Process.runSync('git', <String>['init', '-q', '-b', 'main'], workingDirectory: dir.path);
+  Process.runSync(
+    'git',
+    <String>['config', 'user.email', 'test@example.com'],
+    workingDirectory: dir.path,
+  );
+  Process.runSync(
+    'git',
+    <String>['config', 'user.name', 'test'],
+    workingDirectory: dir.path,
+  );
+  File('${dir.path}/a.txt').writeAsStringSync('a');
+  Process.runSync('git', <String>['add', 'a.txt'], workingDirectory: dir.path);
+  Process.runSync('git', <String>['commit', '-qm', 'init'], workingDirectory: dir.path);
+  Process.runSync(
+    'git',
+    <String>['remote', 'add', 'origin', 'https://github.com/acme/lifts.git'],
+    workingDirectory: dir.path,
+  );
+}
+
 Future<(ConatusTuiController, Context)> _build({
   WorkspaceInfo? info,
   ProjectRegistry? registry,
+  void Function(String workdir)? onSwitchProject,
 }) async {
   final Context app = Context.root();
   addTearDown(app.dispose);
@@ -39,6 +62,7 @@ Future<(ConatusTuiController, Context)> _build({
     initialSession: 'project',
     modelLabel: 'mock',
     onExit: () {},
+    onSwitchProject: onSwitchProject,
   );
   await controller.start();
   return (controller, app);
@@ -116,6 +140,79 @@ void main() {
     expect(text, contains(Directory(b.path).resolveSymbolicLinksSync()));
     expect(text, contains('* '));
     controller.dispose();
+  });
+
+  test('/project open 用 worktree 短 ID 请求切换', () async {
+    final Directory temp = _tempDir();
+    final Directory a = _tempDir();
+    final Directory b = _tempDir();
+    final ProjectRegistry registry = ProjectRegistry.open(
+      dbPath: '${temp.path}/projects.db',
+      workspacesDir: '${temp.path}/workspaces',
+    );
+    addTearDown(registry.close);
+    final WorkspaceInfo first = registry.resolve(a.path);
+    final WorkspaceInfo second = registry.resolve(b.path);
+    String? switched;
+    final (ConatusTuiController controller, _) = await _build(
+      info: first,
+      registry: registry,
+      onSwitchProject: (String workdir) => switched = workdir,
+    );
+
+    await controller.handleLine(
+      '/project open ${second.worktreeId.substring(0, 8)}',
+    );
+
+    expect(switched, second.worktreePath);
+    controller.dispose();
+  });
+
+  test('/project open 拒绝当前 worktree、歧义 ID 与无回调', () async {
+    final Directory temp = _tempDir();
+    final Directory a = _tempDir();
+    final Directory b = _tempDir();
+    _initRepo(a);
+    _initRepo(b);
+    final ProjectRegistry registry = ProjectRegistry.open(
+      dbPath: '${temp.path}/projects.db',
+      workspacesDir: '${temp.path}/workspaces',
+    );
+    addTearDown(registry.close);
+    final WorkspaceInfo first = registry.resolve(a.path);
+    final WorkspaceInfo second = registry.resolve(b.path);
+    String? switched;
+    final (ConatusTuiController controller, _) = await _build(
+      info: first,
+      registry: registry,
+      onSwitchProject: (String workdir) => switched = workdir,
+    );
+
+    await controller.handleLine('/project open ${first.worktreeId.substring(0, 8)}');
+    expect(switched, isNull);
+    expect(controller.transcript.messages.last.text, contains('已经在'));
+
+    await controller.handleLine('/project open ${first.projectShortId}');
+    expect(switched, isNull);
+    expect(controller.transcript.messages.last.text, contains('多个 worktree'));
+
+    await controller.handleLine('/project open not-a-project');
+    expect(switched, isNull);
+    expect(controller.transcript.messages.last.text, contains('没有匹配'));
+
+    final (ConatusTuiController noCallback, _) = await _build(
+      info: first,
+      registry: registry,
+    );
+    await noCallback.handleLine(
+      '/project open ${second.worktreeId.substring(0, 8)}',
+    );
+    expect(
+      noCallback.transcript.messages.last.text,
+      contains('不支持项目切换'),
+    );
+    controller.dispose();
+    noCallback.dispose();
   });
 
   test('/project rename 更新注册表并提示新名字', () async {

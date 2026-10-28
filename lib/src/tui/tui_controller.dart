@@ -145,6 +145,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.maxSteps = 8,
     this.planning = false,
     this.onExit,
+    this.onSwitchProject,
     this.tts,
     this.ttsSink,
     this.initialPermissionMode = TuiPermissionMode.askWhenNeeded,
@@ -314,6 +315,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 退出请求（`/exit`、`/quit`、Ctrl+C）；由宿主接 `shutdownApp`。
   final void Function()? onExit;
+
+  /// `/project open` 请求：宿主接重启/新进程；null 表示当前模式不支持。
+  final void Function(String workdir)? onSwitchProject;
 
   /// TTS 服务（可选）。注入后随会话装配团队语音播报。
   final TtsService? tts;
@@ -2538,6 +2542,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         '项目：${_projectName ?? info.projectName}\n'
         'ID：${info.projectShortId}\n'
         'worktree：${info.worktreePath}\n'
+        'worktree ID：${info.worktreeId.substring(0, 8)}\n'
         '数据目录：${info.dataDir}',
       );
       return;
@@ -2549,16 +2554,25 @@ class ConatusTuiController implements TuiUserPromptHost {
       );
       for (final WorkspaceInfo item in list) {
         final String mark = item.worktreeId == info.worktreeId ? '*' : ' ';
+        final String worktreeShort = item.worktreeId.substring(0, 8);
         buffer.write(
-          '\n$mark ${item.projectName}  ${item.projectShortId}  '
+          '\n$mark ${item.projectName}  ${item.projectShortId}/$worktreeShort  '
           '${item.worktreePath}',
         );
       }
       transcript.add(TuiRole.system, buffer.toString());
       return;
     }
+    if (rest == 'open' || rest.startsWith('open ')) {
+      final String selector = rest.substring('open'.length).trim();
+      _openProject(info, registry, selector);
+      return;
+    }
     if (rest != 'rename' && !rest.startsWith('rename ')) {
-      transcript.add(TuiRole.system, '用法：/project [list|rename <名字>]');
+      transcript.add(
+        TuiRole.system,
+        '用法：/project [list|open <项目|短ID|路径>|rename <名字>]',
+      );
       return;
     }
     final String name = rest.substring('rename'.length).trim();
@@ -2573,6 +2587,66 @@ class ConatusTuiController implements TuiUserPromptHost {
     } on ArgumentError catch (error) {
       transcript.add(TuiRole.system, '重命名失败：${error.message}');
     }
+  }
+
+  void _openProject(
+    WorkspaceInfo current,
+    ProjectRegistry registry,
+    String selector,
+  ) {
+    if (selector.isEmpty) {
+      transcript.add(
+        TuiRole.system,
+        '用法：/project open <项目名|短ID|路径>',
+      );
+      return;
+    }
+    if (busy) {
+      transcript.add(TuiRole.system, '有在途轮次，请稍候再试。');
+      return;
+    }
+    final List<WorkspaceInfo> matches = registry
+        .list()
+        .where(
+          (WorkspaceInfo item) =>
+              item.worktreeId == selector ||
+              item.projectId == selector ||
+              item.worktreeId.startsWith(selector) ||
+              item.projectId.startsWith(selector) ||
+              item.projectName == selector ||
+              item.worktreePath == selector,
+        )
+        .toList();
+    if (matches.isEmpty) {
+      transcript.add(TuiRole.system, '没有匹配的项目：$selector');
+      return;
+    }
+    if (matches.length > 1) {
+      transcript.add(
+        TuiRole.system,
+        '匹配到多个 worktree，请用 worktree 短 ID（/project list 查看）。',
+      );
+      return;
+    }
+    final WorkspaceInfo target = matches.single;
+    if (target.worktreeId == current.worktreeId) {
+      transcript.add(TuiRole.system, '已经在当前 worktree。');
+      return;
+    }
+    if (!Directory(target.worktreePath).existsSync()) {
+      transcript.add(
+        TuiRole.system,
+        '目标 worktree 不存在：${target.worktreePath}',
+      );
+      return;
+    }
+    final void Function(String)? switchProject = onSwitchProject;
+    if (switchProject == null) {
+      transcript.add(TuiRole.system, '当前模式不支持项目切换。');
+      return;
+    }
+    transcript.add(TuiRole.system, '正在切换到 ${target.projectName}…');
+    switchProject(target.worktreePath);
   }
 
   /// 项目数据目录：`workdir` 服务在时由它与 `project_dir` 推出。

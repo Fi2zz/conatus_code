@@ -34,6 +34,7 @@ class TuiOptions {
     this.allowUnsafeHeadless = false,
     this.printRequested = false,
     this.harnessPath,
+    this.workdir,
   });
 
   /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
@@ -73,6 +74,9 @@ class TuiOptions {
   /// `--harness <路径>` 指定的 manifest 文件；`null` 表示不装配。
   final String? harnessPath;
 
+  /// `--workdir <路径>` 覆盖工作目录；`null` 表示用配置或当前目录。
+  final String? workdir;
+
   /// 用法文案。
   static const String usage =
       '用法：nava '
@@ -110,6 +114,7 @@ class TuiOptions {
     bool allowUnsafeHeadless = false;
     bool printRequested = false;
     String? harnessPath;
+    String? workdir;
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
@@ -133,6 +138,8 @@ class TuiOptions {
         configPath = args[++index];
       } else if (arg == '--harness' && index + 1 < args.length) {
         harnessPath = args[++index];
+      } else if (arg == '--workdir' && index + 1 < args.length) {
+        workdir = args[++index];
       } else if (arg == '--print' || arg == '-p') {
         printRequested = true;
         final bool hasValue =
@@ -158,6 +165,7 @@ class TuiOptions {
       allowUnsafeHeadless: allowUnsafeHeadless,
       printRequested: printRequested,
       harnessPath: harnessPath,
+      workdir: workdir,
     );
   }
 }

@@ -858,6 +858,7 @@ class ConatusTuiRuntime {
   ConatusTuiController createController({
     String? initialSession,
     required void Function() onExit,
+    void Function(String workdir)? onSwitchProject,
     String name = '默认',
     bool planning = false,
     TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,
@@ -872,6 +873,7 @@ class ConatusTuiRuntime {
       maxSteps: maxSteps,
       planning: planning,
       onExit: onExit,
+      onSwitchProject: onSwitchProject,
       initialPermissionMode: initialPermissionMode,
       fallbackModels: fallbackModels,
       retryPolicy: retryPolicy,

@@ -68,8 +68,10 @@ export PATH="$PWD/dist:$PATH"
 共享项目，但各有独立数据目录。旧 `~/.nava/projects/` 不再读取，可直接删除。
 
 `/project` 查看当前项目名、短 ID、worktree 与数据目录；`/project list` 列出
-全部已登记 worktree（`*` 标记当前项）；`/project rename <名字>` 只改 SQLite
-里的显示名，不改目录。状态栏右段也会显示项目名。每个工作区目录里有
+全部已登记 worktree（`*` 标记当前项，格式为 `项目短ID/worktree短ID`）；
+`/project open <短 ID|路径>` 会退出当前进程并在目标 worktree 启动新的 nava
+（新会话，不继承当前标签）；`/project rename <名字>` 只改 SQLite 里的显示名，
+不改目录。状态栏右段也会显示项目名。每个工作区目录里有
 `workspace.json` sidecar；DB 丢失或损坏时运行 `nava project repair` 可从
 sidecar 重建注册表（损坏的 DB 会先备份为 `projects.db.corrupt-<时间>`）。
 SQLite 使用系统库：macOS/Linux 通常自带；

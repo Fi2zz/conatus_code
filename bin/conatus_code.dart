@@ -90,7 +90,8 @@ Future<void> main(List<String> args) async {
     if (askNotice != null) stderr.writeln(askNotice);
   }
 
-  final String workdir = config.agent.workdir ?? Directory.current.path;
+  final String workdir =
+      options.workdir ?? config.agent.workdir ?? Directory.current.path;
   final String sep = Platform.pathSeparator;
 
   // 项目注册表：项目/工作区元数据进 ~/.nava/projects.db，数据落
@@ -246,15 +247,50 @@ Future<void> main(List<String> args) async {
 
   // 回退链与重试策略已在 runtime 上（`/model` 切换主模型时要跟着重建），
   // `createController` 直接取用，这里不重复传。
+  String? switchWorkdir;
   final ConatusTuiController controller = runtime.createController(
     initialSession: initialSession,
     planning: true,
     initialPermissionMode: toTuiPermissionMode(config.approval.mode),
     onExit: shutdownApp,
+    onSwitchProject: (String workdir) {
+      switchWorkdir = workdir;
+      shutdownApp();
+    },
     keybinds: config.keybinds,
   );
   await runApp(AgentTui(controller: controller));
   await runtime.dispose();
+  if (switchWorkdir != null) {
+    final List<String> childArgs = <String>[
+      '--workdir',
+      switchWorkdir!,
+    ];
+    if (options.configPath != null) {
+      childArgs.addAll(<String>[
+        '--config',
+        File(options.configPath!).absolute.path,
+      ]);
+    }
+    if (options.harnessPath != null) {
+      childArgs.addAll(<String>[
+        '--harness',
+        File(options.harnessPath!).absolute.path,
+      ]);
+    }
+    try {
+      await Process.start(
+        Platform.resolvedExecutable,
+        childArgs,
+        mode: ProcessStartMode.inheritStdio,
+        workingDirectory: switchWorkdir,
+      );
+    } catch (error) {
+      stderr.writeln('项目切换失败：$error');
+      exit(2);
+    }
+    exit(0);
+  }
 }
 
 /// 读取并解析 `--harness` 指定的 manifest；路径为空返回 `null`，失败即退出 2。
