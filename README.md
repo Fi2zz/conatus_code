@@ -558,6 +558,35 @@ OS Error: Path does not exist, path = 'lib/…/nope.dart'
   `[Formatter] skipped` 提示，不影响工具成功。一次编辑涉及超过 20 个文件时只
   格式化前 20 个，其余在提示里报数量（整批跳过会让大补丁带来的文件全不格式化）。
 
+## LSP（`[lsp]`）
+
+LSP **默认关闭**；配置 `[lsp] enabled = true` 后按扩展名懒启动 stdio 语言服务器：
+
+```toml
+[lsp]
+enabled = true
+
+[lsp.servers.dart]
+command = ["dart", "language-server"]
+extensions = [".dart"]
+# [lsp.servers.dart.env]
+# DART_LOG = "debug"
+# [lsp.servers.dart.initialization]
+# trace = "verbose"
+```
+
+- 支持 `initialize`、`didOpen`、`didChange`、`didSave`、`publishDiagnostics`；
+  暂不支持 hover / definition / references（后续阶段）。
+- 新增 `lsp_diagnostics` 工具（参数 `path` / `severity`），返回
+  `path:line:column severity code message`。
+- `write_file` / `edit_file` / `apply_patch` 成功后自动追加诊断；LSP 崩溃、
+  超时或无诊断不影响编辑本身。
+- `/lsp` 查看配置的服务器与状态；`/lsp restart [名字]` 重启。
+- 服务器命令是本地进程，绕过工具审批；只允许用户在 config.toml 显式配置，
+  不从模型输入动态生成。命令不自动安装，找不到可执行文件时只报不可用。
+- `nava import opencode` 会映射 OpenCode 的 `lsp` 对象；`lsp: true` 仅在检测到
+  `pubspec.yaml` 时生成内置 dart server。
+
 ## Hooks（`[hooks]`）
 
 config.toml `[hooks]` 表：`pre_tool_use`（任一非零退出即拒绝该工具）、

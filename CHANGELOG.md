@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **LSP 核心**：`[lsp]` 配置、stdio JSON-RPC 客户端、按扩展名懒启动、
+  `lsp_diagnostics` 工具、编辑后自动追加诊断、`/lsp` 与 `/lsp restart`；
+  `nava import opencode` 支持 LSP 对象映射。默认关闭，失败 fail-open。
+
 - **项目注册表加固**：项目/工作区写入改为单事务并支持唯一冲突重试；
   DB/WAL/SHM 权限统一收紧；打开或迁移失败时释放 SQLite handle。
 

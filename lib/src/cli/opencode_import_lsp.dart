@@ -26,7 +26,7 @@ LspConfig? mapOpenCodeLsp(
       servers: <LspServerConfig>[
         LspServerConfig(
           name: 'dart',
-          command: <String>['dart', 'language-server', '--lsp'],
+          command: <String>['dart', 'language-server'],
           extensions: <String>['.dart'],
         ),
       ],

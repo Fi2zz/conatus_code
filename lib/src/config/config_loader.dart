@@ -205,7 +205,7 @@ mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
 # [lsp]
 # enabled = true
 # [lsp.servers.dart]
-# command = ["dart", "language-server", "--lsp"]
+# command = ["dart", "language-server"]
 # extensions = [".dart"]
 
 [sandbox]

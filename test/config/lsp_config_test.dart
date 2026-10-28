@@ -34,7 +34,7 @@ void main() {
 enabled = true
 
 [lsp.servers.dart]
-command = ["dart", "language-server", "--lsp"]
+command = ["dart", "language-server"]
 extensions = ["dart", ".DART"]
 
 [lsp.servers.dart.env]
@@ -47,7 +47,7 @@ trace = "verbose"
     expect(config.lsp.enabled, isTrue);
     final LspServerConfig server = config.lsp.servers.single;
     expect(server.name, 'dart');
-    expect(server.command, <String>['dart', 'language-server', '--lsp']);
+    expect(server.command, <String>['dart', 'language-server']);
     expect(server.extensions, <String>['.dart', '.dart']);
     expect(server.env, <String, String>{'DART_LOG': 'debug'});
     expect(server.initialization, <String, Object?>{'trace': 'verbose'});
