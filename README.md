@@ -588,6 +588,22 @@ extensions = [".dart"]
 - `nava import opencode` 会映射 OpenCode 的 `lsp` 对象；`lsp: true` 仅在检测到
   `pubspec.yaml` 时生成内置 dart server。
 
+## Web 工具（`web_search` / `fetch_url`）
+
+`web_search` 默认按 Tavily / Exa / Brave / DuckDuckGo 顺序回退；可用 `provider`
+参数强制指定一个源。源失败后进入 60 秒冷却，`/web` 查看可用性与冷却状态。
+
+`fetch_url` 支持：
+
+```text
+format = markdown | text | html   # 默认 markdown
+```
+
+- `markdown`：HTML 转为 Markdown
+- `text`：剥离 HTML 标签后的纯文本
+- `html`：原样返回 HTML
+- 配置 `FIRECRAWL_API_KEY` 时优先走 Firecrawl；否则直接 HTTP GET
+
 ## Hooks（`[hooks]`）
 
 config.toml `[hooks]` 表：`pre_tool_use`（任一非零退出即拒绝该工具）、

@@ -53,6 +53,7 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '查看/重启 LSP 服务器',
     argHint: '[restart [名字]]',
   ),
+  TuiCommand(name: 'web', description: '查看搜索源与冷却状态'),
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(
     name: 'reload',

@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+- **Web 工具对齐**：`fetch_url` 增加 `format=markdown|text|html`（默认
+  markdown），支持 HTML→Markdown；`web_search` 增加 `provider` 参数与 60 秒
+  provider 冷却；新增 `/web` 查看搜索源状态。
+
 - **LSP 核心**：`[lsp]` 配置、stdio JSON-RPC 客户端、按扩展名懒启动、
   `lsp_diagnostics` 工具、编辑后自动追加诊断、`/lsp` 与 `/lsp restart`；
   `nava import opencode` 支持 LSP 对象映射。默认关闭，失败 fail-open。

@@ -18,6 +18,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:conatus_mcp/conatus_mcp.dart';
 import 'package:conatus_schedule/conatus_schedule.dart';
+import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 import 'package:conatus_team/conatus_team.dart';
 import 'package:conatus_tts/conatus_tts.dart';
@@ -1809,6 +1810,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         _handleProject(arg);
       case 'lsp':
         await _handleLsp(arg);
+      case 'web':
+        _handleWeb();
       case 'rename':
         await _handleRename(arg);
       case 'session':
@@ -2650,6 +2653,29 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     transcript.add(TuiRole.system, '正在切换到 ${target.projectName}…');
     switchProject(target.worktreePath);
+  }
+
+  void _handleWeb() {
+    final SearchService? service = _app.get<SearchService>('search');
+    if (service == null) {
+      transcript.add(TuiRole.system, '搜索未装配。');
+      return;
+    }
+    final List<SearchSourceStatus> statuses = service.runtimeStatuses();
+    final List<SearchSourceStatus> all =
+        statuses.isEmpty ? service.statuses : statuses;
+    if (all.isEmpty) {
+      transcript.add(TuiRole.system, '没有可用的搜索源。');
+      return;
+    }
+    final StringBuffer buffer = StringBuffer('搜索源：');
+    for (final SearchSourceStatus status in all) {
+      buffer.write(
+        '\n${status.name}  ${status.available ? '可用' : '不可用'}',
+      );
+      if (status.reason.isNotEmpty) buffer.write('  ${status.reason}');
+    }
+    transcript.add(TuiRole.system, buffer.toString());
   }
 
   Future<void> _handleLsp(String arg) async {
