@@ -575,10 +575,11 @@ extensions = [".dart"]
 # trace = "verbose"
 ```
 
-- 支持 `initialize`、`didOpen`、`didChange`、`didSave`、`publishDiagnostics`；
-  暂不支持 hover / definition / references（后续阶段）。
-- 新增 `lsp_diagnostics` 工具（参数 `path` / `severity`），返回
-  `path:line:column severity code message`。
+- 支持 `initialize`、`didOpen`、`didChange`、`didSave`、`publishDiagnostics`。
+- 新增 `lsp_diagnostics`（`path` / `severity`）、`lsp_hover`、
+  `lsp_definition`、`lsp_references`、`lsp_document_symbols` 工具。
+  位置参数 `line` / `column` 从 1 开始。
+- 导航类工具在服务器不支持/不可用时返回明确提示。
 - `write_file` / `edit_file` / `apply_patch` 成功后自动追加诊断；LSP 崩溃、
   超时或无诊断不影响编辑本身。
 - `/lsp` 查看配置的服务器与状态；`/lsp restart [名字]` 重启。

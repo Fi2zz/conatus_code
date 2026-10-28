@@ -65,12 +65,32 @@ void main() {
     final ConatusTuiRuntime runtime = await _runtime(dir, _config(marker));
     try {
       expect(runtime.lspManager, isNotNull);
-      expect(runtime.tools.names, contains('lsp_diagnostics'));
+      expect(
+        runtime.tools.names,
+        containsAll(<String>[
+          'lsp_diagnostics',
+          'lsp_hover',
+          'lsp_definition',
+          'lsp_references',
+          'lsp_document_symbols',
+        ]),
+      );
       final File file = File('${dir.path}/a.dart')..writeAsStringSync('a');
       final ToolResult diagnostics = await runtime.tools.call(
         ToolCall(name: 'lsp_diagnostics', arguments: <String, Object?>{'path': file.path}),
       );
       expect(diagnostics.content, contains('fake diagnostic'));
+      final ToolResult hover = await runtime.tools.call(
+        ToolCall(
+          name: 'lsp_hover',
+          arguments: <String, Object?>{
+            'path': file.path,
+            'line': 1,
+            'column': 1,
+          },
+        ),
+      );
+      expect(hover.content, contains('fake hover'));
       final ToolResult edit = await runtime.tools.call(
         ToolCall(
           name: 'write_file',

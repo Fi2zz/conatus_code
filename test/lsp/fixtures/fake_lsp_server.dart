@@ -65,7 +65,7 @@ Future<void> _handle(
   final Object? id = message['id'];
   final String? method = message['method'] as String?;
   if (method == 'initialize' && id != null) {
-    _send(<String, Object?>{
+    await _send(<String, Object?>{
       'jsonrpc': '2.0',
       'id': stringIds ? '$id' : id,
       'result': <String, Object?>{'capabilities': <String, Object?>{}},
@@ -73,7 +73,7 @@ Future<void> _handle(
     return;
   }
   if (method == 'workspace/configuration' && id != null) {
-    _send(<String, Object?>{
+    await _send(<String, Object?>{
       'jsonrpc': '2.0',
       'id': stringIds ? '$id' : id,
       'result': <Object?>[null],
@@ -82,7 +82,7 @@ Future<void> _handle(
   }
   if (method == 'shutdown' && id != null) {
     if (ignoreShutdown) return;
-    _send(<String, Object?>{
+    await _send(<String, Object?>{
       'jsonrpc': '2.0',
       'id': stringIds ? '$id' : id,
       'result': null,
@@ -91,6 +91,76 @@ Future<void> _handle(
   }
   if (method == 'exit') {
     exit(0);
+  }
+  if (method == 'textDocument/hover' && id != null) {
+    await _send(<String, Object?>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'result': <String, Object?>{
+        'contents': <String, Object?>{
+          'kind': 'markdown',
+          'value': 'fake hover',
+        },
+      },
+    });
+    return;
+  }
+  if (method == 'textDocument/definition' && id != null) {
+    final Map<String, dynamic> params =
+        (message['params'] as Map).cast<String, dynamic>();
+    final Map<String, dynamic> document =
+        (params['textDocument'] as Map).cast<String, dynamic>();
+    await _send(<String, Object?>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'result': <Map<String, Object?>>[
+        <String, Object?>{
+          'uri': document['uri'],
+          'range': <String, Object?>{
+            'start': <String, Object?>{'line': 2, 'character': 3},
+            'end': <String, Object?>{'line': 2, 'character': 5},
+          },
+        },
+      ],
+    });
+    return;
+  }
+  if (method == 'textDocument/references' && id != null) {
+    final Map<String, dynamic> params =
+        (message['params'] as Map).cast<String, dynamic>();
+    final Map<String, dynamic> document =
+        (params['textDocument'] as Map).cast<String, dynamic>();
+    await _send(<String, Object?>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'result': <Map<String, Object?>>[
+        <String, Object?>{
+          'uri': document['uri'],
+          'range': <String, Object?>{
+            'start': <String, Object?>{'line': 1, 'character': 2},
+            'end': <String, Object?>{'line': 1, 'character': 3},
+          },
+        },
+      ],
+    });
+    return;
+  }
+  if (method == 'textDocument/documentSymbol' && id != null) {
+    await _send(<String, Object?>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'result': <Map<String, Object?>>[
+        <String, Object?>{
+          'name': 'fakeSymbol',
+          'kind': 12,
+          'range': <String, Object?>{
+            'start': <String, Object?>{'line': 4, 'character': 1},
+            'end': <String, Object?>{'line': 4, 'character': 2},
+          },
+        },
+      ],
+    });
+    return;
   }
   if (method == 'textDocument/didOpen' || method == 'textDocument/didChange') {
     if (openOnly && method == 'textDocument/didChange') return;
@@ -101,9 +171,9 @@ Future<void> _handle(
     final String uri = document['uri'] as String;
     if (malformed) {
       stdout.add(utf8.encode('Content-Length: nope\r\n\r\n'));
-      unawaited(stdout.flush());
+      await stdout.flush();
     }
-    _send(<String, Object?>{
+    await _send(<String, Object?>{
       'jsonrpc': '2.0',
       'method': 'textDocument/publishDiagnostics',
       'params': <String, Object?>{
@@ -125,11 +195,11 @@ Future<void> _handle(
   }
 }
 
-void _send(Map<String, Object?> message) {
+Future<void> _send(Map<String, Object?> message) async {
   final List<int> body = utf8.encode(jsonEncode(message));
   stdout.add(utf8.encode('Content-Length: ${body.length}\r\n\r\n'));
   stdout.add(body);
-  stdout.flush();
+  await stdout.flush();
 }
 
 int _headerEnd(List<int> buffer) {

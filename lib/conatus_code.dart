@@ -241,6 +241,14 @@ export 'src/lint/linter.dart'
         kLintToolNames;
 export 'src/lsp/lsp_client.dart' show LspClient, LspException;
 export 'src/lsp/lsp_manager.dart' show LspManager, LspServerStatus;
+export 'src/lsp/lsp_navigation.dart'
+    show LspDocumentSymbol, LspLocation, LspNavigator;
+export 'src/lsp/lsp_navigation_tools.dart'
+    show
+        LspDefinitionTool,
+        LspDocumentSymbolsTool,
+        LspHoverTool,
+        LspReferencesTool;
 export 'src/lsp/lsp_tool.dart' show LspDiagnosticsTool, formatLspDiagnostics;
 export 'src/lsp/lsp_types.dart' show LspDiagnostic, LspDiagnosticsSource, LspSeverity;
 export 'src/mcp/mcp_assembly.dart'

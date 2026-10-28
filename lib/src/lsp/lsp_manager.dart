@@ -62,6 +62,23 @@ class LspManager implements LspDiagnosticsSource {
   }
 
   /// 对 [path] 取诊断；未配置/失败返回空列表。
+  /// 启动并返回匹配 [path] 的 client；无匹配/失败返回 null。
+  Future<LspClient?> clientFor(String path) async {
+    final String absolute = File(path).isAbsolute
+        ? path
+        : '$workdir${Platform.pathSeparator}$path';
+    final LspServerConfig? server = serverFor(absolute);
+    if (server == null) return null;
+    try {
+      final LspClient client = await _clientFor(server);
+      _errors.remove(server.name);
+      return client;
+    } catch (error) {
+      _errors[server.name] = '$error';
+      return null;
+    }
+  }
+
   @override
   Future<List<LspDiagnostic>> diagnose(String path) =>
       _diagnose(path, save: false);

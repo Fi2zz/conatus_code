@@ -44,8 +44,8 @@ class LspClient {
   StreamSubscription<List<int>>? _stdoutSub;
   StreamSubscription<List<int>>? _stderrSub;
   final List<int> _buffer = <int>[];
-  final Map<String, Completer<Map<String, dynamic>>> _pending =
-      <String, Completer<Map<String, dynamic>>>{};
+  final Map<String, Completer<Object?>> _pending =
+      <String, Completer<Object?>>{};
   final Map<String, List<LspDiagnostic>> _diagnostics =
       <String, List<LspDiagnostic>>{};
   final Map<String, Completer<List<LspDiagnostic>>> _waiters =
@@ -115,6 +115,39 @@ class LspClient {
     String? text,
     bool save = false,
   }) async {
+    final String uri = Uri.file(path).toString();
+    final Completer<List<LspDiagnostic>> waiter =
+        Completer<List<LspDiagnostic>>();
+    _waiters[uri] = waiter;
+    _diagnostics[uri] = const <LspDiagnostic>[];
+    try {
+      await _syncDocument(path, text: text, save: save);
+      return await waiter.future.timeout(diagnosticsWait);
+    } on TimeoutException {
+      return _diagnostics[uri] ?? const <LspDiagnostic>[];
+    } finally {
+      _waiters.remove(uri);
+    }
+  }
+
+  /// 打开/更新文档，供 hover/definition 等请求使用。
+  Future<void> ensureDocument(String path, {String? text, bool save = false}) async {
+    await _syncDocument(path, text: text, save: save);
+  }
+
+  /// 发送一个已初始化后的 LSP 请求；调用方负责 ensureDocument。
+  Future<Object?> sendRequest(
+    String method,
+    Map<String, Object?> params,
+  ) {
+    return _request(method, params);
+  }
+
+  Future<void> _syncDocument(
+    String path, {
+    String? text,
+    bool save = false,
+  }) async {
     if (!_started) await start();
     final String uri = Uri.file(path).toString();
     final String content;
@@ -123,10 +156,6 @@ class LspClient {
     } on FileSystemException catch (error) {
       throw LspException('cannot read ${error.path ?? path}: ${error.message}');
     }
-    final Completer<List<LspDiagnostic>> waiter =
-        Completer<List<LspDiagnostic>>();
-    _waiters[uri] = waiter;
-    _diagnostics[uri] = const <LspDiagnostic>[];
     final int version = (_versions[uri] ?? 0) + 1;
     _versions[uri] = version;
     if (!_opened.contains(uri)) {
@@ -152,13 +181,6 @@ class LspClient {
           'text': content,
         });
       }
-    }
-    try {
-      return await waiter.future.timeout(diagnosticsWait);
-    } on TimeoutException {
-      return _diagnostics[uri] ?? const <LspDiagnostic>[];
-    } finally {
-      _waiters.remove(uri);
     }
   }
 
@@ -190,7 +212,7 @@ class LspClient {
     _stderrSub = null;
     _process = null;
     _started = false;
-    for (final Completer<Map<String, dynamic>> pending in _pending.values) {
+    for (final Completer<Object?> pending in _pending.values) {
       if (!pending.isCompleted) {
         pending.completeError(const LspException('client stopped'));
       }
@@ -208,14 +230,13 @@ class LspClient {
 
   Future<void> close() => stop();
 
-  Future<Map<String, dynamic>> _request(
+  Future<Object?> _request(
     String method,
     Object? params, {
     Duration? timeout,
   }) {
     final int id = _nextId++;
-    final Completer<Map<String, dynamic>> completer =
-        Completer<Map<String, dynamic>>();
+    final Completer<Object?> completer = Completer<Object?>();
     final String key = '$id';
     _pending[key] = completer;
     _send(<String, Object?>{
@@ -311,16 +332,13 @@ class LspClient {
       return;
     }
     if (id != null) {
-      final Completer<Map<String, dynamic>>? pending =
+      final Completer<Object?>? pending =
           _pending.remove('$id');
       if (pending != null && !pending.isCompleted) {
         if (message['error'] != null) {
           pending.completeError(LspException('${message['error']}'));
         } else {
-          final Object? result = message['result'];
-          pending.complete(
-            result is Map<String, dynamic> ? result : <String, dynamic>{},
-          );
+          pending.complete(message['result']);
         }
       }
       return;
@@ -378,7 +396,7 @@ class LspClient {
   void _onExit() {
     _process = null;
     _started = false;
-    for (final Completer<Map<String, dynamic>> pending in _pending.values) {
+    for (final Completer<Object?> pending in _pending.values) {
       if (!pending.isCompleted) {
         pending.completeError(
           LspException(_stderr.isEmpty ? 'LSP server exited' : _stderr),

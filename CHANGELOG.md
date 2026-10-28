@@ -8,6 +8,9 @@
   `lsp_diagnostics` 工具、编辑后自动追加诊断、`/lsp` 与 `/lsp restart`；
   `nava import opencode` 支持 LSP 对象映射。默认关闭，失败 fail-open。
 
+- **LSP 导航**：`lsp_hover` / `lsp_definition` / `lsp_references` /
+  `lsp_document_symbols`；位置参数从 1 开始。
+
 - **项目注册表加固**：项目/工作区写入改为单事务并支持唯一冲突重试；
   DB/WAL/SHM 权限统一收紧；打开或迁移失败时释放 SQLite handle。
 

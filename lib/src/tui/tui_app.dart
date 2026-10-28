@@ -42,6 +42,8 @@ import '../instructions/instruction_prompt.dart';
 import '../instructions/instruction_wiring.dart';
 import '../lint/linter.dart';
 import '../lsp/lsp_manager.dart';
+import '../lsp/lsp_navigation.dart';
+import '../lsp/lsp_navigation_tools.dart';
 import '../lsp/lsp_tool.dart';
 import '../mcp/mcp_assembly.dart';
 import '../mcp/mcp_prompt_commands.dart';
@@ -337,16 +339,29 @@ class ConatusTuiRuntime {
     provideFsTools(app);
     LspManager? lspManager;
     if (lsp.enabled) {
-      lspManager = LspManager(config: lsp, workdir: canonicalWorkdir);
-      app.provide('lsp', lspManager);
+      final LspManager manager = LspManager(
+        config: lsp,
+        workdir: canonicalWorkdir,
+      );
+      lspManager = manager;
+      app.provide('lsp', manager);
       app.effect(
-        () => app.tools.register(LspDiagnosticsTool(source: lspManager!)),
+        () => app.tools.register(LspDiagnosticsTool(source: manager)),
       );
       app.effect(
-        () => app.tools.use(lspDiagnosticsMiddleware(lspManager!), tag: 'lsp'),
+        () => app.tools.use(lspDiagnosticsMiddleware(manager), tag: 'lsp'),
       );
+      final LspNavigator navigator = LspNavigator(manager);
+      for (final Tool tool in <Tool>[
+        LspHoverTool(navigator, manager),
+        LspDefinitionTool(navigator, manager),
+        LspReferencesTool(navigator, manager),
+        LspDocumentSymbolsTool(navigator, manager),
+      ]) {
+        app.effect(() => app.tools.register(tool));
+      }
       app.onDispose(() {
-        unawaited(lspManager!.close());
+        unawaited(manager.close());
       });
     }
     // XERJ 代码检索（可选外部二进制）：找不到 xerj 时 provide 返回空列表，
