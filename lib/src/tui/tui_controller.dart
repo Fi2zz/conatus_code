@@ -43,6 +43,7 @@ import '../diagnose/doctor.dart';
 import '../diff/diff_model.dart';
 import '../diff/diff_source.dart';
 import '../hooks/hooks.dart';
+import '../lsp/lsp_manager.dart';
 import '../permissions/permission_wiring.dart';
 import '../project/project_registry.dart';
 import '../revert/revert_compensate.dart';
@@ -1806,6 +1807,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await openPicker();
       case 'project':
         _handleProject(arg);
+      case 'lsp':
+        await _handleLsp(arg);
       case 'rename':
         await _handleRename(arg);
       case 'session':
@@ -2647,6 +2650,41 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     transcript.add(TuiRole.system, '正在切换到 ${target.projectName}…');
     switchProject(target.worktreePath);
+  }
+
+  Future<void> _handleLsp(String arg) async {
+    final LspManager? manager = _app.get<LspManager>('lsp');
+    if (manager == null) {
+      transcript.add(
+        TuiRole.system,
+        'LSP 未启用（[lsp] enabled = true 后重启 nava）。',
+      );
+      return;
+    }
+    final String rest = arg.trim();
+    if (rest == 'restart' || rest.startsWith('restart ')) {
+      final String name = rest.substring('restart'.length).trim();
+      await manager.restart(name.isEmpty ? null : name);
+      transcript.add(
+        TuiRole.system,
+        name.isEmpty ? 'LSP 服务器已重启。' : 'LSP 服务器 $name 已重启。',
+      );
+      return;
+    }
+    final List<LspServerStatus> statuses = manager.statuses();
+    if (statuses.isEmpty) {
+      transcript.add(TuiRole.system, 'LSP 已启用，但没有配置服务器。');
+      return;
+    }
+    final StringBuffer buffer = StringBuffer('LSP 服务器：');
+    for (final LspServerStatus status in statuses) {
+      buffer.write(
+        '\n${status.name}  ${status.state}  '
+        'diagnostics=${status.diagnosticCount}',
+      );
+      if (status.error != null) buffer.write('  ${status.error}');
+    }
+    transcript.add(TuiRole.system, buffer.toString());
   }
 
   /// 项目数据目录：`workdir` 服务在时由它与 `project_dir` 推出。

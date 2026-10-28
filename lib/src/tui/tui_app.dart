@@ -41,6 +41,8 @@ import '../instructions/instruction_loader.dart';
 import '../instructions/instruction_prompt.dart';
 import '../instructions/instruction_wiring.dart';
 import '../lint/linter.dart';
+import '../lsp/lsp_manager.dart';
+import '../lsp/lsp_tool.dart';
 import '../mcp/mcp_assembly.dart';
 import '../mcp/mcp_prompt_commands.dart';
 import '../permissions/permission_wiring.dart';
@@ -101,6 +103,7 @@ class ConatusTuiRuntime {
     required this.fallbackModels,
     required this.retryPolicy,
     required this.storyEnabled,
+    required this.lspManager,
     required void Function(FallbackLlm llm) switchLlm,
   }) : _switchLlm = switchLlm;
 
@@ -130,6 +133,9 @@ class ConatusTuiRuntime {
 
   /// 是否装配故事层（`[story] enabled`）。
   final bool storyEnabled;
+
+  /// 已启用的 LSP 管理器；未启用为 null。
+  final LspManager? lspManager;
 
   final void Function(FallbackLlm llm) _switchLlm;
 
@@ -199,6 +205,7 @@ class ConatusTuiRuntime {
     RetryPolicy? retryPolicy,
     List<String> fallbackModels = const <String>[],
     TurnBudget? turnBudget,
+    LspConfig lsp = const LspConfig(),
     String? modelLabel,
     FileSystem? fs,
     ShellExecutor? shell,
@@ -743,6 +750,15 @@ class ConatusTuiRuntime {
     // 重新装配，工具的嵌套发现因此下一轮即生效；注入 `'workdir'` 服务供
     // `/init` 等命令定位仓库根。
     app.provide('workdir', resolvedWorkdir);
+    LspManager? lspManager;
+    if (lsp.enabled) {
+      lspManager = LspManager(config: lsp, workdir: canonicalWorkdir);
+      app.provide('lsp', lspManager);
+      app.effect(() => app.tools.register(LspDiagnosticsTool(source: lspManager!)));
+      app.effect(
+        () => app.tools.use(lspDiagnosticsMiddleware(lspManager!), tag: 'lsp'),
+      );
+    }
     app.provide('projectDataDir', resolvedBaseDir);
     if (projectInfo != null) {
       app.provide('projectInfo', projectInfo);
@@ -847,6 +863,7 @@ class ConatusTuiRuntime {
       fallbackModels: fallbackModels,
       retryPolicy: retryPolicy ?? const RetryPolicy(),
       storyEnabled: storyEnabled,
+      lspManager: lspManager,
       switchLlm: switchLlm,
     );
   }
@@ -886,6 +903,7 @@ class ConatusTuiRuntime {
 
   /// 结束运行时：等待在途写入落定后释放根上下文。
   Future<void> dispose() async {
+    await lspManager?.close();
     await sessions.flush();
     app.dispose();
   }

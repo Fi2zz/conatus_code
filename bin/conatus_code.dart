@@ -196,6 +196,7 @@ Future<void> main(List<String> args) async {
           : Duration(seconds: config.budget.maxTurnSeconds!),
       maxTokens: config.budget.maxTurnTokens,
     ),
+    lsp: config.lsp,
     credentials: ConfigCredentials(config),
     fs: layers.fs,
     shell: layers.shell,

@@ -48,6 +48,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     description: '查看/重命名当前项目',
     argHint: '[list|open <ID>|rename <名字>]',
   ),
+  TuiCommand(
+    name: 'lsp',
+    description: '查看/重启 LSP 服务器',
+    argHint: '[restart [名字]]',
+  ),
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(
     name: 'reload',
