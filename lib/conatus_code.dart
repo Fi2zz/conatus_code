@@ -249,6 +249,7 @@ export 'src/mcp/mcp_prompt_commands.dart'
 export 'src/permissions/permission_rule_pattern.dart'
     show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;
+export 'src/project/project_cli.dart' show runProjectCli;
 export 'src/project/project_database.dart'
     show ProjectDatabase, ProjectRecord, WorktreeRecord;
 export 'src/project/project_identity.dart'
@@ -256,6 +257,8 @@ export 'src/project/project_identity.dart'
 export 'src/project/project_paths.dart'
     show workspaceDirName, workspaceSlug, workspacesRoot;
 export 'src/project/project_registry.dart' show ProjectRegistry, WorkspaceInfo;
+export 'src/project/project_repair.dart'
+    show ProjectRepairReport, repairProjectRegistry;
 export 'src/references/references.dart'
     show
         ResolvedReference,

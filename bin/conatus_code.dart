@@ -25,6 +25,9 @@ Future<void> main(List<String> args) async {
   if (args.isNotEmpty && args.first == 'harness') {
     exit(await runHarnessCommand(args.sublist(1)));
   }
+  if (args.isNotEmpty && args.first == 'project') {
+    exit(await runProjectCli(args.sublist(1)));
+  }
   final TuiOptions options = TuiOptions.parse(args);
   if (options.helpRequested) {
     stdout.write(TuiOptions.usage);

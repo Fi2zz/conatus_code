@@ -103,6 +103,24 @@ void main() {
     expect(first.dataDir, isNot(second.dataDir));
   });
 
+  test('resolve 写 workspace.json，rename 同步 sidecar', () {
+    final Directory home = _tempDir();
+    final Directory work = _tempDir();
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+    final WorkspaceInfo info = registry.resolve(work.path);
+
+    final File sidecar = File('${info.dataDir}/workspace.json');
+    expect(sidecar.existsSync(), isTrue);
+    final String before = sidecar.readAsStringSync();
+    expect(before, contains(info.projectId));
+    expect(before, contains(info.worktreePath));
+
+    registry.rename(info.projectId, '改名后', dataDir: info.dataDir);
+    final String after = sidecar.readAsStringSync();
+    expect(after, contains('"projectName":"改名后"'));
+  });
+
   test('list 返回已登记 worktree 与项目名', () {
     final Directory home = _tempDir();
     final Directory a = _tempDir();

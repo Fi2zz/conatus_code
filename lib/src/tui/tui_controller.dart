@@ -2567,7 +2567,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     try {
-      registry.rename(info.projectId, name);
+      registry.rename(info.projectId, name, dataDir: info.dataDir);
       _projectName = name;
       transcript.add(TuiRole.system, '项目已重命名为「$name」。');
     } on ArgumentError catch (error) {

@@ -1,8 +1,10 @@
 /// 项目注册表：把项目身份落到 SQLite，并分配独立工作区目录。
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
+import '../config/config_atomic_write.dart';
 import '../config/config_path.dart';
 import '../read_only_paths.dart';
 import 'project_database.dart';
@@ -82,13 +84,15 @@ class ProjectRegistry {
     if (!Platform.isWindows) {
       Process.runSync('chmod', <String>['700', dataDir]);
     }
-    return WorkspaceInfo(
+    final WorkspaceInfo info = WorkspaceInfo(
       projectId: identity.projectId,
       projectName: registration.projectName,
       worktreeId: identity.worktreeId,
       worktreePath: identity.worktreePath,
       dataDir: dataDir,
     );
+    writeWorkspaceSidecar(info);
+    return info;
   }
 
   ({String projectName, String dirName}) _registerWithRetry(
@@ -147,8 +151,8 @@ class ProjectRegistry {
     ];
   }
 
-  /// 重命名项目；只改数据库显示名。
-  void rename(String projectId, String name) {
+  /// 重命名项目；只改数据库显示名，并尽量同步已有 sidecar。
+  void rename(String projectId, String name, {String? dataDir}) {
     final String trimmed = name.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('项目名不能为空');
@@ -160,6 +164,27 @@ class ProjectRegistry {
       throw ArgumentError('项目名不能包含控制字符');
     }
     database.renameProject(projectId, trimmed);
+    final Set<String> dirs = <String>{
+      if (dataDir != null) dataDir,
+      for (final WorktreeRecord worktree in database.worktrees())
+        if (worktree.projectId == projectId)
+          '$workspacesDir${Platform.pathSeparator}${worktree.dirName}',
+    };
+    for (final String dir in dirs) {
+      final File sidecar = File('$dir${Platform.pathSeparator}$kWorkspaceSidecar');
+      if (!sidecar.existsSync()) continue;
+      final WorkspaceInfo? old = readWorkspaceSidecar(dir);
+      if (old == null) continue;
+      writeWorkspaceSidecar(
+        WorkspaceInfo(
+          projectId: old.projectId,
+          projectName: trimmed,
+          worktreeId: old.worktreeId,
+          worktreePath: old.worktreePath,
+          dataDir: old.dataDir,
+        ),
+      );
+    }
   }
 
   void close() => database.close();
@@ -193,5 +218,56 @@ class ProjectRegistry {
       }
     }
     throw StateError('无法分配工作区目录名：$basename');
+  }
+}
+
+
+/// 工作区 sidecar 文件名。
+const String kWorkspaceSidecar = 'workspace.json';
+
+/// 写入 `<dataDir>/workspace.json`（0600）；DB 丢失时 repair 靠它恢复。
+void writeWorkspaceSidecar(WorkspaceInfo info) {
+  final Map<String, Object?> data = <String, Object?>{
+    'version': 1,
+    'projectId': info.projectId,
+    'projectName': info.projectName,
+    'worktreeId': info.worktreeId,
+    'worktreePath': info.worktreePath,
+    'dirName': info.dataDir.split(Platform.pathSeparator).last,
+  };
+  writeFileAtomic(
+    '${info.dataDir}${Platform.pathSeparator}$kWorkspaceSidecar',
+    jsonEncode(data),
+  );
+}
+
+/// 读取 `<dataDir>/workspace.json`；缺失或损坏返回 null。
+WorkspaceInfo? readWorkspaceSidecar(String dataDir) {
+  final File file = File('$dataDir${Platform.pathSeparator}$kWorkspaceSidecar');
+  if (!file.existsSync()) return null;
+  try {
+    final Object? decoded = jsonDecode(file.readAsStringSync());
+    if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
+      return null;
+    }
+    final String? projectId = decoded['projectId'] as String?;
+    final String? projectName = decoded['projectName'] as String?;
+    final String? worktreeId = decoded['worktreeId'] as String?;
+    final String? worktreePath = decoded['worktreePath'] as String?;
+    if (projectId == null ||
+        projectName == null ||
+        worktreeId == null ||
+        worktreePath == null) {
+      return null;
+    }
+    return WorkspaceInfo(
+      projectId: projectId,
+      projectName: projectName,
+      worktreeId: worktreeId,
+      worktreePath: worktreePath,
+      dataDir: dataDir,
+    );
+  } on FormatException {
+    return null;
   }
 }

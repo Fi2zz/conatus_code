@@ -69,8 +69,10 @@ export PATH="$PWD/dist:$PATH"
 
 `/project` 查看当前项目名、短 ID、worktree 与数据目录；`/project list` 列出
 全部已登记 worktree（`*` 标记当前项）；`/project rename <名字>` 只改 SQLite
-里的显示名，不改目录。状态栏右段也会显示项目名。SQLite 使用系统库：
-macOS/Linux 通常自带；
+里的显示名，不改目录。状态栏右段也会显示项目名。每个工作区目录里有
+`workspace.json` sidecar；DB 丢失或损坏时运行 `nava project repair` 可从
+sidecar 重建注册表（损坏的 DB 会先备份为 `projects.db.corrupt-<时间>`）。
+SQLite 使用系统库：macOS/Linux 通常自带；
 Windows 需要另行提供 `sqlite3.dll`，且 nava 的 Windows 命令执行本来默认禁用。
 
 示例：
