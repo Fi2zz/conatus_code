@@ -77,6 +77,7 @@ OpenCodeImportPlan planOpenCodeImport({
     added,
     skipped,
   );
+  final LspConfig? lsp = _planLsp(import.lsp, existing, added, skipped);
   final String updated = applyOpenCodeImport(
     toml,
     model: model,
@@ -87,6 +88,7 @@ OpenCodeImportPlan planOpenCodeImport({
     skillDirs: skillDirs,
     providers: providers,
     references: references,
+    lsp: lsp ?? const LspConfig(),
   );
   ensureImportParseable(updated);
   return OpenCodeImportPlan(
@@ -101,6 +103,7 @@ OpenCodeImportPlan planOpenCodeImport({
       skillDirs: skillDirs,
       providers: providers,
       references: references,
+      lsp: lsp ?? const LspConfig(),
     ).trim(),
     added: List<String>.unmodifiable(added),
     skipped: List<String>.unmodifiable(skipped),
@@ -114,6 +117,21 @@ Map<String, Object?> _parseExisting(String toml) {
   } on TomlException catch (error) {
     throw FormatException('现有配置不是合法 TOML：$error');
   }
+}
+
+LspConfig? _planLsp(
+  LspConfig lsp,
+  Map<String, Object?> existing,
+  List<String> added,
+  List<String> skipped,
+) {
+  if (!lsp.enabled && lsp.servers.isEmpty) return null;
+  if (_hasPath(existing, <String>['lsp'])) {
+    skipped.add('lsp（已有 [lsp]）');
+    return null;
+  }
+  added.add('lsp');
+  return lsp;
 }
 
 String? _planModel(

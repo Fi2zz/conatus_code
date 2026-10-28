@@ -211,8 +211,8 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
 - **不覆盖已有配置**：已有 `default_model` / `default_agent` / 同名 MCP /
   重复 permission 会跳过；顶层 `instructions` / `extra_skill_dirs` 已存在时
   整项跳过（不合并数组）。
-- `plugins` / `lsp` / `policies` / `formatter` / `tools`
-  暂不支持，逐项告警。
+- `plugins` / `policies` / `formatter` / `tools`
+  暂不支持，逐项告警；`lsp` 会映射为 `[lsp]`（`true` 仅在 Dart 项目里生成 dart server）。
 - `--write` 走 `writeConfigFile`：原子写、权限 0600；写入前先校验合并结果仍是
   合法 TOML。
 

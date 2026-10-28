@@ -20,6 +20,7 @@ String applyOpenCodeImport(
   List<String> skillDirs = const <String>[],
   List<ImportedProvider> providers = const <ImportedProvider>[],
   List<ImportedReference> references = const <ImportedReference>[],
+  LspConfig lsp = const LspConfig(),
 }) {
   String out = base;
   if (model != null) out = upsertDefaultModel(out, model);
@@ -48,6 +49,9 @@ String applyOpenCodeImport(
       );
     }
   }
+  if (lsp.enabled || lsp.servers.isNotEmpty) {
+    out = _append(out, _renderLsp(lsp));
+  }
   for (final McpServerSpec spec in mcp) {
     out = _append(out, renderMcpSection(spec));
   }
@@ -73,6 +77,38 @@ void ensureImportParseable(String toml) {
   } on TomlException catch (error) {
     throw FormatException('合并后的配置不是合法 TOML：$error');
   }
+}
+
+String _renderLsp(LspConfig lsp) {
+  final StringBuffer buffer = StringBuffer('[lsp]\n');
+  buffer.write('enabled = ${lsp.enabled}\n');
+  for (final LspServerConfig server in lsp.servers) {
+    final String key = tomlKey(server.name);
+    buffer.write('\n[lsp.servers.$key]\n');
+    buffer.write('command = [${server.command.map((String item) => '"${tomlString(item)}"').join(', ')}]\n');
+    if (server.extensions.isNotEmpty) {
+      buffer.write('extensions = [${server.extensions.map((String item) => '"${tomlString(item)}"').join(', ')}]\n');
+    }
+    if (server.env.isNotEmpty) {
+      buffer.write('\n[lsp.servers.$key.env]\n');
+      for (final MapEntry<String, String> item in server.env.entries) {
+        buffer.write('${tomlKey(item.key)} = "${tomlString(item.value)}"\n');
+      }
+    }
+    if (server.initialization.isNotEmpty) {
+      buffer.write('\n[lsp.servers.$key.initialization]\n');
+      for (final MapEntry<String, Object?> item in server.initialization.entries) {
+        buffer.write('${tomlKey(item.key)} = ${_tomlValue(item.value)}\n');
+      }
+    }
+  }
+  return buffer.toString();
+}
+
+String _tomlValue(Object? value) {
+  if (value is String) return '"${tomlString(value)}"';
+  if (value is num || value is bool) return '$value';
+  return '"${tomlString('$value')}"';
 }
 
 String _renderReference(ImportedReference reference) {

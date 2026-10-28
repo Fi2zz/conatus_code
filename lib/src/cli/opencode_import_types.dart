@@ -29,6 +29,7 @@ class OpenCodeImport {
     this.references = const <ImportedReference>[],
     this.agents = const <ImportedAgent>[],
     this.commands = const <ImportedCommand>[],
+    this.lsp = const LspConfig(),
     this.warnings = const <String>[],
   });
 
@@ -42,6 +43,7 @@ class OpenCodeImport {
   final List<ImportedReference> references;
   final List<ImportedAgent> agents;
   final List<ImportedCommand> commands;
+  final LspConfig lsp;
   final List<String> warnings;
 
   bool get isEmpty =>
@@ -54,7 +56,9 @@ class OpenCodeImport {
       providers.isEmpty &&
       references.isEmpty &&
       agents.isEmpty &&
-      commands.isEmpty;
+      commands.isEmpty &&
+      !lsp.enabled &&
+      lsp.servers.isEmpty;
 }
 
 /// OpenCode `references.<name>` 里的一个本地目录。

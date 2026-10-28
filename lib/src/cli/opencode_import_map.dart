@@ -9,6 +9,7 @@ import 'dart:io';
 import '../config/config_schema.dart';
 import 'opencode_import_command_defs.dart';
 import 'opencode_import_definitions.dart';
+import 'opencode_import_lsp.dart';
 import 'opencode_import_mcp.dart';
 import 'opencode_import_permissions.dart';
 import 'opencode_import_providers.dart';
@@ -18,7 +19,6 @@ import 'opencode_import_types.dart';
 
 const List<String> _ignoredKeys = <String>[
   'plugins',
-  'lsp',
   'policies',
   'formatter',
   'tools',
@@ -40,12 +40,20 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
   final Map<String, ImportedCommand> commands = <String, ImportedCommand>{};
   String? model;
   String? defaultAgent;
+  LspConfig lsp = const LspConfig();
   for (final OpenCodeDocument document in sources.documents) {
     final Map<String, Object?> values = document.values;
     model = _model(values['model'], document.path, warnings) ?? model;
     defaultAgent =
         _string(values['default_agent'], 'default_agent', document.path, warnings) ??
         defaultAgent;
+    final LspConfig? mappedLsp = mapOpenCodeLsp(
+      values['lsp'],
+      document.path,
+      sources.workdir,
+      warnings,
+    );
+    if (mappedLsp != null) lsp = mappedLsp;
     _mcp(values['mcp'], document.path, warnings, mcp);
     permissions.addAll(
       mapOpenCodePermissions(values['permissions'], document.path, warnings),
@@ -115,6 +123,7 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     references: references.values.toList(growable: false),
     agents: agents.values.toList(growable: false),
     commands: commands.values.toList(growable: false),
+    lsp: lsp,
     warnings: List<String>.unmodifiable(warnings),
   );
 }

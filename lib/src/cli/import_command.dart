@@ -27,7 +27,7 @@ const String kImportUsage = '''
 
 支持：model / default_agent / mcp.servers / permissions / instructions，
       agents / commands（物化为 .nava/agents 与 .nava/commands 下的 Markdown）。
-providers / plugins / lsp / references / policies / formatter / tools /
+providers / plugins / references / policies / formatter / tools /
 skills 暂不支持，会列出告警。''';
 
 /// 解析并执行导入，返回进程退出码。
