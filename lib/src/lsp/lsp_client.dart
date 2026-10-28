@@ -102,7 +102,18 @@ class LspClient {
             'name': _workdir.split(Platform.pathSeparator).last,
           },
         ],
-        'capabilities': <String, Object?>{},
+        'capabilities': <String, Object?>{
+          'textDocument': <String, Object?>{
+            'hover': <String, Object?>{
+              'contentFormat': <String>['markdown', 'plaintext'],
+            },
+            'definition': <String, Object?>{'linkSupport': true},
+            'references': <String, Object?>{},
+            'documentSymbol': <String, Object?>{
+              'hierarchicalDocumentSymbolSupport': true,
+            },
+          },
+        },
         'initializationOptions': _initialization,
       },
       timeout: startTimeout,

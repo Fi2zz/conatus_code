@@ -88,6 +88,15 @@ class LspManager implements LspDiagnosticsSource {
   Future<List<LspDiagnostic>> fileChanged(String path) =>
       _diagnose(path, save: true);
 
+  /// 记录一次请求错误，供工具提示使用。
+  void reportError(String path, String error) {
+    final String absolute = File(path).isAbsolute
+        ? path
+        : '$workdir${Platform.pathSeparator}$path';
+    final LspServerConfig? server = serverFor(absolute);
+    if (server != null) _errors[server.name] = error;
+  }
+
   @override
   String? errorFor(String path) {
     final String absolute = File(path).isAbsolute

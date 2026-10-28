@@ -26,7 +26,8 @@ class LspNavigator {
         },
       );
       return _hoverText(result is Map ? result['contents'] : null);
-    } catch (_) {
+    } catch (error) {
+      manager.reportError(path, '$error');
       return null;
     }
   }
@@ -67,7 +68,8 @@ class LspNavigator {
         <String, Object?>{'textDocument': <String, Object?>{'uri': _uri(path)}},
       );
       return _symbols(result);
-    } catch (_) {
+    } catch (error) {
+      manager.reportError(path, '$error');
       return const <LspDocumentSymbol>[];
     }
   }
@@ -91,7 +93,8 @@ class LspNavigator {
           ...extra,
         },
       );
-    } catch (_) {
+    } catch (error) {
+      manager.reportError(path, '$error');
       return null;
     }
   }
@@ -126,10 +129,16 @@ class LspNavigator {
     final List<LspLocation> locations = <LspLocation>[];
     for (final Object? item in items) {
       if (item is! Map) continue;
-      final Object? uri = item['uri'] ?? item['targetUri'];
-      final Object? range = item['range'] ?? item['targetSelectionRange'] ?? item['targetRange'];
-      final LspLocation? location = _location(uri, range);
-      if (location != null) locations.add(location);
+      try {
+        final Object? uri = item['uri'] ?? item['targetUri'];
+        final Object? range = item['range'] ??
+            item['targetSelectionRange'] ??
+            item['targetRange'];
+        final LspLocation? location = _location(uri, range);
+        if (location != null) locations.add(location);
+      } on FormatException {
+        continue;
+      }
     }
     return locations;
   }

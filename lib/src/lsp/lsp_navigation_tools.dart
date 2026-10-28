@@ -40,7 +40,16 @@ abstract class _PositionTool extends Tool {
     return run(path, line, column);
   }
 
-  ToolResult empty(String message) => ToolResult.success(message);
+  ToolResult empty(String path, String message) {
+    final String? error = manager.errorFor(path);
+    if (error != null) {
+      return ToolResult.failure(
+        'LSP 不可用：$error',
+        error: ToolError('LSP_UNAVAILABLE', error),
+      );
+    }
+    return ToolResult.success(message);
+  }
 }
 
 /// `lsp_hover`。
@@ -56,7 +65,10 @@ class LspHoverTool extends _PositionTool {
   @override
   Future<ToolResult> run(String path, int line, int column) async {
     final String? text = await navigator.hover(path, line, column);
-    return empty(text == null || text.trim().isEmpty ? '没有 hover 信息。' : text);
+    return empty(
+      path,
+      text == null || text.trim().isEmpty ? '没有 hover 信息。' : text,
+    );
   }
 }
 
@@ -74,7 +86,7 @@ class LspDefinitionTool extends _PositionTool {
   Future<ToolResult> run(String path, int line, int column) async {
     final List<LspLocation> locations =
         await navigator.definition(path, line, column);
-    return empty(_formatLocations(locations, '没有定义。'));
+    return empty(path, _formatLocations(locations, '没有定义。'));
   }
 }
 
@@ -92,7 +104,7 @@ class LspReferencesTool extends _PositionTool {
   Future<ToolResult> run(String path, int line, int column) async {
     final List<LspLocation> locations =
         await navigator.references(path, line, column);
-    return empty(_formatLocations(locations, '没有引用。'));
+    return empty(path, _formatLocations(locations, '没有引用。'));
   }
 }
 
@@ -129,7 +141,16 @@ class LspDocumentSymbolsTool extends Tool {
     }
     final List<LspDocumentSymbol> symbols =
         await navigator.documentSymbols(path);
-    if (symbols.isEmpty) return ToolResult.success('没有文档符号。');
+    if (symbols.isEmpty) {
+      final String? error = manager.errorFor(path);
+      if (error != null) {
+        return ToolResult.failure(
+          'LSP 不可用：$error',
+          error: ToolError('LSP_UNAVAILABLE', error),
+        );
+      }
+      return ToolResult.success('没有文档符号。');
+    }
     return ToolResult.success(
       <String>[
         for (final LspDocumentSymbol symbol in symbols)
