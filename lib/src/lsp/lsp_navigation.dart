@@ -136,7 +136,7 @@ class LspNavigator {
             item['targetRange'];
         final LspLocation? location = _location(uri, range);
         if (location != null) locations.add(location);
-      } on FormatException {
+      } on Object {
         continue;
       }
     }

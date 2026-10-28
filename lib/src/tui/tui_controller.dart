@@ -2680,7 +2680,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     for (final LspServerStatus status in statuses) {
       buffer.write(
         '\n${status.name}  ${status.state}  '
-        'diagnostics=${status.diagnosticCount}',
+        'diagnostics=${status.diagnosticCount}  '
+        'capabilities=${status.capabilities.join(',')}',
       );
       if (status.error != null) buffer.write('  ${status.error}');
     }

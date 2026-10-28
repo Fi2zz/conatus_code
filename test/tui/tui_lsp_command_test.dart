@@ -110,6 +110,7 @@ void main() {
       final String text = controller.transcript.messages.last.text;
       expect(text, contains('fake'));
       expect(text, contains('running'));
+      expect(text, contains('hover'));
       controller.dispose();
     } finally {
       await runtime.dispose();

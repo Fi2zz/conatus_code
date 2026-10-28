@@ -21,6 +21,8 @@ Future<void> main(List<String> args) async {
   final bool malformed = args.contains('--malformed-frames');
   final bool weirdSeverity = args.contains('--weird-severity');
   final bool stringIds = args.contains('--string-ids');
+  final bool badLocation = args.contains('--bad-location');
+  final bool requestError = args.contains('--request-error');
   final List<int> buffer = <int>[];
   await for (final List<int> chunk in stdin) {
     buffer.addAll(chunk);
@@ -48,6 +50,8 @@ Future<void> main(List<String> args) async {
         malformed: malformed,
         weirdSeverity: weirdSeverity,
         stringIds: stringIds,
+        badLocation: badLocation,
+        requestError: requestError,
       );
     }
   }
@@ -61,6 +65,8 @@ Future<void> _handle(
   required bool malformed,
   required bool weirdSeverity,
   required bool stringIds,
+  required bool badLocation,
+  required bool requestError,
 }) async {
   final Object? id = message['id'];
   final String? method = message['method'] as String?;
@@ -92,6 +98,19 @@ Future<void> _handle(
   if (method == 'exit') {
     exit(0);
   }
+  if (requestError &&
+      (method == 'textDocument/hover' ||
+          method == 'textDocument/definition' ||
+          method == 'textDocument/references' ||
+          method == 'textDocument/documentSymbol') &&
+      id != null) {
+    await _send(<String, Object?>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'error': <String, Object?>{'code': -32601, 'message': 'unsupported'},
+    });
+    return;
+  }
   if (method == 'textDocument/hover' && id != null) {
     await _send(<String, Object?>{
       'jsonrpc': '2.0',
@@ -115,7 +134,7 @@ Future<void> _handle(
       'id': id,
       'result': <Map<String, Object?>>[
         <String, Object?>{
-          'uri': document['uri'],
+          'uri': badLocation ? 'http://%zz' : document['uri'],
           'range': <String, Object?>{
             'start': <String, Object?>{'line': 2, 'character': 3},
             'end': <String, Object?>{'line': 2, 'character': 5},

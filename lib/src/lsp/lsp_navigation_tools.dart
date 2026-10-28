@@ -164,6 +164,7 @@ String _formatLocations(List<LspLocation> locations, String emptyText) {
   if (locations.isEmpty) return emptyText;
   return <String>[
     for (final LspLocation location in locations)
-      '${location.path}:${location.line}:${location.column}',
+      '${location.path}:${location.line}:${location.column}'
+          '${location.endLine == null ? '' : '-${location.endLine}:${location.endColumn}'}',
   ].join('\n');
 }

@@ -7,22 +7,7 @@ import '../config/config_schema.dart';
 import 'lsp_client.dart';
 import 'lsp_types.dart';
 
-/// 一个 LSP server 的运行状态。
-class LspServerStatus {
-  const LspServerStatus({
-    required this.name,
-    required this.state,
-    this.error,
-    this.diagnosticCount = 0,
-  });
-
-  final String name;
-
-  /// `disabled` / `idle` / `running` / `error`。
-  final String state;
-  final String? error;
-  final int diagnosticCount;
-}
+export 'lsp_types.dart' show LspServerStatus;
 
 /// 按配置管理多个 LSP server。
 class LspManager implements LspDiagnosticsSource {
@@ -78,7 +63,6 @@ class LspManager implements LspDiagnosticsSource {
       return null;
     }
   }
-
   @override
   Future<List<LspDiagnostic>> diagnose(String path) =>
       _diagnose(path, save: false);
@@ -145,6 +129,13 @@ class LspManager implements LspDiagnosticsSource {
                       : 'idle',
           error: _errors[server.name],
           diagnosticCount: _counts[server.name] ?? 0,
+          capabilities: const <String>[
+            'diagnostics',
+            'hover',
+            'definition',
+            'references',
+            'documentSymbols',
+          ],
         ),
     ];
   }

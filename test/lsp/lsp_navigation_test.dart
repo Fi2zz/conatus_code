@@ -16,7 +16,10 @@ Directory _tempDir() {
   return dir;
 }
 
-LspManager _manager(Directory work) => LspManager(
+LspManager _manager(
+  Directory work, {
+  List<String> extra = const <String>[],
+}) => LspManager(
       config: LspConfig(
         enabled: true,
         servers: <LspServerConfig>[
@@ -25,6 +28,7 @@ LspManager _manager(Directory work) => LspManager(
             command: <String>[
               Platform.resolvedExecutable,
               '${Directory.current.path}/test/lsp/fixtures/fake_lsp_server.dart',
+              ...extra,
             ],
             extensions: const <String>['.dart'],
           ),
@@ -46,8 +50,46 @@ void main() {
     expect(definitions, hasLength(1));
     expect(definitions.single.line, 3);
     expect(definitions.single.column, 4);
+    expect(definitions.single.endLine, 3);
+    expect(definitions.single.endColumn, 6);
     expect(await navigator.references(file.path, 1, 1), hasLength(1));
     expect(await navigator.documentSymbols(file.path), hasLength(1));
+  });
+
+  test('畸形 location 不抛异常', () async {
+    final Directory work = _tempDir();
+    final File file = File('${work.path}/a.dart')..writeAsStringSync('a');
+    final LspManager manager = _manager(
+      work,
+      extra: <String>['--bad-location'],
+    );
+    final LspNavigator navigator = LspNavigator(manager);
+    addTearDown(manager.close);
+
+    expect(await navigator.definition(file.path, 1, 1), isEmpty);
+  });
+
+  test('JSON-RPC error 让工具报 LSP 不可用', () async {
+    final Directory work = _tempDir();
+    final File file = File('${work.path}/a.dart')..writeAsStringSync('a');
+    final LspManager manager = _manager(
+      work,
+      extra: <String>['--request-error'],
+    );
+    final LspNavigator navigator = LspNavigator(manager);
+    addTearDown(manager.close);
+
+    expect(await navigator.hover(file.path, 1, 1), isNull);
+    expect(manager.errorFor(file.path), isNotNull);
+    final ToolResult result = await LspHoverTool(navigator, manager).call(
+      ToolContext(ToolCall(name: 'lsp_hover', arguments: <String, Object?>{
+        'path': file.path,
+        'line': 1,
+        'column': 1,
+      })),
+    );
+    expect(result.isError, isTrue);
+    expect(result.content, contains('LSP 不可用'));
   });
 
   test('未配置扩展名返回空', () async {
