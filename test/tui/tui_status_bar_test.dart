@@ -86,6 +86,30 @@ void main() {
     });
   });
 
+  test('右段显示项目名', () async {
+    final NoctermTester tester = await NoctermTester.create(
+      size: const Size(160, 24),
+    );
+    addTearDown(tester.dispose);
+    await tester.pumpComponent(
+      const TuiStatusBar(
+        pickerOpen: false,
+        busy: false,
+        tick: 0,
+        modelLabel: 'mock',
+        projectName: 'lifts',
+        location: '~/REPO/lifts master',
+        contextText: 'ctx 1k/1M (0%)',
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.terminalState,
+      containsText('lifts · ~/REPO/lifts master · ctx 1k/1M (0%)'),
+    );
+  });
+
   test('状态栏三段：权限+模型 / 提示 / 位置+上下文', () async {
     final NoctermTester tester = await NoctermTester.create(
       size: const Size(160, 24),

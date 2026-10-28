@@ -46,7 +46,7 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
   TuiCommand(
     name: 'project',
     description: '查看/重命名当前项目',
-    argHint: '[rename <名字>]',
+    argHint: '[list|rename <名字>]',
   ),
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(

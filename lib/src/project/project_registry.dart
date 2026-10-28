@@ -131,6 +131,22 @@ class ProjectRegistry {
     return (projectName: projectName, dirName: dirName);
   }
 
+  /// 已登记的全部 worktree，按最近使用排序。
+  List<WorkspaceInfo> list() {
+    return <WorkspaceInfo>[
+      for (final WorktreeRecord worktree in database.worktrees())
+        WorkspaceInfo(
+          projectId: worktree.projectId,
+          projectName:
+              database.project(worktree.projectId)?.name ?? worktree.name,
+          worktreeId: worktree.id,
+          worktreePath: worktree.path,
+          dataDir:
+              '$workspacesDir${Platform.pathSeparator}${worktree.dirName}',
+        ),
+    ];
+  }
+
   /// 重命名项目；只改数据库显示名。
   void rename(String projectId, String name) {
     final String trimmed = name.trim();

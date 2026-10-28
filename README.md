@@ -67,8 +67,10 @@ export PATH="$PWD/dist:$PATH"
 工作区路径、项目显示名和 worktree 隔离关系；同一 git remote 的多个 clone
 共享项目，但各有独立数据目录。旧 `~/.nava/projects/` 不再读取，可直接删除。
 
-`/project` 查看当前项目名、短 ID、worktree 与数据目录；`/project rename <名字>`
-只改 SQLite 里的显示名，不改目录。SQLite 使用系统库：macOS/Linux 通常自带；
+`/project` 查看当前项目名、短 ID、worktree 与数据目录；`/project list` 列出
+全部已登记 worktree（`*` 标记当前项）；`/project rename <名字>` 只改 SQLite
+里的显示名，不改目录。状态栏右段也会显示项目名。SQLite 使用系统库：
+macOS/Linux 通常自带；
 Windows 需要另行提供 `sqlite3.dll`，且 nava 的 Windows 命令执行本来默认禁用。
 
 示例：

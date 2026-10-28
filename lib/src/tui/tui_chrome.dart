@@ -128,6 +128,7 @@ class TuiStatusBar extends StatelessComponent {
     this.recentTurnStatus,
     required this.modelLabel,
     this.shellMode = false,
+    this.projectName = '',
     this.location = '',
     this.contextText = '',
     this.menuOpen = false,
@@ -160,6 +161,9 @@ class TuiStatusBar extends StatelessComponent {
 
   /// shell 模式：提示 shell 操作键。
   final bool shellMode;
+
+  /// 当前项目显示名（右段）；空则不显示。
+  final String projectName;
 
   /// 工作目录 + git 分支（右段）；空则不显示。
   final String location;
@@ -369,8 +373,12 @@ class TuiStatusBar extends StatelessComponent {
 
   /// 右段：目录 + 分支 + 上下文用量。
   String _rightText() {
-    final String context = contextText.isEmpty ? '' : ' · $contextText';
-    return '$location$context';
+    final List<String> parts = <String>[
+      if (projectName.isNotEmpty) projectName,
+      if (location.isNotEmpty) location,
+      if (contextText.isNotEmpty) contextText,
+    ];
+    return parts.join(' · ');
   }
 
   /// 估算屏上宽度：CJK 全角按两列，其余按一列（近似）。

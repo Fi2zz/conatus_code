@@ -2519,6 +2519,10 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// `/project` 重命名后的内存显示名；持久值在 SQLite 里。
   String? _projectName;
 
+  /// 状态栏等项目展示用的项目名。
+  String? get projectName =>
+      _projectName ?? _app.get<WorkspaceInfo>('projectInfo')?.projectName;
+
   void _handleProject(String arg) {
     final WorkspaceInfo? info = _app.get<WorkspaceInfo>('projectInfo');
     final ProjectRegistry? registry =
@@ -2538,8 +2542,23 @@ class ConatusTuiController implements TuiUserPromptHost {
       );
       return;
     }
+    if (rest == 'list') {
+      final List<WorkspaceInfo> list = registry.list();
+      final StringBuffer buffer = StringBuffer(
+        '已登记 ${list.length} 个 worktree：',
+      );
+      for (final WorkspaceInfo item in list) {
+        final String mark = item.worktreeId == info.worktreeId ? '*' : ' ';
+        buffer.write(
+          '\n$mark ${item.projectName}  ${item.projectShortId}  '
+          '${item.worktreePath}',
+        );
+      }
+      transcript.add(TuiRole.system, buffer.toString());
+      return;
+    }
     if (rest != 'rename' && !rest.startsWith('rename ')) {
-      transcript.add(TuiRole.system, '用法：/project [rename <名字>]');
+      transcript.add(TuiRole.system, '用法：/project [list|rename <名字>]');
       return;
     }
     final String name = rest.substring('rename'.length).trim();

@@ -1069,6 +1069,7 @@ class _AgentTuiState extends State<AgentTui> {
             recentTurnDuration: _controller.recentTurnDuration,
             recentTurnStatus: _controller.recentTurnStatus,
             modelLabel: _controller.modelLabel,
+            projectName: _controller.projectName ?? '',
             location: _location,
             contextText: formatContextUsage(
               _controller.contextTokens,

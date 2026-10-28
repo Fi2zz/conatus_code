@@ -59,6 +59,7 @@ void main() {
       registry: registry,
     );
 
+    expect(controller.projectName, info.projectName);
     await controller.handleLine('/project');
 
     final String text = controller.transcript.messages.last.text;
@@ -66,6 +67,54 @@ void main() {
     expect(text, contains('ID：${info.projectShortId}'));
     expect(text, contains('worktree：${info.worktreePath}'));
     expect(text, contains('数据目录：${info.dataDir}'));
+    controller.dispose();
+  });
+
+  test('/project list 列出所有 worktree 并标记当前项', () async {
+    final Directory temp = _tempDir();
+    final Directory a = _tempDir();
+    final Directory b = _tempDir();
+    for (final Directory dir in <Directory>[a, b]) {
+      Process.runSync('git', <String>['init', '-q', '-b', 'main'], workingDirectory: dir.path);
+      Process.runSync(
+        'git',
+        <String>['config', 'user.email', 'test@example.com'],
+        workingDirectory: dir.path,
+      );
+      Process.runSync(
+        'git',
+        <String>['config', 'user.name', 'test'],
+        workingDirectory: dir.path,
+      );
+      File('${dir.path}/a.txt').writeAsStringSync('a');
+      Process.runSync('git', <String>['add', 'a.txt'], workingDirectory: dir.path);
+      Process.runSync('git', <String>['commit', '-qm', 'init'], workingDirectory: dir.path);
+      Process.runSync(
+        'git',
+        <String>['remote', 'add', 'origin', 'https://github.com/acme/lifts.git'],
+        workingDirectory: dir.path,
+      );
+    }
+    final ProjectRegistry registry = ProjectRegistry.open(
+      dbPath: '${temp.path}/projects.db',
+      workspacesDir: '${temp.path}/workspaces',
+    );
+    addTearDown(registry.close);
+    final WorkspaceInfo first = registry.resolve(a.path);
+    registry.resolve(b.path);
+    final (ConatusTuiController controller, _) = await _build(
+      info: first,
+      registry: registry,
+    );
+
+    await controller.handleLine('/project list');
+
+    final String text = controller.transcript.messages.last.text;
+    expect(text, contains('已登记 2 个 worktree'));
+    expect(text, contains(first.projectName));
+    expect(text, contains(first.worktreePath));
+    expect(text, contains(Directory(b.path).resolveSymbolicLinksSync()));
+    expect(text, contains('* '));
     controller.dispose();
   });
 
@@ -87,6 +136,7 @@ void main() {
 
     expect(controller.transcript.messages.last.text, contains('我的项目'));
     expect(registry.database.project(info.projectId)!.name, '我的项目');
+    expect(controller.projectName, '我的项目');
 
     await controller.handleLine('/project');
     expect(controller.transcript.messages.last.text, contains('项目：我的项目'));

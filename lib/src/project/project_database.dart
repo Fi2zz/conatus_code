@@ -103,6 +103,16 @@ class ProjectDatabase {
     return rows.isEmpty ? null : _worktreeFrom(rows.first);
   });
 
+  /// 全部 worktree，最近更新的在前。
+  List<WorktreeRecord> worktrees() => _guard(() {
+    final ResultSet rows = _db.select(
+      'SELECT * FROM worktree ORDER BY time_updated DESC, path ASC',
+    );
+    return <WorktreeRecord>[
+      for (final Row row in rows) _worktreeFrom(row),
+    ];
+  });
+
   /// 在单个事务内执行 [action]；异常时回滚并原样抛出。
   T transaction<T>(T Function() action) {
     try {

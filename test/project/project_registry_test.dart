@@ -103,6 +103,26 @@ void main() {
     expect(first.dataDir, isNot(second.dataDir));
   });
 
+  test('list 返回已登记 worktree 与项目名', () {
+    final Directory home = _tempDir();
+    final Directory a = _tempDir();
+    final Directory b = _tempDir();
+    _initRepo(a, remote: 'https://github.com/acme/lifts.git');
+    _initRepo(b, remote: 'https://github.com/acme/lifts.git');
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+    final WorkspaceInfo first = registry.resolve(a.path);
+    registry.resolve(b.path);
+
+    final List<WorkspaceInfo> list = registry.list();
+
+    expect(list, hasLength(2));
+    expect(list.map((WorkspaceInfo item) => item.worktreePath),
+        containsAll(<String>[first.worktreePath, Directory(b.path).resolveSymbolicLinksSync()]));
+    expect(list.every((WorkspaceInfo item) => item.projectName == first.projectName),
+        isTrue);
+  });
+
   test('rename 持久化，后续 resolve 不覆盖', () {
     final Directory home = _tempDir();
     final Directory work = _tempDir();
