@@ -78,6 +78,37 @@ void main() {
     await client.stop();
   });
 
+  test('异常 severity 类型不崩溃', () async {
+    final Directory work = _tempDir();
+    final File file = File('${work.path}/a.dart')..writeAsStringSync('a');
+    final LspClient client = _client(
+      work.path,
+      extra: <String>['--weird-severity'],
+    );
+    addTearDown(client.stop);
+
+    final List<LspDiagnostic> diagnostics = await client.diagnose(file.path);
+    expect(diagnostics, hasLength(1));
+    expect(diagnostics.single.severity, LspSeverity.information);
+  });
+
+  test('server 崩溃后重新启动并重新 didOpen', () async {
+    final Directory work = _tempDir();
+    final File file = File('${work.path}/a.dart')..writeAsStringSync('a');
+    final LspClient client = _client(
+      work.path,
+      extra: <String>['--crash-after-open', '--open-only'],
+    );
+    addTearDown(client.stop);
+
+    expect(await client.diagnose(file.path), hasLength(1));
+    for (int i = 0; i < 40 && client.running; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect(client.running, isFalse);
+    expect(await client.diagnose(file.path), hasLength(1));
+  });
+
   test('stop 可以重复调用', () async {
     final Directory work = _tempDir();
     final LspClient client = _client(work.path);

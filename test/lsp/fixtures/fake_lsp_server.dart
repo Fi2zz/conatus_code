@@ -16,6 +16,10 @@ Future<void> main(List<String> args) async {
     return;
   }
   final bool ignoreShutdown = args.contains('--ignore-shutdown');
+  final bool crashAfterOpen = args.contains('--crash-after-open');
+  final bool openOnly = args.contains('--open-only');
+  final bool malformed = args.contains('--malformed-frames');
+  final bool weirdSeverity = args.contains('--weird-severity');
   final List<int> buffer = <int>[];
   await for (final List<int> chunk in stdin) {
     buffer.addAll(chunk);
@@ -35,7 +39,14 @@ Future<void> main(List<String> args) async {
       buffer.removeRange(0, start + length);
       final Map<String, dynamic> message =
           jsonDecode(body) as Map<String, dynamic>;
-      await _handle(message, ignoreShutdown: ignoreShutdown);
+      await _handle(
+        message,
+        ignoreShutdown: ignoreShutdown,
+        crashAfterOpen: crashAfterOpen,
+        openOnly: openOnly,
+        malformed: malformed,
+        weirdSeverity: weirdSeverity,
+      );
     }
   }
 }
@@ -43,6 +54,10 @@ Future<void> main(List<String> args) async {
 Future<void> _handle(
   Map<String, dynamic> message, {
   required bool ignoreShutdown,
+  required bool crashAfterOpen,
+  required bool openOnly,
+  required bool malformed,
+  required bool weirdSeverity,
 }) async {
   final Object? id = message['id'];
   final String? method = message['method'] as String?;
@@ -71,11 +86,16 @@ Future<void> _handle(
     exit(0);
   }
   if (method == 'textDocument/didOpen' || method == 'textDocument/didChange') {
+    if (openOnly && method == 'textDocument/didChange') return;
     final Map<String, dynamic> params =
         (message['params'] as Map).cast<String, dynamic>();
     final Map<String, dynamic> document =
         (params['textDocument'] as Map).cast<String, dynamic>();
     final String uri = document['uri'] as String;
+    if (malformed) {
+      stdout.add(utf8.encode('Content-Length: nope\r\n\r\n'));
+      unawaited(stdout.flush());
+    }
     _send(<String, Object?>{
       'jsonrpc': '2.0',
       'method': 'textDocument/publishDiagnostics',
@@ -87,13 +107,14 @@ Future<void> _handle(
               'start': <String, Object?>{'line': 0, 'character': 0},
               'end': <String, Object?>{'line': 0, 'character': 1},
             },
-            'severity': 1,
+            'severity': weirdSeverity ? 1.0 : 1,
             'code': 'fake',
             'message': 'fake diagnostic',
           },
         ],
       },
     });
+    if (crashAfterOpen) exit(0);
   }
 }
 

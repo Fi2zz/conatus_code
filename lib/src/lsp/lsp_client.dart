@@ -187,6 +187,9 @@ class LspClient {
       if (!waiter.isCompleted) waiter.complete(const <LspDiagnostic>[]);
     }
     _waiters.clear();
+    _opened.clear();
+    _versions.clear();
+    _diagnostics.clear();
     _stopping = false;
   }
 
@@ -233,16 +236,23 @@ class LspClient {
     while (true) {
       final int headerEnd = _indexOfHeaderEnd();
       if (headerEnd < 0) return;
-      final String header = utf8.decode(_buffer.sublist(0, headerEnd));
+      final String header = utf8.decode(
+        _buffer.sublist(0, headerEnd),
+        allowMalformed: true,
+      );
       final Match? match = RegExp(
         r'Content-Length:\s*(\d+)',
         caseSensitive: false,
       ).firstMatch(header);
-      if (match == null) {
+      final int? length = match == null ? null : int.tryParse(match.group(1)!);
+      if (length == null) {
         _buffer.removeRange(0, headerEnd + 4);
         continue;
       }
-      final int length = int.parse(match.group(1)!);
+      if (length > 10 * 1024 * 1024) {
+        _buffer.removeRange(0, headerEnd + 4);
+        continue;
+      }
       final int start = headerEnd + 4;
       if (_buffer.length < start + length) return;
       final List<int> body = _buffer.sublist(start, start + length);
@@ -250,8 +260,8 @@ class LspClient {
       try {
         final Object? decoded = jsonDecode(utf8.decode(body));
         if (decoded is Map<String, dynamic>) _handle(decoded);
-      } on FormatException {
-        // Ignore malformed frame; next frame can still be parsed.
+      } catch (_) {
+        // A malformed frame must never escape the stdout listener.
       }
     }
   }
@@ -324,7 +334,7 @@ class LspClient {
             path: path,
             line: _startValue(item, 'line') + 1,
             column: _startValue(item, 'character') + 1,
-            severity: _severity(item['severity'] as int?),
+            severity: _severity(item['severity'] is int ? item['severity'] as int : null),
             message: '${item['message'] ?? ''}',
             code: item['code']?.toString(),
           ),
@@ -376,5 +386,8 @@ class LspClient {
       if (!waiter.isCompleted) waiter.complete(const <LspDiagnostic>[]);
     }
     _waiters.clear();
+    _opened.clear();
+    _versions.clear();
+    _diagnostics.clear();
   }
 }

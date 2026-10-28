@@ -33,4 +33,5 @@ class LspDiagnostic {
 abstract interface class LspDiagnosticsSource {
   Future<List<LspDiagnostic>> diagnose(String path);
   Future<List<LspDiagnostic>> fileChanged(String path);
+  String? errorFor(String path);
 }

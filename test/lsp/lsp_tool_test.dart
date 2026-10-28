@@ -7,10 +7,11 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
 class _Source implements LspDiagnosticsSource {
-  _Source(this.diagnostics, {this.fail = false});
+  _Source(this.diagnostics, {this.fail = false, this.error});
 
   final List<LspDiagnostic> diagnostics;
   final bool fail;
+  final String? error;
 
   @override
   Future<List<LspDiagnostic>> diagnose(String path) async {
@@ -20,6 +21,9 @@ class _Source implements LspDiagnosticsSource {
 
   @override
   Future<List<LspDiagnostic>> fileChanged(String path) => diagnose(path);
+
+  @override
+  String? errorFor(String path) => error ?? (fail ? 'lsp down' : null);
 }
 
 const LspDiagnostic _error = LspDiagnostic(
@@ -75,6 +79,18 @@ void main() {
 
     expect(result.isError, isTrue);
     expect(result.error?.code, 'LSP_UNAVAILABLE');
+  });
+
+  test('空诊断但 server 报错时工具返回不可用', () async {
+    final LspDiagnosticsTool tool = LspDiagnosticsTool(
+      source: _Source(const <LspDiagnostic>[], error: 'down'),
+    );
+    final ToolResult result = await tool.call(
+      const ToolContext(ToolCall(name: 'lsp_diagnostics', arguments: <String, Object?>{'path': '/tmp/a.dart'})),
+    );
+
+    expect(result.isError, isTrue);
+    expect(result.content, contains('LSP 不可用'));
   });
 
   test('编辑成功结果追加诊断', () async {

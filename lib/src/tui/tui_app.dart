@@ -335,6 +335,20 @@ class ConatusTuiRuntime {
     // 不过模型命令白名单（对齐 OpenCode）；模型命令仍走上面的 'shell' 沙箱缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
     provideFsTools(app);
+    LspManager? lspManager;
+    if (lsp.enabled) {
+      lspManager = LspManager(config: lsp, workdir: canonicalWorkdir);
+      app.provide('lsp', lspManager);
+      app.effect(
+        () => app.tools.register(LspDiagnosticsTool(source: lspManager!)),
+      );
+      app.effect(
+        () => app.tools.use(lspDiagnosticsMiddleware(lspManager!), tag: 'lsp'),
+      );
+      app.onDispose(() {
+        unawaited(lspManager!.close());
+      });
+    }
     // XERJ 代码检索（可选外部二进制）：找不到 xerj 时 provide 返回空列表，
     // 工具面与未启用完全一致。节点懒启动、数据目录在工作区之外。
     final XerjConfig xerjConfig = xerj ?? const XerjConfig();
@@ -750,15 +764,6 @@ class ConatusTuiRuntime {
     // 重新装配，工具的嵌套发现因此下一轮即生效；注入 `'workdir'` 服务供
     // `/init` 等命令定位仓库根。
     app.provide('workdir', resolvedWorkdir);
-    LspManager? lspManager;
-    if (lsp.enabled) {
-      lspManager = LspManager(config: lsp, workdir: canonicalWorkdir);
-      app.provide('lsp', lspManager);
-      app.effect(() => app.tools.register(LspDiagnosticsTool(source: lspManager!)));
-      app.effect(
-        () => app.tools.use(lspDiagnosticsMiddleware(lspManager!), tag: 'lsp'),
-      );
-    }
     app.provide('projectDataDir', resolvedBaseDir);
     if (projectInfo != null) {
       app.provide('projectInfo', projectInfo);

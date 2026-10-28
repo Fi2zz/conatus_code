@@ -63,6 +63,13 @@ class LspDiagnosticsTool extends Tool {
     }
     diagnostics = _filter(diagnostics, severity);
     if (diagnostics.isEmpty) {
+      final String? error = _source.errorFor(path);
+      if (error != null) {
+        return ToolResult.failure(
+          'LSP 不可用：$error',
+          error: ToolError('LSP_UNAVAILABLE', error),
+        );
+      }
       return ToolResult.success('没有 LSP 诊断。');
     }
     return ToolResult.success(
