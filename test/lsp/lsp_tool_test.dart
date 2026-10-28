@@ -17,6 +17,9 @@ class _Source implements LspDiagnosticsSource {
     if (fail) throw StateError('lsp down');
     return diagnostics;
   }
+
+  @override
+  Future<List<LspDiagnostic>> fileChanged(String path) => diagnose(path);
 }
 
 const LspDiagnostic _error = LspDiagnostic(

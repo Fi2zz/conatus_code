@@ -63,7 +63,18 @@ class LspManager implements LspDiagnosticsSource {
 
   /// 对 [path] 取诊断；未配置/失败返回空列表。
   @override
-  Future<List<LspDiagnostic>> diagnose(String path) async {
+  Future<List<LspDiagnostic>> diagnose(String path) =>
+      _diagnose(path, save: false);
+
+  /// 文件编辑后刷新诊断，并发送 didSave。
+  @override
+  Future<List<LspDiagnostic>> fileChanged(String path) =>
+      _diagnose(path, save: true);
+
+  Future<List<LspDiagnostic>> _diagnose(
+    String path, {
+    required bool save,
+  }) async {
     final String absolute = File(path).isAbsolute
         ? path
         : '$workdir${Platform.pathSeparator}$path';
@@ -71,7 +82,10 @@ class LspManager implements LspDiagnosticsSource {
     if (server == null) return const <LspDiagnostic>[];
     try {
       final LspClient client = await _clientFor(server);
-      final List<LspDiagnostic> diagnostics = await client.diagnose(absolute);
+      final List<LspDiagnostic> diagnostics = await client.diagnose(
+        absolute,
+        save: save,
+      );
       _counts[server.name] = diagnostics.length;
       _errors.remove(server.name);
       return diagnostics;
@@ -81,9 +95,6 @@ class LspManager implements LspDiagnosticsSource {
       return const <LspDiagnostic>[];
     }
   }
-
-  /// 文件编辑后刷新诊断。
-  Future<List<LspDiagnostic>> fileChanged(String path) => diagnose(path);
 
   List<LspServerStatus> statuses() {
     return <LspServerStatus>[

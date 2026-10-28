@@ -107,7 +107,11 @@ class LspClient {
     _notify('initialized', <String, Object?>{});
   }
 
-  Future<List<LspDiagnostic>> diagnose(String path, {String? text}) async {
+  Future<List<LspDiagnostic>> diagnose(
+    String path, {
+    String? text,
+    bool save = false,
+  }) async {
     if (!_started) await start();
     final String uri = Uri.file(path).toString();
     final String content = text ?? await File(path).readAsString();
@@ -134,6 +138,12 @@ class LspClient {
           <String, Object?>{'text': content},
         ],
       });
+      if (save) {
+        _notify('textDocument/didSave', <String, Object?>{
+          'textDocument': <String, Object?>{'uri': uri},
+          'text': content,
+        });
+      }
     }
     try {
       return await waiter.future.timeout(diagnosticsWait);

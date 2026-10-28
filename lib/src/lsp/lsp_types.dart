@@ -32,4 +32,5 @@ class LspDiagnostic {
 /// 供工具/中间件消费的诊断来源。
 abstract interface class LspDiagnosticsSource {
   Future<List<LspDiagnostic>> diagnose(String path);
+  Future<List<LspDiagnostic>> fileChanged(String path);
 }

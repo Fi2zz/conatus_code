@@ -103,7 +103,7 @@ ToolMiddleware lspDiagnosticsMiddleware(LspDiagnosticsSource source) {
     final List<LspDiagnostic> diagnostics = <LspDiagnostic>[];
     for (final String path in paths) {
       try {
-        diagnostics.addAll(await source.diagnose(path));
+        diagnostics.addAll(await source.fileChanged(path));
       } catch (_) {
         // LSP is optional; never fail an edit because diagnostics failed.
       }
