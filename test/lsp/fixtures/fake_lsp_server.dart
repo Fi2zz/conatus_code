@@ -20,6 +20,7 @@ Future<void> main(List<String> args) async {
   final bool openOnly = args.contains('--open-only');
   final bool malformed = args.contains('--malformed-frames');
   final bool weirdSeverity = args.contains('--weird-severity');
+  final bool stringIds = args.contains('--string-ids');
   final List<int> buffer = <int>[];
   await for (final List<int> chunk in stdin) {
     buffer.addAll(chunk);
@@ -46,6 +47,7 @@ Future<void> main(List<String> args) async {
         openOnly: openOnly,
         malformed: malformed,
         weirdSeverity: weirdSeverity,
+        stringIds: stringIds,
       );
     }
   }
@@ -58,13 +60,14 @@ Future<void> _handle(
   required bool openOnly,
   required bool malformed,
   required bool weirdSeverity,
+  required bool stringIds,
 }) async {
   final Object? id = message['id'];
   final String? method = message['method'] as String?;
   if (method == 'initialize' && id != null) {
     _send(<String, Object?>{
       'jsonrpc': '2.0',
-      'id': id,
+      'id': stringIds ? '$id' : id,
       'result': <String, Object?>{'capabilities': <String, Object?>{}},
     });
     return;
@@ -72,14 +75,18 @@ Future<void> _handle(
   if (method == 'workspace/configuration' && id != null) {
     _send(<String, Object?>{
       'jsonrpc': '2.0',
-      'id': id,
+      'id': stringIds ? '$id' : id,
       'result': <Object?>[null],
     });
     return;
   }
   if (method == 'shutdown' && id != null) {
     if (ignoreShutdown) return;
-    _send(<String, Object?>{'jsonrpc': '2.0', 'id': id, 'result': null});
+    _send(<String, Object?>{
+      'jsonrpc': '2.0',
+      'id': stringIds ? '$id' : id,
+      'result': null,
+    });
     return;
   }
   if (method == 'exit') {

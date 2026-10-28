@@ -107,14 +107,19 @@ ToolMiddleware lspDiagnosticsMiddleware(LspDiagnosticsSource source) {
     }
     final List<String> paths = _paths(result.value);
     if (paths.isEmpty) return result;
-    final List<LspDiagnostic> diagnostics = <LspDiagnostic>[];
-    for (final String path in paths) {
-      try {
-        diagnostics.addAll(await source.fileChanged(path));
-      } catch (_) {
-        // LSP is optional; never fail an edit because diagnostics failed.
-      }
-    }
+    final List<List<LspDiagnostic>> results = await Future.wait(
+      paths.map((String path) async {
+        try {
+          return await source.fileChanged(path);
+        } catch (_) {
+          // LSP is optional; never fail an edit because diagnostics failed.
+          return const <LspDiagnostic>[];
+        }
+      }),
+    );
+    final List<LspDiagnostic> diagnostics = <LspDiagnostic>[
+      for (final List<LspDiagnostic> result in results) ...result,
+    ];
     final String text = formatLspDiagnostics(diagnostics);
     if (text.isEmpty) return result;
     return result.withContent('${result.content}\n\nLSP diagnostics:\n$text');

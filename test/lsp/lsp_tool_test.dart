@@ -26,6 +26,28 @@ class _Source implements LspDiagnosticsSource {
   String? errorFor(String path) => error ?? (fail ? 'lsp down' : null);
 }
 
+class _SlowSource implements LspDiagnosticsSource {
+  int active = 0;
+  int maxActive = 0;
+
+  Future<List<LspDiagnostic>> _run() async {
+    active++;
+    if (active > maxActive) maxActive = active;
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    active--;
+    return const <LspDiagnostic>[];
+  }
+
+  @override
+  Future<List<LspDiagnostic>> diagnose(String path) => _run();
+
+  @override
+  Future<List<LspDiagnostic>> fileChanged(String path) => _run();
+
+  @override
+  String? errorFor(String path) => null;
+}
+
 const LspDiagnostic _error = LspDiagnostic(
   path: '/tmp/a.dart',
   line: 1,
@@ -91,6 +113,20 @@ void main() {
 
     expect(result.isError, isTrue);
     expect(result.content, contains('LSP 不可用'));
+  });
+
+  test('多个文件诊断并发执行', () async {
+    final _SlowSource source = _SlowSource();
+    final ToolMiddleware middleware = lspDiagnosticsMiddleware(source);
+    await middleware(
+      const ToolCall(name: 'apply_patch'),
+      () async => ToolResult.success(
+        '已应用',
+        value: <String, Object?>{'files': <String>['/tmp/a.dart', '/tmp/b.dart']},
+      ),
+    );
+
+    expect(source.maxActive, 2);
   });
 
   test('编辑成功结果追加诊断', () async {

@@ -109,6 +109,48 @@ void main() {
     expect(await client.diagnose(file.path), hasLength(1));
   });
 
+
+  test('读取不存在的文件抛 LspException', () async {
+    final Directory work = _tempDir();
+    final LspClient client = _client(work.path);
+    addTearDown(client.stop);
+
+    expect(
+      () => client.diagnose('${work.path}/missing.dart'),
+      throwsA(isA<LspException>()),
+    );
+  });
+
+  test('接受字符串 id 的响应', () async {
+    final Directory work = _tempDir();
+    final File file = File('${work.path}/a.dart')..writeAsStringSync('a');
+    final LspClient client = _client(work.path, extra: <String>['--string-ids']);
+    addTearDown(client.stop);
+
+    expect(await client.diagnose(file.path), hasLength(1));
+  });
+
+  test('languageId 不把点目录当扩展名', () {
+    expect(languageIdForPath('/tmp/a.b/file'), 'plaintext');
+    expect(languageIdForPath('/tmp/.gitignore'), 'plaintext');
+    expect(languageIdForPath('/tmp/a.dart'), 'dart');
+    expect(languageIdForPath('/tmp/a.tsx'), 'typescript');
+  });
+
+  test('stop 杀掉忽略 shutdown 的进程', () async {
+    final Directory work = _tempDir();
+    final LspClient client = _client(work.path, extra: <String>['--ignore-shutdown']);
+    await client.start();
+    final int? pid = client.serverPid;
+    expect(pid, isNotNull);
+    await client.stop();
+
+    if (!Platform.isWindows) {
+      final ProcessResult result = Process.runSync('kill', <String>['-0', '$pid']);
+      expect(result.exitCode, isNot(0));
+    }
+  });
+
   test('stop 可以重复调用', () async {
     final Directory work = _tempDir();
     final LspClient client = _client(work.path);
