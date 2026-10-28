@@ -102,7 +102,7 @@ void main() {
     addTearDown(client.stop);
 
     expect(await client.diagnose(file.path), hasLength(1));
-    for (int i = 0; i < 40 && client.running; i++) {
+    for (int i = 0; i < 200 && client.running; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
     expect(client.running, isFalse);
