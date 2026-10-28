@@ -201,6 +201,13 @@ mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
 # extensions = [".dart"]
 # timeout_ms = 10000
 
+# LSP（默认关闭）。启用后按扩展名启动配置的 stdio 语言服务器。
+# [lsp]
+# enabled = true
+# [lsp.servers.dart]
+# command = ["dart", "language-server", "--lsp"]
+# extensions = [".dart"]
+
 [sandbox]
 enabled = true
 fs_jail = true

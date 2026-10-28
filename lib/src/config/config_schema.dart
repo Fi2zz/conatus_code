@@ -489,6 +489,50 @@ class HooksConfig {
   final List<String> stop;
 }
 
+
+/// 一个 LSP server 配置；对应 `[lsp.servers.<name>]`。
+class LspServerConfig {
+  const LspServerConfig({
+    required this.name,
+    required this.command,
+    this.extensions = const <String>[],
+    this.env = const <String, String>{},
+    this.initialization = const <String, Object?>{},
+    this.disabled = false,
+  });
+
+  final String name;
+
+  /// 启动命令；第一项是可执行文件，其余是参数（不经 shell）。
+  final List<String> command;
+
+  /// 文件扩展名（已归一为带点的小写形式）。
+  final List<String> extensions;
+
+  /// 子进程环境变量。
+  final Map<String, String> env;
+
+  /// initialize.initializationOptions。
+  final Map<String, Object?> initialization;
+
+  /// 显式禁用；保留配置但不启动。
+  final bool disabled;
+}
+
+/// LSP 总配置；对应 `[lsp]`。
+class LspConfig {
+  const LspConfig({
+    this.enabled = false,
+    this.servers = const <LspServerConfig>[],
+  });
+
+  /// 是否启用；缺省关闭。服务器仍可预先配置。
+  final bool enabled;
+
+  /// 按 TOML 书写顺序保存的服务器。
+  final List<LspServerConfig> servers;
+}
+
 /// lint-on-edit 配置；对应 `[lint]` 表。
 class LintConfig {
   const LintConfig({
@@ -585,6 +629,7 @@ class ConatusCodeConfig {
     this.hooks = const HooksConfig(),
     this.lint = const LintConfig(),
     this.formatter = const FormatterConfig(),
+    this.lsp = const LspConfig(),
     this.story = const StoryConfig(),
     this.background = const BackgroundConfig(),
     this.tui = const TuiConfig(),
@@ -638,6 +683,9 @@ class ConatusCodeConfig {
 
   /// `[formatter]` 表。
   final FormatterConfig formatter;
+
+  /// `[lsp]` 表。
+  final LspConfig lsp;
 
   /// `[story]` 表。
   final StoryConfig story;

@@ -37,6 +37,7 @@ class ConfigParser extends ConfigValues {
     hooks: _readHooks(),
     lint: _readLint(),
     formatter: _readFormatter(),
+    lsp: _readLsp(),
     story: _readStory(),
     background: _readBackground(),
     tui: _readTui(),
@@ -525,6 +526,76 @@ class ConfigParser extends ConfigValues {
   String _formatterExtension(String value) {
     final String trimmed = value.trim().toLowerCase();
     return trimmed.startsWith('.') ? trimmed : '.$trimmed';
+  }
+
+  LspConfig _readLsp() {
+    final Map<String, dynamic> table = readTable('lsp');
+    final bool enabled = readBool(table, 'enabled', false);
+    final Object? rawServers = table['servers'];
+    if (rawServers == null) {
+      return LspConfig(enabled: enabled);
+    }
+    if (rawServers is! Map) {
+      throw ConfigException('$source：lsp.servers 必须是表。');
+    }
+    final List<LspServerConfig> servers = <LspServerConfig>[];
+    for (final MapEntry<Object?, Object?> entry in rawServers.entries) {
+      final String name = entry.key.toString().trim();
+      final Object? raw = entry.value;
+      if (raw is! Map) {
+        throw ConfigException('$source：lsp.servers.$name 必须是表。');
+      }
+      final Map<String, dynamic> server = raw.cast<String, dynamic>();
+      final bool disabled = readBool(server, 'disabled', false);
+      final List<String> command = <String>[
+        for (final String item in readStringList(server, 'command'))
+          if (item.trim().isNotEmpty) item.trim(),
+      ];
+      if (!disabled && command.isEmpty) {
+        throw ConfigException('$source：lsp.servers.$name.command 不能为空。');
+      }
+      final List<String> extensions = <String>[
+        for (final String item in readStringList(server, 'extensions'))
+          if (item.trim().isNotEmpty) _lspExtension(item),
+      ];
+      final Map<String, String> env = readStringMap(
+        server,
+        'env',
+        'lsp.servers.$name.env',
+      );
+      final Map<String, Object?> initialization = _readLspInitialization(
+        server,
+        name,
+      );
+      servers.add(
+        LspServerConfig(
+          name: name,
+          command: command,
+          extensions: extensions,
+          env: env,
+          initialization: initialization,
+          disabled: disabled,
+        ),
+      );
+    }
+    return LspConfig(enabled: enabled, servers: servers);
+  }
+
+  String _lspExtension(String value) {
+    final String trimmed = value.trim().toLowerCase();
+    return trimmed.startsWith('.') ? trimmed : '.$trimmed';
+  }
+
+  Map<String, Object?> _readLspInitialization(
+    Map<String, dynamic> server,
+    String name,
+  ) {
+    final Object? value = server['initialization'];
+    if (value == null) return const <String, Object?>{};
+    if (value is! Map) {
+      throw ConfigException('$source：lsp.servers.$name.initialization 必须是表。');
+    }
+    return value.cast<String, Object?>();
   }
 
   StoryConfig _readStory() {

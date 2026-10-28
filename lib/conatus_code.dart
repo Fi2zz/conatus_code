@@ -130,6 +130,8 @@ export 'src/config/config_schema.dart'
         HooksConfig,
         LintConfig,
         LlmConfig,
+        LspConfig,
+        LspServerConfig,
         McpConfig,
         McpServerSpec,
         McpServerType,
