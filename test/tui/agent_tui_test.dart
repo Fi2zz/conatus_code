@@ -192,6 +192,29 @@ void main() {
     }
   });
 
+  test('ctrl+v 粘贴文件路径生成附件占位', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('nava-paste-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final File file = File('${dir.path}/note.md')..writeAsStringSync('hi');
+
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      ClipboardManager.copy(file.path);
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyV,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+
+      expect(tester.terminalState, containsText('[file #1 (note.md)]'));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('ctrl+o 展开最近一条可折叠的工具结果', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();

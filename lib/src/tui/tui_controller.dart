@@ -391,6 +391,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 设置面板是否打开。
   bool get settingsOpen => settingsPrompt.open;
 
+  /// 当前工作目录：配置的 `[agent] workdir`，缺省为进程 cwd。
+  String get workdir => _app.get<String>('workdir') ?? Directory.current.path;
+
   /// Agent 选择面板（`/agents` 打开）。
   late final AgentPicker agentPicker = AgentPicker(onChanged: _refresh);
 

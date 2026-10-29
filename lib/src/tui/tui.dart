@@ -26,6 +26,7 @@ import 'tui_choice.dart';
 import 'tui_choice_view.dart';
 import 'tui_chrome.dart';
 import 'tui_clipboard_image.dart';
+import 'tui_clipboard_text.dart';
 import 'tui_command_menu_view.dart';
 import 'tui_commands.dart';
 import 'tui_controller.dart';
@@ -99,6 +100,23 @@ class _AgentTuiState extends State<AgentTui> {
     });
     unawaited(_controller.start());
     unawaited(_resolveLocation());
+    _disableLiteralNext();
+  }
+
+  /// 关掉终端的 IEXTEN：否则 Ctrl+V 会被 tty 当作 literal-next 吃掉，
+  /// 应用永远收不到这个按键（bracketed paste 不受影响）。
+  ///
+  /// 只改当前控制终端；退出时 nocterm 恢复原始 termios，IEXTEN 随之复原。
+  void _disableLiteralNext() {
+    if (!Platform.isMacOS && !Platform.isLinux) return;
+    try {
+      Process.runSync(
+        'sh',
+        <String>['-c', 'stty -iexten < /dev/tty 2>/dev/null'],
+      );
+    } on ProcessException {
+      // 无控制终端（测试 / 重定向）时忽略。
+    }
   }
 
   /// 解析状态栏位置信息（目录 + 分支）；失败时保持空串不显示右段。
@@ -263,11 +281,11 @@ class _AgentTuiState extends State<AgentTui> {
     if (!event.matches(LogicalKey.keyV, ctrl: true)) {
       return false;
     }
-    final String? clipboard = ClipboardManager.paste();
-    if (clipboard != null && clipboard.isNotEmpty) {
+    final String? internal = ClipboardManager.paste();
+    if (internal != null && internal.isNotEmpty) {
       final List<TuiAttachment> found = extractPathAttachments(
-        clipboard,
-        Directory.current.path,
+        internal,
+        _controller.workdir,
       );
       if (found.isNotEmpty) {
         _addAttachments(found);
@@ -275,8 +293,35 @@ class _AgentTuiState extends State<AgentTui> {
       }
       return false;
     }
+    // 终端没走 bracketed paste（Ctrl+V 是裸按键）时，直接读系统剪贴板。
+    final String? system = readClipboardTextSync();
+    if (system != null && system.isNotEmpty) {
+      final List<TuiAttachment> found = extractPathAttachments(
+        system,
+        _controller.workdir,
+      );
+      if (found.isNotEmpty) {
+        _addAttachments(found);
+        return true;
+      }
+      _insertPastedText(system);
+      return true;
+    }
     unawaited(_attachClipboardImage());
     return true;
+  }
+
+  /// 把系统剪贴板文本插入当前光标位置（替代终端未执行的粘贴）。
+  void _insertPastedText(String text) {
+    final String current = _input.text;
+    final TextSelection selection = _input.selection;
+    final int start = selection.start < 0 ? current.length : selection.start;
+    final int end = selection.end < start ? start : selection.end;
+    _input.text = current.replaceRange(start, end, text);
+    _input.selection =
+        TextSelection.collapsed(offset: start + text.length);
+    _onInputChanged();
+    _refresh();
   }
 
   /// 登记附件并往输入框插入占位标记（`[image #N (宽×高)]` / `[file #N (名)]`）；
