@@ -49,6 +49,7 @@ import '../mcp/mcp_assembly.dart';
 import '../mcp/mcp_prompt_commands.dart';
 import '../permissions/permission_wiring.dart';
 import '../project/project_registry.dart';
+import '../project/worktree_service.dart';
 import '../references/references.dart';
 import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
@@ -785,6 +786,13 @@ class ConatusTuiRuntime {
     }
     if (projectRegistryService != null) {
       app.provide('projectRegistry', projectRegistryService);
+      app.provide(
+        'worktreeService',
+        WorktreeService(
+          registry: projectRegistryService,
+          workdir: resolvedWorkdir,
+        ),
+      );
       app.onDispose(projectRegistryService.close);
     }
     app.provide('configWarnings', configWarnings);

@@ -54,6 +54,11 @@ const List<TuiCommand> tuiCommands = <TuiCommand>[
     argHint: '[restart [名字]]',
   ),
   TuiCommand(name: 'web', description: '查看搜索源与冷却状态'),
+  TuiCommand(
+    name: 'worktree',
+    description: '创建/列出/删除 nava 管理的 git worktree',
+    argHint: '[new <名字> [branch]|list|remove <名字>]',
+  ),
   TuiCommand(name: 'tools', description: '列出当前已注册的工具'),
   TuiCommand(
     name: 'reload',

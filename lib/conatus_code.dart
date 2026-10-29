@@ -274,6 +274,8 @@ export 'src/project/project_paths.dart'
 export 'src/project/project_registry.dart' show ProjectRegistry, WorkspaceInfo;
 export 'src/project/project_repair.dart'
     show ProjectRepairReport, repairProjectRegistry;
+export 'src/project/worktree_service.dart'
+    show WorktreeCreateResult, WorktreeService;
 export 'src/references/references.dart'
     show
         ResolvedReference,

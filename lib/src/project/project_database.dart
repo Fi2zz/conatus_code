@@ -28,6 +28,7 @@ class WorktreeRecord {
     required this.path,
     required this.name,
     required this.dirName,
+    this.strategy,
   });
 
   final String id;
@@ -35,6 +36,7 @@ class WorktreeRecord {
   final String path;
   final String name;
   final String dirName;
+  final String? strategy;
 }
 
 /// 项目注册表数据库；同步 API，生命周期由调用方关闭。
@@ -167,23 +169,32 @@ ON CONFLICT(id) DO UPDATE SET
     required String path,
     required String name,
     required String dirName,
+    String? strategy,
   }) {
     _guard(() {
       final int now = DateTime.now().millisecondsSinceEpoch;
       _db.execute(
         '''
 INSERT INTO worktree
-  (id, project_id, path, name, dir_name, time_created, time_updated)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+  (id, project_id, path, name, dir_name, strategy, time_created, time_updated)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
   project_id = excluded.project_id,
   path = excluded.path,
   name = excluded.name,
   dir_name = excluded.dir_name,
+  strategy = excluded.strategy,
   time_updated = excluded.time_updated
 ''',
-        <Object?>[id, projectId, path, name, dirName, now, now],
+        <Object?>[id, projectId, path, name, dirName, strategy, now, now],
       );
+      _restrictArtifacts(path);
+    });
+  }
+
+  void deleteWorktree(String id) {
+    _guard(() {
+      _db.execute('DELETE FROM worktree WHERE id = ?', <Object?>[id]);
       _restrictArtifacts(path);
     });
   }
@@ -225,7 +236,12 @@ ON CONFLICT(id) DO UPDATE SET
   static void _migrate(Database db, String path) {
     final int version =
         db.select('PRAGMA user_version').first.values.first! as int;
-    if (version == 1) return;
+    if (version == 2) return;
+    if (version == 1) {
+      db.execute('ALTER TABLE worktree ADD COLUMN strategy TEXT');
+      db.execute('PRAGMA user_version = 2');
+      return;
+    }
     final bool empty = db
         .select("SELECT name FROM sqlite_master WHERE type = 'table'")
         .isEmpty;
@@ -247,11 +263,12 @@ CREATE TABLE worktree (
   path TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   dir_name TEXT NOT NULL UNIQUE,
+  strategy TEXT,
   time_created INTEGER NOT NULL,
   time_updated INTEGER NOT NULL
 );
 CREATE INDEX worktree_project_idx ON worktree(project_id);
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 ''');
   }
 
@@ -268,5 +285,6 @@ PRAGMA user_version = 1;
     path: row['path'] as String,
     name: row['name'] as String,
     dirName: row['dir_name'] as String,
+    strategy: row['strategy'] as String?,
   );
 }

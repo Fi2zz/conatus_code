@@ -47,6 +47,7 @@ import '../hooks/hooks.dart';
 import '../lsp/lsp_manager.dart';
 import '../permissions/permission_wiring.dart';
 import '../project/project_registry.dart';
+import '../project/worktree_service.dart';
 import '../revert/revert_compensate.dart';
 import '../revert/revert_service.dart';
 import '../revert/revert_stage.dart';
@@ -1812,6 +1813,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleLsp(arg);
       case 'web':
         _handleWeb();
+      case 'worktree':
+        await _handleWorktree(arg);
       case 'rename':
         await _handleRename(arg);
       case 'session':
@@ -2674,6 +2677,73 @@ class ConatusTuiController implements TuiUserPromptHost {
       if (status.reason.isNotEmpty) buffer.write('  ${status.reason}');
     }
     transcript.add(TuiRole.system, buffer.toString());
+  }
+
+  Future<void> _handleWorktree(String arg) async {
+    final WorktreeService? service =
+        _app.get<WorktreeService>('worktreeService');
+    if (service == null) {
+      transcript.add(TuiRole.system, '项目注册表未启用，worktree 不可用。');
+      return;
+    }
+    final String rest = arg.trim();
+    if (rest.isEmpty || rest == 'list') {
+      final List<WorkspaceInfo> list = service.list();
+      if (list.isEmpty) {
+        transcript.add(TuiRole.system, '没有已登记 worktree。');
+        return;
+      }
+      final String current = _app.get<WorkspaceInfo>('projectInfo')?.worktreeId ?? '';
+      final StringBuffer buffer = StringBuffer('worktree：');
+      for (final WorkspaceInfo item in list) {
+        final String mark = item.worktreeId == current ? '*' : ' ';
+        buffer.write(
+          '\n$mark ${item.worktreePath.split(Platform.pathSeparator).last}  '
+          '${item.strategy ?? 'user'}  ${item.worktreePath}',
+        );
+      }
+      transcript.add(TuiRole.system, buffer.toString());
+      return;
+    }
+    if (rest == 'new' || rest.startsWith('new ')) {
+      final List<String> parts = rest.substring(3).trim().split(RegExp(r'\s+'));
+      if (parts.isEmpty || parts.first.isEmpty) {
+        transcript.add(TuiRole.system, '用法：/worktree new <名字> [branch]');
+        return;
+      }
+      try {
+        final WorktreeCreateResult result = await service.create(
+          parts.first,
+          branch: parts.length > 1 ? parts[1] : null,
+        );
+        transcript.add(
+          TuiRole.system,
+          '已创建 worktree：${result.path}（分支 ${result.branch}）；'
+          '用 /project open ${result.info.worktreeId.substring(0, 8)} 切换。',
+        );
+      } catch (error) {
+        transcript.add(TuiRole.system, '创建 worktree 失败：$error');
+      }
+      return;
+    }
+    if (rest == 'remove' || rest.startsWith('remove ')) {
+      final String selector = rest.substring(6).trim();
+      if (selector.isEmpty) {
+        transcript.add(TuiRole.system, '用法：/worktree remove <名字>');
+        return;
+      }
+      try {
+        await service.remove(selector);
+        transcript.add(TuiRole.system, '已删除 worktree：$selector');
+      } catch (error) {
+        transcript.add(TuiRole.system, '删除 worktree 失败：$error');
+      }
+      return;
+    }
+    transcript.add(
+      TuiRole.system,
+      '用法：/worktree [new <名字> [branch]|list|remove <名字>]',
+    );
   }
 
   Future<void> _handleLsp(String arg) async {

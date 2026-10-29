@@ -25,7 +25,7 @@ void main() {
     expect(File(path).existsSync(), isTrue);
     final Database raw = sqlite3.open(path);
     addTearDown(raw.dispose);
-    expect(raw.select('PRAGMA user_version').first.values.first, 1);
+    expect(raw.select('PRAGMA user_version').first.values.first, 2);
     expect(
       raw
           .select("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -56,7 +56,42 @@ void main() {
     expect(db.project('p1')!.name, 'lifts');
     expect(db.worktree('w1')!.path, '/tmp/lifts');
     expect(db.worktreeAt('/tmp/lifts')!.dirName, 'lifts-3f9a2c1b7d4e');
+    expect(db.worktree('w1')!.strategy, isNull);
     expect(db.worktreeByDirName('lifts-3f9a2c1b7d4e')!.id, 'w1');
+  });
+
+  test('v1 数据库迁移增加 strategy 列', () {
+    final Directory dir = _tempDir();
+    final String path = _dbPath(dir);
+    final Database raw = sqlite3.open(path);
+    raw.execute('''
+CREATE TABLE project (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, vcs TEXT, remote TEXT,
+  time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL
+);
+CREATE TABLE worktree (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+  path TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  dir_name TEXT NOT NULL UNIQUE,
+  time_created INTEGER NOT NULL,
+  time_updated INTEGER NOT NULL
+);
+PRAGMA user_version = 1;
+''');
+    raw.dispose();
+
+    final ProjectDatabase db = ProjectDatabase.open(path);
+    addTearDown(db.close);
+    final Database check = sqlite3.open(path);
+    addTearDown(check.dispose);
+    expect(check.select('PRAGMA user_version').first.values.first, 2);
+    expect(
+      check.select("SELECT name FROM pragma_table_info('worktree')")
+          .map((Row row) => row['name']),
+      contains('strategy'),
+    );
   });
 
   test('重复 path / dirName 仍是单行并更新字段', () {
@@ -76,10 +111,47 @@ void main() {
       path: '/tmp/lifts',
       name: 'lifts-renamed',
       dirName: 'lifts-3f9a2c1b7d4e',
+      strategy: 'git',
     );
 
     expect(db.worktreeAt('/tmp/lifts')!.name, 'lifts-renamed');
+    expect(db.worktreeAt('/tmp/lifts')!.strategy, 'git');
     expect(db.worktreeByDirName('lifts-3f9a2c1b7d4e')!.id, 'w1');
+    expect(db.worktreeAt('/tmp/lifts')!.strategy, 'git');
+  });
+
+  test('v1 数据库迁移增加 strategy 列', () {
+    final Directory dir = _tempDir();
+    final String path = _dbPath(dir);
+    final Database raw = sqlite3.open(path);
+    raw.execute('''
+CREATE TABLE project (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, vcs TEXT, remote TEXT,
+  time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL
+);
+CREATE TABLE worktree (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+  path TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  dir_name TEXT NOT NULL UNIQUE,
+  time_created INTEGER NOT NULL,
+  time_updated INTEGER NOT NULL
+);
+PRAGMA user_version = 1;
+''');
+    raw.dispose();
+
+    final ProjectDatabase db = ProjectDatabase.open(path);
+    addTearDown(db.close);
+    final Database check = sqlite3.open(path);
+    addTearDown(check.dispose);
+    expect(check.select('PRAGMA user_version').first.values.first, 2);
+    expect(
+      check.select("SELECT name FROM pragma_table_info('worktree')")
+          .map((Row row) => row['name']),
+      contains('strategy'),
+    );
   });
 
   test('renameProject 只改显示名，重新 saveProject 不覆盖', () {

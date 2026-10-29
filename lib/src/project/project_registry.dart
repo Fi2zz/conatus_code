@@ -19,6 +19,7 @@ class WorkspaceInfo {
     required this.worktreeId,
     required this.worktreePath,
     required this.dataDir,
+    this.strategy,
   });
 
   final String projectId;
@@ -26,6 +27,7 @@ class WorkspaceInfo {
   final String worktreeId;
   final String worktreePath;
   final String dataDir;
+  final String? strategy;
 
   /// `/project` 等界面使用的短 ID。
   String get projectShortId => projectId.substring(0, 8);
@@ -65,7 +67,11 @@ class ProjectRegistry {
   final String workspacesDir;
 
   /// 解析并登记 [workdir]；[dataDirOverride] 用于显式 `project_dir`。
-  WorkspaceInfo resolve(String workdir, {String? dataDirOverride}) {
+  WorkspaceInfo resolve(
+    String workdir, {
+    String? dataDirOverride,
+    String? strategy,
+  }) {
     final ProjectIdentity identity = resolveProjectIdentity(workdir);
     final String launchDir = _canonical(workdir);
     final String? override = _absoluteOverride(dataDirOverride, launchDir);
@@ -73,7 +79,7 @@ class ProjectRegistry {
       throw StateError(kReadOnlyPathMessage);
     }
     final ({String projectName, String dirName}) registration =
-        _registerWithRetry(identity);
+        _registerWithRetry(identity, strategy);
     final String dataDir =
         override ??
         '$workspacesDir${Platform.pathSeparator}${registration.dirName}';
@@ -90,6 +96,7 @@ class ProjectRegistry {
       worktreeId: identity.worktreeId,
       worktreePath: identity.worktreePath,
       dataDir: dataDir,
+      strategy: strategy ?? database.worktree(identity.worktreeId)?.strategy,
     );
     writeWorkspaceSidecar(info);
     return info;
@@ -97,10 +104,11 @@ class ProjectRegistry {
 
   ({String projectName, String dirName}) _registerWithRetry(
     ProjectIdentity identity,
+    String? strategy,
   ) {
     for (int attempt = 0; attempt < 2; attempt++) {
       try {
-        return database.transaction(() => _register(identity));
+        return database.transaction(() => _register(identity, strategy));
       } on StateError catch (error) {
         if (attempt == 0 &&
             error.message.contains('UNIQUE constraint failed')) {
@@ -112,7 +120,10 @@ class ProjectRegistry {
     throw StateError('项目注册表写入冲突，请重试');
   }
 
-  ({String projectName, String dirName}) _register(ProjectIdentity identity) {
+  ({String projectName, String dirName}) _register(
+    ProjectIdentity identity,
+    String? strategy,
+  ) {
     final ProjectRecord? existingProject = database.project(identity.projectId);
     final String projectName = existingProject?.name ?? identity.name;
     database.saveProject(
@@ -131,6 +142,7 @@ class ProjectRegistry {
       path: identity.worktreePath,
       name: identity.name,
       dirName: dirName,
+      strategy: strategy ?? database.worktree(identity.worktreeId)?.strategy,
     );
     return (projectName: projectName, dirName: dirName);
   }
@@ -147,6 +159,7 @@ class ProjectRegistry {
           worktreePath: worktree.path,
           dataDir:
               '$workspacesDir${Platform.pathSeparator}${worktree.dirName}',
+          strategy: worktree.strategy,
         ),
     ];
   }
@@ -182,6 +195,7 @@ class ProjectRegistry {
           worktreeId: old.worktreeId,
           worktreePath: old.worktreePath,
           dataDir: old.dataDir,
+          strategy: old.strategy,
         ),
       );
     }
@@ -234,6 +248,7 @@ void writeWorkspaceSidecar(WorkspaceInfo info) {
     'worktreeId': info.worktreeId,
     'worktreePath': info.worktreePath,
     'dirName': info.dataDir.split(Platform.pathSeparator).last,
+    if (info.strategy != null) 'strategy': info.strategy,
   };
   writeFileAtomic(
     '${info.dataDir}${Platform.pathSeparator}$kWorkspaceSidecar',
@@ -266,6 +281,7 @@ WorkspaceInfo? readWorkspaceSidecar(String dataDir) {
       worktreeId: worktreeId,
       worktreePath: worktreePath,
       dataDir: dataDir,
+      strategy: decoded['strategy'] as String?,
     );
   } on FormatException {
     return null;

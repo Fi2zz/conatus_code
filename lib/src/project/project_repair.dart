@@ -76,6 +76,7 @@ ProjectRepairReport repairProjectRegistry({
           path: info.worktreePath,
           name: entity.path.split(sep).last,
           dirName: entity.path.split(sep).last,
+          strategy: info.strategy,
         );
         restored++;
       } on StateError {
@@ -107,6 +108,7 @@ void _writeMissingSidecars(ProjectDatabase database, String root) {
         worktreeId: worktree.id,
         worktreePath: worktree.path,
         dataDir: dir,
+        strategy: worktree.strategy,
       ),
     );
   }

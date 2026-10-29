@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **git worktree 管理**：`/worktree new|list|remove`；worktree 表新增
+  `strategy`（DB v2 自动迁移），删除只允许 nava 管理目录下的 `git` worktree。
+
 - **Web 工具对齐**：`fetch_url` 增加 `format=markdown|text|html`（默认
   markdown），支持 HTML→Markdown；`web_search` 增加 `provider` 参数与 60 秒
   provider 冷却；新增 `/web` 查看搜索源状态。
