@@ -150,8 +150,8 @@ class TuiPermissionGate implements Approval {
   /// 哪些工具需要差异预览（其参数可推导出可读的 diff）。
   bool _previewable(String toolName) =>
       toolName == 'apply_patch' ||
-      toolName == 'write_file' ||
-      toolName == 'edit_file';
+      toolName == 'write' ||
+      toolName == 'edit';
 
   /// 用差异预览替换请求的静态描述；预览不可得时原样返回。
   Future<ApprovalRequest> _withPreview(ApprovalRequest request) async {

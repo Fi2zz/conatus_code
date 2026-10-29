@@ -93,7 +93,7 @@ void main() {
       expect(hover.content, contains('fake hover'));
       final ToolResult edit = await runtime.tools.call(
         ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{
             'path': file.path,
             'content': 'void main() {}',

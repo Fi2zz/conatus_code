@@ -58,10 +58,10 @@ void main() {
     expect(registry!.servers, <String>['fs', 'net']);
     expect(ctx.mcp.servers, <String>['fs', 'net']);
     expect(registry.clientOf('fs')?.ready, isTrue);
-    expect(registry.toolsOf('fs').single.name, 'fs__read_file');
+    expect(registry.toolsOf('fs').single.name, 'fs__read');
     expect(
       tools.names,
-      containsAll(<String>['fs__read_file', 'net__read_file']),
+      containsAll(<String>['fs__read', 'net__read']),
     );
   });
 
@@ -97,8 +97,8 @@ void main() {
     expect(messages.single, contains('broken'));
     expect(messages.single, contains('已跳过'));
     expect(registry.servers, <String>['ok']);
-    expect(tools.names, contains('ok__read_file'));
-    expect(tools.names, isNot(contains('broken__read_file')));
+    expect(tools.names, contains('ok__read'));
+    expect(tools.names, isNot(contains('broken__read')));
   });
 
   test('传输构造抛错不中断整循环：报告并跳过，其余照常挂载', () async {
@@ -127,7 +127,7 @@ void main() {
     expect(messages, hasLength(1));
     expect(messages.single, contains('bad'));
     expect(registry.servers, <String>['ok']);
-    expect(tools.names, contains('ok__read_file'));
+    expect(tools.names, contains('ok__read'));
   });
 
   test('未解析的占位符报告键名（不泄露值）', () async {
@@ -187,7 +187,7 @@ void main() {
     expect(registry!.toolsOf('fs').single.riskLevel, ToolRisk.high);
     provideApproval(ctx, approval: AutoApproval(false));
     final ToolResult result = await ctx.tools.call(
-      const ToolCall(name: 'fs__read_file'),
+      const ToolCall(name: 'fs__read'),
     );
 
     expect(result.isError, isTrue);

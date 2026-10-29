@@ -126,11 +126,11 @@ typedef ShellAnswer = ShellRunResult Function(String command);
   return (app, shell, service);
 }
 
-/// 注册一个只回显成功的 `write_file`（不落盘，测试自己建文件）。
+/// 注册一个只回显成功的 `write`（不落盘，测试自己建文件）。
 void registerWriteFile(Context app, {ToolResult Function()? result}) {
   app.effect(
     () => app.tools.fn(
-      'write_file',
+      'write',
       description: '写文件',
       params: <ParamSpec>[ParamSpec.string('path', required: true)],
       handler: (ToolContext ctx) async =>
@@ -152,11 +152,11 @@ void registerApplyPatch(Context app, List<String> files) {
   );
 }
 
-/// 注册一个只回显成功的 `edit_file`（不落盘，测试自己建文件）。
+/// 注册一个只回显成功的 `edit`（不落盘，测试自己建文件）。
 void registerEditFile(Context app) {
   app.effect(
     () => app.tools.fn(
-      'edit_file',
+      'edit',
       description: '编辑文件',
       params: <ParamSpec>[ParamSpec.string('path', required: true)],
       handler: (ToolContext ctx) async => ToolResult.success('已编辑'),

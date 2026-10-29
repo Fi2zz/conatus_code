@@ -19,16 +19,16 @@ List<SessionEvent> _oneTurn() => <SessionEvent>[
         'text': '',
         'reasoning': '先看文件',
         'toolCalls': <Object?>[
-          <String, Object?>{'id': 'c1', 'name': 'read_file'},
+          <String, Object?>{'id': 'c1', 'name': 'read'},
         ],
       }),
       _event(2, kToolResultEvent, <String, Object?>{
-        'name': 'read_file',
+        'name': 'read',
         'content': 'void main() {}',
         'isError': false,
       }),
       _event(3, kToolResultEvent, <String, Object?>{
-        'name': 'edit_file',
+        'name': 'edit',
         'content': 'boom: permission denied',
         'isError': true,
       }),
@@ -48,7 +48,7 @@ void main() {
 
       expect(text, contains('你 › 修一下 bug'));
       expect(text, contains('思考 › 先看文件'));
-      expect(text, contains('✓ read_file › void main() {}'));
+      expect(text, contains('✓ read › void main() {}'));
       expect(text, contains('助手 › 改完了'));
     });
 
@@ -56,7 +56,7 @@ void main() {
     test('失败的工具结果标 ✗ 并带出原因', () {
       final String text = renderer.render(_oneTurn());
 
-      expect(text, contains('✗ edit_file › boom: permission denied'));
+      expect(text, contains('✗ edit › boom: permission denied'));
     });
 
     test('不可读的事件被跳过（不产生噪声行）', () {
@@ -121,7 +121,7 @@ void main() {
       final String text = const TraceRenderer(toolResultChars: 40).render(
         <SessionEvent>[
           _event(0, kToolResultEvent, <String, Object?>{
-            'name': 'rg',
+            'name': 'grep',
             'content': List<String>.generate(12, (int i) => 'a.dart:$i')
                 .join('\n'),
             'isError': false,
@@ -136,7 +136,7 @@ void main() {
     test('单行结果不追加行数后缀', () {
       final String text = renderer.render(<SessionEvent>[
         _event(0, kToolResultEvent, <String, Object?>{
-          'name': 'rg',
+          'name': 'grep',
           'content': '只有一行',
           'isError': false,
         }),
@@ -149,7 +149,7 @@ void main() {
       final String text = const TraceRenderer(toolResultChars: 5).render(
         <SessionEvent>[
           _event(0, kToolResultEvent, <String, Object?>{
-            'name': 'rg',
+            'name': 'grep',
             'content': '很长的一行结果内容',
             'isError': false,
           }),
@@ -161,7 +161,7 @@ void main() {
     test('空内容显示（空）而不是留白', () {
       final String text = renderer.render(<SessionEvent>[
         _event(0, kToolResultEvent, <String, Object?>{
-          'name': 'edit_file',
+          'name': 'edit',
           'content': '',
           'isError': false,
         }),

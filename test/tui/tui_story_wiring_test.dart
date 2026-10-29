@@ -66,13 +66,13 @@ Future<(ConatusTuiController, Context, Directory)> _buildController({
 }
 
 void main() {
-  test('story 关闭：write_file 直接落盘', () async {
+  test('story 关闭：write 直接落盘', () async {
     final (ConatusTuiController _, Context app, Directory dir) =
         await _buildController(storyEnabled: false);
 
     final ToolResult result = await app.tools.call(
       const ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': 'a.txt', 'content': 'hello'},
       ),
     );
@@ -82,13 +82,13 @@ void main() {
     expect(File('${dir.path}/a.txt').readAsStringSync(), 'hello');
   });
 
-  test('story 开启：write_file 成待定补丁，apply 后落盘', () async {
+  test('story 开启：write 成待定补丁，apply 后落盘', () async {
     final (ConatusTuiController controller, Context app, Directory dir) =
         await _buildController(storyEnabled: true);
 
     final ToolResult result = await app.tools.call(
       const ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': 'a.txt', 'content': 'hello'},
       ),
     );
@@ -107,7 +107,7 @@ void main() {
     File('${dir.path}/a.txt').writeAsStringSync('old');
     await app.tools.call(
       const ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{
           'path': 'a.txt',
           'content': 'hello',
@@ -152,7 +152,7 @@ void main() {
 
     final ToolResult result = await ctx.tools.call(
       const ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': 'a.txt', 'content': 'hello'},
       ),
     );

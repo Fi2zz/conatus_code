@@ -14,8 +14,8 @@ import 'xerj_exec.dart';
 
 /// 触发刷新的编辑工具（与 lint-on-edit 保持同一集合）。
 const Set<String> kXerjWriteTools = <String>{
-  'write_file',
-  'edit_file',
+  'write',
+  'edit',
   'apply_patch',
 };
 

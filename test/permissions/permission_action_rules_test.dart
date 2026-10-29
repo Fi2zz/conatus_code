@@ -32,16 +32,16 @@ void main() {
     test('run_tests 映射为 shell', () async {
       final ApprovalRequest request = await askFor(
         'run_tests',
-        'shell',
+        'bash',
         <String, Object?>{'test_cmd': 'dart test'},
       );
-      expect(request.action, 'shell');
+      expect(request.action, 'bash');
       expect(request.resources, <String>['dart test']);
     });
 
-    test('web_search 映射为 websearch，资源为查询词', () async {
+    test('websearch 映射为 websearch，资源为查询词', () async {
       final ApprovalRequest request = await askFor(
-        'web_search',
+        'websearch',
         'websearch',
         <String, Object?>{'query': 'dart'},
       );
@@ -51,39 +51,39 @@ void main() {
 
     test('MCP server__tool 映射为 server_tool', () async {
       final ApprovalRequest request = await askFor(
-        'fs__read_file',
-        'fs_read_file',
+        'fs__read',
+        'fs_read',
         <String, Object?>{},
       );
-      expect(request.action, 'fs_read_file');
+      expect(request.action, 'fs_read');
       expect(request.resources, <String>['*']);
     });
 
-    test('read_file / list_files 映射为 read', () async {
+    test('read / list 映射为 read', () async {
       final ApprovalRequest read = await askFor(
-        'read_file',
+        'read',
         'read',
         <String, Object?>{'path': 'src/a.dart'},
       );
       expect(read.action, 'read');
       expect(read.resources, <String>['src/a.dart']);
       final ApprovalRequest list = await askFor(
-        'list_files',
+        'list',
         'read',
         <String, Object?>{'path': 'src'},
       );
       expect(list.action, 'read');
     });
 
-    test('write_file / edit_file / apply_patch 映射为 edit', () async {
+    test('write / edit / apply_patch 映射为 edit', () async {
       final ApprovalRequest write = await askFor(
-        'write_file',
+        'write',
         'edit',
         <String, Object?>{'path': 'a.txt'},
       );
       expect(write.action, 'edit');
       final ApprovalRequest edit = await askFor(
-        'edit_file',
+        'edit',
         'edit',
         <String, Object?>{'path': 'a.txt'},
       );
@@ -98,26 +98,26 @@ void main() {
 
     test('rg 映射为 grep', () async {
       final ApprovalRequest request = await askFor(
-        'rg',
+        'grep',
         'grep',
         <String, Object?>{'pattern': 'TODO'},
       );
       expect(request.action, 'grep');
     });
 
-    test('spawn_agent 映射为 subagent，资源缺省 default', () async {
+    test('task 映射为 subagent，资源缺省 default', () async {
       final ApprovalRequest request = await askFor(
-        'spawn_agent',
-        'subagent',
+        'task',
+        'task',
         <String, Object?>{'task': '查一下'},
       );
-      expect(request.action, 'subagent');
+      expect(request.action, 'task');
       expect(request.resources, <String>['default']);
     });
 
-    test('fetch_url 映射为 webfetch，资源为 URL', () async {
+    test('webfetch 映射为 webfetch，资源为 URL', () async {
       final ApprovalRequest request = await askFor(
-        'fetch_url',
+        'webfetch',
         'webfetch',
         <String, Object?>{'url': 'https://example.com/a'},
       );
@@ -125,9 +125,9 @@ void main() {
       expect(request.resources, <String>['https://example.com/a']);
     });
 
-    test('ask_user 映射为 question，资源为 *', () async {
+    test('question 映射为 question，资源为 *', () async {
       final ApprovalRequest request = await askFor(
-        'ask_user',
+        'question',
         'question',
         <String, Object?>{'question': '选哪个'},
       );
@@ -137,7 +137,7 @@ void main() {
 
     test('grep 资源取 pattern', () async {
       final ApprovalRequest request = await askFor(
-        'rg',
+        'grep',
         'grep',
         <String, Object?>{'pattern': 'TODO'},
       );
@@ -161,8 +161,8 @@ void main() {
       );
 
       for (final String tool in <String>[
-        'write_file',
-        'edit_file',
+        'write',
+        'edit',
         'apply_patch',
       ]) {
         final ToolResult result = await rig.tools.call(
@@ -176,7 +176,7 @@ void main() {
       expect(rig.runs, isEmpty);
     });
 
-    test('action=read 覆盖 read_file / list_files', () async {
+    test('action=read 覆盖 read / list', () async {
       final PermissionRig rig = assemblePermissionRig(
         scope: const PermissionScope(
           askThreshold: ToolRisk.high,
@@ -191,16 +191,16 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': '/tmp/a.txt'}),
+        permissionCall('read', <String, Object?>{'path': '/tmp/a.txt'}),
       );
       await rig.tools.call(
-        permissionCall('list_files', <String, Object?>{'path': '/tmp'}),
+        permissionCall('list', <String, Object?>{'path': '/tmp'}),
       );
       expect(rig.gate.requests, isEmpty);
-      expect(rig.runs, <String>['read_file', 'list_files']);
+      expect(rig.runs, <String>['read', 'list']);
     });
 
-    test('action=grep 命中 rg，action=shell 命中 run_command', () async {
+    test('action=grep 命中 rg，action=shell 命中 bash', () async {
       final PermissionRig grepRig = assemblePermissionRig(
         scope: const PermissionScope(
           rules: <PermissionRule>[
@@ -213,7 +213,7 @@ void main() {
         ),
       );
       final ToolResult grep = await grepRig.tools.call(
-        permissionCall('rg', <String, Object?>{'pattern': 'TODO'}),
+        permissionCall('grep', <String, Object?>{'pattern': 'TODO'}),
       );
       expect(grep.error!.code, 'PERMISSION_DENIED');
 
@@ -221,7 +221,7 @@ void main() {
         scope: const PermissionScope(
           rules: <PermissionRule>[
             PermissionRule(
-              action: 'shell',
+              action: 'bash',
               resource: '*',
               effect: PermissionEffect.deny,
             ),
@@ -229,7 +229,7 @@ void main() {
         ),
       );
       final ToolResult shell = await shellRig.tools.call(
-        permissionCall('run_command', <String, Object?>{'command': 'echo hi'}),
+        permissionCall('bash', <String, Object?>{'command': 'echo hi'}),
       );
       expect(shell.error!.code, 'PERMISSION_DENIED');
     });

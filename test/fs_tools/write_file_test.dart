@@ -5,7 +5,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
 ToolContext _context(Map<String, Object?> args) =>
-    ToolContext(ToolCall(name: 'write_file', arguments: args));
+    ToolContext(ToolCall(name: 'write', arguments: args));
 
 void main() {
   late Directory dir;
@@ -23,6 +23,10 @@ void main() {
   });
 
   group('WriteFileTool', () {
+    test('工具名为 write', () {
+      expect(tool.name, 'write');
+    });
+
     test('create 写入新文件', () async {
       final ToolResult result = await tool.call(
           _context(<String, Object?>{'path': 'a.txt', 'content': 'hi'}));

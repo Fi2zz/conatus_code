@@ -24,7 +24,7 @@ body
     expect(def.permissions[0].action, 'edit');
     expect(def.permissions[0].resource, '*');
     expect(def.permissions[0].effect, PermissionEffect.deny);
-    expect(def.permissions[1].action, 'shell');
+    expect(def.permissions[1].action, 'bash');
     expect(def.permissions[1].effect, PermissionEffect.ask);
   });
 
@@ -42,11 +42,11 @@ body
 
     expect(def.permissions, hasLength(3));
     final PermissionRule wildcard = def.permissions.firstWhere(
-      (PermissionRule rule) => rule.action == 'shell' && rule.resource == '*',
+      (PermissionRule rule) => rule.action == 'bash' && rule.resource == '*',
     );
     final PermissionRule command = def.permissions.firstWhere(
       (PermissionRule rule) =>
-          rule.action == 'shell' && rule.resource == 'git diff',
+          rule.action == 'bash' && rule.resource == 'git diff',
     );
     expect(wildcard.effect, PermissionEffect.ask);
     expect(command.effect, PermissionEffect.allow);
@@ -72,7 +72,7 @@ body
     expect(def.permissions.last.effect, PermissionEffect.deny);
   });
 
-  test('task 动作映射为 subagent', () {
+  test('task 动作保持 task', () {
     final AgentDefinition def = parse('''
 ---
 permission:
@@ -81,11 +81,11 @@ permission:
 body
 ''');
 
-    expect(def.permissions.single.action, 'subagent');
+    expect(def.permissions.single.action, 'task');
     expect(def.permissions.single.effect, PermissionEffect.ask);
   });
 
-  test('无对应工具的 OpenCode 动作告警并忽略规则', () {
+  test('todowrite / list 受支持，未知动作告警并忽略规则', () {
     final AgentParseResult result = parseAgentDocumentDetailed(
       '''
 ---
@@ -100,9 +100,12 @@ body
       sourcePath: '/tmp/unsupported.md',
     );
 
-    expect(result.definition!.permissions, isEmpty);
-    expect(result.warnings, hasLength(3));
-    expect(result.warnings.first, contains('todowrite'));
+    expect(
+      result.definition!.permissions.map((PermissionRule r) => r.action),
+      <String>['todowrite', 'read'],
+    );
+    expect(result.warnings, hasLength(1));
+    expect(result.warnings.first, contains('lsp'));
   });
 
   test('未知权限动作保留原值并产生警告', () {

@@ -1,4 +1,4 @@
-/// `ask_user` 工具：让模型把若干选项交给用户，经 TUI 选项浮层选择后回传。
+/// `question` 工具：让模型把若干选项交给用户，经 TUI 选项浮层选择后回传。
 ///
 /// 除通用选项外，`purpose: permission_mode` 是一个内置选项集：渲染三档权限
 /// 模式，选中即应用到当前会话（模型据此获知结果）。工具自身风险为 low，
@@ -12,8 +12,8 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'tui_choice.dart';
 import 'tui_permission.dart';
 
-/// `ask_user` 工具名。
-const String kAskUserToolName = 'ask_user';
+/// `question` 工具名。
+const String kAskUserToolName = 'question';
 
 /// 内置提问用途：询问权限模式。
 const String kAskUserPurposePermissionMode = 'permission_mode';

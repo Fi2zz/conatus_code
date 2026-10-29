@@ -59,7 +59,7 @@ bool _looksWrite(String command) => _writeOps.hasMatch(command);
 /// git 写子命令对 `.opencode` 的兜底拒绝（`runGit` 用）。
 ///
 /// git 写工具（`git_add` / `git_commit` / `git_branch` / `git_stash`）经
-/// `runGit` 直接拼 argv，不经过 `run_command` 的命令检查；`git checkout
+/// `runGit` 直接拼 argv，不经过 `bash` 的命令检查；`git checkout
 /// .opencode/x` 之类的操作会真的写用户只读目录。这里按「子命令 + 非选项操作数
 /// 里的受保护路径段」判定，跳过 `-m` 的消息文本（`git commit -m "fix
 /// .opencode"` 不该被误拒）。

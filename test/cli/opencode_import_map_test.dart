@@ -171,7 +171,7 @@ void main() {
 
     expect(
       result.permissions.map((ImportedPermission rule) => rule.action),
-      <String>['shell', 'edit'],
+      <String>['bash', 'edit'],
     );
     expect(result.permissions[0].resource, 'git push *');
     expect(result.permissions[1].effect, 'deny');

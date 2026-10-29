@@ -10,7 +10,7 @@ import 'package:conatus_doc/conatus_doc.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
-/// 装配：临时目录 fs + write_file + 故事层（内存 SessionLog，会话 s1）。
+/// 装配：临时目录 fs + write + 故事层（内存 SessionLog，会话 s1）。
 Future<(Context, DocEngine, Directory)> _build() async {
   final Directory dir = Directory.systemTemp.createTempSync('nava-watch-');
   final Context app = Context.root();
@@ -89,7 +89,7 @@ void main() {
 
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': 'AI 写的'},
         ),
       );
@@ -105,7 +105,7 @@ void main() {
       final StoryWatcher watcher = StoryWatcher(engine: engine, dir: dir.path);
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': 'AI 初稿'},
         ),
       );
@@ -166,7 +166,7 @@ void main() {
       final (Context app1, DocEngine engine1, Directory dir) = await _build();
       await app1.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'novel.md', 'content': '序章'},
         ),
       );

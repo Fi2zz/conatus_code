@@ -14,7 +14,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 /// 允许该工具」「信任此文件夹」）仍留在 [TuiPermissionGate] 里，不写进作用域。
 ///
 /// [workdir] 用于把规则里的相对路径解析成绝对路径（`edit "src/*"` 必须能匹配
-/// `write_file("/abs/work/src/x")`）；判定器还会补真实路径拼写。库用法可以
+/// `write("/abs/work/src/x")`）；判定器还会补真实路径拼写。库用法可以
 /// 不传，此时只做词法规范化。
 class PermissionWiring {
   /// 创建装配；[store] 指向项目数据目录下的 `permissions.json`。
@@ -125,7 +125,7 @@ class PermissionWiring {
 
   /// 找出会被 [rules] 覆盖的 deny；按被批准的具体 [resources] 判断。
   ///
-  /// shell 规则额外做**字面前缀交集**：`deny "git push origin *"` 比
+  /// bash 规则额外做**字面前缀交集**：`deny "git push origin *"` 比
   /// `allow "git push *"` 更具体，若只做「allow pattern 是否匹配 deny pattern」
   /// 的检查，后者会先落盘、把前者的 deny 覆盖掉——用户批准的只是
   /// `git push --tags`，不该顺带放行所有 `git push`。
@@ -143,7 +143,7 @@ class PermissionWiring {
       for (final PermissionRule current in existing) {
         if (current.action != rule.action) continue;
         if (current.effect != PermissionEffect.deny) continue;
-        if (rule.action == 'shell') {
+        if (rule.action == 'bash') {
           if (permissionPatternMatches(rule.resource, current.resource)) {
             return current;
           }

@@ -34,8 +34,8 @@ void main() {
     final Future<bool> pending = gate.request(
       ApprovalRequest(
         id: 'r1',
-        toolName: 'run_command',
-        action: 'shell',
+        toolName: 'bash',
+        action: 'bash',
         resources: <String>['git status'],
         arguments: <String, Object?>{'command': 'git status'},
       ),
@@ -60,7 +60,7 @@ void main() {
     final List<PermissionRule> saved = await PermissionStore(
       '${dir.path}${sep}permissions.json',
     ).load();
-    expect(saved.single.action, 'shell');
+    expect(saved.single.action, 'bash');
     expect(saved.single.resource, 'git *');
 
     final PermissionScope scope = slot.current;
@@ -92,7 +92,7 @@ void main() {
     await controller.rememberPermissionRules(
       const <PermissionRule>[
         PermissionRule(
-          action: 'shell',
+          action: 'bash',
           resource: 'git *',
           effect: PermissionEffect.allow,
           source: 'project',
@@ -133,7 +133,7 @@ void main() {
     );
     wiring.setSessionRules(const <PermissionRule>[
       PermissionRule(
-        action: 'shell',
+        action: 'bash',
         resource: 'old *',
         effect: PermissionEffect.deny,
         source: 'session',

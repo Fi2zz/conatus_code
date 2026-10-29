@@ -161,7 +161,7 @@ void main() {
         lines: <TeamActivityLine>[
           TeamActivityLine('· 第 1 轮'),
           TeamActivityLine('→ rg'),
-          TeamActivityLine('✗ read_file', failed: true),
+          TeamActivityLine('✗ read', failed: true),
         ],
       ),
     ));
@@ -169,7 +169,7 @@ void main() {
     expect(state, containsText('◐ researcher  [执行中]'));
     expect(state.getText().indexOf('researcher'),
         lessThan(state.getText().indexOf('→ rg')));
-    expect(state, containsText('✗ read_file'));
+    expect(state, containsText('✗ read'));
   });
 
   test('MemberLaneView：活动过多时只留末尾若干行', () async {

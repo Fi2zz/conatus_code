@@ -65,8 +65,8 @@ body
 description: read only
 mode: all
 tools:
-  - read_file
-  - rg
+  - read
+  - grep
 hidden: true
 color: "#ff6b6b"
 ---
@@ -77,7 +77,7 @@ body
     )!;
 
     expect(def.mode, AgentMode.all);
-    expect(def.tools, <String>['read_file', 'rg']);
+    expect(def.tools, <String>['read', 'grep']);
     expect(def.hidden, isTrue);
     expect(def.color, '#ff6b6b');
   });
@@ -87,7 +87,7 @@ body
       '''
 ---
 permissions:
-  - action: edit_file
+  - action: write
     resource: "./src/../lib/*"
     effect: ask
 ---
@@ -158,7 +158,7 @@ body
       '---\nmode: 3\n---\nbody',
       '---\nsteps: many\n---\nbody',
       '---\nsteps: 0\n---\nbody',
-      '---\ntools: read_file\n---\nbody',
+      '---\ntools: read\n---\nbody',
       '---\ntools:\n  - 3\n---\nbody',
       '---\nhidden: yes-please\n---\nbody',
       '---\ncolor: 3\n---\nbody',

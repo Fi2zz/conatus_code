@@ -17,8 +17,8 @@ Future<String?> buildApprovalPreview(
   Map<String, Object?> args,
 ) async {
   if (toolName == 'apply_patch') return _previewPatch(args['patch']);
-  if (toolName == 'write_file') return _previewWrite(fs, args);
-  if (toolName == 'edit_file') return _previewEdit(fs, args);
+  if (toolName == 'write') return _previewWrite(fs, args);
+  if (toolName == 'edit') return _previewEdit(fs, args);
   return null;
 }
 
@@ -28,7 +28,7 @@ String? _previewPatch(Object? patch) {
   return _truncate(patch);
 }
 
-/// write_file：读旧内容（FsError 一律按不存在处理）后做整文件 diff。
+/// write：读旧内容（FsError 一律按不存在处理）后做整文件 diff。
 Future<String?> _previewWrite(
   FileSystem? fs,
   Map<String, Object?> args,
@@ -42,7 +42,7 @@ Future<String?> _previewWrite(
   return _previewDiff(oldText, content, path);
 }
 
-/// edit_file：按与工具相同的替换语义得到替换后文本再 diff。
+/// edit：按与工具相同的替换语义得到替换后文本再 diff。
 Future<String?> _previewEdit(
   FileSystem? fs,
   Map<String, Object?> args,

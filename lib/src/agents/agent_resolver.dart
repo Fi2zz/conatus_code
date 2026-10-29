@@ -1,4 +1,4 @@
-/// 把 nava 的 AgentRegistry 定义解析成 `spawn_agent` 的 [SubAgentProfile]。
+/// 把 nava 的 AgentRegistry 定义解析成 `task` 的 [SubAgentProfile]。
 library;
 
 import 'package:conatus_agent/conatus_agent.dart'

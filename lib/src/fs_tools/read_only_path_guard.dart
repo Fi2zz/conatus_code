@@ -2,7 +2,7 @@
 ///
 /// OpenCode 的 `.opencode/**`（项目级）与 `~/.config/opencode/**`（全局）属于
 /// 用户自己的安装：nava 只是兼容读取方，绝不创建 / 写入 / 删除 / 改权限。
-/// 闸门包在 `'fs'` 接缝上，write_file / edit_file / apply_patch / story 写回
+/// 闸门包在 `'fs'` 接缝上，write / edit / apply_patch / story 写回
 /// 等一切经 fs 的写操作自动继承；读操作全部透传。
 ///
 /// 判定同时看两种拼写：`inner.processPath`（已解析符号链接的规范路径）与

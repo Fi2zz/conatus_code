@@ -22,12 +22,16 @@ ToolContext _context(String name, Map<String, Object?> args) =>
     ToolContext(ToolCall(name: name, arguments: args));
 
 void main() {
+  test('工具名为 bash', () {
+    expect(RunCommandTool(shell: FakeShellExecutor(_result())).name, 'bash');
+  });
+
   test('exit 0 → success，content 为 stdout，value 附字段', () async {
     final FakeShellExecutor shell = FakeShellExecutor(_result(stdout: 'hello\n'));
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
     final ToolResult result = await tool.call(
-        _context('run_command', <String, Object?>{'command': 'echo hello'}));
+        _context('bash', <String, Object?>{'command': 'echo hello'}));
 
     expect(result.isError, isFalse);
     expect(result.content, 'hello\n');
@@ -43,7 +47,7 @@ void main() {
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
     final ToolResult result = await tool.call(
-        _context('run_command', <String, Object?>{'command': 'false'}));
+        _context('bash', <String, Object?>{'command': 'false'}));
 
     expect(result.isError, isTrue);
     expect(result.error!.code, 'COMMAND_FAILED');
@@ -56,7 +60,7 @@ void main() {
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
     final ToolResult result = await tool.call(
-        _context('run_command', <String, Object?>{'command': 'x'}));
+        _context('bash', <String, Object?>{'command': 'x'}));
 
     expect(result.isError, isTrue);
     expect(result.error!.code, 'COMMAND_FAILED');
@@ -68,7 +72,7 @@ void main() {
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
     final ToolResult result = await tool.call(
-        _context('run_command', <String, Object?>{'command': 'sleep 5'}));
+        _context('bash', <String, Object?>{'command': 'sleep 5'}));
 
     expect(result.isError, isTrue);
     expect(result.error!.code, 'TOOL_TIMEOUT');
@@ -80,7 +84,7 @@ void main() {
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
     final ToolResult result = await tool.call(
-        _context('run_command', <String, Object?>{'command': 'x'}));
+        _context('bash', <String, Object?>{'command': 'x'}));
 
     expect(result.isError, isTrue);
     expect(result.error!.code, 'SHELL_ERROR');
@@ -90,7 +94,7 @@ void main() {
     final FakeShellExecutor shell = FakeShellExecutor(_result(stdout: 'x'));
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
-    await tool.call(_context('run_command', <String, Object?>{
+    await tool.call(_context('bash', <String, Object?>{
       'command': 'sleep 1',
       'cwd': 'sub',
       'timeout_ms': 500,
@@ -116,7 +120,7 @@ void main() {
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
     final ToolResult result = await tool.call(_context(
-      'run_command',
+      'bash',
       <String, Object?>{'command': 'echo x > .opencode/x'},
     ));
 
@@ -143,7 +147,7 @@ void main() {
     final RunCommandTool tool = RunCommandTool(shell: shell);
 
     final ToolResult result = await tool.call(_context(
-      'run_command',
+      'bash',
       <String, Object?>{'command': 'cat .opencode/commands/x.md'},
     ));
 

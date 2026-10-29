@@ -88,7 +88,7 @@ class TraceRenderer {
 
   /// 工具结果正文：取首行 + 报出总行数。
   ///
-  /// 只取首行是为了不刷屏，但**必须带上行数**——`rg` 命中 12 处和 1 处是完全
+  /// 只取首行是为了不刷屏，但**必须带上行数**——`grep` 命中 12 处和 1 处是完全
   /// 不同的两种情况，砍到首行就把这个信息丢了，而行数正是复盘时最想先看的。
   static String _clip(String text, int limit) {
     final List<String> lines = text

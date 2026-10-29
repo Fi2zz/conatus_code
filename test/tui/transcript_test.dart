@@ -47,7 +47,7 @@ void main() {
     final Session session = Session(id: 's');
     session.append(kToolResultEvent, data: <String, Object?>{
       'callId': '1',
-      'name': 'read_file',
+      'name': 'read',
       'content': '错误：文件不存在',
       'isError': true,
     });

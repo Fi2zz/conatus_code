@@ -1,11 +1,11 @@
-/// update_plan 工具：执行中推进 / 修订当前会话的执行计划。
+/// todowrite 工具：执行中推进 / 修订当前会话的执行计划。
 library;
 
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-/// `update_plan` 工具：按步骤序号更新当前计划。
+/// `todowrite` 工具：按步骤序号更新当前计划。
 ///
 /// 序号与计划面板 / system prompt 里的「1. [ ] text」一致；不带 `index` 的
 /// 条目追加到末尾。更新写回 `plan/updated` 事件，面板与后续摘要即时反映。
@@ -16,7 +16,7 @@ class UpdatePlanTool extends Tool {
   final Session session;
 
   @override
-  String get name => 'update_plan';
+  String get name => 'todowrite';
 
   @override
   String get description => '更新当前执行计划：标记步骤完成、改写步骤文案或追加步骤。';
@@ -129,7 +129,7 @@ void _patchStep(
   );
 }
 
-/// 把 `update_plan` 注册到 `ctx.tools`（对齐 `providePlanTool`）。
+/// 把 `todowrite` 注册到 `ctx.tools`（对齐 `providePlanTool`）。
 UpdatePlanTool provideUpdatePlanTool(
   Context ctx, {
   required Session session,

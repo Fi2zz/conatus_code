@@ -6,7 +6,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
 ToolContext _context(Map<String, Object?> args) =>
-    ToolContext(ToolCall(name: 'read_file', arguments: args));
+    ToolContext(ToolCall(name: 'read', arguments: args));
 
 void main() {
   late Directory dir;
@@ -24,6 +24,10 @@ void main() {
   });
 
   group('ReadFileTool', () {
+    test('工具名为 read', () {
+      expect(tool.name, 'read');
+    });
+
     test('默认带行号读取', () async {
       File('${dir.path}/a.txt').writeAsStringSync('hello\nworld');
 
@@ -147,7 +151,7 @@ void main() {
       final ToolRegistry tools = ToolRegistry()..register(tool);
 
       final ToolResult result =
-          await tools.call(const ToolCall(name: 'read_file'));
+          await tools.call(const ToolCall(name: 'read'));
 
       expect(result.error!.code, 'INVALID_ARGS');
     });

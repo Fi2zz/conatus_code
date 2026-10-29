@@ -65,13 +65,13 @@ class _SpyGate extends TuiPermissionGate {
 
 void main() {
   group('StoryReviewGate 拦截', () {
-    test('write_file 被拦：文件未落盘、结果非错误、pending +1', () async {
+    test('write 被拦：文件未落盘、结果非错误、pending +1', () async {
       final (tools, pending, _, Directory dir) = _buildGate();
       addTearDown(() => dir.deleteSync(recursive: true));
 
       final ToolResult result = await tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': '待定内容'},
         ),
       );
@@ -81,7 +81,7 @@ void main() {
       expect(result.content, contains('无需重试'));
       expect(File('${dir.path}/a.md').existsSync(), isFalse);
       expect(pending.patches.single.ops.single, isA<InsertBlockOp>());
-      expect(pending.sources.values.single, 'write_file');
+      expect(pending.sources.values.single, 'write');
     });
 
     test('审查门在审批位（内层探针）之前命中：拦截后审批不触发', () async {
@@ -99,7 +99,7 @@ void main() {
 
       await tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': 'x'},
         ),
       );
@@ -108,14 +108,14 @@ void main() {
       expect(pending.patches.length, 1);
     });
 
-    test('edit_file 的 old 串找不到 → fail-open 放行，真实错误回到模型', () async {
+    test('edit 的 old 串找不到 → fail-open 放行，真实错误回到模型', () async {
       final (tools, pending, _, Directory dir) = _buildGate();
       addTearDown(() => dir.deleteSync(recursive: true));
       File('${dir.path}/a.md').writeAsStringSync('实际内容');
 
       final ToolResult result = await tools.call(
         const ToolCall(
-          name: 'edit_file',
+          name: 'edit',
           arguments: <String, Object?>{
             'path': 'a.md',
             'old_string': '不存在的串',
@@ -171,7 +171,7 @@ void main() {
       // 不挂审查门（headless 不经控制器 _syncPermissionMode）。
       final ToolResult result = await tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'direct.md', 'content': '直写'},
         ),
       );
@@ -182,7 +182,7 @@ void main() {
   });
 
   group('控制器端到端', () {
-    test('write_file 拦成待定补丁（审批不弹）→ /story pending 显示来源 → '
+    test('write 拦成待定补丁（审批不弹）→ /story pending 显示来源 → '
         'apply 落盘入故事', () async {
       final Directory dir = Directory.systemTemp.createTempSync(
         'nava-review-e2e-',
@@ -211,7 +211,7 @@ void main() {
 
       final ToolResult result = await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'ch1.md', 'content': '第一章'},
         ),
       );
@@ -222,7 +222,7 @@ void main() {
 
       await controller.handleLine('/story pending');
       final String list = controller.transcript.messages.last.text;
-      expect(list, contains('[write_file]'));
+      expect(list, contains('[write]'));
       expect(list, contains('ch1.md'));
 
       await controller.handleLine('/story apply 1');
@@ -258,7 +258,7 @@ void main() {
       await controller.start();
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'ch2.md', 'content': '待定'},
         ),
       );

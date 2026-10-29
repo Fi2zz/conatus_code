@@ -8,7 +8,7 @@ import 'package:test/test.dart';
 import 'support/fake_shell.dart';
 
 ToolContext _context(Map<String, Object?> args) =>
-    ToolContext(ToolCall(name: 'rg', arguments: args));
+    ToolContext(ToolCall(name: 'grep', arguments: args));
 
 const String _text = 'lib/a.dart:3:7: final x = 1;\n'
     'lib/b.dart:5:7: final y = 2;\n';
@@ -37,6 +37,10 @@ ShellRunResult _run({
     );
 
 void main() {
+  test('工具名为 grep', () {
+    expect(_tool(FakeShellExecutor(_run())).name, 'grep');
+  });
+
   group('RipgrepTool', () {
     test('exitCode == 1 → 无匹配', () async {
       final FakeShellExecutor shell = FakeShellExecutor(_run(exitCode: 1));

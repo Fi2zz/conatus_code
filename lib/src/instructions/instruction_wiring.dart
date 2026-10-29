@@ -11,9 +11,9 @@ const String kInstructionsService = 'instructions';
 
 /// 读过路径后需要记下沿途 `AGENTS.md` 的工具。
 const Set<String> kInstructionNoteTools = <String>{
-  'read_file',
-  'list_files',
-  'rg',
+  'read',
+  'list',
+  'grep',
   'glob',
 };
 

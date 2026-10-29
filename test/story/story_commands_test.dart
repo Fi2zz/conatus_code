@@ -12,7 +12,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:test/test.dart';
 
-/// 装配：临时目录 fs + write_file + 内存 sessionLog + 故事层。
+/// 装配：临时目录 fs + write + 内存 sessionLog + 故事层。
 Future<(Context, DocEngine, Directory)> _build() async {
   final Directory dir = Directory.systemTemp.createTempSync('nava-cmd-');
   final Context app = Context.root();
@@ -30,7 +30,7 @@ Future<(Context, DocEngine, Directory)> _build() async {
 Future<ToolResult> _write(Context app, String path, String content) =>
     app.tools.call(
       ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': path, 'content': content},
       ),
     );
@@ -90,7 +90,7 @@ void main() {
       await _write(app, 'a.md', '第一版');
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{
             'path': 'a.md',
             'content': '第二版',

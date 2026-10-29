@@ -34,19 +34,19 @@ void main() {
   test('[[permissions]] 按书写顺序解析为规则列表', () {
     final ConatusCodeConfig config = _load('''
 [[permissions]]
-action = "shell"
+action = "bash"
 resource = "git push *"
 effect = "deny"
 
 [[permissions]]
-action = "read_file"
+action = "read"
 resource = "/tmp/*"
 effect = "allow"
 ''');
 
     expect(config.permissions.rules, hasLength(2));
     final PermissionRule first = config.permissions.rules.first;
-    expect(first.action, 'shell');
+    expect(first.action, 'bash');
     expect(first.resource, 'git push *');
     expect(first.effect, PermissionEffect.deny);
     expect(first.source, 'config');
@@ -63,27 +63,32 @@ effect = "deny"
     expect(config.permissions.rules.single.resource, 'src/*.env');
   });
 
-  test('已知工具名归一为规范 action（run_command/read_file/rg）', () {
+  test('工具名归一为规范 action（write/apply_patch/list/run_tests）', () {
     final ConatusCodeConfig config = _load('''
 [[permissions]]
-action = "run_command"
-resource = "git status"
+action = "write"
+resource = "src/*"
 effect = "allow"
 
 [[permissions]]
-action = "read_file"
+action = "apply_patch"
+resource = "*"
+effect = "deny"
+
+[[permissions]]
+action = "list"
 resource = "/tmp/*"
 effect = "deny"
 
 [[permissions]]
-action = "rg"
-resource = "*.env"
-effect = "deny"
+action = "run_tests"
+resource = "dart test"
+effect = "ask"
 ''');
 
     expect(
       config.permissions.rules.map((PermissionRule r) => r.action),
-      <String>['shell', 'read', 'grep'],
+      <String>['edit', 'edit', 'read', 'bash'],
     );
   });
 
@@ -95,7 +100,7 @@ effect = "deny"
     _expectConfigError('effect', () {
       _load('''
 [[permissions]]
-action = "shell"
+action = "bash"
 resource = "*"
 effect = "block"
 ''');
@@ -107,10 +112,10 @@ effect = "block"
       _load('[[permissions]]\nresource = "*"\neffect = "allow"\n');
     });
     _expectConfigError('resource', () {
-      _load('[[permissions]]\naction = "shell"\neffect = "allow"\n');
+      _load('[[permissions]]\naction = "bash"\neffect = "allow"\n');
     });
     _expectConfigError('effect', () {
-      _load('[[permissions]]\naction = "shell"\nresource = "*"\n');
+      _load('[[permissions]]\naction = "bash"\nresource = "*"\n');
     });
   });
 

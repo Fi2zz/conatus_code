@@ -11,7 +11,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 
 /// 单条工具结果的硬上限（字符）。
 ///
-/// 导出本该是完整的，但一条 10MB 的 `rg` 结果能把 markdown 撑到没法看。超出的
+/// 导出本该是完整的，但一条 10MB 的 `grep` 结果能把 markdown 撑到没法看。超出的
 /// 部分截掉并**显式标注被截了多少**——静默截断会让读的人以为那就是全部。
 const int kExportMaxToolChars = 8000;
 

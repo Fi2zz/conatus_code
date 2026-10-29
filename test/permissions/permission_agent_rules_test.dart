@@ -32,7 +32,7 @@ void main() {
         source: 'agent',
       ),
       const PermissionRule(
-        action: 'shell',
+        action: 'bash',
         resource: 'git push *',
         effect: PermissionEffect.deny,
         source: 'agent',
@@ -46,7 +46,7 @@ void main() {
       ),
       isEmpty,
     );
-    expect(wiring.rules.last.action, 'shell');
+    expect(wiring.rules.last.action, 'bash');
     expect(wiring.rules.last.effect, PermissionEffect.deny);
   });
 

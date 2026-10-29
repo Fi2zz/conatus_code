@@ -134,7 +134,7 @@ void main() {
       _Source(const <LspDiagnostic>[_error]),
     );
     final ToolResult result = await middleware(
-      const ToolCall(name: 'edit_file', arguments: <String, Object?>{'path': '/tmp/a.dart'}),
+      const ToolCall(name: 'edit', arguments: <String, Object?>{'path': '/tmp/a.dart'}),
       () async => ToolResult.success(
         '已编辑',
         value: <String, Object?>{'path': '/tmp/a.dart'},
@@ -168,19 +168,19 @@ void main() {
     );
     final ToolResult failed = ToolResult.failure('bad');
     final ToolResult first = await middleware(
-      const ToolCall(name: 'edit_file'),
+      const ToolCall(name: 'edit'),
       () async => failed,
     );
     expect(identical(first, failed), isTrue);
 
     final ToolResult unknown = await middleware(
-      const ToolCall(name: 'read_file'),
+      const ToolCall(name: 'read'),
       () async => ToolResult.success('ok', value: <String, Object?>{'path': '/tmp/a.dart'}),
     );
     expect(unknown.content, 'ok');
 
     final ToolResult broken = await middleware(
-      const ToolCall(name: 'edit_file'),
+      const ToolCall(name: 'edit'),
       () async => ToolResult.success('ok', value: <String, Object?>{'path': '/tmp/a.dart'}),
     );
     expect(broken.content, 'ok');

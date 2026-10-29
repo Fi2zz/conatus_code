@@ -36,7 +36,7 @@ class RipgrepTool extends Tool {
   static const int _maxOutputBytes = 20 * 1024 * 1024;
 
   @override
-  String get name => 'rg';
+  String get name => 'grep';
 
   @override
   String get description =>
@@ -104,7 +104,7 @@ class RipgrepTool extends Tool {
         if (preview != null) 'spilled': true,
         if (preview != null) 'spillPath': eviction!.spilledPaths.last,
         if (preview != null)
-          'note': '结果已截断，完整输出已落盘，可用 read_file 读取',
+          'note': '结果已截断，完整输出已落盘，可用 read 读取',
       },
     );
   }

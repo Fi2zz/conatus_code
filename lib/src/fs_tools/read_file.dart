@@ -22,7 +22,7 @@ class ReadFileTool extends Tool {
   final int maxChars;
 
   @override
-  String get name => 'read_file';
+  String get name => 'read';
 
   @override
   String get description =>

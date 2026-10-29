@@ -42,7 +42,7 @@ class CommandHarness {
   /// 模型替身。
   final CommandCaptureProvider provider;
 
-  /// 假 spawn_agent。
+  /// 假 task。
   final FakeSpawnTool spawn;
 
   /// 假副作用工具（Plan Mode 拦截断言）。

@@ -78,21 +78,21 @@ PermissionRig assemblePermissionRig({
     );
   }
 
-  track('run_command', risk: ToolRisk.high);
+  track('bash', risk: ToolRisk.high);
   track('run_tests', risk: ToolRisk.high);
-  track('read_file', paths: const <String>['path']);
-  track('list_files', paths: const <String>['path']);
-  track('write_file', risk: ToolRisk.medium, paths: const <String>['path']);
-  track('edit_file', risk: ToolRisk.medium, paths: const <String>['path']);
+  track('read', paths: const <String>['path']);
+  track('list', paths: const <String>['path']);
+  track('write', risk: ToolRisk.medium, paths: const <String>['path']);
+  track('edit', risk: ToolRisk.medium, paths: const <String>['path']);
   track('apply_patch', risk: ToolRisk.high);
-  track('rg');
+  track('grep');
   track('glob', paths: const <String>['path']);
   track('skill');
-  track('web_search');
-  track('fetch_url');
-  track('ask_user');
-  track('spawn_agent', risk: ToolRisk.medium);
-  track('fs__read_file');
+  track('websearch');
+  track('webfetch');
+  track('question');
+  track('task', risk: ToolRisk.medium);
+  track('fs__read');
   return PermissionRig(ctx, tools, slot, resolved, runs);
 }
 

@@ -37,28 +37,28 @@ void main() {
   test('一次委托走完：起手 → 工具 → 收口', () {
     swarm
       ..report(const SubAgentStarted('调研存储'))
-      ..report(const SubAgentToolCall('rg'))
-      ..report(const SubAgentToolDone('rg', false))
-      ..report(const SubAgentToolCall('read_file'))
-      ..report(const SubAgentToolDone('read_file', true))
+      ..report(const SubAgentToolCall('grep'))
+      ..report(const SubAgentToolDone('grep', false))
+      ..report(const SubAgentToolCall('read'))
+      ..report(const SubAgentToolDone('read', true))
       ..report(const SubAgentRound(2, '输出 80 字符'))
-      ..report(const SubAgentFinished('success', 3, <String>['rg', 'read_file']));
+      ..report(const SubAgentFinished('success', 3, <String>['grep', 'read']));
 
     expect(written, <String>[
       'swarm-1|· 开始',
-      'swarm-1|→ rg',
-      'swarm-1|✓ rg',
-      'swarm-1|→ read_file',
-      'swarm-1|✗ read_file',
+      'swarm-1|→ grep',
+      'swarm-1|✓ grep',
+      'swarm-1|→ read',
+      'swarm-1|✗ read',
       'swarm-1|· 第 2 轮 输出 80 字符',
-      'swarm-1|✓ 收口：3 轮 （rg、read_file）',
+      'swarm-1|✓ 收口：3 轮 （grep、read）',
     ]);
   });
 
   test('失败标记透传（工具失败 / 委托失败）', () {
     swarm
       ..report(const SubAgentStarted('x'))
-      ..report(const SubAgentToolDone('rg', true))
+      ..report(const SubAgentToolDone('grep', true))
       ..report(const SubAgentFinished('failed', 1, <String>[]));
 
     expect(failures, <bool>[false, true, true]);
@@ -66,7 +66,7 @@ void main() {
 
   test('无在途委托时的事件被丢弃（不产生空泳道）', () {
     swarm
-      ..report(const SubAgentToolCall('rg'))
+      ..report(const SubAgentToolCall('grep'))
       ..report(const SubAgentFinished('success', 1, <String>[]));
 
     expect(written, isEmpty);

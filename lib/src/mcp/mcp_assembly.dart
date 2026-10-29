@@ -2,7 +2,7 @@
 /// `conatus_mcp` 的 [McpRegistry]；单台失败提示并跳过，不阻塞启动。
 ///
 /// stdio 传输的子进程**不走** Layer 2 沙箱：MCP server 是用户在 config.toml
-/// 显式声明的受信端，与模型临时写出的命令（`run_command`）不同风险面。
+/// 显式声明的受信端，与模型临时写出的命令（`bash`）不同风险面。
 library;
 
 import 'dart:io';

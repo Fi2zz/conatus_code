@@ -85,9 +85,9 @@ void main() {
 
   group('XerjAutoIndexer', () {
     test('从未索引过 → 编辑后不触发', () async {
-      tools.register(_StubTool('edit_file', ToolResult.success('ok')));
+      tools.register(_StubTool('edit', ToolResult.success('ok')));
 
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await settle();
 
       expect(shell.calls, 0);
@@ -95,9 +95,9 @@ void main() {
 
     test('已索引 + 编辑成功 → 去抖后触发一次', () async {
       await markIndexed();
-      tools.register(_StubTool('edit_file', ToolResult.success('ok')));
+      tools.register(_StubTool('edit', ToolResult.success('ok')));
 
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await settle();
 
       expect(shell.calls, 1);
@@ -105,13 +105,13 @@ void main() {
 
     test('去抖窗口内连续编辑只触发一次', () async {
       await markIndexed();
-      tools.register(_StubTool('edit_file', ToolResult.success('ok')));
+      tools.register(_StubTool('edit', ToolResult.success('ok')));
 
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await settle();
 
       expect(shell.calls, 1);
@@ -119,9 +119,9 @@ void main() {
 
     test('非编辑工具不触发', () async {
       await markIndexed();
-      tools.register(_StubTool('read_file', ToolResult.success('ok')));
+      tools.register(_StubTool('read', ToolResult.success('ok')));
 
-      await tools.call(const ToolCall(name: 'read_file'));
+      await tools.call(const ToolCall(name: 'read'));
       await settle();
 
       expect(shell.calls, 0);
@@ -130,10 +130,10 @@ void main() {
     test('编辑失败不触发', () async {
       await markIndexed();
       tools.register(
-        _StubTool('edit_file', ToolResult.failure('boom')),
+        _StubTool('edit', ToolResult.failure('boom')),
       );
 
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await settle();
 
       expect(shell.calls, 0);
@@ -148,9 +148,9 @@ void main() {
 
     test('dispose 取消待执行任务', () async {
       await markIndexed();
-      tools.register(_StubTool('edit_file', ToolResult.success('ok')));
+      tools.register(_StubTool('edit', ToolResult.success('ok')));
 
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       indexer.dispose();
       await settle();
 
@@ -159,13 +159,13 @@ void main() {
 
     test('索引进行中再次编辑 → 结束后补跑一次', () async {
       await markIndexed();
-      tools.register(_StubTool('edit_file', ToolResult.success('ok')));
+      tools.register(_StubTool('edit', ToolResult.success('ok')));
 
       shell.result = _run();
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await Future<void>.delayed(const Duration(milliseconds: 40));
       // 第一次索引进行中（FakeShell 立即返回，这里只验证去抖链不丢事件）。
-      await tools.call(const ToolCall(name: 'edit_file'));
+      await tools.call(const ToolCall(name: 'edit'));
       await settle();
 
       expect(shell.calls, greaterThanOrEqualTo(1));

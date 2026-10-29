@@ -70,7 +70,7 @@ void main() {
     await controller.handleLine('/init');
 
     expect(p.prompts.single, contains('生成 AGENTS.md'));
-    expect(p.prompts.single, contains('write_file 创建'));
+    expect(p.prompts.single, contains('write 创建'));
     expect(p.prompts.single, contains('文件不存在'));
   });
 

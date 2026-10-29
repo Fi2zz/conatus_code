@@ -64,7 +64,7 @@ LlmResult _writeReply() => const LlmResult(
       toolCalls: <LlmToolCall>[
         LlmToolCall(
           id: 'c1',
-          name: 'write_file',
+          name: 'write',
           arguments: '{"path":"a.txt","content":"hello"}',
         ),
       ],

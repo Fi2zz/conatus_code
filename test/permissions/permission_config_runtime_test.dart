@@ -63,7 +63,7 @@ void main() {
 
     final ToolResult result = await runtime.tools.call(
       ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': target, 'content': 'x'},
       ),
     );
@@ -91,7 +91,7 @@ void main() {
 
     final ToolResult denied = await runtime.tools.call(
       const ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': 'src/x.dart', 'content': 'x'},
       ),
     );
@@ -100,7 +100,7 @@ void main() {
 
     final ToolResult allowed = await runtime.tools.call(
       const ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': 'ok.txt', 'content': 'ok'},
       ),
     );

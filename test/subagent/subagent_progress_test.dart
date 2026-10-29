@@ -78,28 +78,28 @@ void main() {
     test('起手 / 工具 / 收口都出屏', () async {
       store
         ..report(const SubAgentStarted('调研 checkpoint 存储'))
-        ..report(const SubAgentToolCall('rg'))
-        ..report(const SubAgentToolDone('rg', false))
+        ..report(const SubAgentToolCall('grep'))
+        ..report(const SubAgentToolDone('grep', false))
         ..report(const SubAgentRound(1, '输出 120 字符'))
-        ..report(const SubAgentFinished('success', 3, <String>['rg']));
+        ..report(const SubAgentFinished('success', 3, <String>['grep']));
       await pumpEventQueue();
 
       expect(seen, <String>[
         '◆ 子 Agent：调研 checkpoint 存储',
-        '  → rg',
-        '  ✓ rg',
+        '  → grep',
+        '  ✓ grep',
         '  · 第 1 轮 输出 120 字符',
-        '✓ 子 Agent success：3 轮 （rg）',
+        '✓ 子 Agent success：3 轮 （grep）',
       ]);
     });
 
     test('失败标 ✗', () async {
       store
-        ..report(const SubAgentToolDone('edit_file', true))
-        ..report(const SubAgentFinished('failed', 2, <String>['edit_file']));
+        ..report(const SubAgentToolDone('edit', true))
+        ..report(const SubAgentFinished('failed', 2, <String>['edit']));
       await pumpEventQueue();
 
-      expect(seen.first, '  ✗ edit_file');
+      expect(seen.first, '  ✗ edit');
       expect(seen.last, contains('✗'));
       expect(store.runs, 1);
     });
@@ -114,10 +114,10 @@ void main() {
 
     test('收口摘要记进 lastSummary', () {
       store.report(
-        const SubAgentFinished('success', 5, <String>['rg', 'read_file']),
+        const SubAgentFinished('success', 5, <String>['grep', 'read']),
       );
 
-      expect(store.lastSummary, '5 轮 （rg、read_file）');
+      expect(store.lastSummary, '5 轮 （grep、read）');
     });
 
     test('关闭后再报不抛异常', () {
@@ -175,7 +175,7 @@ void main() {
   });
 
   group('装配接线', () {
-    test('spawn_agent 拿的是未包装的模型，不共用主轮次计数器', () async {
+    test('task 拿的是未包装的模型，不共用主轮次计数器', () async {
       // 这是任务 3 的关键不变量：若把 app 的 'llm'（BudgetedLlmProvider）
       // 传给 provideSpawnAgent，子 Agent 的每轮都会记进主轮次，主轮次会被
       // 提前收口。装配必须传 resolvedLlm。
@@ -199,7 +199,7 @@ void main() {
 
       final LlmProvider registered = runtime.app.get<LlmProvider>('llm')!;
       final SpawnAgentTool? spawn =
-          runtime.app.tools.get('spawn_agent') as SpawnAgentTool?;
+          runtime.app.tools.get('task') as SpawnAgentTool?;
 
       expect(spawn, isNotNull);
       expect(spawn!.llm, isA<FallbackLlm>(), reason: '子 Agent 的模型应是未包预算的那一层');
@@ -231,15 +231,15 @@ void main() {
       addTearDown(runtime.dispose);
 
       final SpawnAgentTool spawn =
-          runtime.app.tools.get('spawn_agent') as SpawnAgentTool;
+          runtime.app.tools.get('task') as SpawnAgentTool;
 
       // 只读探索类默认放开：模型没传 tools 时子 Agent 也要能搜项目、定位文件
-      //（此前只有 get_time/echo/read_file，等于无法定位）。
+      //（此前只有 get_time/echo/read，等于无法定位）。
       expect(spawn.defaultTools,
-          containsAll(<String>['rg', 'glob', 'list_files']));
+          containsAll(<String>['grep', 'glob', 'list']));
       // 写 / 执行类不进默认白名单。
-      expect(spawn.defaultTools, isNot(contains('write_file')));
-      expect(spawn.defaultTools, isNot(contains('run_command')));
+      expect(spawn.defaultTools, isNot(contains('write')));
+      expect(spawn.defaultTools, isNot(contains('bash')));
       // 缺省继承宿主权限。
       expect(spawn.permissionMode, SubAgentPermission.inherit);
     });
@@ -265,7 +265,7 @@ void main() {
       addTearDown(runtime.dispose);
 
       final SpawnAgentTool spawn =
-          runtime.app.tools.get('spawn_agent') as SpawnAgentTool;
+          runtime.app.tools.get('task') as SpawnAgentTool;
 
       expect(spawn.permissionMode, SubAgentPermission.readonly);
     });

@@ -26,7 +26,7 @@ String? approvalModeIgnoredNotice({
 
 /// headless 缺省档（`ask_when_needed`）的后果提示，一行即可。
 ///
-/// 缺省阈值为 high：`run_command` / `apply_patch` / `git_commit` 这类工具在
+/// 缺省阈值为 high：`bash` / `apply_patch` / `git_commit` 这类工具在
 /// `-p` 下不会弹窗，而是直接被拒。用户看到的是「模型说它要跑命令，然后什么
 /// 也没发生」——启动时说清楚，比让模型反复重试有用。
 String? headlessAskNotice({
@@ -36,7 +36,7 @@ String? headlessAskNotice({
   if (!headless || approval.mode == ApprovalMode.neverAsk) return null;
   if (approval.mode == ApprovalMode.alwaysAsk) return null;
   return '提示：headless 无人应答审批——ask_when_needed 下 high 风险工具'
-      '（run_command / apply_patch / git_commit 等）会被直接拒绝'
+      '（bash / apply_patch / git_commit 等）会被直接拒绝'
       '（PERMISSION_ASK_UNATTENDED）。需要它们运行请配置 [[permissions]] allow，'
       '或在无人值守环境显式设 [approval] mode = "never_ask"。';
 }

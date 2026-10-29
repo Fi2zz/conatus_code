@@ -1,4 +1,4 @@
-/// conatus 的文件系统工具包：read_file / write_file / edit_file / rg / glob。
+/// conatus 的文件系统工具包：read / write / edit / grep / glob。
 ///
 /// **实验性**：API 可能在没有 major 版本变更的情况下调整，勿在生产环境依赖。
 library;

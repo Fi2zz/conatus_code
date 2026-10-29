@@ -27,13 +27,13 @@ void main() {
     test('shell 取命令前缀 + " *"', () {
       final List<PermissionRule> rules = permissionRulesFor(
         _request(
-          tool: 'run_command',
-          action: 'shell',
+          tool: 'bash',
+          action: 'bash',
           resources: <String>['git push origin main'],
         ),
       );
 
-      expect(rules.single.action, 'shell');
+      expect(rules.single.action, 'bash');
       expect(rules.single.resource, 'git *');
       expect(rules.single.effect, PermissionEffect.allow);
       expect(rules.single.source, 'project');
@@ -46,7 +46,7 @@ void main() {
     test('路径工具保存具体路径（不放大到目录）', () {
       final List<PermissionRule> rules = permissionRulesFor(
         _request(
-          tool: 'read_file',
+          tool: 'read',
           action: 'read',
           resources: <String>['/tmp/work/a.txt'],
         ),
@@ -76,7 +76,7 @@ void main() {
     test('相对路径 / ~ 规范化后再保存', () {
       final List<PermissionRule> dot = permissionRulesFor(
         _request(
-          tool: 'write_file',
+          tool: 'write',
           action: 'edit',
           resources: <String>['./src/deep/../a.dart'],
         ),
@@ -85,7 +85,7 @@ void main() {
 
       final List<PermissionRule> home = permissionRulesFor(
         _request(
-          tool: 'write_file',
+          tool: 'write',
           action: 'edit',
           resources: <String>['~/secret.txt'],
         ),
@@ -97,9 +97,9 @@ void main() {
 
     test('没有具体资源时不生成规则（MCP / question / 通配）', () {
       for (final String action in <String>[
-        'fs_read_file',
+        'fs_read',
         'question',
-        'shell',
+        'bash',
       ]) {
         expect(
           permissionRulesFor(
@@ -110,7 +110,7 @@ void main() {
       }
       expect(
         permissionRulesFor(
-          _request(tool: 'read_file', action: 'read', resources: <String>['*']),
+          _request(tool: 'read', action: 'read', resources: <String>['*']),
         ),
         isEmpty,
       );
@@ -120,7 +120,7 @@ void main() {
       final List<PermissionRule> rules = permissionRulesFor(
         _request(tool: 'run_tests', resources: <String>['dart test']),
       );
-      expect(rules.single.action, 'shell');
+      expect(rules.single.action, 'bash');
       expect(rules.single.resource, 'dart *');
     });
   });
@@ -132,15 +132,15 @@ void main() {
 
       final Future<bool> pending = gate.request(
         _request(
-          tool: 'run_command',
-          action: 'shell',
+          tool: 'bash',
+          action: 'bash',
           resources: <String>['git push'],
           rule: 'PermissionRule(shell, git push *, deny)',
         ),
       );
 
       final String description = choice.request!.choices.first.description;
-      expect(description, contains('shell'));
+      expect(description, contains('bash'));
       expect(description, contains('git push'));
       expect(description, contains('PermissionRule'));
 
@@ -162,7 +162,7 @@ void main() {
 
       final Future<bool> first = gate.request(
         _request(
-          tool: 'read_file',
+          tool: 'read',
           action: 'read',
           resources: <String>['/tmp/a.txt'],
         ),
@@ -177,8 +177,8 @@ void main() {
 
       expect(remembered.single.resource, '/tmp/a.txt');
       expect(resources, <String>['/tmp/a.txt']);
-      expect(gate.alwaysAllowed, contains('read_file'));
-      expect(await gate.request(_request(tool: 'read_file')), isTrue);
+      expect(gate.alwaysAllowed, contains('read'));
+      expect(await gate.request(_request(tool: 'read')), isTrue);
       expect(choice.open, isFalse);
     });
 
@@ -223,8 +223,8 @@ void main() {
 
       final Future<bool> pending = gate.request(
         _request(
-          tool: 'fs__read_file',
-          action: 'fs_read_file',
+          tool: 'fs__read',
+          action: 'fs_read',
           resources: <String>['*'],
         ),
       );

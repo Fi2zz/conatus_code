@@ -21,16 +21,16 @@ Session _session() => Session(id: 'session_abc123', seed: <SessionEvent>[
         'text': '',
         'reasoning': '先看文件',
         'toolCalls': <Object?>[
-          <String, Object?>{'id': 'c1', 'name': 'read_file'},
+          <String, Object?>{'id': 'c1', 'name': 'read'},
         ],
       }),
       _event(2, kToolResultEvent, <String, Object?>{
-        'name': 'read_file',
+        'name': 'read',
         'content': 'void main() {}',
         'isError': false,
       }),
       _event(3, kToolResultEvent, <String, Object?>{
-        'name': 'edit_file',
+        'name': 'edit',
         'content': 'boom: permission denied',
         'isError': true,
       }),
@@ -88,8 +88,8 @@ void main() {
     test('工具结果带成败标记', () {
       final String md = _export().toMarkdown();
 
-      expect(md, contains('### ✓ read_file'));
-      expect(md, contains('### ✗ edit_file'));
+      expect(md, contains('### ✓ read'));
+      expect(md, contains('### ✗ edit'));
       expect(md, contains('boom: permission denied'));
     });
 
@@ -99,7 +99,7 @@ void main() {
       final SessionExport export = SessionExport(
         session: Session(id: 's', seed: <SessionEvent>[
           _event(0, kToolResultEvent, <String, Object?>{
-            'name': 'rg',
+            'name': 'grep',
             'content': big,
             'isError': false,
           }),
@@ -114,7 +114,7 @@ void main() {
       final SessionExport export = SessionExport(
         session: Session(id: 's', seed: <SessionEvent>[
           _event(0, kToolResultEvent, <String, Object?>{
-            'name': 'rg',
+            'name': 'grep',
             'content': huge,
             'isError': false,
           }),

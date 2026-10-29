@@ -154,15 +154,15 @@ const String kNavaSkillToolMapping = '''
 When a skill requests an action, substitute the nava equivalent:
 - Invoke a skill -> the `skill` tool. Use the bare kebab-case name
   (`brainstorming`), never the `superpowers:` prefix.
-- Read a file -> `read_file`; write -> `write_file`; edit -> `edit_file` or
+- Read a file -> `read`; write -> `write`; edit -> `edit` or
   `apply_patch`.
-- Run a shell command -> `run_command`; search contents -> `rg`; find files ->
-  `glob`; list a directory -> `list_files`.
-- Dispatch a subagent -> `spawn_agent` with `task`; `agent` is only for a
-  registered profile. Do not invent a `subagent_type` argument.
-- Track tasks -> `plan_write` to create the plan and `update_plan` to advance
-  it; nava has no TodoWrite tool. A markdown checklist is an acceptable fallback.
-- Fetch a URL -> `fetch_url`; search the web -> `web_search`.
+- Run a shell command -> `bash`; search contents -> `grep`; find files ->
+  `glob`; list a directory -> `list`.
+- Dispatch a subagent -> `task` with the `task` argument; `agent` is only for
+  a registered profile. Do not invent a `subagent_type` argument.
+- Track tasks -> `plan_write` to create the plan and `todowrite` to advance
+  it. A markdown checklist is an acceptable fallback.
+- Fetch a URL -> `webfetch`; search the web -> `websearch`.
 - "Your instructions file" -> `AGENTS.md` (project root or `~/.nava/AGENTS.md`).
 
 Use the `skill` tool for other available skills listed in the catalog.''';

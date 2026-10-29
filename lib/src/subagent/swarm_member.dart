@@ -1,6 +1,6 @@
 /// 让子 Agent 借团队成员的身份出现在泳道里。
 ///
-/// 背景：[SpawnAgentTool]（`spawn_agent`）与 [AgentTeam] 是两套并行的多 agent
+/// 背景：[SpawnAgentTool]（`task`）与 [AgentTeam] 是两套并行的多 agent
 /// 机制——前者是「一次性委托」（同步 await、拿回结论、随即销毁），后者是
 /// 「常驻成员」（可收发消息、可 interrupt、有任务板）。二者语义重叠但视图各
 /// 有一套，于是「谁在干什么」被拆成两处。

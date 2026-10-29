@@ -21,7 +21,7 @@ List<PermissionRule> permissionRulesFor(ApprovalRequest request) {
       : request.action;
   final List<String> resources = _concreteResources(request.resources, action);
   if (resources.isEmpty) return const <PermissionRule>[];
-  if (action == 'shell') {
+  if (action == 'bash') {
     final String head = resources.first.split(RegExp(r'\s+')).first;
     if (head.isEmpty) return const <PermissionRule>[];
     return <PermissionRule>[_rule(action, '$head *')];

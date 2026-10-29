@@ -1,6 +1,6 @@
 /// XERJ 代码检索工具：`code_search` / `find_definition` / `index_project`。
 ///
-/// 只读检索与索引构建；节点起不来时返回 [ToolError] 让模型退回 `rg`。
+/// 只读检索与索引构建；节点起不来时返回 [ToolError] 让模型退回 `grep`。
 library;
 
 import 'dart:io';
@@ -24,7 +24,7 @@ class CodeSearchTool extends Tool {
   @override
   String get description =>
       '在已索引的项目里检索代码定义与片段（XERJ，定义优先）。返回 file:line + 片段，'
-      '比 rg 更省上下文。首次使用前先调用 index_project；结果为空或返回未索引时再退回 rg。';
+      '比 grep 更省上下文。首次使用前先调用 index_project；结果为空或返回未索引时再退回 grep。';
 
   @override
   List<ParamSpec> get params => <ParamSpec>[

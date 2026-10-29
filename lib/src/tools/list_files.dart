@@ -2,7 +2,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 
 /// 列出目录内容的工具：按深度展开，目录以 `/` 结尾。
 ///
-/// 走 `'fs'` 接缝，因此与 read_file / glob 受同一套路径约束。
+/// 走 `'fs'` 接缝，因此与 read / glob 受同一套路径约束。
 class ListFilesTool extends Tool {
   const ListFilesTool({
     required FileSystem fs,
@@ -27,7 +27,7 @@ class ListFilesTool extends Tool {
       <String>{'.git', '.nava', 'node_modules', '.dart_tool', 'build'};
 
   @override
-  String get name => 'list_files';
+  String get name => 'list';
 
   @override
   String get description =>

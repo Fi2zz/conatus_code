@@ -5,7 +5,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
 ToolContext _context(Map<String, Object?> args) =>
-    ToolContext(ToolCall(name: 'list_files', arguments: args));
+    ToolContext(ToolCall(name: 'list', arguments: args));
 
 void main() {
   late Directory dir;
@@ -28,6 +28,10 @@ void main() {
   });
 
   group('ListFilesTool', () {
+    test('工具名为 list', () {
+      expect(tool.name, 'list');
+    });
+
     test('默认只列一层，目录以 / 结尾，跳过 .git', () async {
       final ToolResult result = await tool.call(_context(<String, Object?>{}));
 

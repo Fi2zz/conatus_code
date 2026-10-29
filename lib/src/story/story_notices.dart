@@ -3,7 +3,7 @@
 /// 「diff 即反馈」闭环（设计文档 §2.4）。
 ///
 /// 通报形态是摘要 + 每文件 +/- 行数，不带全文：模型要细节自己会
-/// read_file（对齐 tool_result_eviction 的「预览 + 路径」哲学）。
+/// read（对齐 tool_result_eviction 的「预览 + 路径」哲学）。
 library;
 
 /// 待通报队列（会话级临时态，不落盘；服务键 `'storyNotices'`）。
@@ -50,5 +50,5 @@ String renderEditNotice(List<StoryFileChange> changes) {
   final String files = changes
       .map((StoryFileChange c) => '${c.path}（+${c.added}/-${c.removed} 行）')
       .join('、');
-  return '（你在 AI 工作途中修改了文件：$files；需要细节用 read_file 读取）';
+  return '（你在 AI 工作途中修改了文件：$files；需要细节用 read 读取）';
 }

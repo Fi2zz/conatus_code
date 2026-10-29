@@ -27,7 +27,7 @@ class _ScriptedProvider implements LlmProvider {
             provider: 'scripted',
             model: 'm',
             toolCalls: <LlmToolCall>[
-              LlmToolCall(id: 'c1', name: 'read_file'),
+              LlmToolCall(id: 'c1', name: 'read'),
             ],
           )
         : const LlmResult(content: '改完了', provider: 'scripted', model: 'm');
@@ -73,7 +73,7 @@ void main() {
 
     final String text = controller.transcript.messages.last.text;
     expect(text, contains('你 › 读一下文件'));
-    expect(text, contains('read_file'));
+    expect(text, contains('read'));
     expect(text, contains('助手 › 改完了'));
   });
 

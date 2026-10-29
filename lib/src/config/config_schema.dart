@@ -137,7 +137,7 @@ class AgentConfig {
   final String? projectDir;
 
   /// 子代理默认权限模式（`[agent] subagent_permission`）：`inherit` / `readonly`
-  /// / `ask` / `auto`。模型可在 `spawn_agent` 里请求，但只能收紧。
+  /// / `ask` / `auto`。模型可在 `task` 里请求，但只能收紧。
   final String subagentPermission;
 }
 

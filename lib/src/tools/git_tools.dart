@@ -24,7 +24,7 @@ class GitRun {
 ///
 /// 走 `shell` 接缝，因此与 rg 受同一套命令策略约束（M3 起同受沙箱约束）。
 /// 另外在构造 argv 后先过 `.opencode` 写保护：git 写工具不经过
-/// `run_command` 的命令检查，`git checkout .opencode/x` 会真的改写只读目录。
+/// `bash` 的命令检查，`git checkout .opencode/x` 会真的改写只读目录。
 Future<GitRun> runGit(
   ShellExecutor shell,
   String args,

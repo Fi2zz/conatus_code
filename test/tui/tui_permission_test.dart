@@ -13,7 +13,7 @@ ApprovalRequest _tool(String name) =>
     ApprovalRequest(id: 'r1', toolName: name, description: '说明');
 
 /// 带路径参数的审批请求。
-ApprovalRequest _pathTool(String path, [String name = 'read_file']) =>
+ApprovalRequest _pathTool(String path, [String name = 'read']) =>
     ApprovalRequest(
       id: 'r2',
       toolName: name,
@@ -279,7 +279,7 @@ void main() {
       await pending;
 
       expect(await gate.preapproved(_pathTool(file)), isTrue);
-      expect(await gate.preapproved(_pathTool(file, 'write_file')), isFalse);
+      expect(await gate.preapproved(_pathTool(file, 'write')), isFalse);
     });
 
     test('信任目录取路径所在目录，而非文件本身', () async {
@@ -345,8 +345,8 @@ void main() {
       );
       final ApprovalRequest request = ApprovalRequest(
         id: 'r5',
-        toolName: 'run_command',
-        action: 'shell',
+        toolName: 'bash',
+        action: 'bash',
         resources: const <String>['git status --short'],
       );
 
@@ -358,7 +358,7 @@ void main() {
       expect(await pending, isTrue);
       expect(rules.single.resource, 'git *');
       expect(rules.single.effect, PermissionEffect.allow);
-      expect(gate.alwaysAllowed, contains('run_command'));
+      expect(gate.alwaysAllowed, contains('bash'));
     });
   });
 

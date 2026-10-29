@@ -33,7 +33,7 @@ String _diag(String severity, String code, String path, int line, int col,
         String message) =>
     '$severity|TYPE|$code|$path|$line|$col|2|$message';
 
-/// 建一个带假 shell + write_file 工具的上下文并挂 linter 中间件。
+/// 建一个带假 shell + write 工具的上下文并挂 linter 中间件。
 Future<(Context, FakeShellExecutor)> _boot({
   required LintConfig config,
   required String workdir,
@@ -45,7 +45,7 @@ Future<(Context, FakeShellExecutor)> _boot({
       FakeShellExecutor(lintResult ?? _textLint('告警'));
   provideLinter(app, config: config, workdir: workdir, shell: shell);
   app.effect(() => app.tools.fn(
-        'write_file',
+        'write',
         description: '写文件',
         params: <ParamSpec>[ParamSpec.string('path', required: true)],
         handler: (ToolContext ctx) async => ToolResult.success('已写入'),
@@ -104,7 +104,7 @@ void main() {
     addTearDown(app.dispose);
 
     final ToolResult result = await app.tools.call(const ToolCall(
-      name: 'write_file',
+      name: 'write',
       arguments: <String, Object?>{'path': 'lib/a.dart'},
     ));
 
@@ -133,7 +133,7 @@ void main() {
     addTearDown(app.dispose);
 
     final ToolResult result = await app.tools.call(const ToolCall(
-      name: 'write_file',
+      name: 'write',
       arguments: <String, Object?>{'path': 'lib/a.dart'},
     ));
     expect(shell.lastRequest, isNotNull); // 确实跑过
@@ -151,7 +151,7 @@ void main() {
     addTearDown(app.dispose);
 
     await app.tools.call(const ToolCall(
-      name: 'write_file',
+      name: 'write',
       arguments: <String, Object?>{'path': 'lib/deleted.dart'},
     ));
     expect(shell.calls, 0);
@@ -168,7 +168,7 @@ void main() {
     addTearDown(app.dispose);
 
     Future<void> edit(String path) => app.tools.call(ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': path},
         ));
 

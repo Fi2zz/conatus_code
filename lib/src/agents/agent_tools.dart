@@ -1,8 +1,6 @@
 /// Agent `tools` 字段解析：白名单数组与 OpenCode 逐工具开关。
 library;
 
-import 'agent_open_code.dart';
-
 /// `tools` 字段的解析结果：显式白名单与被显式禁用的工具。
 ///
 /// 数组形式给出白名单（空数组 = 禁止所有工具）；OpenCode 表形式给出的是
@@ -37,7 +35,7 @@ String _toolListEntry(Object? item) {
   if (item is! String || item.trim().isEmpty) {
     throw const FormatException('字段 tools 的元素必须是非空字符串');
   }
-  return mapAgentToolName(item);
+  return item.trim();
 }
 
 List<String> _disabledTools(Map<Object?, Object?> table) {
@@ -50,7 +48,7 @@ List<String> _disabledTools(Map<Object?, Object?> table) {
     if (entry.value is! bool) {
       throw FormatException('字段 tools 的 $key 必须是布尔值');
     }
-    if (!(entry.value as bool)) names.add(mapAgentToolName(key));
+    if (!(entry.value as bool)) names.add(key.trim());
   }
   return names;
 }

@@ -21,7 +21,7 @@ class WriteFileTool extends Tool {
   final FileSystem _fs;
 
   @override
-  String get name => 'write_file';
+  String get name => 'write';
 
   @override
   String get description =>

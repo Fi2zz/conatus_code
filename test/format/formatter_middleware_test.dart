@@ -11,7 +11,7 @@ import 'package:test/test.dart';
 import 'support/format_harness.dart';
 
 ToolCall _write(String path) =>
-    ToolCall(name: 'write_file', arguments: <String, Object?>{'path': path});
+    ToolCall(name: 'write', arguments: <String, Object?>{'path': path});
 
 void main() {
   test('成功格式化：工具结果保持成功且不追加噪声', () async {
@@ -126,7 +126,7 @@ void main() {
     expect(shell.commands[1], contains('b.dart'));
   });
 
-  test('edit_file：成功结果同样触发格式化', () async {
+  test('edit：成功结果同样触发格式化', () async {
     final Directory dir = createProject('mw-edit', <String, String>{
       'pubspec.yaml': 'name: x\n',
       'lib/a.dart': 'void main() {}\n',
@@ -138,7 +138,7 @@ void main() {
 
     final ToolResult result = await app.tools.call(
       const ToolCall(
-        name: 'edit_file',
+        name: 'edit',
         arguments: <String, Object?>{'path': 'lib/a.dart'},
       ),
     );

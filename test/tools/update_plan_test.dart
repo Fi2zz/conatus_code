@@ -86,18 +86,18 @@ void main() {
     });
   });
 
-  test('provideUpdatePlanTool 注册 update_plan', () {
+  test('provideUpdatePlanTool 注册 todowrite', () {
     final Context ctx = Context.root();
     provideTools(ctx);
     provideUpdatePlanTool(ctx, session: Session(id: 's1'));
 
-    expect(ctx.tools.get('update_plan'), isNotNull);
+    expect(ctx.tools.get('todowrite'), isNotNull);
     ctx.dispose();
   });
 }
 
 ToolContext _call(Map<String, Object?> arguments) => ToolContext(
-      ToolCall(name: 'update_plan', arguments: arguments),
+      ToolCall(name: 'todowrite', arguments: arguments),
     );
 
 Future<Session> _withPlan(int stepCount) async {

@@ -65,7 +65,7 @@ class AgentDefinition {
   /// 工具白名单；`null` 表示未设置（不额外限制）。
   ///
   /// 来自 `tools` 数组形式。空数组表示**禁止所有工具**。作为**子 Agent**
-  /// 使用时，`null` 会落到宿主 `spawn_agent` 的默认白名单（只读探索集），
+  /// 使用时，`null` 会落到宿主 `task` 的默认白名单（只读探索集），
   /// 而不是全部工具——需要写能力的内置 / 自定义子 Agent 必须显式列出。
   /// 作为主会话 Agent 时 `null` 才表示不额外限制。
   final List<String>? tools;

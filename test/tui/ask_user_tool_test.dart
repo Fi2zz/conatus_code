@@ -1,4 +1,4 @@
-/// `ask_user` 工具：自定义选项、内置权限模式选项集、缺选项与取消。
+/// `question` 工具：自定义选项、内置权限模式选项集、缺选项与取消。
 library;
 
 import 'package:conatus_code/tui.dart';

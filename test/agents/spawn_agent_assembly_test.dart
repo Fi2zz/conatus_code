@@ -1,4 +1,4 @@
-/// nava 侧 resolver：把 AgentRegistry 定义映射为 spawn_agent 的 profile。
+/// nava 侧 resolver：把 AgentRegistry 定义映射为 task 的 profile。
 library;
 
 import 'dart:io';
@@ -36,8 +36,8 @@ void main() {
     final SubAgentProfile profile = (await resolver.resolve('explore'))!;
 
     expect(profile.permissionMode, SubAgentPermission.readonly);
-    expect(profile.tools, contains('read_file'));
-    expect(profile.tools, isNot(contains('write_file')));
+    expect(profile.tools, contains('read'));
+    expect(profile.tools, isNot(contains('write')));
     expect(
       profile.permissions,
       contains(
@@ -140,7 +140,7 @@ void main() {
     final SubAgentProfile profile = (await resolver.resolve('tools'))!;
     expect(
       profile.disabledTools,
-      containsAll(<String>['spawn_agent', 'list_files', 'update_plan']),
+      containsAll(<String>['task', 'list', 'todowrite']),
     );
   });
 
@@ -166,7 +166,7 @@ void main() {
     expect((await resolver.resolve('plan'))!.id, 'plan');
   });
 
-  test('tui_app 装配把 AgentRegistry 解析器注入 spawn_agent', () async {
+  test('tui_app 装配把 AgentRegistry 解析器注入 task', () async {
     writeAgent(
       Directory('${workdir.path}/.nava/agents'),
       'wired.md',
@@ -186,7 +186,7 @@ void main() {
     addTearDown(runtime.dispose);
 
     final SpawnAgentTool tool =
-        runtime.tools.get('spawn_agent')! as SpawnAgentTool;
+        runtime.tools.get('task')! as SpawnAgentTool;
     expect(tool.profileResolver, isA<AgentProfileResolver>());
     final SubAgentProfile? profile = await tool.profileResolver!.resolve(
       'wired',

@@ -1,4 +1,4 @@
-/// 命令测试替身：模型、假 spawn_agent、可记录请求的 provider 注册表。
+/// 命令测试替身：模型、假 task、可记录请求的 provider 注册表。
 library;
 
 import 'dart:async';
@@ -92,7 +92,7 @@ class CommandCaptureProvider implements LlmProvider {
   void close() {}
 }
 
-/// 记录 `spawn_agent` 调用的假工具。
+/// 记录 `task` 调用的假工具。
 class FakeSpawnTool extends Tool {
   /// 收到的参数。
   final List<Map<String, Object?>> calls = <Map<String, Object?>>[];
@@ -104,7 +104,7 @@ class FakeSpawnTool extends Tool {
   Completer<void>? gate;
 
   @override
-  String get name => 'spawn_agent';
+  String get name => 'task';
 
   @override
   String get description => '假子 Agent';

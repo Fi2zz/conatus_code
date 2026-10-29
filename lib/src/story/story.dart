@@ -1,6 +1,6 @@
 /// 故事层（人机双写）薄接入：一次成功的文件编辑 = 一个补丁。
 ///
-/// 块 = 文件的薄映射：块 id 即文件相对路径。`write_file` / `edit_file` /
+/// 块 = 文件的薄映射：块 id 即文件相对路径。`write` / `edit` /
 /// `apply_patch` 的成功结果各产生一个 [DocPatch]（author: ai）；失败结果
 /// 不记。补丁经 [provideDoc] 的引擎提交——装配了 `'sessionLog'` 服务时
 /// 同步落 `doc/patch` 会话事件，否则为纯内存故事线。
@@ -22,8 +22,8 @@ import 'story_watcher.dart';
 
 /// 产生故事补丁的编辑工具。
 const Set<String> kStoryToolNames = <String>{
-  'write_file',
-  'edit_file',
+  'write',
+  'edit',
   'apply_patch',
 };
 

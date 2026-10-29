@@ -11,7 +11,7 @@ import 'package:conatus_doc/conatus_doc.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
-/// 装配：临时目录 fs + write_file + 内存 sessionLog + 故事层 + 通报队列。
+/// 装配：临时目录 fs + write + 内存 sessionLog + 故事层 + 通报队列。
 Future<(Context, DocEngine, StoryNotices, Directory)> _build() async {
   final Directory dir = Directory.systemTemp.createTempSync('nava-notice-');
   final Context app = Context.root();
@@ -53,7 +53,7 @@ void main() {
       // AI 先写 3 行（经工具，产生 ai 补丁）。
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{
             'path': 'notes.md',
             'content': 'l1\nl2\nl3',
@@ -124,7 +124,7 @@ void main() {
 
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': 'AI 写的'},
         ),
       );
@@ -149,13 +149,13 @@ void main() {
       final FileSystem fs = app.require<FileSystem>('fs');
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': '第一版'},
         ),
       );
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{
             'path': 'a.md',
             'content': '第二版',

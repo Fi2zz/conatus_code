@@ -20,8 +20,8 @@ import 'formatter_probe.dart';
 
 /// 触发 format-on-edit 的编辑工具。
 const Set<String> kFormatterToolNames = <String>{
-  'write_file',
-  'edit_file',
+  'write',
+  'edit',
   'apply_patch',
 };
 

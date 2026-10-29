@@ -25,7 +25,7 @@ OpenCodeImport _import() => const OpenCodeImport(
   ],
   permissions: <ImportedPermission>[
     ImportedPermission(
-      action: 'shell',
+      action: 'bash',
       resource: 'git push *',
       effect: 'ask',
     ),
@@ -104,7 +104,7 @@ instructions = ["AGENTS.md"]
   test('重复 permissions 不重复写', () {
     const String existing = '''
 [[permissions]]
-action = "shell"
+action = "bash"
 resource = "git push *"
 effect = "ask"
 ''';

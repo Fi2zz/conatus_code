@@ -169,14 +169,14 @@ class ConatusTuiRuntime {
   ///
   /// [fs] / [shell] / [credentials] 是能力接缝的注入点：缺省用本地实现
   /// （`LocalFileSystem` / `LocalShellExecutor` / `EnvCredentials`）。沙箱层经
-  /// 它们换成受限实现；`fs` 工具与 `rg` 都会跟随（`rg` 从上下文取 `'shell'`）。
+  /// 它们换成受限实现；`fs` 工具与 `grep` 都会跟随（`grep` 从上下文取 `'shell'`）。
   /// [mcpTransportFactory] 是 MCP 传输的测试注入点（缺省按配置分派）。
   /// [commandHome] 覆盖命令发现的家目录（测试注入假 home；缺省读环境变量）。
   /// [shellInteractive] 是用户直发命令（`!` shell 模式）的交互缝，缺省本地直执
   /// 不经命令白名单；模型发起的命令仍走 [shell]（沙箱照常）。
   /// [turnBudget] 为每轮预算护栏（缺省 10 分钟墙钟 + 模型窗口 75% 的估算
   /// token）；传 `TurnBudget(maxDuration: null, maxTokens: null)` 可关闭。
-  /// [interactive] 为 `false` 时跳过人机交互件（浮层 / 审批服务 / `ask_user`
+  /// [interactive] 为 `false` 时跳过人机交互件（浮层 / 审批服务 / `question`
   /// 工具），供 headless 单轮执行使用。
   ///
   /// 显式 [baseDir] 会绕过项目注册表；若同时传入 [projectRegistry]，该
@@ -316,8 +316,8 @@ class ConatusTuiRuntime {
     instrumentTools(app);
 
     // `.opencode`（项目级 + 全局）是用户 OpenCode 自己的目录：nava 只做兼容
-    // 读取，绝不创建 / 写入 / 删除。闸门包在 fs 接缝上，write_file /
-    // edit_file / apply_patch / story 写回等一切经 'fs' 的写操作自动继承
+    // 读取，绝不创建 / 写入 / 删除。闸门包在 fs 接缝上，write /
+    // edit / apply_patch / story 写回等一切经 'fs' 的写操作自动继承
     // （见 read_only_path_guard.dart）；读操作透传。
     //
     // 受保护根同时用字面 workdir 与规范 workdir 两种拼写：`--workdir /tmp/x`
@@ -337,7 +337,7 @@ class ConatusTuiRuntime {
       ),
     );
     // 'shell' 既是 rg 的必需依赖（fs 工具回落到 ctx.get('shell')），也是命令执行
-    // 的唯一接缝：注入受限实现后 rg / run_command / run_tests / run_code 一并跟随。
+    // 的唯一接缝：注入受限实现后 grep / bash / run_tests / run_code 一并跟随。
     // 命令形状审查：本地直执外面套一层 command_shield 分析。REVIEW 的人工
     // 复核回调在下面的审批装配里接线；headless 未接线即按拒绝（fail-closed）。
     final GuardedShellExecutor guardedShell = shell is GuardedShellExecutor
@@ -392,22 +392,22 @@ class ConatusTuiRuntime {
       );
     }
     // 溢出目录必须落在工作目录内（fs jail 以工作目录为根，而溢出预览要让模型
-    // 用 read_file 读回来，见 spill_dir.dart）。且必须用**规范化**路径：jail 在
+    // 用 read 读回来，见 spill_dir.dart）。且必须用**规范化**路径：jail 在
     // 目标父链尚不存在时无法解析符号链接，退回字符串前缀比对，而 jail 的根是
     // 规范化过的 —— macOS 上 /var → /private/var、/tmp → /private/tmp 这种别名
     // 会让首次写入被误判越界。
     provideToolResultEviction(app, dir: toolResultSpillDir(canonicalWorkdir));
-    // conatus_code 自己的工具：list_files / git_status / git_diff（M3 起再加
-    // run_command / run_tests / apply_patch）。同样跟随上面的 fs / shell 接缝。
+    // conatus_code 自己的工具：list / git_status / git_diff（M3 起再加
+    // bash / run_tests / apply_patch）。同样跟随上面的 fs / shell 接缝。
     provideCodeTools(app);
 
     // ── 交互：选项浮层 + 审批端口（headless 不装）────────────────
-    // 浮层状态挂在根上下文：控制器构造时接上重绘回调，审批与 `ask_user`
+    // 浮层状态挂在根上下文：控制器构造时接上重绘回调，审批与 `question`
     // 共用同一条提问通道。权限中间件已在上面根上下文最外层挂好（见
     // `instrumentPermission`）；这里只提供 `Approval` 端口，控制器绑定会话时
     // 只更新作用域槽位，不再重挂中间件。
     // `interactive: false`（headless）跳过全部人机交互件：无浮层、无审批
-    // 服务、无 ask_user 工具——需要询问的调用由权限中间件按
+    // 服务、无 question 工具——需要询问的调用由权限中间件按
     // `PERMISSION_ASK_UNATTENDED` 拒绝（沙箱仍是执行层底线）。
     if (interactive) {
       final TuiChoicePrompt choice = TuiChoicePrompt();
@@ -616,7 +616,7 @@ class ConatusTuiRuntime {
 
     provideReflection(app);
 
-    // ── 自定义 Agent：发现 + spawn_agent 的 profile 解析 ──────────
+    // ── 自定义 Agent：发现 + task 的 profile 解析 ──────────
     final AgentRegistry agentRegistry = await AgentRegistry.load(
       workdir: resolvedWorkdir,
       defaultId: defaultAgent,
@@ -675,17 +675,17 @@ class ConatusTuiRuntime {
         budget: resolvedBudget,
         costTracker: costTracker,
       ),
-      // 默认只读探索集：子 Agent 无人看管，默认不给写 / 执行类（write_file 等
-      // 是 medium、run_command 等是 high；high 在框架层已被 `_allowedTools`
-      // 挡掉，这里再把 medium 写操作排除）。rg/glob/list_files 是定位文件的
+      // 默认只读探索集：子 Agent 无人看管，默认不给写 / 执行类（write 等
+      // 是 medium、bash 等是 high；high 在框架层已被 `_allowedTools`
+      // 挡掉，这里再把 medium 写操作排除）。grep/glob/list 是定位文件的
       // 入口——缺了它们，模型没显式传 tools 时子 Agent 只能读已知路径。
       defaultTools: const <String>[
         'get_time',
         'echo',
-        'read_file',
-        'rg',
+        'read',
+        'grep',
         'glob',
-        'list_files',
+        'list',
         'git_status',
         'git_diff',
       ],
@@ -763,7 +763,7 @@ class ConatusTuiRuntime {
         name: 'coding',
         text: () =>
             '编码任务先规划后执行：复杂任务先用 plan_write 制定执行计划，'
-            '执行中每完成一步用 update_plan 标记进度；工具失败时反思原因并重试或调整方案。',
+            '执行中每完成一步用 todowrite 标记进度；工具失败时反思原因并重试或调整方案。',
       ),
     );
     if (storyEnabled && interactive) {
@@ -771,7 +771,7 @@ class ConatusTuiRuntime {
         PromptSection(
           name: 'story-ops',
           text: () =>
-              '文件编辑（write_file / edit_file / apply_patch）默认进入待定审阅：'
+              '文件编辑（write / edit / apply_patch）默认进入待定审阅：'
               '人接受后才真正落盘。收到「已登记为待定补丁」的结果后继续推进或等待，'
               '不要重试同一编辑。也可以用 ```ops 围栏块（JSON 数组的块操作）提议修改。',
         ),

@@ -176,7 +176,7 @@ debounce_seconds = 10         # 去抖窗口（秒），防连续编辑连跑
 # default_agent = "build"            # 新会话默认 Agent；未知 ID 回退 build
 max_steps = 8
 # subagent_permission = "inherit"   # 子代理默认权限：inherit/readonly/ask/auto
-                                    # （模型可在 spawn_agent 里收紧，不能放宽）
+                                    # （模型可在 task 里收紧，不能放宽）
 
 [approval]
 mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
@@ -187,7 +187,7 @@ mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
 # skill / question / external_directory，也可直接写工具名。
 # 路径动作的资源按工作区解析，符号链接按真实路径比较。
 # [[permissions]]
-# action = "shell"
+# action = "bash"
 # resource = "git push *"
 # effect = "deny"
 #

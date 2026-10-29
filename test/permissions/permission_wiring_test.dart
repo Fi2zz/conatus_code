@@ -25,7 +25,7 @@ void main() {
       final Directory dir = Directory.systemTemp.createTempSync('perm-wiring');
       addTearDown(() => dir.deleteSync(recursive: true));
       const PermissionRule configRule = PermissionRule(
-        action: 'shell',
+        action: 'bash',
         resource: 'git status *',
         effect: PermissionEffect.allow,
         source: 'config',
@@ -40,7 +40,7 @@ void main() {
       final String? warning = await wiring.remember(
         <PermissionRule>[
           const PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'git *',
             effect: PermissionEffect.allow,
             source: 'project',
@@ -106,7 +106,7 @@ void main() {
         dir.path,
         configRules: const <PermissionRule>[
           PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'git push *',
             effect: PermissionEffect.deny,
           ),
@@ -117,7 +117,7 @@ void main() {
       final String? warning = await wiring.remember(
         const <PermissionRule>[
           PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'git *',
             effect: PermissionEffect.allow,
           ),
@@ -158,7 +158,7 @@ void main() {
         dir.path,
         configRules: const <PermissionRule>[
           PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'a *',
             effect: PermissionEffect.allow,
           ),
@@ -168,7 +168,7 @@ void main() {
       await wiring.remember(
         const <PermissionRule>[
           PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'b *',
             effect: PermissionEffect.allow,
           ),
@@ -177,7 +177,7 @@ void main() {
       );
       wiring.setSessionRules(const <PermissionRule>[
         PermissionRule(
-          action: 'shell',
+          action: 'bash',
           resource: 'c *',
           effect: PermissionEffect.deny,
         ),
@@ -226,7 +226,7 @@ void main() {
       final String? warning = await wiring.remember(
         const <PermissionRule>[
           PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'git *',
             effect: PermissionEffect.allow,
           ),
@@ -247,7 +247,7 @@ void main() {
         dir.path,
         configRules: const <PermissionRule>[
           PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'git push origin *',
             effect: PermissionEffect.deny,
             source: 'config',
@@ -259,7 +259,7 @@ void main() {
       final String? warning = await wiring.remember(
         const <PermissionRule>[
           PermissionRule(
-            action: 'shell',
+            action: 'bash',
             resource: 'git push *',
             effect: PermissionEffect.allow,
             source: 'project',

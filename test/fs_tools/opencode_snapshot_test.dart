@@ -108,15 +108,15 @@ Future<(HeadlessResult, List<List<LlmMessage>>)> _runSessionWithEdits(
   final _ScriptedProvider provider = _ScriptedProvider(<LlmResult>[
     _tool(
       'c1',
-      'write_file',
+      'write',
       '{"path":".opencode/commands/x.md","content":"pwned"}',
     ),
     _tool(
       'c2',
-      'edit_file',
+      'edit',
       '{"path":".opencode/agents/a.md","old_string":"agent","new_string":"pwned"}',
     ),
-    _tool('c3', 'write_file', '{"path":"notes.txt","content":"hello"}'),
+    _tool('c3', 'write', '{"path":"notes.txt","content":"hello"}'),
     const LlmResult(content: '完成', provider: 's', model: 'm'),
   ]);
   final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(

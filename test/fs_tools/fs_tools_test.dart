@@ -29,10 +29,10 @@ void main() {
       final List<Tool> registered = provideFsTools(ctx);
 
       expect(registered.map((Tool t) => t.name),
-          containsAll(<String>['read_file', 'write_file', 'edit_file', 'glob']));
-      expect(registered.map((Tool t) => t.name), isNot(contains('rg')));
+          containsAll(<String>['read', 'write', 'edit', 'glob']));
+      expect(registered.map((Tool t) => t.name), isNot(contains('grep')));
       expect(tools.names,
-          containsAll(<String>['read_file', 'write_file', 'edit_file', 'glob']));
+          containsAll(<String>['read', 'write', 'edit', 'glob']));
       ctx.dispose();
       expect(tools.names, isEmpty);
     });
@@ -49,8 +49,8 @@ void main() {
         ripgrep: const RipgrepBinary(path: 'rg', source: RipgrepSource.system),
       );
 
-      expect(registered.map((Tool t) => t.name), contains('rg'));
-      expect(tools.names, contains('rg'));
+      expect(registered.map((Tool t) => t.name), contains('grep'));
+      expect(tools.names, contains('grep'));
     });
 
     test('enableSearch=false → 不注册 glob 与 rg', () {
@@ -61,7 +61,7 @@ void main() {
       final List<Tool> registered = provideFsTools(ctx, enableSearch: false);
 
       expect(registered.map((Tool t) => t.name),
-          <String>['read_file', 'write_file', 'edit_file']);
+          <String>['read', 'write', 'edit']);
       expect(tools.names, isNot(contains('glob')));
     });
   });

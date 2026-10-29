@@ -70,7 +70,7 @@ void main() {
     expect(_projectText(runtime), contains('CONFIG-EXTRA'));
   });
 
-  test('read_file 后下一轮 project 段包含嵌套 AGENTS.md', () async {
+  test('read 后下一轮 project 段包含嵌套 AGENTS.md', () async {
     final String nested = <String>[dir.path, 'pkg'].join(_sep);
     _write(nested, <String>['AGENTS.md'], 'RUNTIME-NESTED');
     final String file = _write(nested, <String>['a.dart'], 'void main() {}');
@@ -81,7 +81,7 @@ void main() {
     expect(_projectText(runtime), isNull);
 
     final ToolResult result = await runtime.tools.call(
-      ToolCall(name: 'read_file', arguments: <String, Object?>{'path': file}),
+      ToolCall(name: 'read', arguments: <String, Object?>{'path': file}),
     );
 
     expect(result.isError, isFalse);

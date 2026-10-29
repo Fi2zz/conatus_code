@@ -22,7 +22,7 @@ body
     expect(def.tools, isNull);
     expect(
       def.disabledTools,
-      containsAll(<String>['write_file', 'edit_file', 'run_command']),
+      containsAll(<String>['write', 'edit', 'bash']),
     );
   });
 
@@ -38,10 +38,10 @@ body
 ''');
 
     expect(def.tools, isNull);
-    expect(def.disabledTools, <String>['write_file']);
+    expect(def.disabledTools, <String>['write']);
   });
 
-  test('tools 数组仍是显式白名单并映射 OpenCode 工具名', () {
+  test('tools 数组仍是显式白名单，OpenCode 工具名原样生效', () {
     final AgentDefinition def = parse('''
 ---
 tools:
@@ -52,11 +52,11 @@ tools:
 body
 ''');
 
-    expect(def.tools, <String>['read_file', 'rg', 'custom_tool']);
+    expect(def.tools, <String>['read', 'grep', 'custom_tool']);
     expect(def.disabledTools, isEmpty);
   });
 
-  test('question 工具名映射为 ask_user', () {
+  test('question / todowrite 保持原名', () {
     final AgentDefinition def = parse('''
 ---
 tools:
@@ -66,7 +66,7 @@ tools:
 body
 ''');
 
-    expect(def.tools, <String>['ask_user', 'update_plan']);
+    expect(def.tools, <String>['question', 'todowrite']);
   });
 
   test('tools: [] 表示禁止所有工具', () {

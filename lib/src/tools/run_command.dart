@@ -9,7 +9,7 @@ class RunCommandTool extends Tool {
   final ShellExecutor _shell;
 
   @override
-  String get name => 'run_command';
+  String get name => 'bash';
 
   @override
   String get description => '在沙箱中执行一条命令，返回退出码与输出。';

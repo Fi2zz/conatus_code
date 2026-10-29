@@ -12,8 +12,8 @@ import 'run_tests.dart';
 ///
 /// 依赖：
 /// - `'tools'`：工具注册（必需）
-/// - `'fs'`：文件系统接缝（必需，`list_files` 用）
-/// - `'shell'`：子进程执行（git 工具必需；缺失时只注册 `list_files` 与 `apply_patch`）
+/// - `'fs'`：文件系统接缝（必需，`list` 用）
+/// - `'shell'`：子进程执行（git 工具必需；缺失时只注册 `list` 与 `apply_patch`）
 ///
 /// 注册撤销由上下文生命周期统一管理。
 List<Tool> provideCodeTools(

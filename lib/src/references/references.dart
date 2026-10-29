@@ -91,7 +91,7 @@ void provideReferencePrompt(
 String renderReferences(List<ResolvedReference> references) {
   final StringBuffer buffer = StringBuffer(
     '<references>\n'
-    'These directories are read-only references. Use read_file / rg / glob '
+    'These directories are read-only references. Use read / grep / glob '
     'with the absolute paths below when the task needs them.\n',
   );
   for (final ResolvedReference reference in references) {

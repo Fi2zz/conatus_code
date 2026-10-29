@@ -59,7 +59,7 @@ Future<List<SessionEvent>> _docEvents(InMemorySessionLog log) async {
 
 void main() {
   group('provideStory', () {
-    test('write_file 成功 → 补丁进 log、落 doc/patch 事件、fold 出文件内容', () async {
+    test('write 成功 → 补丁进 log、落 doc/patch 事件、fold 出文件内容', () async {
       final (
         Context app,
         DocEngine engine,
@@ -73,7 +73,7 @@ void main() {
 
       final ToolResult result = await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': '你好'},
         ),
       );
@@ -89,7 +89,7 @@ void main() {
       expect(engine.state.blocks.single.text, '你好');
     });
 
-    test('edit_file 成功 → Replace op，作者为 ai', () async {
+    test('edit 成功 → Replace op，作者为 ai', () async {
       final (Context app, DocEngine engine, _, Directory dir) = await _build();
       addTearDown(() {
         app.dispose();
@@ -97,14 +97,14 @@ void main() {
       });
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': '旧文'},
         ),
       );
 
       final ToolResult result = await app.tools.call(
         const ToolCall(
-          name: 'edit_file',
+          name: 'edit',
           arguments: <String, Object?>{
             'path': 'a.md',
             'old_string': '旧文',
@@ -177,7 +177,7 @@ void main() {
 
       final ToolResult result = await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'a.md', 'content': '覆盖'},
         ),
       );
@@ -197,7 +197,7 @@ void main() {
 
       await app.tools.call(
         const ToolCall(
-          name: 'read_file',
+          name: 'read',
           arguments: <String, Object?>{'path': 'a.md'},
         ),
       );
@@ -233,7 +233,7 @@ void main() {
       // 交互模式下写工具被事前审阅门拦成待定补丁，apply 后才入故事。
       await app.tools.call(
         const ToolCall(
-          name: 'write_file',
+          name: 'write',
           arguments: <String, Object?>{'path': 'story.md', 'content': '第一章'},
         ),
       );

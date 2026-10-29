@@ -14,7 +14,7 @@ void main() {
         scope: const PermissionScope(
           rules: <PermissionRule>[
             PermissionRule(
-              action: 'shell',
+              action: 'bash',
               resource: 'git push *',
               effect: PermissionEffect.deny,
             ),
@@ -23,7 +23,7 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('run_command', <String, Object?>{
+        permissionCall('bash', <String, Object?>{
           'command': 'git push origin main',
         }),
       );
@@ -40,7 +40,7 @@ void main() {
         scope: const PermissionScope(
           rules: <PermissionRule>[
             PermissionRule(
-              action: 'shell',
+              action: 'bash',
               resource: 'rm *',
               effect: PermissionEffect.deny,
             ),
@@ -49,7 +49,7 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('run_command', <String, Object?>{'command': 'rm -rf x'}),
+        permissionCall('bash', <String, Object?>{'command': 'rm -rf x'}),
       );
       expect(result.error!.code, 'PERMISSION_DENIED');
       expect(rig.runs, isEmpty);
@@ -63,14 +63,14 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('run_command', <String, Object?>{'command': 'ls'}),
+        permissionCall('bash', <String, Object?>{'command': 'ls'}),
       );
 
       expect(result.isError, isFalse);
       expect(rig.gate.requests, hasLength(1));
-      expect(rig.gate.requests.single.toolName, 'run_command');
-      expect(rig.gate.requests.single.action, 'shell');
-      expect(rig.runs, <String>['run_command']);
+      expect(rig.gate.requests.single.toolName, 'bash');
+      expect(rig.gate.requests.single.action, 'bash');
+      expect(rig.runs, <String>['bash']);
     });
 
     test('拒绝时返回 APPROVAL_DENIED 且不执行', () async {
@@ -80,7 +80,7 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('run_command', <String, Object?>{'command': 'ls'}),
+        permissionCall('bash', <String, Object?>{'command': 'ls'}),
       );
       expect(result.error!.code, 'APPROVAL_DENIED');
       expect(rig.runs, isEmpty);
@@ -92,7 +92,7 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': '/tmp/a.txt'}),
+        permissionCall('read', <String, Object?>{'path': '/tmp/a.txt'}),
       );
       expect(result.isError, isFalse);
       expect(rig.gate.requests, hasLength(1));
@@ -107,20 +107,20 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': '/tmp/a.txt'}),
+        permissionCall('read', <String, Object?>{'path': '/tmp/a.txt'}),
       );
       expect(rig.gate.requests, isEmpty);
-      expect(rig.runs, <String>['read_file']);
+      expect(rig.runs, <String>['read']);
     });
 
     test('never_ask 下路径工具不询问，直接放行', () async {
       final PermissionRig rig = assemblePermissionRig();
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': '/tmp/a.txt'}),
+        permissionCall('read', <String, Object?>{'path': '/tmp/a.txt'}),
       );
       expect(rig.gate.requests, isEmpty);
-      expect(rig.runs, <String>['read_file']);
+      expect(rig.runs, <String>['read']);
     });
 
     test('显式 allow 规则跳过路径询问', () async {
@@ -138,10 +138,10 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': '/tmp/a.txt'}),
+        permissionCall('read', <String, Object?>{'path': '/tmp/a.txt'}),
       );
       expect(rig.gate.requests, isEmpty);
-      expect(rig.runs, <String>['read_file']);
+      expect(rig.runs, <String>['read']);
     });
   });
 
@@ -154,7 +154,7 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('run_command', <String, Object?>{'command': 'ls'}),
+        permissionCall('bash', <String, Object?>{'command': 'ls'}),
       );
       expect(result.error!.code, 'PERMISSION_ASK_UNATTENDED');
       expect(rig.runs, isEmpty);
@@ -168,10 +168,10 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': '/tmp/a.txt'}),
+        permissionCall('read', <String, Object?>{'path': '/tmp/a.txt'}),
       );
       expect(result.isError, isFalse);
-      expect(rig.runs, <String>['read_file']);
+      expect(rig.runs, <String>['read']);
     });
 
     test('显式 allow / never_ask 仍可放行', () async {
@@ -181,7 +181,7 @@ void main() {
         scope: const PermissionScope(
           rules: <PermissionRule>[
             PermissionRule(
-              action: 'shell',
+              action: 'bash',
               resource: 'ls *',
               effect: PermissionEffect.allow,
             ),
@@ -190,9 +190,9 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('run_command', <String, Object?>{'command': 'ls -la'}),
+        permissionCall('bash', <String, Object?>{'command': 'ls -la'}),
       );
-      expect(rig.runs, <String>['run_command']);
+      expect(rig.runs, <String>['bash']);
     });
   });
 }

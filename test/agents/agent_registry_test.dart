@@ -48,7 +48,7 @@ void main() {
     );
     expect(
       registry.byId('explore')!.tools,
-      containsAll(<String>['read_file', 'rg', 'glob', 'web_search']),
+      containsAll(<String>['read', 'grep', 'glob', 'websearch']),
     );
   });
 

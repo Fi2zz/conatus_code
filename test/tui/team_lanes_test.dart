@@ -14,9 +14,9 @@ void main() {
   group('MemberLaneBuilder', () {
     test('按成员分开累积', () {
       final MemberLaneBuilder b = MemberLaneBuilder();
-      _act(b, 'a', const TeammateToolCall('rg'));
-      _act(b, 'b', const TeammateToolCall('read_file'));
-      _act(b, 'a', const TeammateToolResult('rg'));
+      _act(b, 'a', const TeammateToolCall('grep'));
+      _act(b, 'b', const TeammateToolCall('read'));
+      _act(b, 'a', const TeammateToolResult('grep'));
 
       final Map<String, MemberLane> lanes = b.build(<String, bool>{});
       expect(lanes.keys.toSet(), <String>{'a', 'b'});
@@ -37,17 +37,17 @@ void main() {
     test('工具行不与正文合并', () {
       final MemberLaneBuilder b = MemberLaneBuilder();
       _act(b, 'a', const TeammateText('前置'));
-      _act(b, 'a', const TeammateToolCall('rg'));
+      _act(b, 'a', const TeammateToolCall('grep'));
       _act(b, 'a', const TeammateText('后置'));
 
       final List<TeamActivityLine> lines = b.build(<String, bool>{})['a']!.lines;
       expect(lines, hasLength(3));
-      expect(lines[1].text, '→ rg');
+      expect(lines[1].text, '→ grep');
     });
 
     test('工具后紧跟的正文另起一行（不并进工具行）', () {
       final MemberLaneBuilder b = MemberLaneBuilder();
-      _act(b, 'a', const TeammateToolResult('rg'));
+      _act(b, 'a', const TeammateToolResult('grep'));
       _act(b, 'a', const TeammateText('找到了'));
 
       expect(b.build(<String, bool>{})['a']!.lines, hasLength(2));
@@ -75,14 +75,14 @@ void main() {
 
     test('失败标记透传', () {
       final MemberLaneBuilder b = MemberLaneBuilder();
-      _act(b, 'a', const TeammateToolResult('rg', failed: true));
+      _act(b, 'a', const TeammateToolResult('grep', failed: true));
 
       expect(b.build(<String, bool>{})['a']!.lines.single.failed, isTrue);
     });
 
     test('build 带上活跃标记', () {
       final MemberLaneBuilder b = MemberLaneBuilder();
-      _act(b, 'a', const TeammateToolCall('rg'));
+      _act(b, 'a', const TeammateToolCall('grep'));
 
       final Map<String, MemberLane> lanes =
           b.build(<String, bool>{'a': true, 'b': false});
@@ -93,14 +93,14 @@ void main() {
 
     test('有泳道但当前已终态：active 为 false', () {
       final MemberLaneBuilder b = MemberLaneBuilder();
-      _act(b, 'a', const TeammateToolCall('rg'));
+      _act(b, 'a', const TeammateToolCall('grep'));
 
       expect(b.build(<String, bool>{})['a']!.active, isFalse);
     });
 
     test('remove 丢掉该成员泳道，clear 清空', () {
       final MemberLaneBuilder b = MemberLaneBuilder();
-      _act(b, 'a', const TeammateToolCall('rg'));
+      _act(b, 'a', const TeammateToolCall('grep'));
       b.remove('a');
       expect(b.build(<String, bool>{}), isEmpty);
 
@@ -137,8 +137,8 @@ void main() {
       addTearDown(sub.dispose);
 
       // 广播流异步投递，emit 后要放一个事件循环才收得到。
-      team.emit(const TeammateActed('a', TeammateToolCall('rg')));
-      team.emit(const TeammateActed('a', TeammateToolResult('rg')));
+      team.emit(const TeammateActed('a', TeammateToolCall('grep')));
+      team.emit(const TeammateActed('a', TeammateToolResult('grep')));
       await pumpEventQueue();
 
       expect(sub.snapshot.lanes['a']!.lines, hasLength(2));

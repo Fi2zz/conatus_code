@@ -117,7 +117,7 @@ void main() {
       config.mcp.servers.map((McpServerSpec spec) => spec.name),
       containsAll(<String>['global-fs', 'project-remote']),
     );
-    expect(config.permissions.rules.single.action, 'shell');
+    expect(config.permissions.rules.single.action, 'bash');
     expect(config.permissions.rules.single.resource, 'git push *');
     expect(config.instructions, <String>['CONTRIBUTING.md']);
     expect(fixture.out.toString(), contains('已写入'));

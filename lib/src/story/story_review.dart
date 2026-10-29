@@ -17,7 +17,7 @@ import '../diff/diff_types.dart';
 import 'story.dart';
 import 'story_pending.dart';
 
-/// 事前审阅门：把 `write_file` / `edit_file` / `apply_patch` 拦成待定补丁。
+/// 事前审阅门：把 `write` / `edit` / `apply_patch` 拦成待定补丁。
 class StoryReviewGate {
   /// 以待定补丁列表 [pending] 与读文件内容的 [fs] 缝构造。
   StoryReviewGate({required this.pending, this.fs});
@@ -74,13 +74,13 @@ Future<List<PatchOp>?> previewEditedOps(FileSystem? fs, ToolCall call) async {
 }
 
 Future<List<PatchOp>?> _opsFor(FileSystem fs, ToolCall call) async {
-  if (call.name == 'write_file') return _writeOps(fs, call.arguments);
-  if (call.name == 'edit_file') return _editOps(fs, call.arguments);
+  if (call.name == 'write') return _writeOps(fs, call.arguments);
+  if (call.name == 'edit') return _editOps(fs, call.arguments);
   if (call.name == 'apply_patch') return _patchOps(fs, call.arguments);
   return null;
 }
 
-/// write_file：create 且文件已存在时真实工具会失败 → 放行；append 语义为
+/// write：create 且文件已存在时真实工具会失败 → 放行；append 语义为
 /// 旧内容 + 新内容；overwrite 为整文件替换。
 Future<List<PatchOp>?> _writeOps(
   FileSystem fs,
@@ -98,7 +98,7 @@ Future<List<PatchOp>?> _writeOps(
   return <PatchOp>[_fileOp(path, old, next)];
 }
 
-/// edit_file：与 EditFileTool 相同的字面替换语义（见 [applyEditText]）；
+/// edit：与 EditFileTool 相同的字面替换语义（见 [applyEditText]）；
 /// 文件不存在或替换语义不成立 → 放行。
 Future<List<PatchOp>?> _editOps(
   FileSystem fs,

@@ -68,7 +68,7 @@ void main() {
       );
     });
 
-    test('节点不可用 → XERJ_UNAVAILABLE，提示退回 rg', () async {
+    test('节点不可用 → XERJ_UNAVAILABLE，提示退回 grep', () async {
       final FakeShellExecutor shell = FakeShellExecutor(_run());
       final CodeSearchTool tool = CodeSearchTool(
         _exec(shell, endpoint: _FakeEndpoint(null)),
@@ -80,7 +80,7 @@ void main() {
 
       expect(result.isError, isTrue);
       expect(result.error!.code, 'XERJ_UNAVAILABLE');
-      expect(result.content, contains('rg'));
+      expect(result.content, contains('grep'));
       expect(shell.calls, 0);
     });
 

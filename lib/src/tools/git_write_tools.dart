@@ -2,7 +2,7 @@
 ///
 /// 此前只有 `git_status` / `git_diff` / `git_commit` 三个只读+提交工具，于是
 /// `/commit` 的提示词让模型「向用户说明并给出建议（如先 git add 暂存）」——
-/// nava 把一个例行步骤推回给了用户。模型想自己暂存只能走 `run_command`，而它是
+/// nava 把一个例行步骤推回给了用户。模型想自己暂存只能走 `bash`，而它是
 /// `ToolRisk.high`，默认 `askWhenNeeded` 模式正好卡在 high 阈值上，于是每次提交
 /// 都要弹一次审批框。
 ///

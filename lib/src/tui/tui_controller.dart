@@ -258,7 +258,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 子 Agent 进度订阅；控制器销毁时取消。
   StreamSubscription<SubAgentLine>? _subagentSub;
 
-  /// 选项浮层（`ask_user` 与工具审批共用）。
+  /// 选项浮层（`question` 与工具审批共用）。
   ///
   /// 优先复用根上下文里已提供的 `'tuiChoice'`（审批门持有的是同一个），
   /// 未提供时自建一个。
@@ -1196,7 +1196,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     // SpawnAgentTool（子 Agent 不走主轮次的取消竞速）。
     _foregroundInterrupt?.call();
     // 普通聊天轮次里的子 Agent 也一并收掉，否则它在后台继续烧 token。
-    final Tool? spawn = _app.tools.get('spawn_agent');
+    final Tool? spawn = _app.tools.get('task');
     if (_foregroundInterrupt == null && spawn is SpawnAgentTool) {
       spawn.interrupt();
     }
@@ -2023,7 +2023,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     return true;
   }
 
-  /// 自定义命令的 `subagent: true`：前台调用 `spawn_agent`，结果写入记录。
+  /// 自定义命令的 `subagent: true`：前台调用 `task`，结果写入记录。
   ///
   /// 与普通对话轮次一样占用 [busy]、登记取消句柄：期间新输入排队，Esc 会
   /// 同时取消等待与真正的 `SpawnAgentTool`。
@@ -2033,13 +2033,13 @@ class ConatusTuiController implements TuiUserPromptHost {
     String prompt,
   ) async {
     final ToolRegistry tools = _app.tools;
-    final Tool? tool = tools.get('spawn_agent');
+    final Tool? tool = tools.get('task');
     if (tool == null) {
-      showSystemNotice('命令 /$name 需要 spawn_agent，但当前未装配。');
+      showSystemNotice('命令 /$name 需要 task，但当前未装配。');
       return;
     }
     if (def.model != null && def.model!.trim().isNotEmpty) {
-      // 子 Agent 的模型由 Agent profile（`agent:` 对应定义）决定，spawn_agent
+      // 子 Agent 的模型由 Agent profile（`agent:` 对应定义）决定，task
       // 没有单次 model 参数：明确告知而不是静默忽略。
       showSystemNotice(
         '命令 /$name 的 model: ${def.model} 对子 Agent 不生效；'
@@ -2057,7 +2057,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       data: <String, Object?>{
         'text': '',
         'toolCalls': toolCallsToJson(<LlmToolCall>[
-          LlmToolCall(id: callId, name: 'spawn_agent'),
+          LlmToolCall(id: callId, name: 'task'),
         ]),
       },
     );
@@ -2080,7 +2080,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         result = await Future.any<ToolResult>(<Future<ToolResult>>[
           tools.call(
             ToolCall(
-              name: 'spawn_agent',
+              name: 'task',
               arguments: <String, Object?>{
                 'task': prompt,
                 if (def.agent != null) 'agent': def.agent,
@@ -2101,7 +2101,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         kToolResultEvent,
         data: <String, Object?>{
           'callId': callId,
-          'name': 'spawn_agent',
+          'name': 'task',
           'content': interrupted ? '已打断' : result.content,
           'isError': interrupted || result.isError,
         },
@@ -3300,7 +3300,7 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/init`：让模型扫描仓库并生成 / 更新 AGENTS.md。
   ///
-  /// 不直接写文件：提交固定提示词走正常轮次，由模型经 write_file 落盘
+  /// 不直接写文件：提交固定提示词走正常轮次，由模型经 write 落盘
   /// （沙箱限定工作区、审批照常）。
   /// `/init` 生成的 AGENTS.md 章节骨架。
   ///
@@ -3326,7 +3326,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     await submit(
       '扫描当前仓库（工作目录）的结构与关键文件，生成 AGENTS.md：'
       '$kInitSections。$kInitDiagnosticsHint'
-      '${exists ? '文件已存在：先读取再改写，保留仍有用的内容。' : '文件不存在：用 write_file 创建到仓库根。'}',
+      '${exists ? '文件已存在：先读取再改写，保留仍有用的内容。' : '文件不存在：用 write 创建到仓库根。'}',
     );
   }
 
@@ -3822,7 +3822,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         planning: planning,
         onStream: _onLlmStream,
       );
-      // 计划闭环：plan_write 建计划，update_plan 在执行中推进。
+      // 计划闭环：plan_write 建计划，todowrite 在执行中推进。
       providePlanTool(child, session: session);
       provideUpdatePlanTool(child, session: session);
       providePlanMode(child, session: session);

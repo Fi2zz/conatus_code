@@ -40,7 +40,7 @@ void main() {
     const String source = '''
 {
   "permissions": [
-    { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "bash", "resource": "*", "effect": "ask" },
   ],
   "instructions": ["AGENTS.md",],
 }
@@ -49,7 +49,7 @@ void main() {
     expect(decodeJsonc(source), <String, Object?>{
       'permissions': <Object?>[
         <String, Object?>{
-          'action': 'shell',
+          'action': 'bash',
           'resource': '*',
           'effect': 'ask',
         },

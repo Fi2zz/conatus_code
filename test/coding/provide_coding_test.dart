@@ -39,12 +39,12 @@ void main() {
 
       expect(
         registered.map((Tool t) => t.name),
-        containsAll(<String>['read_file', 'write_file', 'edit_file', 'glob']),
+        containsAll(<String>['read', 'write', 'edit', 'glob']),
       );
-      expect(registered.map((Tool t) => t.name), isNot(contains('rg')));
+      expect(registered.map((Tool t) => t.name), isNot(contains('grep')));
       expect(
         tools.names,
-        containsAll(<String>['read_file', 'write_file', 'edit_file', 'glob']),
+        containsAll(<String>['read', 'write', 'edit', 'glob']),
       );
       ctx.dispose();
       expect(tools.names, isEmpty);
@@ -61,8 +61,8 @@ void main() {
         ripgrep: const RipgrepBinary(path: 'rg', source: RipgrepSource.system),
       );
 
-      expect(registered.map((Tool t) => t.name), contains('rg'));
-      expect(tools.names, contains('rg'));
+      expect(registered.map((Tool t) => t.name), contains('grep'));
+      expect(tools.names, contains('grep'));
     });
 
     test('enableSearch=false → 不注册 glob 与 rg', () {
@@ -72,7 +72,7 @@ void main() {
           provideCoding(ctx, fs: fs, enableSearch: false);
 
       expect(registered.map((Tool t) => t.name), isNot(contains('glob')));
-      expect(registered.map((Tool t) => t.name), isNot(contains('rg')));
+      expect(registered.map((Tool t) => t.name), isNot(contains('grep')));
     });
 
     test('enableRuntime=false → 不提供 codeRuntime 服务', () {

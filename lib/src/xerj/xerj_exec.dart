@@ -184,7 +184,7 @@ class XerjExec {
   ToolResult _unavailable() => _failure(
     'XERJ_UNAVAILABLE',
     'XERJ 节点不可用（未安装 xerj、端口 $_port/${_port + 1} 被占用或启动超时）。'
-        '改用 rg 检索；需要代码索引时先运行 index_project。',
+        '改用 grep 检索；需要代码索引时先运行 index_project。',
   );
 
   int get _port => Uri.parse(_url).port;

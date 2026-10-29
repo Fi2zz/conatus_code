@@ -1,32 +1,21 @@
-/// OpenCode 兼容映射：权限动作名与工具名。
+/// OpenCode 兼容映射：权限动作名。
 ///
-/// OpenCode 的 Agent frontmatter 用 `bash` / `write` / `patch` 等动作名，工具
-/// 名也与 nava 不同；解析时统一归一到 nava 的动作 / 工具标识。未知名称原样
-/// 保留，便于自定义工具继续工作。
+/// nava 的工具标识与权限动作已与 OpenCode 对齐（`bash` / `read` / `edit` /
+/// `task` …）；这里只保留历史动作名的归并（`write` / `patch` → `edit`，
+/// `list` → `read`）。未知名称原样保留，便于自定义工具继续工作。
 library;
 
 import 'package:conatus_agent/conatus_agent.dart' show permissionActionFor;
 
-/// OpenCode 权限动作 → nava 权限动作。
+/// OpenCode 动作名 → nava 权限动作。
 const Map<String, String> _openCodeActions = <String, String>{
-  'bash': 'shell',
   'write': 'edit',
   'patch': 'edit',
-  'edit': 'edit',
-  'read': 'read',
-  'grep': 'grep',
-  'glob': 'glob',
-  'webfetch': 'webfetch',
-  'websearch': 'websearch',
-  'subagent': 'subagent',
-  'task': 'subagent',
-  'skill': 'skill',
+  'list': 'read',
 };
 
 /// OpenCode 有、但 nava 没有对应工具的权限动作；保留规则只会永不命中。
 const Set<String> _unsupportedActions = <String>{
-  'list',
-  'todowrite',
   'todoread',
   'lsp',
 };
@@ -35,34 +24,16 @@ const Set<String> _unsupportedActions = <String>{
 const Set<String> _knownActions = <String>{
   'read',
   'edit',
-  'shell',
+  'bash',
   'grep',
   'glob',
   'webfetch',
   'websearch',
-  'subagent',
+  'task',
   'skill',
   'question',
+  'todowrite',
   'external_directory',
-};
-
-/// OpenCode 工具名 → nava 工具名。
-const Map<String, String> _openCodeTools = <String, String>{
-  'read': 'read_file',
-  'write': 'write_file',
-  'edit': 'edit_file',
-  'patch': 'apply_patch',
-  'bash': 'run_command',
-  'grep': 'rg',
-  'glob': 'glob',
-  'webfetch': 'fetch_url',
-  'websearch': 'web_search',
-  'question': 'ask_user',
-  'subagent': 'spawn_agent',
-  'task': 'spawn_agent',
-  'list': 'list_files',
-  'todowrite': 'update_plan',
-  'skill': 'skill',
 };
 
 /// 把 OpenCode / 工具名形式的动作归一为 nava 权限动作。
@@ -82,9 +53,3 @@ bool agentActionKnown(String raw, String normalized) {
 /// nava 是否有对应工具承接该 OpenCode 动作。
 bool agentActionSupported(String raw) =>
     !_unsupportedActions.contains(raw.trim());
-
-/// 把 OpenCode 工具名归一为 nava 工具名；未知名称原样返回。
-String mapAgentToolName(String raw) {
-  final String trimmed = raw.trim();
-  return _openCodeTools[trimmed] ?? trimmed;
-}

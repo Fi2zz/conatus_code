@@ -9,7 +9,7 @@ class EditFileTool extends Tool {
   final FileSystem _fs;
 
   @override
-  String get name => 'edit_file';
+  String get name => 'edit';
 
   @override
   String get description =>

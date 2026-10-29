@@ -57,7 +57,7 @@ void main() {
     );
 
     await rig.tools.call(
-      permissionCall('write_file', <String, Object?>{
+      permissionCall('write', <String, Object?>{
         'path': '${dir.path}/src/a.dart',
       }),
     );

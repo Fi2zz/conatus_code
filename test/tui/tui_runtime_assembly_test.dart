@@ -291,7 +291,7 @@ void main() {
     await runtime.dispose();
   });
 
-  test('装配后 approval 与 ask_user 就绪，控制器共用同一浮层', () async {
+  test('装配后 approval 与 question 就绪，控制器共用同一浮层', () async {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));
     final String sep = Platform.pathSeparator;
@@ -347,7 +347,7 @@ void main() {
     controller.choice.confirm(); // 「允许一次」
     expect((await blocked).isError, isFalse);
 
-    // ask_user 经同一浮层提问，选中项作为工具结果回传。
+    // question 经同一浮层提问，选中项作为工具结果回传。
     final Future<ToolResult> asked = runtime.tools.call(
       const ToolCall(
         name: kAskUserToolName,
@@ -363,7 +363,7 @@ void main() {
     await runtime.dispose();
   });
 
-  test('interactive: false 时跳过浮层 / 审批 / ask_user（headless）', () async {
+  test('interactive: false 时跳过浮层 / 审批 / question（headless）', () async {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));
     final String sep = Platform.pathSeparator;

@@ -48,7 +48,7 @@ void main() {
 
     final ToolResult result = await app.tools.call(
       const ToolCall(
-        name: 'write_file',
+        name: 'write',
         arguments: <String, Object?>{'path': 'lib/a.dart'},
       ),
     );

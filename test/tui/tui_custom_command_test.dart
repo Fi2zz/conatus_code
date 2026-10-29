@@ -179,7 +179,7 @@ void main() {
     );
   });
 
-  test('subagent: true 前台执行 spawn_agent 并写入结果', () async {
+  test('subagent: true 前台执行 task 并写入结果', () async {
     final CommandHarness harness = await buildCommandHarness(
       commands: <String, String>{
         'research.md':
@@ -221,7 +221,7 @@ void main() {
     );
 
     expect((user.last.data as Map)['text'], contains('调研：src/core'));
-    expect((tools.last.data as Map)['name'], 'spawn_agent');
+    expect((tools.last.data as Map)['name'], 'task');
     expect((tools.last.data as Map)['content'], contains('fake-spawn'));
 
     harness.controller.transcript.rebuildFrom(session);
@@ -275,7 +275,7 @@ void main() {
       session: session,
       modelLabel: 'mock',
     ).toMarkdown();
-    expect(exported, contains('spawn_agent'));
+    expect(exported, contains('task'));
     expect(exported, contains('fake-spawn'));
   });
 

@@ -33,7 +33,7 @@ void main() {
       );
 
       final ToolResult result = await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': file}),
+        permissionCall('read', <String, Object?>{'path': file}),
       );
       expect(result.isError, isFalse);
       final ApprovalRequest request = rig.gate.requests.single;
@@ -59,9 +59,9 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': file}),
+        permissionCall('read', <String, Object?>{'path': file}),
       );
-      expect(rig.runs, <String>['read_file']);
+      expect(rig.runs, <String>['read']);
     });
 
     test('相对路径 ../../ 越界也进入 external_directory', () async {
@@ -81,14 +81,14 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{
+        permissionCall('read', <String, Object?>{
           'path': '../../etc/passwd',
         }),
       );
       expect(rig.gate.requests.single.action, 'external_directory');
 
       await rig.tools.call(
-        permissionCall('read_file', <String, Object?>{'path': 'sub/a.txt'}),
+        permissionCall('read', <String, Object?>{'path': 'sub/a.txt'}),
       );
       expect(rig.gate.requests, hasLength(1));
     });
@@ -110,13 +110,13 @@ void main() {
       );
 
       await rig.tools.call(
-        permissionCall('rg', <String, Object?>{'pattern': 'TODO', 'path': '/'}),
+        permissionCall('grep', <String, Object?>{'pattern': 'TODO', 'path': '/'}),
       );
       expect(rig.gate.requests.single.action, 'external_directory');
       expect(rig.gate.requests.single.resources.single, '/*');
 
       await rig.tools.call(
-        permissionCall('rg', <String, Object?>{
+        permissionCall('grep', <String, Object?>{
           'pattern': 'TODO',
           'path': work.path,
         }),

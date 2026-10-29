@@ -6,7 +6,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 
 import 'story_blocks.dart';
 
-/// 取出本次编辑涉及的文件：`write_file` / `edit_file` 在参数里，
+/// 取出本次编辑涉及的文件：`write` / `edit` 在参数里，
 /// `apply_patch`（多文件）在结果的 `files` 里（与 lint 同一取法）。
 List<String> storyEditedPaths(ToolCall call, ToolResult result) {
   final Object? single = call.arguments['path'];

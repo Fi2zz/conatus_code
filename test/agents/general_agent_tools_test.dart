@@ -50,17 +50,17 @@ void main() {
     addTearDown(host.dispose);
     final ToolRegistry tools = ToolRegistry();
     tools.fn(
-      'write_file',
+      'write',
       riskLevel: ToolRisk.medium,
       handler: (ToolContext ctx) async => ToolResult.success('w'),
     );
     tools.fn(
-      'run_command',
+      'bash',
       riskLevel: ToolRisk.high,
       handler: (ToolContext ctx) async => ToolResult.success('r'),
     );
     tools.fn(
-      'spawn_agent',
+      'task',
       handler: (ToolContext ctx) async => ToolResult.success('s'),
     );
     final Directory workdir = Directory.systemTemp.createTempSync(
@@ -86,7 +86,7 @@ void main() {
     final ToolResult result = await spawn.call(
       const ToolContext(
         ToolCall(
-          name: 'spawn_agent',
+          name: 'task',
           arguments: <String, Object?>{'task': 'write', 'agent': 'general'},
         ),
       ),
@@ -94,8 +94,8 @@ void main() {
 
     expect(result.isError, isFalse);
     final Set<String> exposed = _names(provider.schemas.first);
-    expect(exposed, contains('write_file'));
-    expect(exposed, isNot(contains('spawn_agent')));
-    expect(exposed, isNot(contains('run_command')));
+    expect(exposed, contains('write'));
+    expect(exposed, isNot(contains('task')));
+    expect(exposed, isNot(contains('bash')));
   });
 }

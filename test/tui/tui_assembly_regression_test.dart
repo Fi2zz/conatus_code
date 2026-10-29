@@ -2,7 +2,7 @@
 ///
 /// - 大工具结果：溢出目录曾落在 `systemTemp`，而 fs 闸门默认以工作目录为根，
 ///   于是 >80KB 的结果直接 `FS_SANDBOX_DENIED`；就算写出去，模型按预览里的提示
-///   `read_file` 读回来也会被拒。
+///   `read` 读回来也会被拒。
 /// - 换模型：装配期无条件 `provide('llmChain', …)`，换模型再 provide 一次撞
 ///   Context 的服务键唯一性 → 第一次切换必抛 StateError。
 library;
@@ -71,7 +71,7 @@ Future<ConatusTuiRuntime> _boot(
 }
 
 void main() {
-  test('大工具结果：溢出文件写在 jail 内，且模型能 read_file 读回来', () async {
+  test('大工具结果：溢出文件写在 jail 内，且模型能 read 读回来', () async {
     final Directory dir = Directory.systemTemp.createTempSync('nava-spill');
     addTearDown(() => dir.deleteSync(recursive: true));
     final Context app = (await _boot(dir)).app;
@@ -92,14 +92,14 @@ void main() {
     final RegExpMatch? spill = RegExp(r'(/\S+\.txt)').firstMatch(first.content);
     expect(spill, isNotNull, reason: '预览应给出溢出文件路径，实际：${first.content}');
 
-    // 关键：预览让模型 read_file 读回来，这一步以前必然被 jail 拒绝。
+    // 关键：预览让模型 read 读回来，这一步以前必然被 jail 拒绝。
     final ToolResult read = await app.tools.call(
       ToolCall(
-        name: 'read_file',
+        name: 'read',
         arguments: <String, Object?>{'path': spill!.group(1)},
       ),
     );
-    expect(read.isError, isFalse, reason: '溢出文件必须可被 read_file 读回');
+    expect(read.isError, isFalse, reason: '溢出文件必须可被 read 读回');
     expect(read.content, contains('yyyy'));
   });
 
@@ -137,7 +137,7 @@ void main() {
 
     final ToolResult result = await app.tools.call(
       const ToolCall(
-        name: 'read_file',
+        name: 'read',
         arguments: <String, Object?>{'path': 'pubspec.yaml'},
       ),
       timeout: const Duration(milliseconds: 30),

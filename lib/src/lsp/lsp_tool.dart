@@ -102,7 +102,7 @@ ToolMiddleware lspDiagnosticsMiddleware(LspDiagnosticsSource source) {
   return (ToolCall call, Future<ToolResult> Function() next) async {
     final ToolResult result = await next();
     if (result.isError) return result;
-    if (!const <String>{'write_file', 'edit_file', 'apply_patch'}.contains(call.name)) {
+    if (!const <String>{'write', 'edit', 'apply_patch'}.contains(call.name)) {
       return result;
     }
     final List<String> paths = _paths(result.value);

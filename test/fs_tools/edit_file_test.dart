@@ -5,7 +5,7 @@ import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
 ToolContext _context(Map<String, Object?> args) =>
-    ToolContext(ToolCall(name: 'edit_file', arguments: args));
+    ToolContext(ToolCall(name: 'edit', arguments: args));
 
 void main() {
   late Directory dir;
@@ -23,6 +23,10 @@ void main() {
   });
 
   group('EditFileTool', () {
+    test('工具名为 edit', () {
+      expect(tool.name, 'edit');
+    });
+
     test('唯一匹配替换', () async {
       File('${dir.path}/a.txt').writeAsStringSync('hello world');
 

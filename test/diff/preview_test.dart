@@ -31,34 +31,34 @@ void main() {
     );
   });
 
-  test('write_file 预览：缺 fs / 新文件 / 无改动 / 已有文件', () async {
+  test('write 预览：缺 fs / 新文件 / 无改动 / 已有文件', () async {
     final Map<String, Object?> args = <String, Object?>{
       'path': 'a.txt',
       'content': 'hi\n',
     };
-    expect(await buildApprovalPreview(null, 'write_file', args), isNull);
+    expect(await buildApprovalPreview(null, 'write', args), isNull);
 
-    final String? created = await buildApprovalPreview(fs, 'write_file', args);
+    final String? created = await buildApprovalPreview(fs, 'write', args);
     expect(created, contains('--- a/a.txt'));
     expect(created, contains('+hi'));
 
     File('${dir.path}/a.txt').writeAsStringSync('hi\n');
-    expect(await buildApprovalPreview(fs, 'write_file', args), '（无实际改动）');
+    expect(await buildApprovalPreview(fs, 'write', args), '（无实际改动）');
 
     final String? changed = await buildApprovalPreview(
       fs,
-      'write_file',
+      'write',
       <String, Object?>{'path': 'a.txt', 'content': 'new\n'},
     );
     expect(changed, contains('-hi'));
     expect(changed, contains('+new'));
   });
 
-  test('edit_file 预览：替换后 diff；old_string 不存在返回 null；超长截断', () async {
+  test('edit 预览：替换后 diff；old_string 不存在返回 null；超长截断', () async {
     File('${dir.path}/b.txt').writeAsStringSync('hello world\n');
     final String? edited = await buildApprovalPreview(
       fs,
-      'edit_file',
+      'edit',
       <String, Object?>{
         'path': 'b.txt',
         'old_string': 'world',
@@ -71,7 +71,7 @@ void main() {
     expect(
       await buildApprovalPreview(
         fs,
-        'edit_file',
+        'edit',
         <String, Object?>{'path': 'b.txt', 'old_string': 'zzz', 'new_string': 'y'},
       ),
       isNull,

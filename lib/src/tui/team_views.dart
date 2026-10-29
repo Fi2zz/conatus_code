@@ -172,7 +172,7 @@ class MemberLaneView extends StatelessComponent {
   /// 泳道 id（团队成员 id 或子 Agent 投影 id）。
   ///
   /// 团队成员显示成员名；子 Agent 泳道没有成员可显示，故退回 id——
-  /// 它的**行**里带着投影器给的阶段描述（`→ rg` / `✓ 收口：3 轮`），
+  /// 它的**行**里带着投影器给的阶段描述（`→ grep` / `✓ 收口：3 轮`），
   /// 那才是有用的信息。
   final String id;
 
