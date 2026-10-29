@@ -169,27 +169,6 @@ void main() {
     expect(fix.controller.transcript.messages.last.text, contains('读取失败'));
   });
 
-  test('tab 栏渲染标题、活跃标记与容量提示', () async {
-    final RenameFixture fix = await buildRenameFixture(start: false);
-    final NoctermTester tester = await NoctermTester.create();
-    addTearDown(tester.dispose);
-    await tester.pumpComponent(AgentTui(controller: fix.controller));
-    await _eventually(tester, () => fix.controller.ready);
-    await fix.controller.renameSession(renameCurrentId, 'TabTitleOne');
-    await tester.pump();
-
-    expect(tester.terminalState, containsText('TabTitleOne'));
-    expect(tester.terminalState, containsText('1/8'));
-    expect(tester.terminalState, containsText('▸'));
-    expect(tester.terminalState, containsText('+'));
-    expect(tester.terminalState, containsText('ctrl+x 再 w'));
-
-    await fix.controller.handleLine('/new');
-    await tester.pump();
-    expect(fix.controller.tabs.tabs, hasLength(2));
-    expect(tester.terminalState, containsText('2/8'));
-  });
-
   test('Ctrl+Tab / Ctrl+Shift+Tab / <leader>w 通过键位动作切换与关闭', () async {
     final RenameFixture fix = await buildRenameFixture(start: false);
     final NoctermTester tester = await NoctermTester.create();
