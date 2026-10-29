@@ -156,6 +156,33 @@ void main() {
     }
   });
 
+  test('ctrl+o 展开最近一条可折叠的工具结果', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      controller.transcript.add(
+        TuiRole.tool,
+        List<String>.generate(20, (int i) => '展开测试第 $i 行').join('\n'),
+      );
+      controller.transcript.add(TuiRole.thinking, '· 思考：短消息');
+      await tester.pump();
+
+      expect(tester.terminalState, isNot(containsText('展开测试第 15 行')));
+
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyO,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+
+      expect(tester.terminalState, containsText('展开测试第 15 行'));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('输入框为空时 ↑ 取回上一条提交的输入', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();

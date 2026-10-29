@@ -364,6 +364,23 @@ void main() {
     resumedApp.dispose();
   });
 
+  test('ctrl+o 展开最近一条可折叠消息，跳过后面的短思考', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+    );
+    controller.transcript.add(
+      TuiRole.tool,
+      List<String>.generate(20, (int i) => '第 $i 行').join('\n'),
+    );
+    controller.transcript.add(TuiRole.thinking, '· 思考：短消息');
+
+    controller.toggleToolExpanded();
+
+    expect(controller.transcript.messages.first.expanded, isTrue);
+    expect(controller.transcript.messages.last.expanded, isFalse);
+    app.dispose();
+  });
+
   test('/setting 打开设置面板，Esc 关闭', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],

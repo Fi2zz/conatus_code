@@ -3941,11 +3941,14 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 消息时不动作）。
   void toggleToolExpanded() {
     for (final TuiMessage message in transcript.messages.reversed) {
-      if (message.role == TuiRole.tool || message.role == TuiRole.thinking) {
-        message.expanded = !message.expanded;
-        _refresh();
-        return;
+      if (message.role != TuiRole.tool && message.role != TuiRole.thinking) {
+        continue;
       }
+      // 跳过本来就不折叠的短消息：最近一条可折叠的才响应 ctrl+o。
+      if (message.text.split('\n').length <= kToolPreviewLines) continue;
+      message.expanded = !message.expanded;
+      _refresh();
+      return;
     }
   }
 
