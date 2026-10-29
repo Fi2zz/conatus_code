@@ -2661,9 +2661,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       transcript.add(TuiRole.system, '搜索未装配。');
       return;
     }
-    final List<SearchSourceStatus> statuses = service.runtimeStatuses();
-    final List<SearchSourceStatus> all =
-        statuses.isEmpty ? service.statuses : statuses;
+    final List<SearchSourceStatus> all = service.allStatuses();
     if (all.isEmpty) {
       transcript.add(TuiRole.system, '没有可用的搜索源。');
       return;
