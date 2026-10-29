@@ -2389,15 +2389,13 @@ class ConatusTuiController implements TuiUserPromptHost {
       box.writeln('│ ${row.padRight(width - 1)}│');
     }
     box.writeln('╰${'─' * width}╯');
-    transcript.add(TuiRole.system, box.toString());
-
     final List<String> footer = <String>[
       'Started a new session ($_sessionId).',
       for (final String server in servers)
         'MCP server "$server" connected · '
             '${registry!.toolsOf(server).length} tools',
     ];
-    transcript.add(TuiRole.system, footer.join('\n'));
+    transcript.add(TuiRole.system, '${box.toString()}\n${footer.join('\n')}');
   }
 
   /// 启动默认 Plan Mode：会话没有历史 `plan/mode` 事件时才生效。
