@@ -36,6 +36,33 @@ class _NoopProvider implements LlmProvider {
 }
 
 /// chat 永远挂起、不返回的 provider，用于制造稳定的"在飞轮次"。
+class _StreamingHangProvider implements LlmProvider {
+  final StreamController<LlmStreamEvent> events =
+      StreamController<LlmStreamEvent>();
+
+  @override
+  String get name => 'stream-hang';
+
+  @override
+  Future<LlmResult> chat(
+    List<LlmMessage> messages, {
+    Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
+  }) =>
+      Completer<LlmResult>().future;
+
+  @override
+  Stream<LlmStreamEvent> chatStream(
+    List<LlmMessage> messages, {
+    Map<String, dynamic>? options,
+    List<Map<String, dynamic>>? tools,
+  }) =>
+      events.stream;
+
+  @override
+  void close() {}
+}
+
 class _HangingProvider implements LlmProvider {
   @override
   String get name => 'hang';
@@ -215,6 +242,28 @@ void main() {
       ));
       await tester.pump();
       expect(tester.terminalState, containsText('[file #2 (note.md)]'));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
+  test('打断后迟到的流式思考不再上屏', () async {
+    final _StreamingHangProvider provider = _StreamingHangProvider();
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui(provider: provider);
+    try {
+      unawaited(controller.submit('你好'));
+      await tester.pump();
+      expect(controller.busy, isTrue);
+
+      controller.interrupt();
+      await tester.pump();
+
+      provider.events.add(const LlmReasoningDelta('迟到的思考'));
+      await tester.pump();
+      expect(tester.terminalState, isNot(containsText('迟到的思考')));
     } finally {
       tester.dispose();
       controller.dispose();

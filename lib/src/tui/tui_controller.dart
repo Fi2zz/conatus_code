@@ -496,6 +496,13 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 在飞轮次的取消句柄（Esc / 打断）；null = 无在飞轮次。
   AgentCancel? _cancel;
 
+  /// 当前轮是否已被用户打断；打断后丢弃迟到的流式增量。
+  ///
+  /// `streamChatResult` 被取消后底层 HTTP 流不会立刻停止，仍可能吐几个
+  /// reasoning / text 增量；若照单全收，屏上会在「已打断这一轮」之后又出现
+  /// 一段思考，看起来像自动发起了新请求。
+  bool _turnInterrupted = false;
+
   /// 团队订阅（随会话绑定/解绑）。
   TeamSubscription? _teamSub;
 
@@ -1215,6 +1222,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       _refresh();
       return;
     }
+    _turnInterrupted = true;
     cancel.cancel();
     // 前台子 Agent 命令用同一个 _cancel 门面；闭包里同时收掉真正的
     // SpawnAgentTool（子 Agent 不走主轮次的取消竞速）。
@@ -1283,6 +1291,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     final AgentCancel cancel = AgentCancel();
     _cancel = cancel;
+    _turnInterrupted = false;
     // 新 prompt 即提交：撤销点与待回填内容作废（/redo 不再可用）。
     _revertStage = null;
     _prefill = null;
@@ -3957,6 +3966,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 流式增量透传：思考 / 正文 delta 实时追加到屏上消息（同一条边到边增长），
   /// 终态结束本步流式。
   void _onLlmStream(LlmStreamEvent event) {
+    if (_turnInterrupted) return;
     if (event is LlmReasoningDelta) {
       transcript.appendStream(reasoning: event.text);
       _refresh();
