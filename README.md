@@ -11,7 +11,7 @@
 ## 特性
 
 - 🖥️ 终端交互（内置 TUI，入口 `lib/tui.dart`；Enter 提交，Shift+Enter / Ctrl+J 换行）
-- 🔍 文件读写与搜索（read / write / edit / rg / glob；read 支持目录列举、png/jpg/gif/webp 图片与 PDF 附件）
+- 🔍 文件读写与搜索（read / write / edit / grep / glob；read 支持目录列举、png/jpg/gif/webp 图片与 PDF 附件）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
 - 🔒 审批与命令审查（高危操作走审批；命令执行前过 `command_shield` 形状审查）
@@ -312,7 +312,7 @@ dart:io，不经 fs 接缝；`/rewind` 是用户命令，不挂审批。
   `write("/abs/work/src/x")`，工作区里指向 `/etc/hosts` 的链接也逃不过
   `deny read "/etc/*"`。
 - **工作区外**：路径落到 workdir 外时追加 `external_directory` 判定；`grep` 的
-  `path` 参数也参与边界检查（但不会把每次 rg 变成路径信任提示）。
+  `path` 参数也参与边界检查（但不会把每次 grep 变成路径信任提示）。
 - **MCP 资源**：`action = "list_mcp_resources"` / `"read_mcp_resource"` 配合
   `resource = "<server>"` / `"<server>:*"` 可只放行单台；旧式
   `action = "<server>_list_mcp_resources"` / `"<server>_read_mcp_resource"`
@@ -462,7 +462,7 @@ git clone --depth 1 https://github.com/obra/superpowers ~/.config/superpowers
 ```
 你 › 把 checkpoint 的存储后端加上 git 选项
 思考 › 先看存储实现是怎么选后端的
-✓ rg › lib/src/checkpoint/checkpoint_backend.dart:24（+11 行）
+✓ grep › lib/src/checkpoint/checkpoint_backend.dart:24（+11 行）
 ✗ edit › OS Error: Path does not exist, path = .../nope.dart
 助手 › 路径写错了，改用 checkpoint_backend.dart
 ```
@@ -865,12 +865,12 @@ max_attempts = 4
 ```
 ◆ 子 Agent：调研 checkpoint 存储的实现
   · 第 1 轮 思考中（工具已 0 次）
-  → rg
-  ✓ rg
+  → grep
+  ✓ grep
   · 第 2 轮 输出 380 字符
   → read
   ✗ read
-✓ 子 Agent success：3 轮 （rg、read）
+✓ 子 Agent success：3 轮 （grep、read）
 ```
 
 （`TuiRole.stage` 暗色行，不污染助手正文的排版。）
@@ -916,13 +916,13 @@ token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn
 ```
 ◐ researcher  [执行中]
   · 第 1 轮
-  → rg
-  ✓ rg · 12 处匹配
+  → grep
+  ✓ grep · 12 处匹配
   → read
   ✗ read
 ◆ swarm-1
   → read
-  ✓ 收口：3 轮 （read、rg）
+  ✓ 收口：3 轮 （read、grep）
 ```
 
 - `spawn_teammate` 起的成员与 `task` 起的子 Agent **同处一个视图**
