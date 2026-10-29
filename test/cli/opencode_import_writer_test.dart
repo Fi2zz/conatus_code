@@ -53,6 +53,8 @@ void main() {
     expect(plan.updatedToml, contains('[mcp.servers.fs]'));
     expect(plan.updatedToml, contains(r'env = { TOKEN = "${TOKEN}" }'));
     expect(plan.updatedToml, contains('[[permissions]]'));
+    expect(plan.updatedToml, contains('action = "bash"'));
+    expect(plan.updatedToml, isNot(contains('action = "shell"')));
     expect(plan.updatedToml, contains('instructions = [ "CONTRIBUTING.md" ]'));
     expect(plan.updatedToml, contains('extra_skill_dirs = [ "/tmp/team-skills" ]'));
     expect(plan.snippet, contains('[mcp.servers.fs]'));
