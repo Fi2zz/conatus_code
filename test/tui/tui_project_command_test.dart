@@ -250,6 +250,30 @@ void main() {
     controller.dispose();
   });
 
+  test('/projects 支持 r 回填重命名', () async {
+    final Directory temp = _tempDir();
+    final Directory work = _tempDir();
+    final ProjectRegistry registry = ProjectRegistry.open(
+      dbPath: '${temp.path}/projects.db',
+      workspacesDir: '${temp.path}/workspaces',
+    );
+    addTearDown(registry.close);
+    final WorkspaceInfo info = registry.resolve(work.path);
+    final (ConatusTuiController controller, _) = await _build(
+      info: info,
+      registry: registry,
+    );
+
+    final Future<void> pending = controller.handleLine('/projects');
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.choice.request!.showRename, isTrue);
+    controller.renameSelectedProject();
+    await pending;
+
+    expect(controller.takePrefillInput(), '/project rename ${info.projectName}');
+    controller.dispose();
+  });
+
   test('/project icon 与 prune', () async {
     final Directory temp = _tempDir();
     final Directory work = _tempDir();
@@ -271,6 +295,14 @@ void main() {
     Directory(work.path).deleteSync(recursive: true);
     await controller.handleLine('/project prune');
     expect(controller.transcript.messages.last.text, contains('已归档 1'));
+
+    await controller.handleLine('/project unarchive ${info.projectId}');
+    expect(registry.project(info.projectId)!.timeArchived, isNull);
+
+    await controller.handleLine('/project prune');
+    await controller.handleLine('/project prune --purge');
+    expect(registry.project(info.projectId), isNull);
+    expect(Directory(info.dataDir).existsSync(), isFalse);
     controller.dispose();
   });
 

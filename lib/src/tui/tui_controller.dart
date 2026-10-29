@@ -46,6 +46,7 @@ import '../diff/diff_source.dart';
 import '../hooks/hooks.dart';
 import '../lsp/lsp_manager.dart';
 import '../permissions/permission_wiring.dart';
+import '../project/project_database.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
 import '../revert/revert_compensate.dart';
@@ -1792,6 +1793,12 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   Future<void> _handleCommand(String command, String arg) async {
+    final WorkspaceInfo? activeInfo = _app.get<WorkspaceInfo>('projectInfo');
+    final ProjectRegistry? activeRegistry =
+        _app.get<ProjectRegistry>('projectRegistry');
+    if (activeInfo != null && activeRegistry != null) {
+      activeRegistry.touchProject(activeInfo.projectId);
+    }
     switch (command) {
       case 'quit' || 'exit':
         onExit?.call();
@@ -2558,9 +2565,33 @@ class ConatusTuiController implements TuiUserPromptHost {
       );
       return;
     }
-    if (rest == 'prune') {
+    if (rest == 'prune' || rest.startsWith('prune ')) {
+      final bool purge = rest.substring('prune'.length).trim() == '--purge';
       final int archived = registry.archiveMissing();
-      transcript.add(TuiRole.system, '已归档 $archived 个失效项目。');
+      final int purged = purge ? registry.purgeArchived() : 0;
+      transcript.add(
+        TuiRole.system,
+        '已归档 $archived 个失效项目${purge ? '，删除 $purged 个归档项目' : ''}。',
+      );
+      return;
+    }
+    if (rest == 'unarchive' || rest.startsWith('unarchive ')) {
+      final String selector = rest.substring('unarchive'.length).trim();
+      final WorkspaceInfo? target = registry
+          .list(includeArchived: true)
+          .where(
+            (WorkspaceInfo item) =>
+                item.projectId == selector ||
+                item.projectId.startsWith(selector) ||
+                item.projectName == selector,
+          )
+          .firstOrNull;
+      if (target == null) {
+        transcript.add(TuiRole.system, '没有匹配的归档项目：$selector');
+        return;
+      }
+      registry.setArchived(target.projectId, archived: false);
+      transcript.add(TuiRole.system, '已恢复项目：${target.projectName}');
       return;
     }
     if (rest == 'icon' || rest.startsWith('icon ')) {
@@ -2601,7 +2632,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (rest != 'rename' && !rest.startsWith('rename ')) {
       transcript.add(
         TuiRole.system,
-        '用法：/project [list|open <项目|短ID|路径>|rename <名字>]',
+        '用法：/project [list|open <项目|短ID|路径>|rename <名字>|'
+        'unarchive <项目|短ID>|icon <图标> [颜色]|prune [--purge]]',
       );
       return;
     }
@@ -2636,7 +2668,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     final List<WorkspaceInfo> matches = registry
-        .list()
+        .list(includeArchived: true)
         .where(
           (WorkspaceInfo item) =>
               item.worktreeId == selector ||
@@ -2708,7 +2740,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       transcript.add(TuiRole.system, '项目注册表未启用。');
       return;
     }
-    final List<WorkspaceInfo> list = registry.list();
+    final List<WorkspaceInfo> list = registry.list(includeArchived: true);
     if (list.isEmpty) {
       transcript.add(TuiRole.system, '没有已登记项目。');
       return;
@@ -2716,22 +2748,51 @@ class ConatusTuiController implements TuiUserPromptHost {
     final String? selected = await choice.ask(
       TuiChoiceRequest(
         title: '项目',
+        showRename: true,
         choices: <TuiChoice>[
           for (final WorkspaceInfo item in list)
-            TuiChoice(
-              id: item.worktreeId,
-              label:
-                  '${registry.project(item.projectId)?.iconUrl ?? ''}'
-                  '${registry.project(item.projectId)?.iconUrl == null ? '' : ' '}'
-                  '${item.projectName}',
-              description: item.worktreePath,
-              current: item.worktreeId == info.worktreeId,
-            ),
+            _projectChoice(registry, item, info.worktreeId),
         ],
       ),
     );
     if (selected == null) return;
     _openProject(info, registry, selected);
+  }
+
+  TuiChoice _projectChoice(
+    ProjectRegistry registry,
+    WorkspaceInfo item,
+    String currentWorktreeId,
+  ) {
+    final ProjectRecord? project = registry.project(item.projectId);
+    final String icon = project?.iconUrl ?? '';
+    final bool archived = project?.timeArchived != null;
+    return TuiChoice(
+      id: item.worktreeId,
+      label:
+          '${icon.isEmpty ? '' : '$icon '}${item.projectName}'
+          '${archived ? '  [已归档]' : ''}',
+      description: item.worktreePath,
+      current: item.worktreeId == currentWorktreeId,
+      color: project?.iconColor,
+    );
+  }
+
+  /// 项目面板按 `r`：当前项直接回填重命名命令；其他项先让用户切换。
+  void renameSelectedProject() {
+    final TuiChoiceRequest? request = choice.request;
+    if (request == null || request.choices.isEmpty) return;
+    final String id = request.choices[choice.index].id;
+    final WorkspaceInfo? info = _app.get<WorkspaceInfo>('projectInfo');
+    if (info == null || info.worktreeId != id) {
+      transcript.add(TuiRole.system, '先 Enter 打开该项目，再按 r 重命名。');
+      return;
+    }
+    final ProjectRecord? project = _app
+        .get<ProjectRegistry>('projectRegistry')
+        ?.project(info.projectId);
+    choice.cancel();
+    prefillInput('/project rename ${project?.name ?? info.projectName}');
   }
 
   Future<void> _handleWorktree(String arg) async {

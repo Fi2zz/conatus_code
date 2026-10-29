@@ -14,6 +14,7 @@ class TuiChoice {
     required this.label,
     this.description = '',
     this.current = false,
+    this.color,
   });
 
   /// 回传给提问方的标识。
@@ -27,17 +28,27 @@ class TuiChoice {
 
   /// 是否为当前取值（渲染 `← 当前` 标记）。
   final bool current;
+
+  /// 可选的文字颜色（`#RRGGBB`）。
+  final String? color;
 }
 
 /// 一次提问的内容。
 class TuiChoiceRequest {
-  const TuiChoiceRequest({required this.title, required this.choices});
+  const TuiChoiceRequest({
+    required this.title,
+    required this.choices,
+    this.showRename = false,
+  });
 
   /// 标题行。
   final String title;
 
   /// 可选项。
   final List<TuiChoice> choices;
+
+  /// 是否显示 `r 重命名` 提示；由项目面板使用。
+  final bool showRename;
 }
 
 /// 选项浮层状态。

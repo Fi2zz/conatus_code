@@ -706,7 +706,7 @@ class _AgentTuiState extends State<AgentTui> {
     setState(() {});
   }
 
-  /// 选项浮层按键：↑↓ 移动、Enter 确认、Esc 取消；浮层未打开返回 false。
+  /// 选项浮层按键：↑↓ 移动、Enter 确认、Esc 取消；项目面板额外支持 r 重命名。
   bool _onChoiceKey(KeyboardEvent event) {
     final TuiChoicePrompt prompt = _controller.choice;
     if (!prompt.open) {
@@ -720,6 +720,9 @@ class _AgentTuiState extends State<AgentTui> {
       prompt.confirm();
     } else if (event.logicalKey == LogicalKey.escape) {
       prompt.cancel();
+    } else if (event.logicalKey == LogicalKey.keyR &&
+        prompt.request?.showRename == true) {
+      _controller.renameSelectedProject();
     }
     return true; // 浮层打开时吞掉按键，避免误输入。
   }

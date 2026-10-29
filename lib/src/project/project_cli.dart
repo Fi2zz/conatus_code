@@ -10,15 +10,25 @@ Future<int> runProjectCli(
   List<String> args, {
   Map<String, String>? env,
 }) async {
-  if (args.length != 1 || (args.first != 'repair' && args.first != 'prune')) {
-    stderr.writeln('用法：nava project repair|prune');
+  final bool purge = args.contains('--purge');
+  final List<String> positional = args
+      .where((String arg) => arg != '--purge')
+      .toList();
+  if (positional.length != 1 ||
+      (positional.first != 'repair' && positional.first != 'prune') ||
+      (purge && positional.first != 'prune')) {
+    stderr.writeln('用法：nava project repair|prune [--purge]');
     return 2;
   }
-  if (args.first == 'prune') {
+  if (positional.first == 'prune') {
     final ProjectRegistry registry = ProjectRegistry.open(env: env);
     try {
       final int archived = registry.archiveMissing();
-      stdout.writeln('已归档 $archived 个失效项目。');
+      final int purged = purge ? registry.purgeArchived() : 0;
+      stdout.writeln(
+        '已归档 $archived 个失效项目'
+        '${purge ? '，删除 $purged 个归档项目' : ''}。',
+      );
       return 0;
     } finally {
       registry.close();

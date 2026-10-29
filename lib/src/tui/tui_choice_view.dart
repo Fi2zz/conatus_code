@@ -41,7 +41,9 @@ class TuiChoiceView extends StatelessComponent {
             ),
           ),
           Text(
-            '↑↓ 选择 · Enter 确认 · Esc 取消',
+            request.showRename
+                ? '↑↓ 选择 · Enter 确认 · r 重命名 · Esc 取消'
+                : '↑↓ 选择 · Enter 确认 · Esc 取消',
             style: TextStyle(color: NavaTheme.palette.muted),
           ),
           const SizedBox(height: 1),
@@ -50,6 +52,15 @@ class TuiChoiceView extends StatelessComponent {
         ],
       ),
     );
+  }
+
+  Color? _color(String? value) {
+    if (value == null) return null;
+    final String hex = value.replaceFirst('#', '');
+    if (hex.length != 6) return null;
+    final int? rgb = int.tryParse(hex, radix: 16);
+    if (rgb == null) return null;
+    return Color(rgb | 0xFF000000);
   }
 
   Component _row(TuiChoice choice, bool isSelected) {
@@ -66,7 +77,7 @@ class TuiChoiceView extends StatelessComponent {
                 style: TextStyle(
                   color: isSelected
                       ? NavaTheme.palette.selectedText
-                      : NavaTheme.palette.text,
+                      : _color(choice.color) ?? NavaTheme.palette.text,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),

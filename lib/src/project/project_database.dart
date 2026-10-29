@@ -243,6 +243,13 @@ ON CONFLICT(id) DO UPDATE SET
     });
   }
 
+  void deleteProject(String id) {
+    _guard(() {
+      _db.execute('DELETE FROM worktree WHERE project_id = ?', <Object?>[id]);
+      _db.execute('DELETE FROM project WHERE id = ?', <Object?>[id]);
+    });
+  }
+
   void renameProject(String id, String name) {
     _guard(() {
       _db.execute(

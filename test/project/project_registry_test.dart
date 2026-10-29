@@ -166,6 +166,24 @@ void main() {
     );
   });
 
+  test('unarchive 与 purgeArchived', () {
+    final Directory home = _tempDir();
+    final Directory work = _tempDir();
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+    final WorkspaceInfo info = registry.resolve(work.path);
+    Directory(work.path).deleteSync(recursive: true);
+    expect(registry.archiveMissing(), 1);
+    expect(registry.list(), isEmpty);
+    registry.setArchived(info.projectId, archived: false);
+    expect(registry.list(), isNotEmpty);
+
+    expect(registry.archiveMissing(), 1);
+    expect(registry.purgeArchived(), 1);
+    expect(registry.database.project(info.projectId), isNull);
+    expect(Directory(info.dataDir).existsSync(), isFalse);
+  });
+
   test('setIcon 持久化', () {
     final Directory home = _tempDir();
     final Directory work = _tempDir();

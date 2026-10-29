@@ -203,6 +203,32 @@ class ProjectRegistry {
     database.setProjectIcon(projectId, url: url, color: color);
   }
 
+  void setArchived(String projectId, {required bool archived}) {
+    database.archiveProject(projectId, archived: archived);
+  }
+
+  void touchProject(String projectId) {
+    database.touchProject(projectId);
+  }
+
+  /// 删除所有已归档项目及其工作区数据；返回删除的项目数。
+  int purgeArchived() {
+    int purged = 0;
+    for (final ProjectRecord project in database.projects()) {
+      if (project.timeArchived == null) continue;
+      for (final WorktreeRecord worktree in database.worktrees()) {
+        if (worktree.projectId != project.id) continue;
+        final Directory dir = Directory(
+          '$workspacesDir${Platform.pathSeparator}${worktree.dirName}',
+        );
+        if (dir.existsSync()) dir.deleteSync(recursive: true);
+      }
+      database.deleteProject(project.id);
+      purged++;
+    }
+    return purged;
+  }
+
   ProjectRecord? project(String id) => database.project(id);
 
   /// 重命名项目；只改数据库显示名，并尽量同步已有 sidecar。
