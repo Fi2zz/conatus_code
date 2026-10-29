@@ -61,6 +61,37 @@ void main() {
     expect(transcript.messages.single.text, contains('\$ echo hi'));
   });
 
+  test('skill 结果只保留加载摘要，不显示正文', () {
+    final Session session = Session(id: 's');
+    session.append(kToolResultEvent, data: <String, Object?>{
+      'callId': '1',
+      'name': 'skill',
+      'content': '<skill_content name="byted-web-search">\n'
+          '<skill_resources>\n...\n</skill_resources>\n'
+          '<skill_instructions>\n保密指令\n</skill_instructions>\n'
+          '</skill_content>',
+      'isError': false,
+    });
+
+    final Transcript transcript = Transcript()..rebuildFrom(session);
+
+    expect(transcript.messages.single.text, '✓ skill · 已加载 byted-web-search');
+  });
+
+  test('skill 失败时保留错误内容', () {
+    final Session session = Session(id: 's');
+    session.append(kToolResultEvent, data: <String, Object?>{
+      'callId': '1',
+      'name': 'skill',
+      'content': '技能不存在',
+      'isError': true,
+    });
+
+    final Transcript transcript = Transcript()..rebuildFrom(session);
+
+    expect(transcript.messages.single.text, contains('技能不存在'));
+  });
+
   test('失败的工具结果标记为 ✗ 并带内容预览', () {
     final Session session = Session(id: 's');
     session.append(kToolResultEvent, data: <String, Object?>{

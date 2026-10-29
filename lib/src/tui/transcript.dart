@@ -157,6 +157,15 @@ class Transcript {
         final String mark = failed ? '✗' : '✓';
         // 完整内容存进消息正文；过长时由视图折叠，ctrl+o 展开。
         final String content = _field(data, 'content').trim();
+        if (name == 'skill' && !failed) {
+          // 技能正文是给模型看的指令块，不铺到屏上；只留一行加载结果。
+          final String skill = _skillName(content);
+          add(
+            TuiRole.tool,
+            skill.isEmpty ? '$mark skill' : '$mark skill · 已加载 $skill',
+          );
+          return;
+        }
         add(TuiRole.tool, content.isEmpty ? '$mark $name' : '$mark $name\n$content');
       case kPlanEvent:
         _upsertPlan(data);
@@ -184,6 +193,13 @@ class Transcript {
   }
 
   static String _text(Object? data) => _field(data, 'text');
+
+  /// 从技能结果正文里取 `<skill_content name="...">` 的技能名。
+  static String _skillName(String content) {
+    final RegExpMatch? match =
+        RegExp(r'<skill_content\s+name="([^"]+)"').firstMatch(content);
+    return match?.group(1) ?? '';
+  }
 
   static String _field(Object? data, String key) {
     if (data is Map) {
