@@ -11,7 +11,6 @@ import 'package:conatus_llm/conatus_llm.dart';
 import 'package:nocterm/nocterm.dart';
 
 import '../diff/tui_diff_view.dart';
-import '../tabs/tab_bar.dart';
 import 'agent_picker_view.dart';
 import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
@@ -1010,16 +1009,6 @@ class _AgentTuiState extends State<AgentTui> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
-          TabBar(
-            tabs: _controller.tabs.tabs,
-            active: _controller.tabs.active,
-            nextHint: _controller.keymap
-                .displayLabelsFor(KeyActions.tabNext)
-                .join(', '),
-            closeHint: _controller.keymap
-                .displayLabelsFor(KeyActions.tabClose)
-                .join(', '),
-          ),
           Expanded(
             child: _view == ViewMode.chat
                 ? (_controller.diffOpen ? _diffView() : _body())
