@@ -82,12 +82,12 @@ jobs:
 
       - run: dart analyze --fatal-infos
 
-      - run: dart test test/platform_smoke_test.dart
-
       - name: Fetch sqlite3.dll (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./tool/fetch_sqlite3_dll.ps1
+
+      - run: dart test test/platform_smoke_test.dart
 
       - name: Build binary
         shell: bash
