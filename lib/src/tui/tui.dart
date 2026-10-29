@@ -16,6 +16,7 @@ import 'at_ref_menu.dart';
 import 'at_ref_menu_view.dart';
 import 'keymap/keymap.dart';
 import 'keymap/keymap_dispatcher.dart';
+import 'settings_view.dart';
 import 'team_snapshot.dart';
 import 'team_views.dart';
 import 'theme/nava_theme.dart';
@@ -796,7 +797,31 @@ class _AgentTuiState extends State<AgentTui> {
     return false;
   }
 
+  /// 设置面板按键：↑↓ 选择、←→ 翻页、Enter 执行、Esc 取消；其余按键吞掉。
+  bool _onSettingsKey(KeyboardEvent event) {
+    if (!_controller.settingsOpen) {
+      return false;
+    }
+    if (event.logicalKey == LogicalKey.arrowUp) {
+      _controller.moveSettings(-1);
+    } else if (event.logicalKey == LogicalKey.arrowDown) {
+      _controller.moveSettings(1);
+    } else if (event.logicalKey == LogicalKey.arrowLeft) {
+      _controller.pageSettings(-1);
+    } else if (event.logicalKey == LogicalKey.arrowRight) {
+      _controller.pageSettings(1);
+    } else if (event.logicalKey == LogicalKey.enter) {
+      unawaited(_controller.selectSettings());
+    } else if (event.logicalKey == LogicalKey.escape) {
+      _controller.closeSettings();
+    }
+    return true;
+  }
+
   bool _onKey(KeyboardEvent event) {
+    if (_onSettingsKey(event)) {
+      return true;
+    }
     if (_onGlobalKey(event)) {
       return true;
     }
@@ -1002,6 +1027,7 @@ class _AgentTuiState extends State<AgentTui> {
       // 带输入框的浮层（表单 / 模型搜索 / 重命名）打开时让出焦点，由浮层内的
       // TextField 接收字符与按键（其 onKeyEvent 即浮层按键处理）。
       focused:
+          !_controller.settingsOpen &&
           !_controller.modelPrompt.open &&
           !_controller.formPrompt.open &&
           !_controller.renamePrompt.open,
@@ -1010,9 +1036,11 @@ class _AgentTuiState extends State<AgentTui> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
           Expanded(
-            child: _view == ViewMode.chat
-                ? (_controller.diffOpen ? _diffView() : _body())
-                : TeamView(snapshot: _controller.teamSnapshot),
+            child: _controller.settingsOpen
+                ? SettingsView(prompt: _controller.settingsPrompt)
+                : _view == ViewMode.chat
+                    ? (_controller.diffOpen ? _diffView() : _body())
+                    : TeamView(snapshot: _controller.teamSnapshot),
           ),
           // 交互浮层一律贴在输入栏上方（小面板），消息区保持可见。
           if (_controller.renamePrompt.open)
@@ -1070,7 +1098,7 @@ class _AgentTuiState extends State<AgentTui> {
           if (_atMenu.open)
             AtRefMenuView(matches: _atMenu.matches, selected: _atMenu.index),
           TeamStatusBar(snapshot: _controller.teamSnapshot),
-          if (!_controller.diffOpen)
+          if (!_controller.diffOpen && !_controller.settingsOpen)
             TuiInputBar(
               controller: _input,
               shellMode: _shell.active,

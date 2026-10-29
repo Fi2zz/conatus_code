@@ -32,6 +32,8 @@ export 'src/tui/keymap/keymap_dispatcher.dart';
 export 'src/tui/keymap/keymap_view.dart';
 export 'src/tui/session_display.dart' show shortSessionId;
 export 'src/tui/session_exporter.dart';
+export 'src/tui/settings_prompt.dart';
+export 'src/tui/settings_view.dart';
 export 'src/tui/team_lanes.dart';
 export 'src/tui/team_snapshot.dart';
 export 'src/tui/team_subscription.dart';

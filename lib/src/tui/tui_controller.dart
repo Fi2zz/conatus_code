@@ -68,6 +68,7 @@ import 'keymap/keymap.dart';
 import 'keymap/keymap_view.dart';
 import 'session_exporter.dart';
 import 'session_ui_state.dart';
+import 'settings_prompt.dart';
 import 'team_snapshot.dart';
 import 'team_subscription.dart';
 import 'theme/nava_theme.dart';
@@ -383,6 +384,12 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// Plan Mode 面板浮层（`/plan`）。
   late final TuiPlanPrompt planPrompt = TuiPlanPrompt(onChanged: _refresh);
+
+  /// 设置面板（`/settings`；分页列表，选中后跳到对应命令面板）。
+  late final SettingsPrompt settingsPrompt = SettingsPrompt(onChanged: _refresh);
+
+  /// 设置面板是否打开。
+  bool get settingsOpen => settingsPrompt.open;
 
   /// Agent 选择面板（`/agents` 打开）。
   late final AgentPicker agentPicker = AgentPicker(onChanged: _refresh);
@@ -1974,6 +1981,9 @@ class ConatusTuiController implements TuiUserPromptHost {
         transcript.clear();
       case 'keybinds':
         transcript.add(TuiRole.system, renderKeybinds(keymap));
+      case 'settings':
+      case 'setting':
+        openSettings();
       default:
         // 内置命令优先；未命中再查自定义命令，最后才把命令词当技能名试一次。
         if (!await runCustomCommand(command, arg) &&
@@ -2341,6 +2351,25 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// `/agents`：打开 Agent 选择面板。
+  /// `/settings`：打开设置面板。
+  void openSettings() => settingsPrompt.openPanel();
+
+  /// Esc：关闭设置面板。
+  void closeSettings() => settingsPrompt.close();
+
+  /// ↑ / ↓：移动选中项。
+  void moveSettings(int delta) => settingsPrompt.move(delta);
+
+  /// ← / →：翻页。
+  void pageSettings(int delta) => settingsPrompt.pageBy(delta);
+
+  /// Enter：关闭面板并执行选中项对应的命令。
+  Future<void> selectSettings() async {
+    final String command = settingsPrompt.selected.command;
+    settingsPrompt.close();
+    await handleLine(command);
+  }
+
   void openAgentPicker() {
     final AgentRegistry? registry = _agentRegistry;
     if (registry == null) {

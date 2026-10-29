@@ -364,6 +364,20 @@ void main() {
     resumedApp.dispose();
   });
 
+  test('/setting 打开设置面板，Esc 关闭', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+    );
+
+    await controller.handleLine('/setting');
+    expect(controller.settingsOpen, isTrue);
+    expect(controller.settingsPrompt.selected.title, 'Model');
+
+    controller.closeSettings();
+    expect(controller.settingsOpen, isFalse);
+    app.dispose();
+  });
+
   test('startInPlanMode 启动即激活 Plan Mode，状态栏带 plan', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
