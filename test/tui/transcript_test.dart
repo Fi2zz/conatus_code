@@ -43,6 +43,24 @@ void main() {
     expect(transcript.messages[3].text, '现在是 12:00。');
   });
 
+  test('bash 调用摘要带 \$ 前缀', () {
+    final Session session = Session(id: 's');
+    session.append(kAssistantMessageEvent, data: <String, Object?>{
+      'text': '',
+      'toolCalls': <Map<String, Object?>>[
+        <String, Object?>{
+          'id': '1',
+          'name': 'bash',
+          'arguments': jsonEncode(<String, Object?>{'command': 'echo hi'}),
+        },
+      ],
+    });
+
+    final Transcript transcript = Transcript()..rebuildFrom(session);
+
+    expect(transcript.messages.single.text, contains('\$ echo hi'));
+  });
+
   test('失败的工具结果标记为 ✗ 并带内容预览', () {
     final Session session = Session(id: 's');
     session.append(kToolResultEvent, data: <String, Object?>{

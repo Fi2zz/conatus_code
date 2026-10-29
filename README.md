@@ -15,7 +15,7 @@
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
 - 🔒 审批与命令审查（高危操作走审批；命令执行前过 `command_shield` 形状审查）
-- 🗺️ 计划闭环（plan_write 建计划、todowrite 执行中推进、计划面板实时渲染）
+- 🗺️ 计划闭环（todowrite 建计划并在执行中推进、计划面板实时渲染）
 - 🩹 失败自愈（工具失败自动反思重试，可按需重规划）
 - ⏱️ 预算护栏（每轮墙钟 + 上下文 token 估算 + 成本跟踪）
 - 📜 故事层（可选，默认关闭）：编辑即补丁、事前审阅、`/story` 时间轴与分叉
@@ -109,6 +109,8 @@ api_key = "sk-..."
 base_url = "https://api.deepseek.com/v1"
 type = "openai"
 
+# default_plan_mode = false    # true = 启动后进入 Plan Mode（--plan 可临时开启）
+
 [agent]
 max_steps = 8                 # 单轮最大模型步数
 workdir = "/path/to/project"  # 工作目录；缺省当前目录
@@ -175,8 +177,12 @@ keep = 5                      # 回滚点数（含 turn 0 全量 base；0 = 不�
 # headers = { Authorization = "Bearer ${REMOTE_TOKEN}" }
 ```
 
+顶层 `default_plan_mode = true`（或命令行 `--plan`）会在启动后进入 Plan Mode：
+先规划、`exit_plan_mode` 审批通过后再执行；状态栏权限模式后显示 `plan`。
+会话里已有 `plan/mode` 事件时以会话记录为准。
+
 已废弃但兼容的键（`[thinking]`、`[services]`、`[loop_control]`、
-`default_plan_mode`、`telemetry`，以及 `[models.*]` 的
+`telemetry`，以及 `[models.*]` 的
 `max_output_size` / `reasoning_key` / `support_efforts` / `default_effort` /
 `off_effort` / `protocol` / `base_url`）仍会被接受，但载入时只写入告警；
 启动提示与 `/doctor` 的“配置废弃项”会列出来，不再静默 no-op。

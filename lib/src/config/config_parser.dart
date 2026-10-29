@@ -5,6 +5,7 @@ import 'package:conatus_agent/conatus_agent.dart'
     show
         PermissionEffect,
         PermissionRule,
+        legacyPermissionAction,
         normalizePermissionPath,
         permissionActionFor,
         permissionActionUsesPath;
@@ -24,6 +25,7 @@ class ConfigParser extends ConfigValues {
     providers: _readProviders(),
     models: _readModels(),
     agent: _readAgent(),
+    defaultPlanMode: readBool(raw, 'default_plan_mode', false),
     approval: _readApproval(),
     permissions: _readPermissions(),
     budget: _readBudget(),
@@ -64,7 +66,6 @@ class ConfigParser extends ConfigValues {
     'thinking',
     'services',
     'loop_control',
-    'default_plan_mode',
     'telemetry',
   ];
 
@@ -84,6 +85,16 @@ class ConfigParser extends ConfigValues {
     for (final String key in _deprecatedTopLevel) {
       if (raw.containsKey(key)) {
         warnings.add('$source：$key 已废弃（当前无效果）。');
+      }
+    }
+    for (final Map<String, dynamic> table in readTableList('permissions')) {
+      final String? action = readString(table, 'action');
+      final String? replacement =
+          action == null ? null : legacyPermissionAction(action);
+      if (replacement != null) {
+        warnings.add(
+          '$source：permissions 的 action "$action" 已不再命中，请改为 "$replacement"。',
+        );
       }
     }
     final Object? models = raw['models'];

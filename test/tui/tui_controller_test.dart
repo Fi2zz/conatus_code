@@ -106,6 +106,7 @@ Future<(ConatusTuiController, Context)> _build(
   bool withApproval = false,
   TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,
   String? initialSession = 's1',
+  bool startInPlanMode = false,
 }) async {
   final Context app = Context.root();
   provideTools(app);
@@ -141,6 +142,7 @@ Future<(ConatusTuiController, Context)> _build(
     initialSession: initialSession,
     modelLabel: 'scripted',
     initialPermissionMode: initialPermissionMode,
+    startInPlanMode: startInPlanMode,
     onExit: () {},
   );
   controller.configureSession = configureSession;
@@ -331,6 +333,17 @@ void main() {
     await controller.confirmPlanPanel();
     expect(controller.planPrompt.active, isFalse);
     expect(controller.transcript.messages.last.text, contains('已退出 Plan Mode'));
+    app.dispose();
+  });
+
+  test('startInPlanMode 启动即激活 Plan Mode，状态栏带 plan', () async {
+    final (ConatusTuiController controller, Context app) = await _build(
+      const <LlmResult>[],
+      startInPlanMode: true,
+    );
+
+    expect(controller.planModeActive, isTrue);
+    expect(controller.permissionLabel, contains('plan'));
     app.dispose();
   });
 

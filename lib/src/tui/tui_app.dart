@@ -752,6 +752,17 @@ class ConatusTuiRuntime {
         ),
       );
     }
+    if (permissionWiring.legacyRules > 0) {
+      prompt.section(
+        PromptSection(
+          name: 'permission-legacy-warning',
+          text: () =>
+              '检测到 ${permissionWiring.legacyRules} 条权限规则仍使用旧动作名'
+              '（shell / subagent / read_file 等），它们已不再命中；'
+              '请改成 bash / task / read 等 OpenCode 名字。',
+        ),
+      );
+    }
     prompt.section(
       PromptSection(
         name: 'persona',
@@ -762,7 +773,7 @@ class ConatusTuiRuntime {
       PromptSection(
         name: 'coding',
         text: () =>
-            '编码任务先规划后执行：复杂任务先用 plan_write 制定执行计划，'
+            '编码任务先规划后执行：复杂任务先用 todowrite 制定执行计划，'
             '执行中每完成一步用 todowrite 标记进度；工具失败时反思原因并重试或调整方案。',
       ),
     );
@@ -924,6 +935,7 @@ class ConatusTuiRuntime {
     void Function(String workdir)? onSwitchProject,
     String name = '默认',
     bool planning = false,
+    bool startInPlanMode = false,
     TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,
     Map<String, String> keybinds = const <String, String>{},
   }) {
@@ -938,6 +950,7 @@ class ConatusTuiRuntime {
       onExit: onExit,
       onSwitchProject: onSwitchProject,
       initialPermissionMode: initialPermissionMode,
+      startInPlanMode: startInPlanMode,
       fallbackModels: fallbackModels,
       retryPolicy: retryPolicy,
       storyEnabled: storyEnabled,

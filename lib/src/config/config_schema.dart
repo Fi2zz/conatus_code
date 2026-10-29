@@ -564,6 +564,7 @@ class ConatusCodeConfig {
     this.providers = const <ProviderConfig>[],
     this.models = const <ModelConfig>[],
     this.agent = const AgentConfig(),
+    this.defaultPlanMode = false,
     this.approval = const ApprovalConfig(),
     this.permissions = const PermissionConfig(),
     this.budget = const BudgetConfig(),
@@ -597,6 +598,10 @@ class ConatusCodeConfig {
   final List<ModelConfig> models;
 
   final AgentConfig agent;
+
+  /// 顶层 `default_plan_mode`（kimi 兼容）：启动后默认进入 Plan Mode。
+  final bool defaultPlanMode;
+
   final ApprovalConfig approval;
 
   /// 顶层 `[[permissions]]`：`config` 层的只读规则基线。

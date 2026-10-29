@@ -237,8 +237,9 @@ String callSummary(LlmToolCall call) {
     }
     final String cut =
         flat.length > 40 ? '${flat.substring(0, 40)}…' : flat;
-    final bool shellLike =
-        call.name.contains('code') || call.name.contains('run');
+    final bool shellLike = call.name == 'bash' ||
+        call.name.contains('code') ||
+        call.name.contains('run');
     return ' · ${shellLike ? '\$ ' : ''}$cut';
   }
   return '';

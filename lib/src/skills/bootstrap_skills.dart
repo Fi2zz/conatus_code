@@ -160,8 +160,8 @@ When a skill requests an action, substitute the nava equivalent:
   `glob`; list a directory -> `list`.
 - Dispatch a subagent -> `task` with the `task` argument; `agent` is only for
   a registered profile. Do not invent a `subagent_type` argument.
-- Track tasks -> `plan_write` to create the plan and `todowrite` to advance
-  it. A markdown checklist is an acceptable fallback.
+- Track tasks -> `todowrite` to create or advance the plan. A markdown
+  checklist is an acceptable fallback.
 - Fetch a URL -> `webfetch`; search the web -> `websearch`.
 - "Your instructions file" -> `AGENTS.md` (project root or `~/.nava/AGENTS.md`).
 

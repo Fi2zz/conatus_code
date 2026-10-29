@@ -242,6 +242,15 @@ DoctorCheck _permissionCheck(Context app) {
       hint: '${wiring.skippedRules} 条规则非法已跳过（permissions.json）',
     );
   }
+  if (wiring.legacyRules > 0) {
+    return DoctorCheck(
+      name: '权限规则',
+      ok: false,
+      warning: true,
+      hint: '${wiring.legacyRules} 条规则使用旧动作名，已不再命中'
+          '（shell / subagent / read_file 等）',
+    );
+  }
   return DoctorCheck(
     name: '权限规则',
     ok: true,

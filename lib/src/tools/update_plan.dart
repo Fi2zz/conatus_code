@@ -5,10 +5,10 @@ import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-/// `todowrite` 工具：按步骤序号更新当前计划。
+/// `todowrite` 工具：无计划时用 `goal + todos` 创建，已有计划时按序号更新。
 ///
 /// 序号与计划面板 / system prompt 里的「1. [ ] text」一致；不带 `index` 的
-/// 条目追加到末尾。更新写回 `plan/updated` 事件，面板与后续摘要即时反映。
+/// 条目追加到末尾。写入统一回 `plan/updated` 事件，面板与后续摘要即时反映。
 class UpdatePlanTool extends Tool {
   UpdatePlanTool({required this.session});
 
@@ -19,39 +19,37 @@ class UpdatePlanTool extends Tool {
   String get name => 'todowrite';
 
   @override
-  String get description => '更新当前执行计划：标记步骤完成、改写步骤文案或追加步骤。';
+  String get description => '制定或更新当前执行计划：无计划时用 goal + todos 创建；'
+      '已有计划时标记完成、改写文案或追加步骤。';
 
   @override
   ToolRisk get riskLevel => ToolRisk.low;
 
   @override
   List<ParamSpec> get params => <ParamSpec>[
-        ParamSpec.string('goal', description: '可选：更新后的任务目标'),
+        ParamSpec.string('goal', description: '任务目标（创建计划时必填）'),
         ParamSpec.array(
           'todos',
           items: ParamSpec.object(
             'todo',
             properties: <String, ParamSpec>{
               'index': ParamSpec.integer('index', description: '步骤序号，从 1 起'),
-              'text': ParamSpec.string('text', description: '新的步骤文案'),
+              'text': ParamSpec.string('text', description: '步骤文案'),
               'done': ParamSpec.boolean('done', description: '是否已完成'),
             },
           ),
-          description: '步骤更新列表；不带 index 的条目追加到末尾',
+          description: '无计划时作为初始步骤；已有计划时按 index 更新，不带 index 的条目追加',
         ),
       ];
 
   @override
   Future<ToolResult> call(ToolContext context) async {
+    final String? goal = context.string('goal')?.trim();
+    final List<Object?>? todos = context.array('todos');
     final Plan? current = readPlan(session);
     if (current == null) {
-      return ToolResult.failure(
-        '尚无执行计划：请先调用 plan_write 制定计划。',
-        error: const ToolError('NO_PLAN', 'no plan written yet'),
-      );
+      return _createPlan(goal: goal, todos: todos);
     }
-    final String? goal = context.string('goal');
-    final List<Object?>? todos = context.array('todos');
     if (goal == null && (todos == null || todos.isEmpty)) {
       throw const ToolArgumentException('todos 为空且未提供 goal，无任何更新');
     }
@@ -66,6 +64,57 @@ class UpdatePlanTool extends Tool {
     writePlan(session, plan);
     return ToolResult.success(plan.summary(), value: plan.toJson());
   }
+
+  /// 无计划时用 `goal + todos` 创建初始计划。
+  ToolResult _createPlan({
+    required String? goal,
+    required List<Object?>? todos,
+  }) {
+    if (goal == null || goal.isEmpty) {
+      return ToolResult.failure(
+        '尚无执行计划：用 goal + todos 创建计划。',
+        error: const ToolError('NO_PLAN', 'no plan written yet'),
+      );
+    }
+    final UpdateResult created = _createdSteps(todos);
+    if (created.errors.isNotEmpty) {
+      return ToolResult.failure('计划未创建：\n${created.errors.join('\n')}');
+    }
+    if (created.steps.isEmpty) {
+      return ToolResult.failure(
+        '尚无执行计划：todos 为空，无法创建。',
+        error: const ToolError('NO_PLAN', 'no plan steps'),
+      );
+    }
+    final Plan plan = Plan(goal: goal, steps: created.steps);
+    writePlan(session, plan);
+    return ToolResult.success(plan.summary(), value: plan.toJson());
+  }
+}
+
+/// 把初始 todos 转成计划步骤；缺 text 的条目记入 errors。
+UpdateResult _createdSteps(List<Object?>? todos) {
+  final List<PlanStep> steps = <PlanStep>[];
+  final List<String> errors = <String>[];
+  for (final Object? raw in todos ?? const <Object?>[]) {
+    final Map<Object?, Object?>? item =
+        raw is Map ? Map<Object?, Object?>.from(raw) : null;
+    final String text = switch (raw) {
+      final String value => value.trim(),
+      final Map<Object?, Object?> value => '${value['text'] ?? ''}'.trim(),
+      _ => '',
+    };
+    if (text.isEmpty) {
+      errors.add('初始步骤缺少 text');
+      continue;
+    }
+    steps.add(PlanStep(
+      id: 's${steps.length + 1}',
+      text: text,
+      done: item?['done'] == true,
+    ));
+  }
+  return UpdateResult(steps, errors);
 }
 
 /// 一次更新应用的结果：新步骤列表与未生效条目的错误。
@@ -129,7 +178,7 @@ void _patchStep(
   );
 }
 
-/// 把 `todowrite` 注册到 `ctx.tools`（对齐 `providePlanTool`）。
+/// 把 `todowrite` 注册到 `ctx.tools`。
 UpdatePlanTool provideUpdatePlanTool(
   Context ctx, {
   required Session session,

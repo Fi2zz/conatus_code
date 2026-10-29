@@ -40,6 +40,9 @@ void main() {
       expect(config.providers.firstWhere((ProviderConfig p) => p.name == 'deepseek').baseUrl,
           'https://api.deepseek.com/v1');
 
+      // 顶层 default_plan_mode（kimi 兼容）：生效，不再算废弃项
+      expect(config.defaultPlanMode, isTrue);
+
       // [background]
       expect(config.background.keepAliveOnExit, isFalse);
       expect(config.background.maxRunningTasks, 4);
@@ -49,7 +52,6 @@ void main() {
       expect(deprecated, contains('thinking'));
       expect(deprecated, contains('services'));
       expect(deprecated, contains('loop_control'));
-      expect(deprecated, contains('default_plan_mode'));
       expect(deprecated, contains('telemetry'));
       expect(deprecated, contains('reasoning_key'));
       expect(deprecated, contains('support_efforts'));

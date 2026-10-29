@@ -153,6 +153,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.tts,
     this.ttsSink,
     this.initialPermissionMode = TuiPermissionMode.askWhenNeeded,
+    this.startInPlanMode = false,
     this.storyEnabled = false,
     this.initialAgentId,
     List<String> fallbackModels = const <String>[],
@@ -313,9 +314,14 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// Agent Loop 单轮最大步数。
   final int maxSteps;
 
-  /// 会话是否先跑规划轮（`plan_write`）再执行；开启后每条新任务会先产出
+  /// 会话是否先跑规划轮（`todowrite`）再执行；开启后每条新任务会先产出
   /// TODO 计划（屏上 `plan` 消息），执行过程从第一步可见。
   final bool planning;
+
+  /// 启动后是否默认进入 Plan Mode（`default_plan_mode` / `--plan`）。
+  ///
+  /// 会话里已有 `plan/mode` 事件时以事件为准，不覆盖用户上次的选择。
+  final bool startInPlanMode;
 
   /// 退出请求（`/exit`、`/quit`、Ctrl+C）；由宿主接 `shutdownApp`。
   final void Function()? onExit;
@@ -593,7 +599,10 @@ class ConatusTuiController implements TuiUserPromptHost {
   TuiPermissionMode get permissionMode => _permissionMode;
 
   /// 状态栏展示的权限模式名。
-  String get permissionLabel => _permissionMode.label;
+  String get permissionLabel {
+    final String label = _permissionMode.label;
+    return planModeActive ? '$label plan' : label;
+  }
 
   /// 团队状态快照（未装配团队或未绑定时为空）。
   TeamSnapshot get teamSnapshot => _teamSub?.snapshot ?? const TeamSnapshot();
@@ -708,6 +717,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     await _bindStartup(_sessionId);
     _firstBind = false;
+    _applyStartInPlanMode();
     _persistAgentSelection();
     _syncTabState();
     _addKeybindWarnings();
@@ -2343,15 +2353,31 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
   }
 
+  /// 启动默认 Plan Mode：会话没有历史 `plan/mode` 事件时才生效。
+  void _applyStartInPlanMode() {
+    if (!startInPlanMode) return;
+    final bool hasEvent = _session?.ownEvents.any(
+          (SessionEvent event) => event.type == kPlanModeEvent,
+        ) ??
+        false;
+    if (!hasEvent) _setPlanMode(true);
+  }
+
   /// 显式设置 Plan Mode；无绑定时静默忽略。
   void _setPlanMode(bool active) {
     final PlanMode? planMode = _planMode;
     if (planMode == null) return;
     if (active) {
-      if (planMode.state != PlanModeState.active) planMode.enter();
+      if (planMode.state != PlanModeState.active) {
+        planMode.enter();
+        _refresh();
+      }
       return;
     }
-    if (planMode.state == PlanModeState.active) planMode.exit();
+    if (planMode.state == PlanModeState.active) {
+      planMode.exit();
+      _refresh();
+    }
   }
 
   /// 把 `/skill:<技能名> [补充要求]` 当作技能调用；不是 `skill:` 前缀命令时
@@ -3822,8 +3848,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         planning: planning,
         onStream: _onLlmStream,
       );
-      // 计划闭环：plan_write 建计划，todowrite 在执行中推进。
-      providePlanTool(child, session: session);
+      // 计划闭环：todowrite 无计划时创建，有计划时在执行中推进。
       provideUpdatePlanTool(child, session: session);
       providePlanMode(child, session: session);
       provideGoal(child, session: session);

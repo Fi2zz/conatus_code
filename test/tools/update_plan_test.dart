@@ -6,15 +6,39 @@ import 'package:test/test.dart';
 
 void main() {
   group('UpdatePlanTool', () {
-    test('无计划时提示先 plan_write', () async {
+    test('无计划时用 goal + todos 创建计划', () async {
+      final Session session = Session(id: 's1');
+      final UpdatePlanTool tool = UpdatePlanTool(session: session);
+
+      final ToolResult result = await tool.call(_call(<String, Object?>{
+        'goal': '查三家公司',
+        'todos': <Object?>[
+          <String, Object?>{'text': '查A'},
+          <String, Object?>{'text': '查B'},
+        ],
+      }));
+
+      expect(result.isError, isFalse);
+      final Plan? plan = readPlan(session);
+      expect(plan, isNotNull);
+      expect(plan!.goal, '查三家公司');
+      expect(
+        plan.steps.map((PlanStep step) => step.text),
+        <String>['查A', '查B'],
+      );
+      expect(plan.summary(), contains('1. [ ] 查A'));
+    });
+
+    test('无计划且缺 goal 时返回 NO_PLAN 并提示创建方式', () async {
       final UpdatePlanTool tool = UpdatePlanTool(session: Session(id: 's1'));
 
       final ToolResult result = await tool.call(_call(<String, Object?>{
-        'todos': <Object?>[<String, Object?>{'index': 1, 'done': true}],
+        'todos': <Object?>[<String, Object?>{'text': '查A'}],
       }));
 
       expect(result.isError, isTrue);
-      expect(result.content, contains('plan_write'));
+      expect(result.error!.code, 'NO_PLAN');
+      expect(result.content, contains('goal'));
     });
 
     test('按 index 标记完成并改写文案', () async {
@@ -102,15 +126,15 @@ ToolContext _call(Map<String, Object?> arguments) => ToolContext(
 
 Future<Session> _withPlan(int stepCount) async {
   final Session session = Session(id: 's1');
-  final PlanTool tool = PlanTool(session: session);
-  await tool.call(ToolContext(ToolCall(
-    name: kPlanToolName,
-    arguments: <String, Object?>{
-      'goal': '测试目标',
-      'steps': <Object?>[
-        for (int i = 1; i <= stepCount; i++) '步骤$i',
+  writePlan(
+    session,
+    Plan(
+      goal: '测试目标',
+      steps: <PlanStep>[
+        for (int i = 1; i <= stepCount; i++)
+          PlanStep(id: 's$i', text: '步骤$i'),
       ],
-    },
-  )));
+    ),
+  );
   return session;
 }

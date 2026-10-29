@@ -171,6 +171,9 @@ debounce_seconds = 10         # 去抖窗口（秒），防连续编辑连跑
 # "theme.switch" = "<leader>t"
 # "tab.next" = "none"          # 关闭某个动作
 
+# 启动即进入 Plan Mode（kimi 兼容）；--plan 可在命令行临时开启。
+# default_plan_mode = false
+
 [agent]
 # workdir = "/path/to/your/project"
 # default_agent = "build"            # 新会话默认 Agent；未知 ID 回退 build
@@ -183,8 +186,8 @@ mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
 
 # 权限规则（最外层工具中间件，先于审批 / hooks / lint / story 生效）：
 # 按 action + resource 通配匹配，后出现的规则优先；任一条 deny 即拒绝。
-# 动作：read / edit / glob / grep / shell / websearch / webfetch / subagent /
-# skill / question / external_directory，也可直接写工具名。
+# 动作：read / edit / glob / grep / bash / websearch / webfetch / task /
+# skill / question / todowrite / external_directory，也可直接写工具名。
 # 路径动作的资源按工作区解析，符号链接按真实路径比较。
 # [[permissions]]
 # action = "bash"

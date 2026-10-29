@@ -106,6 +106,12 @@ void main() {
     expect(options.session, isNull);
   });
 
+  test('--plan 启动即进入 Plan Mode', () {
+    expect(TuiOptions.parse(const <String>['--plan']).planRequested, isTrue);
+    expect(TuiOptions.parse(const <String>[]).planRequested, isFalse);
+    expect(TuiOptions.usage, contains('--plan'));
+  });
+
   test('用法文案列出全部开关', () {
     expect(TuiOptions.usage, contains('--session <id>'));
     expect(TuiOptions.usage, contains('--config <路径>'));

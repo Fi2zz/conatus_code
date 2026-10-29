@@ -57,7 +57,7 @@ class TuiPlanView extends StatelessComponent {
           const SizedBox(height: 1),
           if (plan == null)
             Text(
-              '尚未写入计划（激活后模型会经 plan_write 写入）。',
+              '尚未写入计划（激活后模型会经 todowrite 写入）。',
               style: TextStyle(color: NavaTheme.palette.muted),
             )
           else ...<Component>[

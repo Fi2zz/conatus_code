@@ -31,6 +31,7 @@ class TuiOptions {
     this.outputFormat = 'text',
     this.versionRequested = false,
     this.continueRequested = false,
+    this.planRequested = false,
     this.printRequested = false,
     this.harnessPath,
     this.workdir,
@@ -58,6 +59,9 @@ class TuiOptions {
 
   /// 是否出现了 `--continue`：恢复最近一次会话（无 `--session` 时生效）。
   final bool continueRequested;
+
+  /// 命令行里是否出现了 `--plan`：启动后进入 Plan Mode。
+  final bool planRequested;
 
   /// 命令行里是否出现了 `-p` / `--print`（无论是否带值）。
   ///
@@ -87,6 +91,7 @@ class TuiOptions {
       '  --output-format   headless 输出格式：text / json（缺省 text）\n'
       '  --harness <路径>  装配指定 harness manifest（JSON）\n'
       '  --continue        恢复最近一次会话（--session 优先于它）\n'
+      '  --plan            启动后进入 Plan Mode（先规划，批准后执行）\n'
       '  --version         打印版本号后退出\n'
       '       nava harness list|show|diff|check  ↗ 管理 harness 制品\n';
 
@@ -104,6 +109,7 @@ class TuiOptions {
     String outputFormat = 'text';
     bool versionRequested = false;
     bool continueRequested = false;
+    bool planRequested = false;
     bool printRequested = false;
     String? harnessPath;
     String? workdir;
@@ -115,6 +121,8 @@ class TuiOptions {
         versionRequested = true;
       } else if (arg == '--continue') {
         continueRequested = true;
+      } else if (arg == '--plan') {
+        planRequested = true;
       } else if (arg == '--session') {
         final bool hasValue =
             index + 1 < args.length && !args[index + 1].startsWith('-');
@@ -152,6 +160,7 @@ class TuiOptions {
       outputFormat: outputFormat,
       versionRequested: versionRequested,
       continueRequested: continueRequested,
+      planRequested: planRequested,
       printRequested: printRequested,
       harnessPath: harnessPath,
       workdir: workdir,

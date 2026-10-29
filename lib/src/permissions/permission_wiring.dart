@@ -50,6 +50,10 @@ class PermissionWiring {
   int get skippedRules => _skippedRules;
   int _skippedRules = 0;
 
+  /// 最近一次 [load] 中仍使用旧动作名、已不再命中的规则条数。
+  int get legacyRules => _legacyRules;
+  int _legacyRules = 0;
+
   /// 当前合成后的规则（config → project → session → agent）。
   List<PermissionRule> get rules =>
       List<PermissionRule>.unmodifiable(<PermissionRule>[
@@ -65,6 +69,7 @@ class PermissionWiring {
     _projectRules = _normalizeRules(await store.load(), workdir);
     _loadError = store.loadError;
     _skippedRules = store.skippedRules;
+    _legacyRules = store.legacyRules;
     _publish();
   }
 

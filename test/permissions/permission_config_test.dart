@@ -96,6 +96,18 @@ effect = "ask"
     expect(_load('').permissions.rules, isEmpty);
   });
 
+  test('旧动作名保留规则并给出迁移提示', () {
+    final ConatusCodeConfig config = _load('''
+[[permissions]]
+action = "shell"
+resource = "rm *"
+effect = "deny"
+''');
+
+    expect(config.permissions.rules.single.action, 'shell');
+    expect(config.deprecations.join('\n'), contains('bash'));
+  });
+
   test('effect 取值非法时抛 ConfigException', () {
     _expectConfigError('effect', () {
       _load('''
