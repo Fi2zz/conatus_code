@@ -198,9 +198,8 @@ void main() {
     final File file = File('${dir.path}/note.md')..writeAsStringSync('hi');
 
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
-        await _launchAgentTui();
+        await _launchAgentTui(clipboardTextReader: () => file.path);
     try {
-      ClipboardManager.copy(file.path);
       await tester.sendKeyEvent(const KeyboardEvent(
         logicalKey: LogicalKey.keyV,
         modifiers: ModifierKeys(ctrl: true),
@@ -208,6 +207,14 @@ void main() {
       await tester.pump();
 
       expect(tester.terminalState, containsText('[file #1 (note.md)]'));
+
+      // 再粘一次：系统剪贴板每次都重新读，应继续生成第二个附件。
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyV,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+      expect(tester.terminalState, containsText('[file #2 (note.md)]'));
     } finally {
       tester.dispose();
       controller.dispose();
@@ -533,6 +540,7 @@ void main() {
 /// 装配一个最小 TUI 并挂载，返回（控制器, 测试器, 应用上下文）。
 Future<(ConatusTuiController, NoctermTester, Context)> _launchAgentTui({
   LlmProvider? provider,
+  String? Function()? clipboardTextReader,
 }) async {
   final Context app = Context.root();
   provideTools(app);
@@ -550,7 +558,10 @@ Future<(ConatusTuiController, NoctermTester, Context)> _launchAgentTui({
     onExit: () {},
   );
   final NoctermTester tester = await NoctermTester.create();
-  await tester.pumpComponent(AgentTui(controller: controller));
+  await tester.pumpComponent(AgentTui(
+    controller: controller,
+    clipboardTextReader: clipboardTextReader,
+  ));
   await tester.pump();
   return (controller, tester, app);
 }

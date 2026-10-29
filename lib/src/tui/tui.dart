@@ -50,10 +50,17 @@ import 'tui_views.dart';
 
 /// conatus TUI 根组件。
 class AgentTui extends StatefulComponent {
-  const AgentTui({super.key, required this.controller});
+  const AgentTui({
+    super.key,
+    required this.controller,
+    this.clipboardTextReader,
+  });
 
   /// 会话控制器（含屏上记录与斜杠命令状态）。
   final ConatusTuiController controller;
+
+  /// 系统剪贴板文本读取（测试注入点；缺省读真实剪贴板）。
+  final String? Function()? clipboardTextReader;
 
   @override
   State<AgentTui> createState() => _AgentTuiState();
@@ -281,31 +288,28 @@ class _AgentTuiState extends State<AgentTui> {
     if (!event.matches(LogicalKey.keyV, ctrl: true)) {
       return false;
     }
+    // 系统剪贴板优先：连续粘贴时 nocterm 的内部缓冲不会更新，先读它会把
+    // 第二次粘贴吞成第一次的旧内容。
+    final String? system =
+        (component.clipboardTextReader ?? readClipboardTextSync)();
     final String? internal = ClipboardManager.paste();
-    if (internal != null && internal.isNotEmpty) {
+    final String? text = system != null && system.isNotEmpty ? system : internal;
+    if (text != null && text.isNotEmpty) {
       final List<TuiAttachment> found = extractPathAttachments(
-        internal,
+        text,
         _controller.workdir,
       );
       if (found.isNotEmpty) {
         _addAttachments(found);
+        return true;
+      }
+      // 系统剪贴板的文本终端没有帮我们插入，这里补插入；内部剪贴板交给
+      // TextField 的 Ctrl+V 默认处理。
+      if (system != null && system.isNotEmpty) {
+        _insertPastedText(system);
         return true;
       }
       return false;
-    }
-    // 终端没走 bracketed paste（Ctrl+V 是裸按键）时，直接读系统剪贴板。
-    final String? system = readClipboardTextSync();
-    if (system != null && system.isNotEmpty) {
-      final List<TuiAttachment> found = extractPathAttachments(
-        system,
-        _controller.workdir,
-      );
-      if (found.isNotEmpty) {
-        _addAttachments(found);
-        return true;
-      }
-      _insertPastedText(system);
-      return true;
     }
     unawaited(_attachClipboardImage());
     return true;
