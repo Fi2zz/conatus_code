@@ -156,6 +156,42 @@ void main() {
     }
   });
 
+  test('/setting 渲染设置面板，↑↓ 选择、←→ 翻页、Esc 关闭', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      await controller.handleLine('/setting');
+      await tester.pump();
+
+      expect(tester.terminalState, containsText('Settings'));
+      expect(tester.terminalState, containsText('Model'));
+      expect(tester.terminalState, containsText('Page 1/2'));
+
+      await tester.sendKeyEvent(
+        const KeyboardEvent(logicalKey: LogicalKey.arrowDown),
+      );
+      await tester.pump();
+      expect(tester.terminalState, containsText('› Permission'));
+
+      await tester.sendKeyEvent(
+        const KeyboardEvent(logicalKey: LogicalKey.arrowRight),
+      );
+      await tester.pump();
+      expect(tester.terminalState, containsText('Page 2/2'));
+      expect(tester.terminalState, containsText('Provider'));
+
+      await tester.sendKeyEvent(
+        const KeyboardEvent(logicalKey: LogicalKey.escape),
+      );
+      await tester.pump();
+      expect(controller.settingsOpen, isFalse);
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('ctrl+o 展开最近一条可折叠的工具结果', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();

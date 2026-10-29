@@ -1027,7 +1027,6 @@ class _AgentTuiState extends State<AgentTui> {
       // 带输入框的浮层（表单 / 模型搜索 / 重命名）打开时让出焦点，由浮层内的
       // TextField 接收字符与按键（其 onKeyEvent 即浮层按键处理）。
       focused:
-          !_controller.settingsOpen &&
           !_controller.modelPrompt.open &&
           !_controller.formPrompt.open &&
           !_controller.renamePrompt.open,
