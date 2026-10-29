@@ -39,6 +39,15 @@ class BudgetedLlmProvider implements LlmProvider {
   DateTime? _turnStart;
   int _turnTokens = 0;
 
+  /// 开始新的用户轮次：清零墙钟与 token 累计。
+  ///
+  /// 仅靠 [idleReset] 推断轮边界不够：用户连续追问时每轮间隔可能都不到
+  /// 2 分钟，旧实现会把上一轮的时间累计进来，最终在正常对话中途误报预算。
+  void beginTurn() {
+    _turnStart = DateTime.now();
+    _turnTokens = 0;
+  }
+
   @override
   String get name => base.name;
 
@@ -48,10 +57,18 @@ class BudgetedLlmProvider implements LlmProvider {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
   }) async {
-    final LlmResult? exhausted = _exhaustedIfOver(estimateMessagesTokens(messages));
-    if (exhausted != null) return exhausted;
-    final LlmResult result =
-        await base.chat(messages, options: options, tools: tools);
+    final bool compaction = _isCompaction(messages);
+    if (!compaction) {
+      final LlmResult? exhausted = _exhaustedIfOver(
+        estimateMessagesTokens(messages),
+      );
+      if (exhausted != null) return exhausted;
+    }
+    final LlmResult result = await base.chat(
+      messages,
+      options: options,
+      tools: tools,
+    );
     costTracker?.recordUsage(result.usage);
     return result;
   }
@@ -62,15 +79,22 @@ class BudgetedLlmProvider implements LlmProvider {
     Map<String, dynamic>? options,
     List<Map<String, dynamic>>? tools,
   }) async* {
-    if (_overLimit(estimateMessagesTokens(messages))) {
+    if (!_isCompaction(messages) &&
+        _overLimit(estimateMessagesTokens(messages))) {
+      // 必须带上收口文本：空流会被上层当成「模型返回空回复」，用户既看不到
+      // 预算原因，也拿不到可重试的信号。
+      yield const LlmTextDelta(kBudgetExhaustedReply);
       yield const LlmStreamDone();
       return;
     }
     // 透传的同时**盯着终态帧**：用量只出现在流末尾的 LlmStreamDone 上。直接
     // `yield*` 不看内容的话这次调用的用量就丢了——而 TUI 恒走流式，于是
     // recordUsage 永远不会被调用，`/cost` 恒为 $0。
-    await for (final LlmStreamEvent event
-        in base.chatStream(messages, options: options, tools: tools)) {
+    await for (final LlmStreamEvent event in base.chatStream(
+      messages,
+      options: options,
+      tools: tools,
+    )) {
       if (event is LlmStreamDone) {
         costTracker?.recordUsage(event.usage);
       }
@@ -80,6 +104,13 @@ class BudgetedLlmProvider implements LlmProvider {
 
   @override
   void close() => base.close();
+
+  /// 压缩摘要属于基础设施调用，不占用户单轮预算；否则预算收口文本会被写进
+  /// 滚动摘要，污染后续所有上下文。
+  bool _isCompaction(List<LlmMessage> messages) =>
+      messages.length == 1 &&
+      messages.single.role == 'user' &&
+      messages.single.content.contains(kCompactionSummaryPrompt);
 
   /// 超限时返回收口结果；未超限返回 null（本次估算已累计）。
   LlmResult? _exhaustedIfOver(int estimated) {
@@ -106,8 +137,10 @@ class BudgetedLlmProvider implements LlmProvider {
     _turnTokens += estimated;
     final Duration elapsed = now.difference(_turnStart!);
     return budget.exceededClock(elapsed) ||
-        budget.exceededTokens(_turnTokens,
-            windowTokens: costTracker?.contextLength ?? 0);
+        budget.exceededTokens(
+          _turnTokens,
+          windowTokens: costTracker?.contextLength ?? 0,
+        );
   }
 }
 
@@ -122,8 +155,11 @@ Disposer provideBudgetedLlm(
   required TurnBudget budget,
   CostTrackerImpl? costTracker,
 }) {
-  final BudgetedLlmProvider instance =
-      BudgetedLlmProvider(llm, budget: budget, costTracker: costTracker);
+  final BudgetedLlmProvider instance = BudgetedLlmProvider(
+    llm,
+    budget: budget,
+    costTracker: costTracker,
+  );
   final Disposer disposer = ctx.provide('llm', instance);
   ctx.onDispose(instance.close);
   return disposer;

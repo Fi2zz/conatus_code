@@ -848,13 +848,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     _definitionsDirty = false;
     if (ready) {
       final AgentDefinition? current = agents.byId(_agentId);
-      final bool removed = current == null || current.mode == AgentMode.subagent;
+      final bool removed =
+          current == null || current.mode == AgentMode.subagent;
       final String target = removed ? agents.defaultAgent.id : current.id;
-      await _activateAgent(
-        target,
-        announce: removed,
-        syncPlanMode: false,
-      );
+      await _activateAgent(target, announce: removed, syncPlanMode: false);
     }
     if (announce) showSystemNotice('已重载 Agent / 命令定义。');
     _refresh();
@@ -1276,6 +1273,10 @@ class ConatusTuiController implements TuiUserPromptHost {
     bool interrupted = false;
     bool budgetExhausted = false;
     String reply = '';
+    // 用户每提交一次就是新的一轮：不能靠空闲时间推断轮边界，否则连续追问
+    // 会把上一轮墙钟累计进来，正常对话中途误报预算并返回空回复。
+    final LlmProvider? budgetedLlm = _app.get<LlmProvider>('llm');
+    if (budgetedLlm is BudgetedLlmProvider) budgetedLlm.beginTurn();
     try {
       final AgentTurn turn = await agent.run(
         messageText,
@@ -1294,10 +1295,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       }
       if (turn.emptyReply) {
         turnOk = false;
-        transcript.add(
-          TuiRole.system,
-          '模型返回了空回复（输出可能被截断），请重试或换模型。',
-        );
+        transcript.add(TuiRole.system, '模型返回了空回复（输出可能被截断），请重试或换模型。');
       }
     } on AgentCancelled {
       turnOk = false;
@@ -1315,11 +1313,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       // 运行记录已是终态。
       _settleCronRuns(ok: turnOk, reply: reply);
       busy = false;
-      _endTurn(
-        ok: turnOk,
-        interrupted: interrupted,
-        budget: budgetExhausted,
-      );
+      _endTurn(ok: turnOk, interrupted: interrupted, budget: budgetExhausted);
       await _afterTurn();
       _refresh();
     }
@@ -1794,8 +1788,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   Future<void> _handleCommand(String command, String arg) async {
     final WorkspaceInfo? activeInfo = _app.get<WorkspaceInfo>('projectInfo');
-    final ProjectRegistry? activeRegistry =
-        _app.get<ProjectRegistry>('projectRegistry');
+    final ProjectRegistry? activeRegistry = _app.get<ProjectRegistry>(
+      'projectRegistry',
+    );
     if (activeInfo != null && activeRegistry != null) {
       activeRegistry.touchProject(activeInfo.projectId);
     }
@@ -2122,11 +2117,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       _foregroundInterrupt = null;
       _cancel = null;
       busy = false;
-      _endTurn(
-        ok: turnOk,
-        interrupted: interrupted,
-        budget: budgetExhausted,
-      );
+      _endTurn(ok: turnOk, interrupted: interrupted, budget: budgetExhausted);
       await _afterTurn();
       _refresh();
     }
@@ -2192,8 +2183,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     final String? rawModel = slash < 0
         ? null
         : spec.substring(slash + 1).trim();
-    final String? typedModel =
-        rawModel == null ? null : stripModelVariant(rawModel);
+    final String? typedModel = rawModel == null
+        ? null
+        : stripModelVariant(rawModel);
     final ProviderProfile? profile = registry.byName(provider);
     if (profile == null) return '未知提供商：$provider';
     final String label = (typedModel != null && typedModel.isNotEmpty)
@@ -2547,8 +2539,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   void _handleProject(String arg) {
     final WorkspaceInfo? info = _app.get<WorkspaceInfo>('projectInfo');
-    final ProjectRegistry? registry =
-        _app.get<ProjectRegistry>('projectRegistry');
+    final ProjectRegistry? registry = _app.get<ProjectRegistry>(
+      'projectRegistry',
+    );
     if (info == null || registry == null) {
       transcript.add(TuiRole.system, '项目注册表未启用。');
       return;
@@ -2657,10 +2650,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     String selector,
   ) {
     if (selector.isEmpty) {
-      transcript.add(
-        TuiRole.system,
-        '用法：/project open <项目名|短ID|路径>',
-      );
+      transcript.add(TuiRole.system, '用法：/project open <项目名|短ID|路径>');
       return;
     }
     if (busy) {
@@ -2696,10 +2686,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       return;
     }
     if (!Directory(target.worktreePath).existsSync()) {
-      transcript.add(
-        TuiRole.system,
-        '目标 worktree 不存在：${target.worktreePath}',
-      );
+      transcript.add(TuiRole.system, '目标 worktree 不存在：${target.worktreePath}');
       return;
     }
     final void Function(String)? switchProject = onSwitchProject;
@@ -2724,9 +2711,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     final StringBuffer buffer = StringBuffer('搜索源：');
     for (final SearchSourceStatus status in all) {
-      buffer.write(
-        '\n${status.name}  ${status.available ? '可用' : '不可用'}',
-      );
+      buffer.write('\n${status.name}  ${status.available ? '可用' : '不可用'}');
       if (status.reason.isNotEmpty) buffer.write('  ${status.reason}');
     }
     transcript.add(TuiRole.system, buffer.toString());
@@ -2734,8 +2719,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   Future<void> _handleProjects() async {
     final WorkspaceInfo? info = _app.get<WorkspaceInfo>('projectInfo');
-    final ProjectRegistry? registry =
-        _app.get<ProjectRegistry>('projectRegistry');
+    final ProjectRegistry? registry = _app.get<ProjectRegistry>(
+      'projectRegistry',
+    );
     if (info == null || registry == null) {
       transcript.add(TuiRole.system, '项目注册表未启用。');
       return;
@@ -2796,8 +2782,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   Future<void> _handleWorktree(String arg) async {
-    final WorktreeService? service =
-        _app.get<WorktreeService>('worktreeService');
+    final WorktreeService? service = _app.get<WorktreeService>(
+      'worktreeService',
+    );
     if (service == null) {
       transcript.add(TuiRole.system, '项目注册表未启用，worktree 不可用。');
       return;
@@ -2809,7 +2796,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         transcript.add(TuiRole.system, '没有已登记 worktree。');
         return;
       }
-      final String current = _app.get<WorkspaceInfo>('projectInfo')?.worktreeId ?? '';
+      final String current =
+          _app.get<WorkspaceInfo>('projectInfo')?.worktreeId ?? '';
       final StringBuffer buffer = StringBuffer('worktree：');
       for (final WorkspaceInfo item in list) {
         final String mark = item.worktreeId == current ? '*' : ' ';
@@ -2859,10 +2847,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       final bool purge = parts.remove('--purge');
       final String selector = parts.join(' ').trim();
       if (selector.isEmpty) {
-        transcript.add(
-          TuiRole.system,
-          '用法：/worktree remove <名字> --purge',
-        );
+        transcript.add(TuiRole.system, '用法：/worktree remove <名字> --purge');
         return;
       }
       if (!purge) {
@@ -2889,10 +2874,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _handleLsp(String arg) async {
     final LspManager? manager = _app.get<LspManager>('lsp');
     if (manager == null) {
-      transcript.add(
-        TuiRole.system,
-        'LSP 未启用（[lsp] enabled = true 后重启 nava）。',
-      );
+      transcript.add(TuiRole.system, 'LSP 未启用（[lsp] enabled = true 后重启 nava）。');
       return;
     }
     final String rest = arg.trim();

@@ -1,3 +1,4 @@
+import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_llm/conatus_llm.dart';
 import 'package:test/test.dart';
@@ -11,8 +12,9 @@ void main() {
         budget: const TurnBudget(maxTokens: 0),
       );
 
-      final LlmResult result =
-          await budgeted.chat(<LlmMessage>[const LlmMessage('user', 'hi')]);
+      final LlmResult result = await budgeted.chat(<LlmMessage>[
+        const LlmMessage('user', 'hi'),
+      ]);
 
       expect(result.content, kBudgetExhaustedReply);
       expect(result.toolCalls, isEmpty);
@@ -26,8 +28,9 @@ void main() {
         budget: const TurnBudget(maxDuration: Duration.zero),
       );
 
-      final LlmResult result =
-          await budgeted.chat(<LlmMessage>[const LlmMessage('user', 'hi')]);
+      final LlmResult result = await budgeted.chat(<LlmMessage>[
+        const LlmMessage('user', 'hi'),
+      ]);
 
       expect(result.content, kBudgetExhaustedReply);
       expect(provider.calls, 0);
@@ -41,8 +44,9 @@ void main() {
       );
 
       await budgeted.chat(<LlmMessage>[LlmMessage('user', 'a' * 40)]);
-      final LlmResult second =
-          await budgeted.chat(<LlmMessage>[LlmMessage('user', 'b' * 40)]);
+      final LlmResult second = await budgeted.chat(<LlmMessage>[
+        LlmMessage('user', 'b' * 40),
+      ]);
 
       expect(second.content, kBudgetExhaustedReply);
       expect(provider.calls, 1);
@@ -58,8 +62,9 @@ void main() {
 
       await budgeted.chat(<LlmMessage>[LlmMessage('user', 'a' * 40)]);
       await Future<void>.delayed(const Duration(milliseconds: 60));
-      final LlmResult second =
-          await budgeted.chat(<LlmMessage>[LlmMessage('user', 'b' * 40)]);
+      final LlmResult second = await budgeted.chat(<LlmMessage>[
+        LlmMessage('user', 'b' * 40),
+      ]);
 
       expect(second.content, isNot(kBudgetExhaustedReply));
       expect(provider.calls, 2);
@@ -67,20 +72,23 @@ void main() {
 
     test('正常调用透传结果并累计成本', () async {
       final CostTrackerImpl tracker = CostTrackerImpl();
-      final _FakeProvider provider = _FakeProvider(_reply(
-        usage: <String, dynamic>{
-          'prompt_tokens': 1000000,
-          'completion_tokens': 0,
-        },
-      ));
+      final _FakeProvider provider = _FakeProvider(
+        _reply(
+          usage: <String, dynamic>{
+            'prompt_tokens': 1000000,
+            'completion_tokens': 0,
+          },
+        ),
+      );
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
         budget: const TurnBudget(maxTokens: 1000000),
         costTracker: tracker,
       );
 
-      final LlmResult result =
-          await budgeted.chat(<LlmMessage>[const LlmMessage('user', 'hi')]);
+      final LlmResult result = await budgeted.chat(<LlmMessage>[
+        const LlmMessage('user', 'hi'),
+      ]);
 
       expect(result.content, 'ok');
       expect(result.usage['prompt_tokens'], 1000000);
@@ -92,47 +100,87 @@ void main() {
     // 从不调 recordUsage —— 用量因此永远记不上，`/cost` 恒为 $0。
     test('chatStream 从终态帧记录用量', () async {
       final CostTrackerImpl tracker = CostTrackerImpl();
-      final _FakeProvider provider = _FakeProvider(_reply(
-        usage: <String, dynamic>{'prompt_tokens': 2000, 'completion_tokens': 8},
-      ));
+      final _FakeProvider provider = _FakeProvider(
+        _reply(
+          usage: <String, dynamic>{
+            'prompt_tokens': 2000,
+            'completion_tokens': 8,
+          },
+        ),
+      );
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
         budget: const TurnBudget(maxTokens: 1000000),
         costTracker: tracker,
       );
 
-      await budgeted
-          .chatStream(<LlmMessage>[const LlmMessage('user', 'hi')]).toList();
+      await budgeted.chatStream(<LlmMessage>[
+        const LlmMessage('user', 'hi'),
+      ]).toList();
 
       expect(tracker.promptTokens, 2000);
       expect(tracker.completionTokens, 8);
       expect(tracker.hasRealUsage, isTrue);
     });
 
-    test('chatStream 超限时只产出一个 LlmStreamDone', () async {
+    test('chatStream 超限时产出预算收口文本而不是空流', () async {
       final _FakeProvider provider = _FakeProvider(_reply());
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
         budget: const TurnBudget(maxTokens: 0),
       );
 
-      final List<LlmStreamEvent> events = await budgeted
-          .chatStream(<LlmMessage>[const LlmMessage('user', 'hi')])
-          .toList();
+      final List<LlmStreamEvent> events = await budgeted.chatStream(
+        <LlmMessage>[const LlmMessage('user', 'hi')],
+      ).toList();
 
-      expect(events, hasLength(1));
-      expect(events.single, isA<LlmStreamDone>());
+      expect(events, hasLength(2));
+      expect(events.first, isA<LlmTextDelta>());
+      expect((events.first as LlmTextDelta).text, kBudgetExhaustedReply);
+      expect(events.last, isA<LlmStreamDone>());
       expect(provider.calls, 0);
+    });
+
+    test('beginTurn 重置累计，不跨用户轮次泄漏', () async {
+      final _FakeProvider provider = _FakeProvider(_reply());
+      final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
+        provider,
+        budget: const TurnBudget(maxTokens: 20),
+      );
+
+      await budgeted.chat(<LlmMessage>[LlmMessage('user', 'a' * 40)]);
+      budgeted.beginTurn();
+      final LlmResult second = await budgeted.chat(<LlmMessage>[
+        LlmMessage('user', 'b' * 40),
+      ]);
+
+      expect(second.content, isNot(kBudgetExhaustedReply));
+      expect(provider.calls, 2);
+    });
+
+    test('压缩摘要请求不占单轮预算', () async {
+      final _FakeProvider provider = _FakeProvider(_reply());
+      final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
+        provider,
+        budget: const TurnBudget(maxTokens: 0),
+      );
+
+      final LlmResult result = await budgeted.chat(<LlmMessage>[
+        const LlmMessage('user', '$kCompactionSummaryPrompt历史……'),
+      ]);
+
+      expect(result.content, 'ok');
+      expect(provider.calls, 1);
     });
   });
 }
 
 LlmResult _reply({Map<String, dynamic>? usage}) => LlmResult(
-      content: 'ok',
-      provider: 'fake',
-      model: 'fake-model',
-      usage: usage ?? const <String, dynamic>{},
-    );
+  content: 'ok',
+  provider: 'fake',
+  model: 'fake-model',
+  usage: usage ?? const <String, dynamic>{},
+);
 
 class _FakeProvider implements LlmProvider {
   _FakeProvider(this.reply);

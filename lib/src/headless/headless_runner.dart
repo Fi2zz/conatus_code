@@ -10,7 +10,9 @@ import 'dart:convert';
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
+import 'package:conatus_llm/conatus_llm.dart';
 
+import '../budget/budgeted_llm.dart';
 import '../providers/providers_provider.dart';
 import '../story/story.dart';
 import '../tui/tui_app.dart';
@@ -54,12 +56,11 @@ Future<HeadlessResult> runHeadless(
       ? runtime.sessions.create()
       : await runtime.sessions.open(sessionId);
   runtime.app.providers?.sessionId = session.id;
-  final Context ctx = runtime.app.plugin(
-    'headless:${session.id}',
-    (Context child) {
-      provideAgentLoop(child, session: session, maxSteps: runtime.maxSteps);
-    },
-  );
+  final Context ctx = runtime.app.plugin('headless:${session.id}', (
+    Context child,
+  ) {
+    provideAgentLoop(child, session: session, maxSteps: runtime.maxSteps);
+  });
   // 故事层：异步（要从 sessionLog 重建），故在插件回调外 await。
   // headless 没有人审阅，review 保持 false（直写）；仅在配置开启时装配。
   if (runtime.storyEnabled) {
@@ -67,6 +68,8 @@ Future<HeadlessResult> runHeadless(
     await provideStory(ctx, sessionId: session.id);
   }
   try {
+    final LlmProvider? budgetedLlm = runtime.app.get<LlmProvider>('llm');
+    if (budgetedLlm is BudgetedLlmProvider) budgetedLlm.beginTurn();
     final AgentTurn turn = await ctx.agentLoop.run(prompt);
     return HeadlessResult(
       exitCode: 0,
