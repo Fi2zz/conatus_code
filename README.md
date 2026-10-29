@@ -959,9 +959,9 @@ stdio 子进程与本地命令同权，审批是未知风险的唯一防线，�
 ## 跨平台
 
 - macOS / Linux：完整测试与二进制构建。
-- Windows：项目注册表（SQLite）、本地文件工具与二进制启动由 CI 冒烟验证；
-  全量测试仍以 macOS 为主。Windows 构建时 `tool/build_binary.sh` 会把
-  `sqlite3.dll` 复制到 `nava.exe` 旁边。
+- Windows：代码支持同目录 `sqlite3.dll` 与系统 `winsqlite3.dll` 回退，但当前
+  没有 Windows 验证机，CI 不跑 Windows；`tool/build_binary.sh` 在 Windows
+  构建时会把 `sqlite3.dll` 复制到 `nava.exe` 旁边。
 - 沙箱层已移除，三端都以当前用户权限执行命令。
 
 ## 命令执行与隔离（没有沙箱）
