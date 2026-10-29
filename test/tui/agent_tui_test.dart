@@ -156,11 +156,11 @@ void main() {
     }
   });
 
-  test('/setting 渲染设置面板，↑↓ 选择、←→ 翻页、Esc 关闭', () async {
+  test('/settings 渲染设置面板，↑↓ 选择、←→ 翻页、Esc 关闭', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();
     try {
-      await controller.handleLine('/setting');
+      await controller.handleLine('/settings');
       await tester.pump();
 
       expect(tester.terminalState, containsText('Settings'));

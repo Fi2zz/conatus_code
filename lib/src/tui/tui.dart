@@ -1035,11 +1035,9 @@ class _AgentTuiState extends State<AgentTui> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Component>[
           Expanded(
-            child: _controller.settingsOpen
-                ? SettingsView(prompt: _controller.settingsPrompt)
-                : _view == ViewMode.chat
-                    ? (_controller.diffOpen ? _diffView() : _body())
-                    : TeamView(snapshot: _controller.teamSnapshot),
+            child: _view == ViewMode.chat
+                ? (_controller.diffOpen ? _diffView() : _body())
+                : TeamView(snapshot: _controller.teamSnapshot),
           ),
           // 交互浮层一律贴在输入栏上方（小面板），消息区保持可见。
           if (_controller.renamePrompt.open)
@@ -1097,7 +1095,9 @@ class _AgentTuiState extends State<AgentTui> {
           if (_atMenu.open)
             AtRefMenuView(matches: _atMenu.matches, selected: _atMenu.index),
           TeamStatusBar(snapshot: _controller.teamSnapshot),
-          if (!_controller.diffOpen && !_controller.settingsOpen)
+          if (_controller.settingsOpen)
+            SettingsView(prompt: _controller.settingsPrompt)
+          else if (!_controller.diffOpen)
             TuiInputBar(
               controller: _input,
               shellMode: _shell.active,

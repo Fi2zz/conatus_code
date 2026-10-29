@@ -1982,7 +1982,6 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'keybinds':
         transcript.add(TuiRole.system, renderKeybinds(keymap));
       case 'settings':
-      case 'setting':
         openSettings();
       default:
         // 内置命令优先；未命中再查自定义命令，最后才把命令词当技能名试一次。

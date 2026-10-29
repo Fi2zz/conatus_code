@@ -381,12 +381,12 @@ void main() {
     app.dispose();
   });
 
-  test('/setting 打开设置面板，Esc 关闭', () async {
+  test('/settings 打开设置面板，Esc 关闭', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
     );
 
-    await controller.handleLine('/setting');
+    await controller.handleLine('/settings');
     expect(controller.settingsOpen, isTrue);
     expect(controller.settingsPrompt.selected.title, 'Model');
 
