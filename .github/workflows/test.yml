@@ -19,12 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # macOS 跑全量测试（本机开发主平台）。
   test:
-    # 沙箱 Layer 2 只在 macOS 可用（probeSandboxBackend 首行即
-    # `if (!Platform.isMacOS) throw`）。test/sandbox/sandbox_review_test.dart 与
-    # sandbox_assembly_test.dart 没有跳过保护，放到 ubuntu 上必红；更糟的是
-    # 即便补了跳过，最有价值的沙箱测试也全被跳掉，等于绿得没有意义。
-    # conatus_code 暂不支持非 macOS（见 README「沙箱分层与已知边界」）。
     runs-on: macos-latest
 
     steps:
@@ -59,3 +55,53 @@ jobs:
         run: |
           bash tool/build_binary.sh
           ./dist/nava --version
+
+  # Linux / Windows 冒烟：项目注册表（SQLite）与本地文件工具可用，二进制能启动。
+  # 不跑全量测试，避免把 POSIX 专属测试当成跨平台回归。
+  cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.2"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-${{ runner.os }}-
+
+      - run: dart pub get
+
+      - run: dart analyze --fatal-infos
+
+      - run: dart test test/platform_smoke_test.dart
+
+      - name: Fetch sqlite3.dll (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tool/fetch_sqlite3_dll.ps1
+
+      - name: Build binary
+        shell: bash
+        run: bash tool/build_binary.sh
+
+      - name: Run binary
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/nava-smoke"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ./dist/nava.exe --version
+            NAVA_HOME="$(cygpath -w "$RUNNER_TEMP/nava-smoke")" \
+              ./dist/nava.exe project prune
+          else
+            ./dist/nava --version
+            NAVA_HOME="$RUNNER_TEMP/nava-smoke" ./dist/nava project prune
+          fi

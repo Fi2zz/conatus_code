@@ -4,6 +4,8 @@
 
 ## [未发布]
 
+- **跨平台**：Windows 优先加载同目录 `sqlite3.dll`，新增 `platform_smoke_test.dart`
+  与 Linux/Windows CI 冒烟；构建脚本支持 Windows 二进制与 DLL 分发。
 - **项目 UX**：`/projects` 选择面板（含 `r` 重命名、归档标记）、
   项目图标/颜色按色值渲染、最近活跃排序、`/project unarchive`、
   `/project prune` 与 `nava project prune`（`--purge` 删除归档数据）。

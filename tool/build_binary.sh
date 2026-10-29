@@ -14,9 +14,22 @@ package_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output="${1:-$package_root/dist/nava}"
 
 mkdir -p "$(dirname "$output")"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) output="${output%.exe}.exe" ;;
+esac
 version="$(grep '^version:' "$package_root/pubspec.yaml" | awk '{print $2}')"
 dart compile exe "$package_root/bin/conatus_code.dart" \
   -DNAVA_VERSION="$version" -o "$output"
-chmod +x "$output"
+chmod +x "$output" 2>/dev/null || true
+
+# Windows 分发：把 sqlite3.dll 放在 nava.exe 旁边，运行时优先加载它。
+if [[ "$output" == *.exe ]]; then
+  if [[ -f "$package_root/sqlite3.dll" ]]; then
+    cp "$package_root/sqlite3.dll" "$(dirname "$output")/sqlite3.dll"
+    echo "已复制 sqlite3.dll"
+  else
+    echo "提示：未找到 sqlite3.dll，将回退到系统 winsqlite3.dll" >&2
+  fi
+fi
 
 echo "产物：${output}（$(du -h "$output" | awk '{print $1}')）"

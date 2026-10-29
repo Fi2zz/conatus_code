@@ -5,6 +5,8 @@ import 'dart:io';
 
 import 'package:sqlite3/sqlite3.dart';
 
+import 'sqlite_library.dart';
+
 /// `project` 表的一行。
 class ProjectRecord {
   const ProjectRecord({
@@ -53,6 +55,7 @@ class ProjectDatabase {
 
   /// 打开（必要时创建）数据库。
   factory ProjectDatabase.open(String path) {
+    configureSqliteLibrary();
     final Directory parent = File(path).parent;
     parent.createSync(recursive: true);
     Database? db;

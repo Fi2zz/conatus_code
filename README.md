@@ -82,8 +82,9 @@ sidecar 重建注册表（损坏的 DB 会先备份为 `projects.db.corrupt-<时
 - `/worktree new <名字> [branch] [--open]` / `list` / `remove <名字> --purge`
   管理 nava 自管 git worktree（remove 会同时删除数据目录）
 
-SQLite 使用系统库：macOS/Linux 通常自带；
-Windows 需要另行提供 `sqlite3.dll`，且 nava 的 Windows 命令执行本来默认禁用。
+SQLite 使用系统库：macOS/Linux 通常自带；Windows 优先加载与 `nava.exe`
+同目录的 `sqlite3.dll`（可用 `tool/fetch_sqlite3_dll.ps1` 下载），找不到时
+回退到系统自带的 `winsqlite3.dll`。nava 的 Windows 命令执行默认禁用。
 
 示例：
 
@@ -954,6 +955,14 @@ nava --harness harnesses/std.json      # 本次运行装配（TUI 与 -p 共用�
 
 未声明风险的 MCP 工具缺省提级 `high`（见 conatus_mcp 的 `mcpToolRisk`）：
 stdio 子进程与本地命令同权，审批是未知风险的唯一防线，缺省必须进得去审批阈值。
+
+## 跨平台
+
+- macOS / Linux：完整测试与二进制构建。
+- Windows：项目注册表（SQLite）、本地文件工具与二进制启动由 CI 冒烟验证；
+  全量测试仍以 macOS 为主。Windows 构建时 `tool/build_binary.sh` 会把
+  `sqlite3.dll` 复制到 `nava.exe` 旁边。
+- 沙箱层已移除，三端都以当前用户权限执行命令。
 
 ## 命令执行与隔离（没有沙箱）
 
