@@ -57,6 +57,25 @@ void main() {
     expect(fix.controller.tabs.active, 0);
   });
 
+
+  test('面板切到旧会话后重建历史记录', () async {
+    final RenameFixture fix = await buildRenameFixture();
+    await fix.controller.openPicker();
+    fix.controller.movePicker(
+      fix.controller.picker.list.indexWhere(
+            (TuiSessionInfo item) => item.id == renameOtherId,
+          ) -
+          fix.controller.picker.index,
+    );
+    await fix.controller.pickSelected();
+
+    expect(fix.controller.sessionId, renameOtherId);
+    expect(
+      fix.controller.transcript.messages.map((TuiMessage m) => m.text).join('\n'),
+      contains('Legacy question'),
+    );
+  });
+
   test('busy 时拒绝切标签与关闭活跃标签并提示', () async {
     final RenameFixture fix = await buildRenameFixture();
     await fix.controller.handleLine('/new');
