@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **项目 UX**：`/projects` 选择面板、项目图标/颜色、最近活跃排序、
+  `/project prune` 与 `nava project prune` 归档失效项目。
+
 - **移除沙箱层（破坏性）**：删除 Layer 1（`JailedFileSystem`）与 Layer 2
   （Seatbelt / bubblewrap）两层隔离，`run_command` 等工具改为以当前用户权限
   直接在本机执行，与 OpenCode / Kimi Code 同姿态；需要隔离时请把 nava 放进

@@ -25,7 +25,7 @@ void main() {
     expect(File(path).existsSync(), isTrue);
     final Database raw = sqlite3.open(path);
     addTearDown(raw.dispose);
-    expect(raw.select('PRAGMA user_version').first.values.first, 2);
+    expect(raw.select('PRAGMA user_version').first.values.first, 3);
     expect(
       raw
           .select("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -60,7 +60,7 @@ void main() {
     expect(db.worktreeByDirName('lifts-3f9a2c1b7d4e')!.id, 'w1');
   });
 
-  test('v1 数据库迁移增加 strategy 列', () {
+  test('v1 数据库迁移增加 strategy 与 project UX 列', () {
     final Directory dir = _tempDir();
     final String path = _dbPath(dir);
     final Database raw = sqlite3.open(path);
@@ -86,11 +86,16 @@ PRAGMA user_version = 1;
     addTearDown(db.close);
     final Database check = sqlite3.open(path);
     addTearDown(check.dispose);
-    expect(check.select('PRAGMA user_version').first.values.first, 2);
+    expect(check.select('PRAGMA user_version').first.values.first, 3);
     expect(
       check.select("SELECT name FROM pragma_table_info('worktree')")
           .map((Row row) => row['name']),
       contains('strategy'),
+    );
+    expect(
+      check.select("SELECT name FROM pragma_table_info('project')")
+          .map((Row row) => row['name']),
+      containsAll(<String>['time_active', 'time_archived', 'icon_url', 'icon_color']),
     );
   });
 
@@ -120,7 +125,7 @@ PRAGMA user_version = 1;
     expect(db.worktreeAt('/tmp/lifts')!.strategy, 'git');
   });
 
-  test('v1 数据库迁移增加 strategy 列', () {
+  test('v1 数据库迁移增加 strategy 与 project UX 列', () {
     final Directory dir = _tempDir();
     final String path = _dbPath(dir);
     final Database raw = sqlite3.open(path);
@@ -146,11 +151,16 @@ PRAGMA user_version = 1;
     addTearDown(db.close);
     final Database check = sqlite3.open(path);
     addTearDown(check.dispose);
-    expect(check.select('PRAGMA user_version').first.values.first, 2);
+    expect(check.select('PRAGMA user_version').first.values.first, 3);
     expect(
       check.select("SELECT name FROM pragma_table_info('worktree')")
           .map((Row row) => row['name']),
       contains('strategy'),
+    );
+    expect(
+      check.select("SELECT name FROM pragma_table_info('project')")
+          .map((Row row) => row['name']),
+      containsAll(<String>['time_active', 'time_archived', 'icon_url', 'icon_color']),
     );
   });
 

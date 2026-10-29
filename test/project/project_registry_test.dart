@@ -11,7 +11,9 @@ import 'package:test/test.dart';
 
 Directory _tempDir() {
   final Directory dir = Directory.systemTemp.createTempSync('nava-registry');
-  addTearDown(() => dir.deleteSync(recursive: true));
+  addTearDown(() {
+    if (dir.existsSync()) dir.deleteSync(recursive: true);
+  });
   return dir;
 }
 
@@ -139,6 +141,43 @@ void main() {
         containsAll(<String>[first.worktreePath, Directory(b.path).resolveSymbolicLinksSync()]));
     expect(list.every((WorkspaceInfo item) => item.projectName == first.projectName),
         isTrue);
+  });
+
+  test('项目活跃排序与 archiveMissing', () {
+    final Directory home = _tempDir();
+    final Directory a = _tempDir();
+    final Directory b = _tempDir();
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+    final WorkspaceInfo first = registry.resolve(a.path);
+    final WorkspaceInfo second = registry.resolve(b.path);
+    registry.database.touchProject(first.projectId);
+    final List<WorkspaceInfo> recent = registry.list();
+    expect(recent.first.projectId, first.projectId);
+
+    Directory(b.path).deleteSync(recursive: true);
+    expect(registry.archiveMissing(), 1);
+    expect(registry.list().where((WorkspaceInfo item) => item.projectId == second.projectId), isEmpty);
+    expect(
+      registry.list(includeArchived: true).where(
+            (WorkspaceInfo item) => item.projectId == second.projectId,
+          ),
+      isNotEmpty,
+    );
+  });
+
+  test('setIcon 持久化', () {
+    final Directory home = _tempDir();
+    final Directory work = _tempDir();
+    final ProjectRegistry registry = _registry(home);
+    addTearDown(registry.close);
+    final WorkspaceInfo info = registry.resolve(work.path);
+
+    registry.setIcon(info.projectId, url: '🐍', color: '#336699');
+
+    final ProjectRecord project = registry.database.project(info.projectId)!;
+    expect(project.iconUrl, '🐍');
+    expect(project.iconColor, '#336699');
   });
 
   test('rename 持久化，后续 resolve 不覆盖', () {

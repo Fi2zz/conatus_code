@@ -1813,6 +1813,8 @@ class ConatusTuiController implements TuiUserPromptHost {
         await _handleLsp(arg);
       case 'web':
         _handleWeb();
+      case 'projects':
+        await _handleProjects();
       case 'worktree':
         await _handleWorktree(arg);
       case 'rename':
@@ -2556,6 +2558,25 @@ class ConatusTuiController implements TuiUserPromptHost {
       );
       return;
     }
+    if (rest == 'prune') {
+      final int archived = registry.archiveMissing();
+      transcript.add(TuiRole.system, '已归档 $archived 个失效项目。');
+      return;
+    }
+    if (rest == 'icon' || rest.startsWith('icon ')) {
+      final List<String> parts = rest.substring(4).trim().split(RegExp(r'\s+'));
+      if (parts.isEmpty || parts.first.isEmpty) {
+        transcript.add(TuiRole.system, '用法：/project icon <图标> [颜色]');
+        return;
+      }
+      registry.setIcon(
+        info.projectId,
+        url: parts.first,
+        color: parts.length > 1 ? parts[1] : null,
+      );
+      transcript.add(TuiRole.system, '项目图标已更新。');
+      return;
+    }
     if (rest == 'list') {
       final List<WorkspaceInfo> list = registry.list();
       final StringBuffer buffer = StringBuffer(
@@ -2677,6 +2698,40 @@ class ConatusTuiController implements TuiUserPromptHost {
       if (status.reason.isNotEmpty) buffer.write('  ${status.reason}');
     }
     transcript.add(TuiRole.system, buffer.toString());
+  }
+
+  Future<void> _handleProjects() async {
+    final WorkspaceInfo? info = _app.get<WorkspaceInfo>('projectInfo');
+    final ProjectRegistry? registry =
+        _app.get<ProjectRegistry>('projectRegistry');
+    if (info == null || registry == null) {
+      transcript.add(TuiRole.system, '项目注册表未启用。');
+      return;
+    }
+    final List<WorkspaceInfo> list = registry.list();
+    if (list.isEmpty) {
+      transcript.add(TuiRole.system, '没有已登记项目。');
+      return;
+    }
+    final String? selected = await choice.ask(
+      TuiChoiceRequest(
+        title: '项目',
+        choices: <TuiChoice>[
+          for (final WorkspaceInfo item in list)
+            TuiChoice(
+              id: item.worktreeId,
+              label:
+                  '${registry.project(item.projectId)?.iconUrl ?? ''}'
+                  '${registry.project(item.projectId)?.iconUrl == null ? '' : ' '}'
+                  '${item.projectName}',
+              description: item.worktreePath,
+              current: item.worktreeId == info.worktreeId,
+            ),
+        ],
+      ),
+    );
+    if (selected == null) return;
+    _openProject(info, registry, selected);
   }
 
   Future<void> _handleWorktree(String arg) async {

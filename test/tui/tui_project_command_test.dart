@@ -12,7 +12,9 @@ import 'package:test/test.dart';
 
 Directory _tempDir() {
   final Directory dir = Directory.systemTemp.createTempSync('nava-project-cmd');
-  addTearDown(() => dir.deleteSync(recursive: true));
+  addTearDown(() {
+    if (dir.existsSync()) dir.deleteSync(recursive: true);
+  });
   return dir;
 }
 
@@ -213,6 +215,63 @@ void main() {
     );
     controller.dispose();
     noCallback.dispose();
+  });
+
+  test('/projects 面板选择后请求切换', () async {
+    final Directory temp = _tempDir();
+    final Directory a = _tempDir();
+    final Directory b = _tempDir();
+    _initRepo(a);
+    _initRepo(b);
+    final ProjectRegistry registry = ProjectRegistry.open(
+      dbPath: '${temp.path}/projects.db',
+      workspacesDir: '${temp.path}/workspaces',
+    );
+    addTearDown(registry.close);
+    final WorkspaceInfo first = registry.resolve(a.path);
+    final WorkspaceInfo second = registry.resolve(b.path);
+    String? switched;
+    final (ConatusTuiController controller, _) = await _build(
+      info: first,
+      registry: registry,
+      onSwitchProject: (String workdir) => switched = workdir,
+    );
+
+    final Future<void> pending = controller.handleLine('/projects');
+    await Future<void>.delayed(Duration.zero);
+    final int index = controller.choice.request!.choices.indexWhere(
+      (TuiChoice choice) => choice.id == second.worktreeId,
+    );
+    controller.choice.move(index - controller.choice.index);
+    controller.choice.confirm();
+    await pending;
+
+    expect(switched, second.worktreePath);
+    controller.dispose();
+  });
+
+  test('/project icon 与 prune', () async {
+    final Directory temp = _tempDir();
+    final Directory work = _tempDir();
+    final ProjectRegistry registry = ProjectRegistry.open(
+      dbPath: '${temp.path}/projects.db',
+      workspacesDir: '${temp.path}/workspaces',
+    );
+    addTearDown(registry.close);
+    final WorkspaceInfo info = registry.resolve(work.path);
+    final (ConatusTuiController controller, _) = await _build(
+      info: info,
+      registry: registry,
+    );
+
+    await controller.handleLine('/project icon 🐍 #336699');
+    expect(registry.project(info.projectId)!.iconUrl, '🐍');
+    expect(registry.project(info.projectId)!.iconColor, '#336699');
+
+    Directory(work.path).deleteSync(recursive: true);
+    await controller.handleLine('/project prune');
+    expect(controller.transcript.messages.last.text, contains('已归档 1'));
+    controller.dispose();
   });
 
   test('/project rename 更新注册表并提示新名字', () async {

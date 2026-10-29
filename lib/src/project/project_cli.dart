@@ -3,15 +3,26 @@ library;
 
 import 'dart:io';
 
+import 'project_registry.dart';
 import 'project_repair.dart';
 
 Future<int> runProjectCli(
   List<String> args, {
   Map<String, String>? env,
 }) async {
-  if (args.length != 1 || args.first != 'repair') {
-    stderr.writeln('用法：nava project repair');
+  if (args.length != 1 || (args.first != 'repair' && args.first != 'prune')) {
+    stderr.writeln('用法：nava project repair|prune');
     return 2;
+  }
+  if (args.first == 'prune') {
+    final ProjectRegistry registry = ProjectRegistry.open(env: env);
+    try {
+      final int archived = registry.archiveMissing();
+      stdout.writeln('已归档 $archived 个失效项目。');
+      return 0;
+    } finally {
+      registry.close();
+    }
   }
   final ProjectRepairReport report = repairProjectRegistry(env: env);
   stdout.writeln(

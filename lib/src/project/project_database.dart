@@ -12,12 +12,20 @@ class ProjectRecord {
     required this.name,
     this.vcs,
     this.remote,
+    this.timeActive = 0,
+    this.timeArchived,
+    this.iconUrl,
+    this.iconColor,
   });
 
   final String id;
   final String name;
   final String? vcs;
   final String? remote;
+  final int timeActive;
+  final int? timeArchived;
+  final String? iconUrl;
+  final String? iconColor;
 }
 
 /// `worktree` 表的一行。
@@ -72,6 +80,13 @@ class ProjectDatabase {
   final String path;
   final Database _db;
   bool _closed = false;
+
+  List<ProjectRecord> projects() => _guard(() {
+    final ResultSet rows = _db.select(
+      'SELECT * FROM project ORDER BY time_active DESC, time_updated DESC',
+    );
+    return <ProjectRecord>[for (final Row row in rows) _projectFrom(row)];
+  });
 
   ProjectRecord? project(String id) => _guard(() {
     final ResultSet rows = _db.select(
@@ -150,14 +165,15 @@ class ProjectDatabase {
       final int now = DateTime.now().millisecondsSinceEpoch;
       _db.execute(
         '''
-INSERT INTO project (id, name, vcs, remote, time_created, time_updated)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO project
+  (id, name, vcs, remote, time_created, time_updated, time_active)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
   vcs = excluded.vcs,
   remote = excluded.remote,
   time_updated = excluded.time_updated
 ''',
-        <Object?>[id, name, vcs, remote, now, now],
+        <Object?>[id, name, vcs, remote, now, now, now],
       );
       _restrictArtifacts(path);
     });
@@ -189,6 +205,34 @@ ON CONFLICT(id) DO UPDATE SET
         <Object?>[id, projectId, path, name, dirName, strategy, now, now],
       );
       _restrictArtifacts(path);
+    });
+  }
+
+  void touchProject(String id) {
+    _guard(() {
+      _db.execute(
+        'UPDATE project SET time_active = ?, time_updated = ? WHERE id = ?',
+        <Object?>[DateTime.now().millisecondsSinceEpoch, DateTime.now().millisecondsSinceEpoch, id],
+      );
+    });
+  }
+
+  void archiveProject(String id, {bool archived = true}) {
+    _guard(() {
+      final int? value = archived ? DateTime.now().millisecondsSinceEpoch : null;
+      _db.execute(
+        'UPDATE project SET time_archived = ?, time_updated = ? WHERE id = ?',
+        <Object?>[value, DateTime.now().millisecondsSinceEpoch, id],
+      );
+    });
+  }
+
+  void setProjectIcon(String id, {String? url, String? color}) {
+    _guard(() {
+      _db.execute(
+        'UPDATE project SET icon_url = ?, icon_color = ?, time_updated = ? WHERE id = ?',
+        <Object?>[url, color, DateTime.now().millisecondsSinceEpoch, id],
+      );
     });
   }
 
@@ -236,10 +280,17 @@ ON CONFLICT(id) DO UPDATE SET
   static void _migrate(Database db, String path) {
     final int version =
         db.select('PRAGMA user_version').first.values.first! as int;
-    if (version == 2) return;
+    if (version == 3) return;
     if (version == 1) {
       db.execute('ALTER TABLE worktree ADD COLUMN strategy TEXT');
       db.execute('PRAGMA user_version = 2');
+    }
+    if (version == 1 || version == 2) {
+      db.execute('ALTER TABLE project ADD COLUMN time_active INTEGER NOT NULL DEFAULT 0');
+      db.execute('ALTER TABLE project ADD COLUMN time_archived INTEGER');
+      db.execute('ALTER TABLE project ADD COLUMN icon_url TEXT');
+      db.execute('ALTER TABLE project ADD COLUMN icon_color TEXT');
+      db.execute('PRAGMA user_version = 3');
       return;
     }
     final bool empty = db
@@ -255,7 +306,11 @@ CREATE TABLE project (
   vcs TEXT,
   remote TEXT,
   time_created INTEGER NOT NULL,
-  time_updated INTEGER NOT NULL
+  time_updated INTEGER NOT NULL,
+  time_active INTEGER NOT NULL DEFAULT 0,
+  time_archived INTEGER,
+  icon_url TEXT,
+  icon_color TEXT
 );
 CREATE TABLE worktree (
   id TEXT PRIMARY KEY,
@@ -268,7 +323,7 @@ CREATE TABLE worktree (
   time_updated INTEGER NOT NULL
 );
 CREATE INDEX worktree_project_idx ON worktree(project_id);
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 ''');
   }
 
@@ -277,6 +332,10 @@ PRAGMA user_version = 2;
     name: row['name'] as String,
     vcs: row['vcs'] as String?,
     remote: row['remote'] as String?,
+    timeActive: (row['time_active'] as int?) ?? 0,
+    timeArchived: row['time_archived'] as int?,
+    iconUrl: row['icon_url'] as String?,
+    iconColor: row['icon_color'] as String?,
   );
 
   static WorktreeRecord _worktreeFrom(Row row) => WorktreeRecord(

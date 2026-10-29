@@ -132,6 +132,8 @@ class ProjectRegistry {
       vcs: identity.vcs,
       remote: identity.remote,
     );
+    database.touchProject(identity.projectId);
+    database.archiveProject(identity.projectId, archived: false);
     final WorktreeRecord? existing = database.worktreeAt(identity.worktreePath);
     final String dirName =
         existing?.dirName ??
@@ -147,9 +149,9 @@ class ProjectRegistry {
     return (projectName: projectName, dirName: dirName);
   }
 
-  /// 已登记的全部 worktree，按最近使用排序。
-  List<WorkspaceInfo> list() {
-    return <WorkspaceInfo>[
+  /// 已登记的全部 worktree，按项目最近使用排序。
+  List<WorkspaceInfo> list({bool includeArchived = false}) {
+    final List<WorkspaceInfo> items = <WorkspaceInfo>[
       for (final WorktreeRecord worktree in database.worktrees())
         WorkspaceInfo(
           projectId: worktree.projectId,
@@ -162,7 +164,46 @@ class ProjectRegistry {
           strategy: worktree.strategy,
         ),
     ];
+    if (!includeArchived) {
+      items.removeWhere(
+        (WorkspaceInfo item) =>
+            database.project(item.projectId)?.timeArchived != null,
+      );
+    }
+    items.sort((WorkspaceInfo a, WorkspaceInfo b) {
+      final int activeA = database.project(a.projectId)?.timeActive ?? 0;
+      final int activeB = database.project(b.projectId)?.timeActive ?? 0;
+      final int byActive = activeB.compareTo(activeA);
+      return byActive == 0 ? a.worktreePath.compareTo(b.worktreePath) : byActive;
+    });
+    return items;
   }
+
+  /// 归档所有 worktree 路径都已不存在的项目；不删除数据。
+  int archiveMissing() {
+    final List<ProjectRecord> projects = database.projects();
+    final List<WorktreeRecord> worktrees = database.worktrees();
+    int archived = 0;
+    for (final ProjectRecord project in projects) {
+      final List<WorktreeRecord> items = worktrees
+          .where((WorktreeRecord item) => item.projectId == project.id)
+          .toList();
+      if (items.any((WorktreeRecord item) => Directory(item.path).existsSync())) {
+        continue;
+      }
+      if (project.timeArchived == null) {
+        database.archiveProject(project.id);
+        archived++;
+      }
+    }
+    return archived;
+  }
+
+  void setIcon(String projectId, {String? url, String? color}) {
+    database.setProjectIcon(projectId, url: url, color: color);
+  }
+
+  ProjectRecord? project(String id) => database.project(id);
 
   /// 重命名项目；只改数据库显示名，并尽量同步已有 sidecar。
   void rename(String projectId, String name, {String? dataDir}) {

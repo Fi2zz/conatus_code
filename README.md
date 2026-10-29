@@ -71,6 +71,14 @@ export PATH="$PWD/dist:$PATH"
 不改目录。状态栏右段也会显示项目名。每个工作区目录里有
 `workspace.json` sidecar；DB 丢失或损坏时运行 `nava project repair` 可从
 sidecar 重建注册表（损坏的 DB 会先备份为 `projects.db.corrupt-<时间>`）。
+
+- `/projects` 打开项目选择面板（↑↓ 选择、Enter 打开）
+- `/project icon <图标> [颜色]` 设置项目图标/颜色
+- `/project prune` 或 `nava project prune` 归档所有 worktree 路径都已不存在的项目
+- 项目按最近活跃排序；`/project list` 只显示未归档项目
+- `/worktree new <名字> [branch] [--open]` / `list` / `remove <名字> --purge`
+  管理 nava 自管 git worktree（remove 会同时删除数据目录）
+
 SQLite 使用系统库：macOS/Linux 通常自带；
 Windows 需要另行提供 `sqlite3.dll`，且 nava 的 Windows 命令执行本来默认禁用。
 
