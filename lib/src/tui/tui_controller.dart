@@ -2566,7 +2566,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         final String worktreeShort = item.worktreeId.substring(0, 8);
         buffer.write(
           '\n$mark ${item.projectName}  ${item.projectShortId}/$worktreeShort  '
-          '${item.worktreePath}',
+          '${item.strategy ?? 'user'}  ${item.worktreePath}',
         );
       }
       transcript.add(TuiRole.system, buffer.toString());
@@ -2707,8 +2707,12 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     if (rest == 'new' || rest.startsWith('new ')) {
       final List<String> parts = rest.substring(3).trim().split(RegExp(r'\s+'));
+      final bool openAfter = parts.remove('--open');
       if (parts.isEmpty || parts.first.isEmpty) {
-        transcript.add(TuiRole.system, '用法：/worktree new <名字> [branch]');
+        transcript.add(
+          TuiRole.system,
+          '用法：/worktree new <名字> [branch] [--open]',
+        );
         return;
       }
       try {
@@ -2721,19 +2725,39 @@ class ConatusTuiController implements TuiUserPromptHost {
           '已创建 worktree：${result.path}（分支 ${result.branch}）；'
           '用 /project open ${result.info.worktreeId.substring(0, 8)} 切换。',
         );
+        if (openAfter) {
+          final void Function(String)? callback = onSwitchProject;
+          if (callback == null) {
+            transcript.add(TuiRole.system, '当前模式不支持自动切换。');
+          } else {
+            callback(result.info.worktreePath);
+          }
+        }
       } catch (error) {
         transcript.add(TuiRole.system, '创建 worktree 失败：$error');
       }
       return;
     }
     if (rest == 'remove' || rest.startsWith('remove ')) {
-      final String selector = rest.substring(6).trim();
+      final List<String> parts = rest.substring(6).trim().split(RegExp(r'\s+'));
+      final bool purge = parts.remove('--purge');
+      final String selector = parts.join(' ').trim();
       if (selector.isEmpty) {
-        transcript.add(TuiRole.system, '用法：/worktree remove <名字>');
+        transcript.add(
+          TuiRole.system,
+          '用法：/worktree remove <名字> --purge',
+        );
+        return;
+      }
+      if (!purge) {
+        transcript.add(
+          TuiRole.system,
+          '删除会同时删除数据目录；请用 /worktree remove <名字> --purge 确认。',
+        );
         return;
       }
       try {
-        await service.remove(selector);
+        await service.remove(selector, purge: true);
         transcript.add(TuiRole.system, '已删除 worktree：$selector');
       } catch (error) {
         transcript.add(TuiRole.system, '删除 worktree 失败：$error');
@@ -2742,7 +2766,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     transcript.add(
       TuiRole.system,
-      '用法：/worktree [new <名字> [branch]|list|remove <名字>]',
+      '用法：/worktree [new <名字> [branch] [--open]|list|remove <名字> --purge]',
     );
   }
 

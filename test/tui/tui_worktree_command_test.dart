@@ -74,6 +74,41 @@ void main() {
     controller.dispose();
   });
 
+  test('/worktree remove 需要 --purge，确认后删除', () async {
+    final Directory home = _tempDir();
+    final Directory repo = _tempDir();
+    Process.runSync('git', <String>['init', '-q', '-b', 'main'], workingDirectory: repo.path);
+    Process.runSync('git', <String>['config', 'user.email', 't@example.com'], workingDirectory: repo.path);
+    Process.runSync('git', <String>['config', 'user.name', 't'], workingDirectory: repo.path);
+    File('${repo.path}/a.txt').writeAsStringSync('a');
+    Process.runSync('git', <String>['add', 'a.txt'], workingDirectory: repo.path);
+    Process.runSync('git', <String>['commit', '-qm', 'init'], workingDirectory: repo.path);
+    final ProjectRegistry registry = ProjectRegistry.open(
+      dbPath: '${home.path}/projects.db',
+      workspacesDir: '${home.path}/workspaces',
+    );
+    addTearDown(registry.close);
+    final WorkspaceInfo info = registry.resolve(repo.path);
+    final WorktreeService service = WorktreeService(
+      registry: registry,
+      workdir: repo.path,
+      worktreesDir: '${home.path}/worktrees',
+    );
+    final WorktreeCreateResult created = await service.create('feature');
+    final (ConatusTuiController controller, _) = await _build(
+      service: service,
+      info: info,
+    );
+
+    await controller.handleLine('/worktree remove feature');
+    expect(controller.transcript.messages.last.text, contains('--purge'));
+
+    await controller.handleLine('/worktree remove feature --purge');
+    expect(controller.transcript.messages.last.text, contains('已删除'));
+    expect(Directory(created.path).existsSync(), isFalse);
+    controller.dispose();
+  });
+
   test('未装配 worktree 服务时提示', () async {
     final (ConatusTuiController controller, _) = await _build();
 

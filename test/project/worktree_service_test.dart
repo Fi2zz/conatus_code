@@ -78,14 +78,14 @@ void main() {
     final WorktreeCreateResult created = await service.create('feature');
     final String dataDir = created.info.dataDir;
 
-    await service.remove('feature');
+    await service.remove('feature', purge: true);
 
     expect(Directory(created.path).existsSync(), isFalse);
     expect(Directory(dataDir).existsSync(), isFalse);
     expect(
       service.list().where(
-            (WorkspaceInfo item) => item.worktreePath == created.info.worktreePath,
-          ),
+        (WorkspaceInfo item) => item.worktreePath == created.info.worktreePath,
+      ),
       isEmpty,
     );
   });
@@ -104,6 +104,6 @@ void main() {
       worktreesDir: '${home.path}/worktrees',
     );
 
-    await expectLater(service.remove('main'), throwsStateError);
+    await expectLater(service.remove('main', purge: true), throwsStateError);
   });
 }

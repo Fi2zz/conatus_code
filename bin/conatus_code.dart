@@ -28,6 +28,9 @@ Future<void> main(List<String> args) async {
   if (args.isNotEmpty && args.first == 'project') {
     exit(await runProjectCli(args.sublist(1)));
   }
+  if (args.isNotEmpty && args.first == 'worktree') {
+    exit(await runWorktreeCli(args.sublist(1)));
+  }
   final TuiOptions options = TuiOptions.parse(args);
   if (options.helpRequested) {
     stdout.write(TuiOptions.usage);

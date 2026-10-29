@@ -34,10 +34,7 @@ class WorktreeService {
   List<WorkspaceInfo> list() => registry.list();
 
   /// 创建 worktree；branch 缺省为规范化后的名字。
-  Future<WorktreeCreateResult> create(
-    String name, {
-    String? branch,
-  }) async {
+  Future<WorktreeCreateResult> create(String name, {String? branch}) async {
     final String slug = workspaceSlug(name.trim());
     if (slug.isEmpty) throw ArgumentError('worktree 名字不能为空');
     final WorkspaceInfo source = registry.resolve(workdir);
@@ -50,35 +47,56 @@ class WorktreeService {
     final String resolvedBranch = (branch?.trim().isNotEmpty ?? false)
         ? branch!.trim()
         : slug;
+    final bool existingBranch =
+        (branch?.trim().isNotEmpty ?? false) &&
+        await _branchExists(source.worktreePath, resolvedBranch);
     Directory(File(path).parent.path).createSync(recursive: true);
-    final ProcessResult result = await Process.run(
-      'git',
-      <String>[
-        '-C',
-        source.worktreePath,
-        'worktree',
-        'add',
-        '-b',
-        resolvedBranch,
-        path,
-      ],
-    );
+    final ProcessResult result = await Process.run('git', <String>[
+      '-C',
+      source.worktreePath,
+      'worktree',
+      'add',
+      if (!existingBranch) ...<String>['-b', resolvedBranch],
+      path,
+      if (existingBranch) resolvedBranch,
+    ]);
     if (result.exitCode != 0) {
       if (Directory(path).existsSync()) {
         Directory(path).deleteSync(recursive: true);
       }
       throw StateError(_message(result));
     }
-    final WorkspaceInfo info = registry.resolve(path, strategy: 'git');
-    return WorktreeCreateResult(
-      info: info,
-      branch: resolvedBranch,
-      path: info.worktreePath,
-    );
+    try {
+      final WorkspaceInfo info = registry.resolve(path, strategy: 'git');
+      return WorktreeCreateResult(
+        info: info,
+        branch: resolvedBranch,
+        path: info.worktreePath,
+      );
+    } catch (error) {
+      await Process.run('git', <String>[
+        '-C',
+        source.worktreePath,
+        'worktree',
+        'remove',
+        '--force',
+        path,
+      ]);
+      if (Directory(path).existsSync()) {
+        Directory(path).deleteSync(recursive: true);
+      }
+      rethrow;
+    }
   }
 
   /// 删除一个 nava 自管 worktree；不清除主工作区或外部 worktree。
-  Future<void> remove(String selector) async {
+  ///
+  /// [purge] 必须显式为 true：删除会连带移除该 worktree 的数据目录，
+  /// 不能让它变成一次误触。
+  Future<void> remove(String selector, {bool purge = false}) async {
+    if (!purge) {
+      throw StateError('删除 worktree 需要 --purge 确认（会删除数据目录）');
+    }
     final WorkspaceInfo source = registry.resolve(workdir);
     final WorkspaceInfo? target = _find(selector);
     if (target == null) throw StateError('找不到 worktree：$selector');
@@ -89,16 +107,13 @@ class WorktreeService {
     if (!target.worktreePath.startsWith('$root${Platform.pathSeparator}')) {
       throw StateError('worktree 不在 nava 管理目录下：${target.worktreePath}');
     }
-    final ProcessResult result = await Process.run(
-      'git',
-      <String>[
-        '-C',
-        source.worktreePath,
-        'worktree',
-        'remove',
-        target.worktreePath,
-      ],
-    );
+    final ProcessResult result = await Process.run('git', <String>[
+      '-C',
+      source.worktreePath,
+      'worktree',
+      'remove',
+      target.worktreePath,
+    ]);
     if (result.exitCode != 0) throw StateError(_message(result));
     registry.database.deleteWorktree(target.worktreeId);
     final Directory data = Directory(target.dataDir);
@@ -116,6 +131,18 @@ class WorktreeService {
       }
     }
     return null;
+  }
+
+  Future<bool> _branchExists(String repo, String branch) async {
+    final ProcessResult result = await Process.run('git', <String>[
+      '-C',
+      repo,
+      'show-ref',
+      '--verify',
+      '--quiet',
+      'refs/heads/$branch',
+    ]);
+    return result.exitCode == 0;
   }
 
   String _message(ProcessResult result) {
