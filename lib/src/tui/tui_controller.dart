@@ -61,6 +61,7 @@ import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
 import '../tabs/tab_manager.dart';
 import '../tools/update_plan.dart';
+import '../version.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
 import 'definition_watcher.dart';
@@ -162,6 +163,7 @@ class ConatusTuiController implements TuiUserPromptHost {
   }) : _app = app,
        _sessions = sessions,
        _sessionId = initialSession ?? '',
+       _newSessionAtStart = initialSession == null,
        _fallbackModels = fallbackModels,
        _retryPolicy = retryPolicy {
     picker = TuiSessionPicker(
@@ -317,6 +319,11 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 会话是否先跑规划轮（`todowrite`）再执行；开启后每条新任务会先产出
   /// TODO 计划（屏上 `plan` 消息），执行过程从第一步可见。
   final bool planning;
+
+  /// 启动时是否新建了会话（显式 `--session` / `--continue` 为 false）。
+  ///
+  /// 仅新会话显示欢迎信息；恢复指定会话时保持安静。
+  final bool _newSessionAtStart;
 
   /// 启动后是否默认进入 Plan Mode（`default_plan_mode` / `--plan`）。
   ///
@@ -717,6 +724,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     await _bindStartup(_sessionId);
     _firstBind = false;
+    if (_newSessionAtStart) _addStartupBanner();
     _applyStartInPlanMode();
     _persistAgentSelection();
     _syncTabState();
@@ -2351,6 +2359,45 @@ class ConatusTuiController implements TuiUserPromptHost {
     } else if (id == 'build') {
       _setPlanMode(false);
     }
+  }
+
+  /// 新会话的欢迎信息：目录 / 会话 / 模型 / 版本 / MCP，以及连接明细。
+  ///
+  /// 只在新建会话时显示；`--session` / `--continue` 恢复会话时保持安静。
+  void _addStartupBanner() {
+    final McpRegistry? registry = _app.get<McpRegistry>('mcp');
+    final List<String> servers = registry?.servers ?? const <String>[];
+    final String workdir =
+        _app.get<String>('workdir') ?? Directory.current.path;
+    final List<String> rows = <String>[
+      'Welcome to nava!',
+      'Send /help for help information.',
+      '',
+      'Directory: $workdir',
+      'Session:   $_sessionId',
+      'Model:     $modelLabel',
+      'Version:   $navaVersion',
+      'MCP:       ${servers.length} connected',
+    ];
+    final int width =
+        rows
+            .map((String row) => row.length)
+            .reduce((int a, int b) => a > b ? a : b) +
+        2;
+    final StringBuffer box = StringBuffer()..writeln('╭${'─' * width}╮');
+    for (final String row in rows) {
+      box.writeln('│ ${row.padRight(width - 1)}│');
+    }
+    box.writeln('╰${'─' * width}╯');
+    transcript.add(TuiRole.system, box.toString());
+
+    final List<String> footer = <String>[
+      'Started a new session ($_sessionId).',
+      for (final String server in servers)
+        'MCP server "$server" connected · '
+            '${registry!.toolsOf(server).length} tools',
+    ];
+    transcript.add(TuiRole.system, footer.join('\n'));
   }
 
   /// 启动默认 Plan Mode：会话没有历史 `plan/mode` 事件时才生效。

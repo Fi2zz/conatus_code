@@ -336,6 +336,34 @@ void main() {
     app.dispose();
   });
 
+  test('新会话启动显示欢迎信息；指定会话不显示', () async {
+    final (ConatusTuiController fresh, Context freshApp) = await _build(
+      const <LlmResult>[],
+      initialSession: null,
+    );
+    expect(fresh.transcript.messages.first.text, contains('Directory:'));
+    expect(fresh.transcript.messages.first.text, contains('Session:'));
+    expect(fresh.transcript.messages.first.text, contains('Model:'));
+    expect(fresh.transcript.messages.first.text, contains('Version:'));
+    expect(fresh.transcript.messages.first.text, contains('MCP:'));
+    expect(
+      fresh.transcript.messages.last.text,
+      contains('Started a new session'),
+    );
+    freshApp.dispose();
+
+    final (ConatusTuiController resumed, Context resumedApp) = await _build(
+      const <LlmResult>[],
+    );
+    expect(
+      resumed.transcript.messages.any(
+        (TuiMessage message) => message.text.contains('Directory:'),
+      ),
+      isFalse,
+    );
+    resumedApp.dispose();
+  });
+
   test('startInPlanMode 启动即激活 Plan Mode，状态栏带 plan', () async {
     final (ConatusTuiController controller, Context app) = await _build(
       const <LlmResult>[],
