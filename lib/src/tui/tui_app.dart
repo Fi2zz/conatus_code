@@ -51,6 +51,7 @@ import '../permissions/permission_wiring.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
 import '../references/references.dart';
+import '../skills/bootstrap_skills.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
 import '../tools/code_tools.dart';
@@ -185,6 +186,8 @@ class ConatusTuiRuntime {
   /// [instructions] 是顶层 `instructions` 的额外来源（路径 / glob / URL），
   /// 追加在项目 `AGENTS.md` 之后；[instructionHome] 覆盖用户级全局文件的
   /// 家目录（测试注入假 home，缺省读 `HOME`）。
+  /// [bootstrapSkills] 是装配期强制加载正文的技能名，挂成常驻 system prompt
+  /// 段；未知技能静默跳过，后续注册表出现同名技能时会自动补挂。
   // REASON: 装配入口的参数聚合是既定形态（本参数已 20 个），调用方是进程级
   // main，不存在逐层透传问题。
   static Future<ConatusTuiRuntime> create({
@@ -198,6 +201,7 @@ class ConatusTuiRuntime {
     bool skills = true,
     List<String> extraSkillDirs = const <String>[],
     bool mergeAllSkills = false,
+    List<String> bootstrapSkills = const <String>[],
     List<ProviderConfig>? providers,
     List<ModelConfig>? models,
     String? provider,
@@ -854,6 +858,16 @@ class ConatusTuiRuntime {
         app,
         roots: _skillRoots(resolvedWorkdir, extraSkillDirs),
       );
+      if (bootstrapSkills.isNotEmpty) {
+        final SkillBootstrapSection section = SkillBootstrapSection(
+          registry: app.require<SkillRegistry>('skillRegistry'),
+          prompt: prompt,
+          names: bootstrapSkills,
+          appendix: kNavaSkillToolMapping,
+        );
+        app.onDispose(section.dispose);
+        await section.start();
+      }
     }
 
     // ── 恢复：数据库（JSON 后端，集中在 baseDir）+ 快照服务 ─────────

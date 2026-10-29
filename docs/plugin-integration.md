@@ -69,13 +69,19 @@ Claude Code 插件的 `commands/*.md`（frontmatter + 正文）与 SKILL.md 同�
 ### 实例：接入 superpowers
 
 [superpowers](https://github.com/obra/superpowers) 是 Claude Code 生态里
-流行的开发工作流插件——纯 Markdown，由 `skills/` + `commands/` + `agents/`
-+ 一个 session-start 脚本组成，无平台代码。它移植到 Codex 的方式是把
-`skills/` 软链进 `~/.agents/skills`，对 nava 同样适用：
+流行的开发工作流插件：核心是标准 `skills/` 目录，宿主侧只需要再加一层
+session-start bootstrap。nava 直接消费 `skills/`，并用 `bootstrap_skills`
+补上 bootstrap：
 
 ```bash
 git clone https://github.com/obra/superpowers ~/.config/superpowers
-ln -s ~/.config/superpowers/skills ~/.agents/skills/superpowers
+```
+
+`~/.nava/config.toml`：
+
+```toml
+extra_skill_dirs = ["~/.config/superpowers/skills"]
+bootstrap_skills = ["using-superpowers"]
 ```
 
 启动 nava 后：
@@ -83,23 +89,18 @@ ln -s ~/.config/superpowers/skills ~/.agents/skills/superpowers
 - 全部技能进目录、出现在 system prompt 技能目录段，模型可经 `skill` 工具
   调用；`disable-model-invocation` 的技能对用户手动触发可见
   （`/skill:<名字>`）
+- `using-superpowers` 正文直接进 system prompt，不需要模型“自觉”加载；
+  nava 会追加工具映射（`spawn_agent` / `run_command` / `read_file` 等），
+  并把 `superpowers:foo` 归一为裸技能名 `foo`
 - 更新 = `cd ~/.config/superpowers && git pull`；发现根有文件监听，热生效
 
-### 已知缺口：bootstrap 强制注入
+### bootstrap 与 SessionStart 的差异
 
-superpowers 依赖 Claude Code 的 SessionStart hook 在会话开始时**强制**注入
-`using-superpowers` 元技能（「先检索技能」是协议而非建议）。nava 的 hooks
-目前只有 `pre_tool_use` / `post_tool_use` / `stop`，没有会话启动事件。
-
-**绕行（现状可用）**：技能目录已在 system prompt 里，多数情况下模型会自行
-发现并调用 `using-superpowers`；只是这是自觉行为，superpowers 作者明确
-反对依赖自觉。
-
-**补缺（未来小改动）**：给 hooks 加对称的 `session_start` 事件，stdout 落成
-system prompt 常驻段（而非一次性消息，压缩后仍在）；或加配置式
-`[bootstrap] skills = ["using-superpowers"]`，装配期把技能正文渲染成常驻段。
-两者都是对称小特性，不需要动技能机制本身，也不引入新格式——SessionStart
-是 Claude Code hooks 的既有事件名，照抄即兼容。
+nava 没有 shell `SessionStart` hook，但 `bootstrap_skills` 在装配期把技能
+正文挂成常驻 system prompt 段，语义上等价于“每个会话自动注入”，且压缩后
+仍在。它不执行插件脚本，因此 OpenCode JS 插件里的其他生命周期钩子仍不生效；
+对 Superpowers 来说，真正必需的是技能发现 + `using-superpowers` 注入，这两
+项都已覆盖。
 
 ### 兼容性注意
 
@@ -274,7 +275,7 @@ CLI 从 stdin 收 `{"name":"deploy","arguments":{...}}`，stdout 返回
 | 现有体系 | 约定 | nava 现状 | 差距 |
 |---|---|---|---|
 | Skills | SKILL.md + frontmatter，`.opencode/skills` / `.agents/skills` / `.claude/skills` | 三类目录都是默认发现根，frontmatter 兼容 | ✅ 零差距 |
-| Claude Code 插件 | 仓库含 `skills/` `commands/` `agents/` `hooks/` | `skills/` 直接可读；`commands/*.md` 软链或按散落 `.md` 技能读；`agents/`、`hooks/` 无对应 | ○ 主体可用；SessionStart hook 是缺口 |
+| Claude Code 插件 | 仓库含 `skills/` `commands/` `agents/` `hooks/` | `skills/` 直接可读；`commands/*.md` 软链或按散落 `.md` 技能读；`agents/`、`hooks/` 无对应；可用 `bootstrap_skills` 补启动注入 | ○ 主体可用；JS/hook 生命周期不执行 |
 | MCP | `mcpServers` JSON（`.mcp.json` / `claude_desktop_config.json`） | 项目 `.mcp.json` 与全局 `claude_desktop_config.json` 都读取；同名 TOML 优先 | ✅ 项目级 + 全局 Claude Desktop 均可直接挂载 |
 | OpenCode 配置 | `opencode.json(c)`（JSONC） | `nava import opencode` 显式导入 model / default_agent / providers / mcp.servers / permissions / instructions；agents / commands 物化为 `.nava` Markdown | ○ 默认不自动合并；OAuth 登录态与 plugins / lsp 等暂不支持 |
 | Hooks | Claude `settings.json` 结构化 hooks（matcher 等） | `[hooks]` 命令列表，事件名对照兼容 | ○ 手工改写，不做自动映射 |

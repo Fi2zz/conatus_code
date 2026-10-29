@@ -4,6 +4,8 @@
 
 ## [未发布]
 
+- **技能 bootstrap**：顶层 `bootstrap_skills` 在装配期注入指定技能正文，
+  支持 Superpowers 的 `using-superpowers` 协议，并附带 nava 工具映射。
 - **跨平台**：Windows 优先加载同目录 `sqlite3.dll`，新增 `platform_smoke_test.dart`
   与 Linux/Windows CI 冒烟；构建脚本支持 Windows 二进制与 DLL 分发。
 - **项目 UX**：`/projects` 选择面板（含 `r` 重命名、归档标记）、

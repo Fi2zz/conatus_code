@@ -43,9 +43,16 @@ class ConfigParser extends ConfigValues {
     keybinds: _readKeybinds(),
     extraSkillDirs: readStringList(raw, 'extra_skill_dirs'),
     mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
+    bootstrapSkills: _readBootstrapSkills(),
     instructions: _readInstructions(),
     deprecations: _readDeprecations(),
   );
+
+  /// 顶层 `bootstrap_skills`：技能名字符串数组；空串过滤掉。
+  List<String> _readBootstrapSkills() => <String>[
+    for (final String entry in readStringList(raw, 'bootstrap_skills'))
+      if (entry.trim().isNotEmpty) entry.trim(),
+  ];
 
   /// 顶层 `instructions`：路径 / glob / URL 字符串数组；空串过滤掉。
   List<String> _readInstructions() => <String>[

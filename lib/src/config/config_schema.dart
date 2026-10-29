@@ -583,6 +583,7 @@ class ConatusCodeConfig {
     this.keybinds = const <String, String>{},
     this.extraSkillDirs = const <String>[],
     this.mergeAllSkills = false,
+    this.bootstrapSkills = const <String>[],
     this.instructions = const <String>[],
     this.deprecations = const <String>[],
   });
@@ -654,6 +655,12 @@ class ConatusCodeConfig {
   /// 顶层 `merge_all_available_skills`：为 true 时把
   /// `disable-model-invocation` 的技能也放进模型可见目录。
   final bool mergeAllSkills;
+
+  /// 顶层 `bootstrap_skills`：装配期强制加载正文的技能名。
+  ///
+  /// 普通技能只进目录；这里列出的技能正文直接进 system prompt，适合
+  /// `using-superpowers` 这类要求「每次会话先执行」的协议型技能。
+  final List<String> bootstrapSkills;
 
   /// 顶层 `instructions`：额外指令来源（路径 / glob / URL），按书写顺序追加在
   /// 项目 `AGENTS.md` 之后；相对路径以工作目录为基准，`~` 展开家目录。

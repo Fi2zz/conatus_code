@@ -156,6 +156,7 @@ Future<void> main(List<String> args) async {
     models: config.models,
     extraSkillDirs: config.extraSkillDirs,
     mergeAllSkills: config.mergeAllSkills,
+    bootstrapSkills: config.bootstrapSkills,
     provider: provider,
     model: model,
     maxSteps: config.agent.maxSteps,

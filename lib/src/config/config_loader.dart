@@ -58,6 +58,8 @@ const String kDefaultConfigToml = '''
 # extra_skill_dirs = ["/path/to/skills"]
 # true = 把 disable-model-invocation 的技能也放进模型可见目录（缺省 false）。
 # merge_all_available_skills = false
+# 装配期强制加载正文的技能（如 ["using-superpowers"]）。
+# bootstrap_skills = []
 
 # 非模型 Key（搜索等）仍走 [credentials]
 [credentials]

@@ -414,6 +414,24 @@ Agent 之外。
 （相对 workdir / 绝对路径 / `~`）；`merge_all_available_skills = true` 会把
 `disable-model-invocation` 的技能也放进模型可见目录（缺省 `false`）。
 
+顶层 `bootstrap_skills` 在装配期把指定技能的完整正文注入 system prompt，
+适合 `using-superpowers` 这类要求“每次会话先执行”的协议型技能：
+
+```toml
+extra_skill_dirs = ["~/.config/superpowers/skills"]
+bootstrap_skills = ["using-superpowers"]
+```
+
+Superpowers 接入：
+
+```bash
+git clone --depth 1 https://github.com/obra/superpowers ~/.config/superpowers
+```
+
+不需要软链；nava 会自动追加 nava 工具映射（`spawn_agent` / `run_command` /
+`read_file` 等），并提示模型把 `superpowers:` 前缀归一成裸技能名。普通技能
+仍按需通过 `skill` 工具加载；bootstrap 只影响列出的技能。
+
 **定义热重载**：`.nava` / `.opencode` 的 `agents/`、`commands/` 目录发生变更
 后，会在 250ms 防抖后自动重载；也可 `/reload` 手动触发。当前 Agent 被删除时
 回退到 `[agent] default_agent`；配置文件变更仍需重启 nava（避免半套服务重建）。
