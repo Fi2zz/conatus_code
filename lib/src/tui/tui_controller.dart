@@ -21,7 +21,6 @@ import 'package:conatus_schedule/conatus_schedule.dart';
 import 'package:conatus_search/conatus_search.dart';
 import 'package:conatus_skill/conatus_skill.dart';
 import 'package:conatus_team/conatus_team.dart';
-import 'package:conatus_tts/conatus_tts.dart';
 
 import '../../providers.dart';
 import '../agents/agent_definition.dart';
@@ -92,7 +91,6 @@ import 'tui_provider.dart';
 import 'tui_rename_view.dart';
 import 'tui_session_picker.dart';
 import 'tui_skill_command.dart';
-import 'voice_reporter.dart';
 
 part 'tui_controller_provider.dart';
 part 'tui_controller_redo.dart';
@@ -152,8 +150,6 @@ class ConatusTuiController implements TuiUserPromptHost {
     this.planning = false,
     this.onExit,
     this.onSwitchProject,
-    this.tts,
-    this.ttsSink,
     this.initialPermissionMode = TuiPermissionMode.askWhenNeeded,
     this.startInPlanMode = false,
     this.storyEnabled = false,
@@ -337,12 +333,6 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// `/project open` 请求：宿主接重启/新进程；null 表示当前模式不支持。
   final void Function(String workdir)? onSwitchProject;
 
-  /// TTS 服务（可选）。注入后随会话装配团队语音播报。
-  final TtsService? tts;
-
-  /// TTS 音频输出目标（可选）。缺省 no-op，桌面 TUI 无声。
-  final TtsAudioSink? ttsSink;
-
   /// 会话装配钩子：会话子上下文与 Session 建好、内置插件提供完毕后回调。
   ///
   /// 宿主可在此往该会话的子上下文里挂自己的插件/服务（如提供 'tasks' 任务中心）。
@@ -498,9 +488,6 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 团队订阅（随会话绑定/解绑）。
   TeamSubscription? _teamSub;
-
-  /// 团队语音播报（随会话绑定/解绑；tts 注入时启用）。
-  VoiceReporter? _voice;
 
   /// 当前权限模式（随绑定的会话变化）。
   TuiPermissionMode _permissionMode = TuiPermissionMode.askWhenNeeded;
@@ -4070,17 +4057,11 @@ class ConatusTuiController implements TuiUserPromptHost {
         label: swarm.labels[laneId] ?? '子 Agent',
       ),
     );
-    final TtsService? tts = this.tts;
-    if (tts != null) {
-      _voice = VoiceReporter(team: team, tts: tts, sink: ttsSink);
-    }
   }
 
   void _unbind() {
     _eventSub?.call();
     _eventSub = null;
-    _voice?.dispose();
-    _voice = null;
     _teamSub?.dispose();
     _teamSub = null;
     _app.get<CheckpointManager>('checkpointManager')?.detach();

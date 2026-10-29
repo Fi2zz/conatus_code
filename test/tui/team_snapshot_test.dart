@@ -69,4 +69,41 @@ void main() {
         snapshot.claimableBy('u').map((TeamTask t) => t.id).toList();
     expect(ids, <String>['a', 'e', 'g']);
   });
+
+  test('summarizeTeamProgress：无团队', () {
+    expect(
+      summarizeTeamProgress(const TeamSnapshot()),
+      '现在没有正在进行的团队任务。',
+    );
+  });
+
+  test('summarizeTeamProgress：按成员状态分组摘要', () {
+    final TeamSnapshot snapshot = TeamSnapshot(
+      members: <Teammate>[
+        _mate('a', TeammateStatus.done),
+        _mate('b', TeammateStatus.working),
+        _mate('c', TeammateStatus.waiting),
+        _mate('d', TeammateStatus.failed),
+      ],
+      tasks: <TeamTask>[
+        _task('t1', TeamTaskStatus.done),
+        _task('t2', TeamTaskStatus.claimed),
+      ],
+    );
+    expect(
+      summarizeTeamProgress(snapshot),
+      '1/2 个任务完成。a完成了，b还在进行，c在等待，d失败了。',
+    );
+  });
+
+  test('summarizeTeamProgress：全部空闲只报任务数', () {
+    final TeamSnapshot snapshot = TeamSnapshot(
+      members: <Teammate>[
+        _mate('a', TeammateStatus.idle),
+        _mate('b', TeammateStatus.idle),
+      ],
+      tasks: <TeamTask>[_task('t1', TeamTaskStatus.pending)],
+    );
+    expect(summarizeTeamProgress(snapshot), '0/1 个任务完成。');
+  });
 }

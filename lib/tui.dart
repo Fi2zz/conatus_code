@@ -85,4 +85,3 @@ export 'src/tui/tui_skill_command.dart';
 export 'src/tui/tui_status_info.dart';
 export 'src/tui/tui_views.dart';
 
-export 'src/tui/voice_reporter.dart';

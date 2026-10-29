@@ -101,3 +101,40 @@ enum ViewMode {
   /// 团队视图。
   team,
 }
+
+/// 生成团队进度摘要（被动查询 / 状态展示共用）。
+String summarizeTeamProgress(TeamSnapshot snapshot) {
+  if (!snapshot.hasTeam) {
+    return '现在没有正在进行的团队任务。';
+  }
+  final List<Teammate> members = snapshot.members;
+  final List<Teammate> done = <Teammate>[
+    for (final Teammate m in members)
+      if (m.status == TeammateStatus.done ||
+          m.status == TeammateStatus.finished)
+        m,
+  ];
+  final List<Teammate> working = <Teammate>[
+    for (final Teammate m in members)
+      if (m.status == TeammateStatus.working) m,
+  ];
+  final List<Teammate> waiting = <Teammate>[
+    for (final Teammate m in members)
+      if (m.status == TeammateStatus.waiting) m,
+  ];
+  final List<Teammate> failed = <Teammate>[
+    for (final Teammate m in members)
+      if (m.status == TeammateStatus.failed) m,
+  ];
+  final List<String> parts = <String>[
+    if (done.isNotEmpty) '${done.map((Teammate m) => m.name).join('、')}完成了',
+    if (working.isNotEmpty)
+      '${working.map((Teammate m) => m.name).join('、')}还在进行',
+    if (waiting.isNotEmpty)
+      '${waiting.map((Teammate m) => m.name).join('、')}在等待',
+    if (failed.isNotEmpty) '${failed.map((Teammate m) => m.name).join('、')}失败了',
+  ];
+  final String header = '${snapshot.doneTasks}/${snapshot.totalTasks} 个任务完成。';
+  if (parts.isEmpty) return header;
+  return '$header${parts.join('，')}。';
+}
