@@ -25,7 +25,7 @@ Claude Code 插件仓库的目录形态——够用，缺的只是挂接点。�
 这个插件是什么形态？
 ├─ 纯 Markdown 技能包（SKILL.md 目录）      → 形态一：挂载到技能发现根
 ├─ MCP server（JS / Python / 任何语言）     → 形态二：[mcp.servers.*] 配置
-├─ CLI 或可执行脚本                          → 形态三：run_command / hooks / [[tools]]
+├─ CLI 或可执行脚本                          → 形态三：bash / hooks / [[tools]]
 ├─ 能读 JSON、写 JSON 的脚本或 HTTP 服务     → 形态五：[[tools]] 声明式自定义工具
 └─ 纯库（只暴露编程 API，无进程接口）         → 形态四：写一个 MCP 适配壳
 ```
@@ -90,7 +90,7 @@ bootstrap_skills = ["using-superpowers"]
   调用；`disable-model-invocation` 的技能对用户手动触发可见
   （`/skill:<名字>`）
 - `using-superpowers` 正文直接进 system prompt，不需要模型“自觉”加载；
-  nava 会追加工具映射（`spawn_agent` / `run_command` / `read_file` 等），
+  nava 会追加工具映射（`task` / `bash` / `read` 等），
   并把 `superpowers:foo` 归一为裸技能名 `foo`
 - 更新 = `cd ~/.config/superpowers && git pull`；发现根有文件监听，热生效
 
@@ -105,7 +105,7 @@ nava 没有 shell `SessionStart` hook，但 `bootstrap_skills` 在装配期把�
 ### 兼容性注意
 
 - 技能正文引用的工具名是 Claude Code 的（`Task` / `Bash` / `Read` 等），
-  nava 对应 `spawn_agent` / `run_command` / `read_file` 等，名字足够接近，
+  nava 对应 `task` / `bash` / `read` 等，名字足够接近，
   模型一般能自行对上；严格要求可在项目 `.conatus/skills/` 放一份映射说明
   技能兜底
 - 涉及写操作的技能（TDD、git worktree）触到的工具照常走审批与命令审查，
@@ -156,7 +156,7 @@ config.toml（或放到项目 `.mcp.json`）。
 
 插件是一个能跑命令的程序（lint 器、生成器、检查脚本）：
 
-- **偶尔调用**：让模型走 `run_command` 直接调，照常过命令审查与审批——
+- **偶尔调用**：让模型走 `bash` 直接调，照常过命令审查与审批——
   无需任何配置
 - **每次工具调用前后固定跑**：配成 hook。hook 经 `/bin/sh -c` 直连运行，
   写 JS/Python/任何脚本语言都可以：
@@ -253,7 +253,7 @@ CLI 从 stdin 收 `{"name":"deploy","arguments":{...}}`，stdout 返回
 | hooks | 等同你本人跑 shell | **直连，不经审查** |
 | `[[tools]]` CLI | 等同安装本地程序 | **不经审查** |
 | `[[tools]]` HTTP | 远端端点，凭据经 headers | n/a |
-| 形态三 `run_command` | 模型发起的命令 | 走审查 + 审批 |
+| 形态三 `bash` | 模型发起的命令 | 走审查 + 审批 |
 
 原则：凡是你写进配置的受信端（MCP / hooks），nava 按你的显式声明放行；
 凡是模型运行时发起的动作，走命令审查与审批。两类风险面不混。

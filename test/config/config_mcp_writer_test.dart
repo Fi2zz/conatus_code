@@ -146,7 +146,7 @@ type = "http"
 url = "https://old.example.com/mcp"
 
 [[permissions]]
-action = "shell"
+action = "bash"
 effect = "deny"
 ''';
 
@@ -157,7 +157,7 @@ effect = "deny"
       );
 
       expect(result, contains('[[permissions]]'));
-      expect(result, contains('action = "shell"'));
+      expect(result, contains('action = "bash"'));
       expect(() => TomlDocument.parse(result), returnsNormally);
     });
 

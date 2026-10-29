@@ -11,11 +11,11 @@
 ## 特性
 
 - 🖥️ 终端交互（内置 TUI，入口 `lib/tui.dart`；Enter 提交，Shift+Enter / Ctrl+J 换行）
-- 🔍 文件读写与搜索（read_file / write_file / edit_file / rg / glob；read_file 支持目录列举、png/jpg/gif/webp 图片与 PDF 附件）
+- 🔍 文件读写与搜索（read / write / edit / rg / glob；read 支持目录列举、png/jpg/gif/webp 图片与 PDF 附件）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
 - 🔒 审批与命令审查（高危操作走审批；命令执行前过 `command_shield` 形状审查）
-- 🗺️ 计划闭环（plan_write 建计划、update_plan 执行中推进、计划面板实时渲染）
+- 🗺️ 计划闭环（plan_write 建计划、todowrite 执行中推进、计划面板实时渲染）
 - 🩹 失败自愈（工具失败自动反思重试，可按需重规划）
 - ⏱️ 预算护栏（每轮墙钟 + 上下文 token 估算 + 成本跟踪）
 - 📜 故事层（可选，默认关闭）：编辑即补丁、事前审阅、`/story` 时间轴与分叉
@@ -124,12 +124,12 @@ mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
 
 # 权限规则：最外层工具中间件（先于审批 / hooks / lint / story）。按 action +
 # resource 通配匹配，后出现的规则优先，任一条 deny 即拒绝。省略则只有兜底阈值。
-# 动作：read / edit / glob / grep / shell / websearch / webfetch / subagent /
-# skill / question / external_directory，也可直接写工具名（装配时归一，
-# run_command→shell、read_file→read、rg→grep）。
+# 动作：read / edit / glob / grep / bash / websearch / webfetch / task /
+# skill / question / todowrite / external_directory，也可直接写工具名
+# （装配时归一，write/apply_patch→edit、list→read）。
 # 路径动作的资源按工作目录解析，符号链接按真实路径比较。
 # [[permissions]]
-# action = "shell"
+# action = "bash"
 # resource = "git push *"
 # effect = "deny"
 #
@@ -228,9 +228,9 @@ description = "产品文档，用于术语与行为说明"
 ```
 
 - 启动时解析为真实路径；目录不存在只告警跳过。
-- 别名、绝对路径与说明注入 system prompt，模型用 `read_file` / `rg` / `glob`
+- 别名、绝对路径与说明注入 system prompt，模型用 `read` / `grep` / `glob`
   按绝对路径读取。
-- **只读**：references 不进入可写面；`write_file` / `edit_file` / `apply_patch`
+- **只读**：references 不进入可写面；`write` / `edit` / `apply_patch`
   / 删除对它们一律拒绝。
 - 只支持本地目录；`repository` 形式的 git reference 暂不支持（配置会报错）。
 
@@ -296,16 +296,16 @@ dart:io，不经 fs 接缝；`/rewind` 是用户命令，不挂审批。
 被放行的调用。规则来源按 `config → project → session` 拼接（后者覆盖前者），
 任意一条 `deny` 即拒绝，`ask` 走审批浮层，`allow` 直接执行。
 
-- **动作归一**：`read_file`→`read`、`write_file`/`edit_file`/`apply_patch`→
-  `edit`、`run_command`/`run_tests`/`run_code` 与四个 git 写工具
-  （`git_add`/`git_commit`/`git_branch`/`git_stash`）→`shell`、`rg`→`grep`。
-  git 写工具的资源由实际 argv 派生（`git add ...`），所以 `action = "shell"`,
+- **动作归一**：`write`/`apply_patch`→`edit`、`list`→`read`；
+  `bash`/`run_tests`/`run_code` 与四个 git 写工具
+  （`git_add`/`git_commit`/`git_branch`/`git_stash`）→`bash`。
+  git 写工具的资源由实际 argv 派生（`git add ...`），所以 `action = "bash"`,
   `resource = "git *"` 能拦住它们；`runGit` 另有一道 `.opencode` 写保护。
 - **路径匹配**：规则资源与调用路径都按工作目录解析，并补真实路径拼写
   （符号链接按目标身份比较）。`edit "src/*"` 能拦住
-  `write_file("/abs/work/src/x")`，工作区里指向 `/etc/hosts` 的链接也逃不过
+  `write("/abs/work/src/x")`，工作区里指向 `/etc/hosts` 的链接也逃不过
   `deny read "/etc/*"`。
-- **工作区外**：路径落到 workdir 外时追加 `external_directory` 判定；`rg` 的
+- **工作区外**：路径落到 workdir 外时追加 `external_directory` 判定；`grep` 的
   `path` 参数也参与边界检查（但不会把每次 rg 变成路径信任提示）。
 - **MCP 资源**：`action = "list_mcp_resources"` / `"read_mcp_resource"` 配合
   `resource = "<server>"` / `"<server>:*"` 可只放行单台；旧式
@@ -322,19 +322,19 @@ dart:io，不经 fs 接缝；`/rewind` 是用户命令，不挂审批。
 `.opencode/**`（项目级）与 `~/.config/opencode/**`（全局）是用户自己 OpenCode
 的安装：nava 只做兼容读取，**绝不创建 / 写入 / 删除 / 改权限**。
 
-- fs 工具（`write_file` / `edit_file` / `apply_patch` / story 写回）经 `'fs'`
+- fs 工具（`write` / `edit` / `apply_patch` / story 写回）经 `'fs'`
   接缝上的只读闸门拦截；删除工作区的祖先目录也会被拒（否则会连带删掉
   `.opencode`）。
 - 检查点默认排除 `.opencode` 与 `.config/opencode`，恢复不会把它们写回。
 - **配置与令牌写入同一道闸门**：`--config .opencode/config.toml`、
   `NAVA_HOME=.opencode`、父目录符号链接指向 `.opencode` 都在创建文件之前拒绝；
   `~/.nava/oauth` 在派生阶段就校验，令牌绝不会落到只读目录。
-- 命令侧（`run_command` / git 写工具）有字面识别兜底：**best-effort**，不是
+- 命令侧（`bash` / git 写工具）有字面识别兜底：**best-effort**，不是
   安全边界；变量拼接、`sh -c`、读脚本再执行都能绕过。
 
 ## 人机双写故事层（可选）
 
-`[story] enabled = true` 时，`write_file` / `edit_file` / `apply_patch` 不再直接
+`[story] enabled = true` 时，`write` / `edit` / `apply_patch` 不再直接
 落盘：先登记为**待定补丁**，用 `/story pending` 查看、`/story apply <i>` 接受、
 `/story reject <i>` 丢弃。人的直接编辑也会被登记为补丁，AI 在下一轮请求前收到
 「改了哪些文件」的摘要通报。`/story` 是补丁时间轴，支持 `preview` / `discard` /
@@ -393,18 +393,18 @@ leader = "ctrl+x"
 `$ARGUMENTS` 展开完整参数，`$1..$9` 按位置取参且**最高位吃掉剩余 token**
 （与 OpenCode 一致）；`` !`命令` `` 块先执行再把输出插进提示词。frontmatter
 支持 `agent:`、`model:` 与
-`subagent: true`（前台跑 `spawn_agent`，命令与结果作为 `user/message` /
+`subagent: true`（前台跑 `task`，命令与结果作为 `user/message` /
 `tool/result` 进会话）。`subagent: true` 的 `model:` 不生效（模型由 agent 定义
 决定），会明确提示。
 
 **自定义 Agent**：`.opencode/agents/**/*.md` 与 `.nava/agents/**/*.md`；同名覆盖
 内置 `build` / `plan` / `general` / `explore`。frontmatter 支持 `mode`
 （`primary` / `subagent` / `all`）、`model`、`steps`、`tools` 白名单 / 开关、
-V2 的 `permissions` 数组与 V1 的 `permission` 映射；OpenCode 工具名会归一
-（`question`→`ask_user`、`todowrite`→`update_plan` 等）。`[agent] default_agent`
+V2 的 `permissions` 数组与 V1 的 `permission` 映射；工具名与权限动作名已与
+OpenCode 对齐（仅 `write`/`patch`→`edit`、`list`→`read` 做动作归并）。`[agent] default_agent`
 决定新会话默认值。内置 `general` 显式列出
 可写工具白名单（read / write / edit / git 读写 / web），但 high 风险工具
-（`run_command`、`run_tests`、`git_commit`）与 `spawn_agent` 仍被框架挡在子
+（`bash`、`run_tests`、`git_commit`）与 `task` 仍被框架挡在子
 Agent 之外。
 
 **技能发现**：项目 `.conatus/skills` → `.opencode/skills` → `.agents/skills` →
@@ -428,8 +428,8 @@ Superpowers 接入：
 git clone --depth 1 https://github.com/obra/superpowers ~/.config/superpowers
 ```
 
-不需要软链；nava 会自动追加 nava 工具映射（`spawn_agent` / `run_command` /
-`read_file` 等），并提示模型把 `superpowers:` 前缀归一成裸技能名。普通技能
+不需要软链；nava 会自动追加 nava 工具映射（`task` / `bash` /
+`read` 等），并提示模型把 `superpowers:` 前缀归一成裸技能名。普通技能
 仍按需通过 `skill` 工具加载；bootstrap 只影响列出的技能。
 
 **定义热重载**：`.nava` / `.opencode` 的 `agents/`、`commands/` 目录发生变更
@@ -457,7 +457,7 @@ git clone --depth 1 https://github.com/obra/superpowers ~/.config/superpowers
 你 › 把 checkpoint 的存储后端加上 git 选项
 思考 › 先看存储实现是怎么选后端的
 ✓ rg › lib/src/checkpoint/checkpoint_backend.dart:24（+11 行）
-✗ edit_file › OS Error: Path does not exist, path = .../nope.dart
+✗ edit › OS Error: Path does not exist, path = .../nope.dart
 助手 › 路径写错了，改用 checkpoint_backend.dart
 ```
 
@@ -468,7 +468,7 @@ git clone --depth 1 https://github.com/obra/superpowers ~/.config/superpowers
 所以这里不新建埋点，只把 `Session.events` 摊成时间线：
 
 - 失败项标 `✗` 并带出原因——模型为什么停下、哪一步炸了
-- 工具结果只取首行但**报出总行数**：`rg` 命中 12 处和 1 处是不同的信息，
+- 工具结果只取首行但**报出总行数**：`grep` 命中 12 处和 1 处是不同的信息，
   砍到首行不能把条数也丢了
 - 不可读的事件（`agent/round` / `plan/updated` 等）跳过，不产生噪声行
 - 压缩事件标出来（压缩失败也会显式提示）
@@ -492,7 +492,7 @@ git clone --depth 1 https://github.com/obra/superpowers ~/.config/superpowers
 ## 代码检索（XERJ，可选）
 
 [XERJ](https://xerj.org) 是一个本地检索二进制：索引一次源码后，按「定义优先」返回
-`file:line` + 片段，比 `rg` 少读很多上下文。它是**可选外部依赖**——PATH 上没有
+`file:line` + 片段，比 `grep` 少读很多上下文。它是**可选外部依赖**——PATH 上没有
 `xerj` 时三个工具都不注册，nava 的行为与接入前完全一致。
 
 ```bash
@@ -505,7 +505,7 @@ curl -fsSL https://xerj.org/get | sh    # 装 xerj（不装也能用 nava）
 | `find_definition` | 已知符号名时定位定义与签名 |
 | `index_project` | 为当前项目建/刷新索引（幂等、可续跑） |
 
-首次使用先 `index_project`。之后 `write_file` / `edit_file` / `apply_patch` 成功后，
+首次使用先 `index_project`。之后 `write` / `edit` / `apply_patch` 成功后，
 会在 20 秒静默期后于后台增量刷新一次（同一时间只跑一个；项目必须先成功索引过一次，
 避免首次使用时突然全量索引）。想关掉设 `auto_index = false`。节点由 nava 懒启动在 `127.0.0.1:19200`，同时占用
 `19201`（XERJ 的 native REST），数据目录 `~/.nava/xerj`（不在工作区内），退出时只停止
@@ -532,7 +532,7 @@ url = "http://127.0.0.1:19200"
 先看 openCheckpointStore 怎么选后端的
 </details>
 
-### ✗ edit_file
+### ✗ edit
 OS Error: Path does not exist, path = 'lib/…/nope.dart'
 ```
 
@@ -549,7 +549,7 @@ OS Error: Path does not exist, path = 'lib/…/nope.dart'
 （medium，默认不拦）· `git_commit`（high，走审批）。
 
 **缺 `git_add` 曾经是条断路**：`/commit` 的提示词让模型「向用户说明并给出建议
-（如先 git add 暂存）」，而模型想自己暂存只能走 `run_command`（`ToolRisk.high`），
+（如先 git add 暂存）」，而模型想自己暂存只能走 `bash`（`ToolRisk.high`），
 于是每次提交都要弹一次审批框，例行步骤被推回给了用户。
 
 三个写操作工具**都不提供丢数据的入口**（无 `reset --hard` / `clean` /
@@ -598,7 +598,7 @@ extensions = [".dart"]
   `lsp_definition`、`lsp_references`、`lsp_document_symbols` 工具。
   位置参数 `line` / `column` 从 1 开始。
 - 导航类工具在服务器不支持/不可用时返回明确提示。
-- `write_file` / `edit_file` / `apply_patch` 成功后自动追加诊断；LSP 崩溃、
+- `write` / `edit` / `apply_patch` 成功后自动追加诊断；LSP 崩溃、
   超时或无诊断不影响编辑本身。
 - `/lsp` 查看配置的服务器与状态；`/lsp restart [名字]` 重启。
 - 服务器命令是本地进程，绕过工具审批；只允许用户在 config.toml 显式配置，
@@ -606,12 +606,12 @@ extensions = [".dart"]
 - `nava import opencode` 会映射 OpenCode 的 `lsp` 对象；`lsp: true` 仅在检测到
   `pubspec.yaml` 时生成内置 dart server。
 
-## Web 工具（`web_search` / `fetch_url`）
+## Web 工具（`websearch` / `webfetch`）
 
-`web_search` 默认按 Tavily / Exa / Brave / DuckDuckGo 顺序回退；可用 `provider`
+`websearch` 默认按 Tavily / Exa / Brave / DuckDuckGo 顺序回退；可用 `provider`
 参数强制指定一个源。源失败后进入 60 秒冷却，`/web` 查看可用性与冷却状态。
 
-`fetch_url` 支持：
+`webfetch` 支持：
 
 ```text
 format = markdown | text | html   # 默认 markdown
@@ -850,7 +850,7 @@ max_attempts = 4
 框架侧（`conatus_llm`）的入口是 `RetryingLlm` / `RetryPolicy` / `LlmErrorKind`
 与 `FallbackLlm`，任何宿主都能单独取用。
 
-## 子 Agent（`spawn_agent`）
+## 子 Agent（`task`）
 
 把一个自包含的子任务委托给隔离子 Agent（独立 `Session` + 受限工具白名单），
 只把结论回传主链路。**每一步实时上屏**——子 Agent 一次能跑几十秒，屏上如果
@@ -862,15 +862,15 @@ max_attempts = 4
   → rg
   ✓ rg
   · 第 2 轮 输出 380 字符
-  → read_file
-  ✗ read_file
-✓ 子 Agent success：3 轮 （rg、read_file）
+  → read
+  ✗ read
+✓ 子 Agent success：3 轮 （rg、read）
 ```
 
 （`TuiRole.stage` 暗色行，不污染助手正文的排版。）
 
 **默认只读白名单**：不传 `tools` 时子 Agent 拿到 `get_time` / `echo` /
-`read_file` / `rg` / `glob` / `list_files` / `git_status` / `git_diff`——够调研，
+`read` / `grep` / `glob` / `list` / `git_status` / `git_diff`——够调研，
 但不给写 / 执行类。显式传 `tools` 也**排除 high 风险**（双保险：写 / 执行类即便
 被点名也要过审批）。
 
@@ -884,7 +884,7 @@ max_attempts = 4
 **权限模式（`permissionMode`）**：子代理级策略，对齐 Claude Code。宿主在
 `[agent] subagent_permission` 设默认（`inherit` / `readonly` / `ask` / `auto`），
 模型可在
-`spawn_agent` 的 `permission_mode` 请求，但**只能收紧**：
+`task` 的 `permission_mode` 请求，但**只能收紧**：
 
 - `inherit`（默认）：走宿主同一条审批管线。
 - `readonly`：仅 low 风险工具，medium/high 直接拒（不弹审批）。
@@ -912,14 +912,14 @@ token 额度——否则它那十几轮调用会把**主**轮次撞爆 `max_turn
   · 第 1 轮
   → rg
   ✓ rg · 12 处匹配
-  → read_file
-  ✗ read_file
+  → read
+  ✗ read
 ◆ swarm-1
-  → read_file
-  ✓ 收口：3 轮 （read_file、rg）
+  → read
+  ✓ 收口：3 轮 （read、rg）
 ```
 
-- `spawn_teammate` 起的成员与 `spawn_agent` 起的子 Agent **同处一个视图**
+- `spawn_teammate` 起的成员与 `task` 起的子 Agent **同处一个视图**
   （后者带 `swarm-` 前缀，标 `◆`）——两套委托机制语义不同但视图统一。
 - 每条泳道保留最近 12 行（`kTeamLaneMaxLines`），连续正文会合并成一行，
   否则一条长回答就能刷掉整个泳道。
@@ -958,7 +958,7 @@ nava --harness harnesses/std.json      # 本次运行装配（TUI 与 -p 共用�
 **权限在 headless 下仍然生效**：权限中间件照常挂在最外层，只是没有审批人。
 `[approval] mode` 直接落到兜底阈值：
 
-- `ask_when_needed`（缺省）：阈值 `high`——`run_command` / `apply_patch` /
+- `ask_when_needed`（缺省）：阈值 `high`——`bash` / `apply_patch` /
   `git_commit` 这类工具需要确认，于是返回 `PERMISSION_ASK_UNATTENDED` **拒绝**
   （不是静默执行）；显式 `[[permissions]] allow` 仍然放行。
 - `always_ask`：阈值更低，更多工具被拒；启动时 stderr 说明。
@@ -984,7 +984,7 @@ stdio 子进程与本地命令同权，审批是未知风险的唯一防线，�
 
 ## 命令执行与隔离（没有沙箱）
 
-**nava 不做沙箱隔离**：`run_command` 等工具以当前用户的权限直接在本机执行，
+**nava 不做沙箱隔离**：`bash` 等工具以当前用户的权限直接在本机执行，
 与 OpenCode / Kimi Code 同姿态。需要强隔离时，请把整个 nava 放进容器或虚拟机
 里跑——那是环境层面的选择，不是本工具的能力。
 
