@@ -1,10 +1,8 @@
 /// `.opencode` 命令级兜底：字面识别「路径段 + 写类操作符」。
 ///
-/// **这只是 best-effort**，不是安全边界。真正的边界是 Seatbelt
-/// （`deny file-write*`，见 `seatbelt_profile.dart` / `sandbox_assembly.dart`）。
-/// 本检查覆盖沙箱未启用（`danger_full_access` / 后端不可用之外的本地直执）
-/// 时命令工具那条路径上能被字面识别的写法；变量拼接、`sh -c "$CMD"`、读脚本
-/// 再执行、`eval` 等都能绕过。
+/// **这只是 best-effort**，不是安全边界：变量拼接、`sh -c "$CMD"`、读脚本
+/// 再执行、`eval` 等都能绕过。它覆盖命令工具那条路径上能被字面识别的写法，
+/// 与 fs 侧的同名闸门（见 `read_only_paths.dart`）共用文案。
 ///
 /// 覆盖两个目录：项目级 `.opencode` 与全局 `~/.config/opencode`
 /// （`rm -rf ~/.config/opencode` 同样必须拒）。

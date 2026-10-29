@@ -113,20 +113,7 @@ void main() {
 
   test('用法文案明示 -p 跳过审批（E-9c）', () {
     expect(TuiOptions.usage, contains('不装审批链'));
-    expect(TuiOptions.usage, contains('--allow-unsafe-headless'));
-  });
-
-  test('--allow-unsafe-headless 解析与缺省（E-9a）', () {
-    expect(
-      TuiOptions.parse(const <String>[
-        '--allow-unsafe-headless',
-      ]).allowUnsafeHeadless,
-      isTrue,
-    );
-    expect(
-      TuiOptions.parse(const <String>['-p', '跑测试']).allowUnsafeHeadless,
-      isFalse,
-    );
+    expect(TuiOptions.usage, contains('PERMISSION_ASK_UNATTENDED'));
   });
 
   test('-p 缺值：printRequested 为真但 print 为空（E-16，调用方据此报错）', () {

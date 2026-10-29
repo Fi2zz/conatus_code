@@ -208,13 +208,6 @@ mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
 # command = ["dart", "language-server"]
 # extensions = [".dart"]
 
-[sandbox]
-enabled = true
-fs_jail = true
-network_allowlist = ["git fetch", "git pull"]
-command_timeout_ms = 120000
-max_output_bytes = 64000
-
 [budget]
 max_turn_seconds = 600
 # max_turn_tokens = 0        # 0 / 省略 = 按模型窗口的 75%；显式值只能更严

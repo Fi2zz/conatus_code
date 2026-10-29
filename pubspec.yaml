@@ -7,7 +7,6 @@ issue_tracker: https://github.com/Fi2zz/conatus_code/issues
 publish_to: none
 
 environment:
-  # dart_io_sandbox 要求 ^3.10.0；工作区内有效 SDK 是 3.11。
   sdk: ^3.10.0
 
 # 由 git filter 管理：工作区为生效状态，提交时自动注释掉，因此独立 clone 仍按
@@ -58,7 +57,6 @@ dependencies:
   conatus_tts:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: ff90bbb258bd72c80cfce7f12077cbe13b1e0e33, path: packages/conatus_tts}
   crypto: ^3.0.0
-  dart_io_sandbox: ^1.2.3
   file: ^7.0.0
   glob: ^2.2.0
   http: ^1.2.0

@@ -70,6 +70,9 @@ class StoryPending {
       if (readOnlyRelativePath(op.blockId)) {
         throw StateError(kReadOnlyPathMessage);
       }
+      if (escapesWorkspace(op.blockId)) {
+        throw StateError('ops 目标越界：${op.blockId}');
+      }
     }
     // 先读基底再登记：读失败时列表保持原样，不留下「没有基底」的补丁
     // （那会让 apply 的冲突检测静默失效）。
@@ -160,6 +163,28 @@ class StoryPending {
     return '已应用第 $index 个补丁（${patch.ops.length} 个文件），并入故事线；'
         '冲突：$conflicts 个文件已留双版本（$kConflictOpen 标记），请人工合并。';
   }
+}
+
+/// 相对路径是否逃出工作区（绝对路径，或靠 `..` 越过根本身）。
+///
+/// 纯字面判定：不做符号链接解析，也不能解析——这里只有模型给的字符串。
+/// 目的与 `.opencode` 检查一致：**登记阶段**就拒掉「apply 时会写工作区外」
+/// 的提议，而不是等到写盘时才失败。
+bool escapesWorkspace(String path) {
+  final String unified = path.replaceAll('\\', '/');
+  if (unified.startsWith('/')) return true;
+  if (RegExp(r'^[A-Za-z]:/').hasMatch(unified)) return true;
+  int depth = 0;
+  for (final String segment in unified.split('/')) {
+    if (segment.isEmpty || segment == '.') continue;
+    if (segment == '..') {
+      depth -= 1;
+      if (depth < 0) return true;
+      continue;
+    }
+    depth += 1;
+  }
+  return false;
 }
 
 /// 渲染待应用列表（`/story pending` 输出）：序号 + 来源 + ops 摘要。

@@ -12,10 +12,12 @@ import 'package:conatus_harness/conatus_harness.dart';
 Future<void> main(List<String> args) async {
   // `nava mcp ...` 与 `nava harness ...` 都是独立子命令：在 TUI 选项解析前分流。
   if (args.isNotEmpty && args.first == 'mcp') {
-    exit(await runMcpCli(
-      args.sublist(1),
-      deps: const McpCliDeps(includeClaudeDesktop: true),
-    ));
+    exit(
+      await runMcpCli(
+        args.sublist(1),
+        deps: const McpCliDeps(includeClaudeDesktop: true),
+      ),
+    );
   }
   // 显式导入 OpenCode 配置：`nava import opencode [--write]`。
   if (args.isNotEmpty && args.first == 'import') {
@@ -65,20 +67,9 @@ Future<void> main(List<String> args) async {
     stderr.writeln(warning);
   }
 
-  // headless 安全闸门（E-9）：`-p` 不装审批链，OS 沙箱是唯一防线；沙箱被
-  // 显式关掉时无人值守 = 裸奔，拒绝启动（除非 --allow-unsafe-headless 显式
-  // 承担风险）。always_ask 这类显式加严的审批配置在 headless 落空时也不
-  // 静默——启动就把话说清楚。
+  // headless 的审批语义提示：`-p` 不装审批链，`ask` 会直接变成拒绝。
+  // always_ask 这类显式加严的配置在 headless 落空时也不静默——启动就说清楚。
   final bool headless = options.print != null;
-  final String? refusal = validateHeadlessSafety(
-    headless: headless,
-    sandbox: config.sandbox,
-    allowUnsafe: options.allowUnsafeHeadless,
-  );
-  if (refusal != null) {
-    stderr.writeln(refusal);
-    exit(2);
-  }
   final String? notice = approvalModeIgnoredNotice(
     headless: headless,
     approval: config.approval,
@@ -136,29 +127,10 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  // 分层沙箱装配：
-  // - Layer 1（fs_jail）：应用层文件 jail，纯应用层防误操作，任何平台可用；
-  // - Layer 2（enabled）：OS 级沙箱，后端不可用时 fail-closed —— 注入拒斥
-  //   执行器禁用命令，而不是整体退出或降级本地 shell。
-  final String canonicalRoot = Directory(workdir).resolveSymbolicLinksSync();
-  SandboxBackend? backend;
-  if (config.sandbox.enabled) {
-    try {
-      backend = probeSandboxBackend();
-    } on SandboxException catch (error) {
-      stderr.writeln('OS 沙箱后端不可用（命令执行将禁用）：${error.message}');
-    }
-  }
   final List<ResolvedReference> references = resolveReferences(
     config.references,
     workdir: workdir,
     onWarning: stderr.writeln,
-  );
-  final SandboxLayers layers = resolveSandboxLayers(
-    root: canonicalRoot,
-    settings: config.sandbox,
-    backend: backend,
-    readOnlyPaths: <String>[for (final ResolvedReference ref in references) ref.path],
   );
 
   final String? defaultModel = config.llm.defaultModel;
@@ -201,8 +173,6 @@ Future<void> main(List<String> args) async {
     ),
     lsp: config.lsp,
     credentials: ConfigCredentials(config),
-    fs: layers.fs,
-    shell: layers.shell,
     mcpServers: mcpServers,
     customTools: config.tools,
     interactive: !headless,
@@ -266,10 +236,7 @@ Future<void> main(List<String> args) async {
   await runApp(AgentTui(controller: controller));
   await runtime.dispose();
   if (switchWorkdir != null) {
-    final List<String> childArgs = <String>[
-      '--workdir',
-      switchWorkdir!,
-    ];
+    final List<String> childArgs = <String>['--workdir', switchWorkdir!];
     if (options.configPath != null) {
       childArgs.addAll(<String>[
         '--config',

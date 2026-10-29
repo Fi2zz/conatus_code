@@ -51,11 +51,12 @@ import '../permissions/permission_wiring.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
 import '../references/references.dart';
-import '../sandbox/sandboxed_shell.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
 import '../tools/code_tools.dart';
+import '../tools/command_policy.dart';
 import '../tools/custom_tools.dart';
+import '../tools/guarded_shell.dart';
 import 'ask_user_tool.dart';
 import 'system_notifier.dart';
 import 'tui_choice.dart';
@@ -333,9 +334,17 @@ class ConatusTuiRuntime {
     );
     // 'shell' 既是 rg 的必需依赖（fs 工具回落到 ctx.get('shell')），也是命令执行
     // 的唯一接缝：注入受限实现后 rg / run_command / run_tests / run_code 一并跟随。
-    provideShellLocal(app, executor: shell);
+    // 命令形状审查：本地直执外面套一层 command_shield 分析。REVIEW 的人工
+    // 复核回调在下面的审批装配里接线；headless 未接线即按拒绝（fail-closed）。
+    final GuardedShellExecutor guardedShell = shell is GuardedShellExecutor
+        ? shell
+        : GuardedShellExecutor(
+            inner: shell ?? LocalShellExecutor(),
+            policy: CommandPolicy(),
+          );
+    provideShellLocal(app, executor: guardedShell);
     // 'shellInteractive'：用户直发命令（`!` shell 模式）的交互缝——本地直执、
-    // 不过模型命令白名单（对齐 OpenCode）；模型命令仍走上面的 'shell' 沙箱缝。
+    // 不过模型命令审查（对齐 OpenCode）；模型命令仍走上面的 'shell' 缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
     provideFsTools(app);
     LspManager? lspManager;
@@ -346,9 +355,7 @@ class ConatusTuiRuntime {
       );
       lspManager = manager;
       app.provide('lsp', manager);
-      app.effect(
-        () => app.tools.register(LspDiagnosticsTool(source: manager)),
-      );
+      app.effect(() => app.tools.register(LspDiagnosticsTool(source: manager)));
       app.effect(
         () => app.tools.use(lspDiagnosticsMiddleware(manager), tag: 'lsp'),
       );
@@ -419,33 +426,30 @@ class ConatusTuiRuntime {
         // 挂第二层审批中间件。
         instrument: false,
       );
-      // 沙箱 REVIEW → 同一选项浮层征询人工复核；headless 不接线（按拒绝，
+      // 命令 REVIEW → 同一选项浮层征询人工复核；headless 不接线（按拒绝，
       // fail-closed）。NeverAsk 视同放行，与其余审批语义一致。
-      final ShellExecutor? sandboxedShell = shell;
-      if (sandboxedShell is SandboxedShellExecutor) {
-        sandboxedShell.reviewPrompter = (String command, String reason) async {
-          if (gate.mode == TuiPermissionMode.neverAsk) return true;
-          final String? picked = await choice.ask(
-            TuiChoiceRequest(
-              title: '命令需人工复核',
-              choices: <TuiChoice>[
-                TuiChoice(
-                  id: 'sandbox-review-allow',
-                  label: '允许执行',
-                  description: '$command\n复核理由：$reason',
-                ),
-                const TuiChoice(
-                  id: 'sandbox-review-deny',
-                  label: '拒绝',
-                  description: '不执行，把拒绝结果回给模型。',
-                ),
-              ],
-            ),
-            timeout: kTuiDecisionTimeout,
-          );
-          return picked == 'sandbox-review-allow';
-        };
-      }
+      guardedShell.reviewPrompter = (String command, String reason) async {
+        if (gate.mode == TuiPermissionMode.neverAsk) return true;
+        final String? picked = await choice.ask(
+          TuiChoiceRequest(
+            title: '命令需人工复核',
+            choices: <TuiChoice>[
+              TuiChoice(
+                id: 'command-review-allow',
+                label: '允许执行',
+                description: '$command\n复核理由：$reason',
+              ),
+              const TuiChoice(
+                id: 'command-review-deny',
+                label: '拒绝',
+                description: '不执行，把拒绝结果回给模型。',
+              ),
+            ],
+          ),
+          timeout: kTuiDecisionTimeout,
+        );
+        return picked == 'command-review-allow';
+      };
       app.effect(
         () => app.tools.register(
           AskUserTool(host: () => app.get<TuiUserPromptHost>('tuiController')),
@@ -982,7 +986,6 @@ class _UnconfiguredProvider implements LlmProvider {
   void close() {}
 }
 
-
 /// 默认发现根 + 配置里的 `extra_skill_dirs`（相对 workdir / `~` 展开）。
 List<SkillRoot> _skillRoots(String workdir, List<String> extra) {
   final List<SkillRoot> roots = defaultSkillRoots(
@@ -994,9 +997,7 @@ List<SkillRoot> _skillRoots(String workdir, List<String> extra) {
   for (final String raw in extra) {
     final String? path = _extraSkillDir(raw, workdir);
     if (path == null || !seen.add(path)) continue;
-    roots.add(
-      SkillRoot(path: path, source: kSkillSourceCustom, rank: 300),
-    );
+    roots.add(SkillRoot(path: path, source: kSkillSourceCustom, rank: 300));
   }
   return roots;
 }

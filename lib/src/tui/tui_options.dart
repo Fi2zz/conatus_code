@@ -31,7 +31,6 @@ class TuiOptions {
     this.outputFormat = 'text',
     this.versionRequested = false,
     this.continueRequested = false,
-    this.allowUnsafeHeadless = false,
     this.printRequested = false,
     this.harnessPath,
     this.workdir,
@@ -67,10 +66,6 @@ class TuiOptions {
   /// 直接挂起）。见 E-16。
   final bool printRequested;
 
-  /// 是否出现了 `--allow-unsafe-headless`：允许 headless 在 OS 沙箱关闭时
-  /// 启动（见 `validateHeadlessSafety`）。
-  final bool allowUnsafeHeadless;
-
   /// `--harness <路径>` 指定的 manifest 文件；`null` 表示不装配。
   final String? harnessPath;
 
@@ -87,10 +82,8 @@ class TuiOptions {
       '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
       '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n'
       '  -p, --print <任务>  headless 单轮执行：跑完即退出，不启动 TUI\n'
-      '       注意：headless 不装审批链——高危工具直接执行、[approval] 配置\n'
-      '       不生效，安全兜底只有 OS 沙箱；沙箱关闭时需\n'
-      '       --allow-unsafe-headless 才能启动\n'
-      '  --allow-unsafe-headless  允许 headless 在沙箱关闭时启动（危险）\n'
+      '       注意：headless 不装审批链——需要确认的工具会被直接拒绝\n'
+      '       （PERMISSION_ASK_UNATTENDED），要用请在 [[permissions]] 显式 allow\n'
       '  --output-format   headless 输出格式：text / json（缺省 text）\n'
       '  --harness <路径>  装配指定 harness manifest（JSON）\n'
       '  --continue        恢复最近一次会话（--session 优先于它）\n'
@@ -111,7 +104,6 @@ class TuiOptions {
     String outputFormat = 'text';
     bool versionRequested = false;
     bool continueRequested = false;
-    bool allowUnsafeHeadless = false;
     bool printRequested = false;
     String? harnessPath;
     String? workdir;
@@ -123,8 +115,6 @@ class TuiOptions {
         versionRequested = true;
       } else if (arg == '--continue') {
         continueRequested = true;
-      } else if (arg == '--allow-unsafe-headless') {
-        allowUnsafeHeadless = true;
       } else if (arg == '--session') {
         final bool hasValue =
             index + 1 < args.length && !args[index + 1].startsWith('-');
@@ -162,7 +152,6 @@ class TuiOptions {
       outputFormat: outputFormat,
       versionRequested: versionRequested,
       continueRequested: continueRequested,
-      allowUnsafeHeadless: allowUnsafeHeadless,
       printRequested: printRequested,
       harnessPath: harnessPath,
       workdir: workdir,

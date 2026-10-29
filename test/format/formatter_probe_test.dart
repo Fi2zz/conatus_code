@@ -115,12 +115,4 @@ void main() {
     expect(detectFormatter(dir.path, '../a.dart'), isNull);
     expect(detectFormatter(dir.path, '/elsewhere/a.dart'), isNull);
   });
-
-  test('格式化命令都在沙箱缺省可执行白名单内', () {
-    final Set<String> allowed = resolveAllowedExecutables(const <String>[]);
-    expect(
-      allowed,
-      containsAll(<String>['dart', 'gofmt', 'rustfmt', 'prettier', 'ruff']),
-    );
-  });
 }

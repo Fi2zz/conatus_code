@@ -60,16 +60,15 @@ void main() {
           name: 'custom_echo',
           description: 'Echo a value',
           command: 'true',
-          params: <ParamSpec>[
-            ParamSpec.string('value', required: true),
-          ],
+          params: <ParamSpec>[ParamSpec.string('value', required: true)],
         ),
       ],
     );
 
     expect(runtime.tools.names, contains('custom_echo'));
-    final Map<String, Object?> schema =
-        runtime.tools.describeOne('custom_echo')!;
+    final Map<String, Object?> schema = runtime.tools.describeOne(
+      'custom_echo',
+    )!;
     expect(schema['description'], 'Echo a value');
     expect(schema['parameters'], containsPair('type', 'object'));
 
@@ -78,7 +77,9 @@ void main() {
 
   test('extra_skill_dirs 的额外目录进入技能目录', () async {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
-    final Directory extra = Directory.systemTemp.createTempSync('conatus-skill');
+    final Directory extra = Directory.systemTemp.createTempSync(
+      'conatus-skill',
+    );
     addTearDown(() {
       dir.deleteSync(recursive: true);
       extra.deleteSync(recursive: true);
@@ -110,7 +111,9 @@ void main() {
 
   test('merge_all_available_skills 把隐藏技能放进目录', () async {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
-    final Directory extra = Directory.systemTemp.createTempSync('conatus-skill');
+    final Directory extra = Directory.systemTemp.createTempSync(
+      'conatus-skill',
+    );
     addTearDown(() {
       dir.deleteSync(recursive: true);
       extra.deleteSync(recursive: true);
@@ -154,11 +157,7 @@ void main() {
       skills: false,
       llm: FallbackLlm(const <LlmProvider>[]),
       references: <ResolvedReference>[
-        ResolvedReference(
-          name: 'docs',
-          path: dir.path,
-          description: '产品文档',
-        ),
+        ResolvedReference(name: 'docs', path: dir.path, description: '产品文档'),
       ],
     );
 
@@ -173,7 +172,8 @@ void main() {
     await runtime.dispose();
   });
 
-  test('装配后 system 带日期锚点，get_time 返回带偏移的时刻', () async {    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+  test('装配后 system 带日期锚点，get_time 返回带偏移的时刻', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));
     final String sep = Platform.pathSeparator;
     final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
@@ -428,14 +428,10 @@ void main() {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));
     final String sep = Platform.pathSeparator;
-    SandboxedShellOptions sandboxOptions(String root) => SandboxedShellOptions(
-      backend: const SandboxBackend(sandboxExecPath: '/bin/false'),
-      root: root,
-      commandPolicy: CommandPolicy(root: root),
-    );
 
-    final SandboxedShellExecutor interactiveShell = SandboxedShellExecutor(
-      options: sandboxOptions(dir.path),
+    final GuardedShellExecutor interactiveShell = GuardedShellExecutor(
+      inner: LocalShellExecutor(),
+      policy: CommandPolicy(),
     );
     final ConatusTuiRuntime interactiveRt = await ConatusTuiRuntime.create(
       baseDir: dir.path,
@@ -449,8 +445,9 @@ void main() {
     expect(interactiveShell.reviewPrompter, isNotNull);
     await interactiveRt.dispose();
 
-    final SandboxedShellExecutor headlessShell = SandboxedShellExecutor(
-      options: sandboxOptions(dir.path),
+    final GuardedShellExecutor headlessShell = GuardedShellExecutor(
+      inner: LocalShellExecutor(),
+      policy: CommandPolicy(),
     );
     final ConatusTuiRuntime headlessRt = await ConatusTuiRuntime.create(
       baseDir: dir.path,

@@ -7,13 +7,13 @@ library;
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-import '../sandbox/protected_command.dart';
+import '../tools/protected_command.dart';
 import 'background_tasks.dart';
 
 /// 后台启动一条命令（high 风险，走审批）。
 class RunCommandBackgroundTool extends Tool {
   RunCommandBackgroundTool({required BackgroundTaskService service})
-      : _service = service;
+    : _service = service;
 
   final BackgroundTaskService _service;
 
@@ -21,7 +21,8 @@ class RunCommandBackgroundTool extends Tool {
   String get name => 'run_command_background';
 
   @override
-  String get description => '在沙箱中后台启动一条命令（不阻塞对话），返回任务 id；'
+  String get description =>
+      '在沙箱中后台启动一条命令（不阻塞对话），返回任务 id；'
       '用 list_background_tasks / background_output 查看。';
 
   @override
@@ -29,9 +30,9 @@ class RunCommandBackgroundTool extends Tool {
 
   @override
   List<ParamSpec> get params => <ParamSpec>[
-        ParamSpec.string('command', required: true, description: '要执行的命令'),
-        ParamSpec.string('cwd', description: '工作目录（相对沙箱根）'),
-      ];
+    ParamSpec.string('command', required: true, description: '要执行的命令'),
+    ParamSpec.string('cwd', description: '工作目录（相对沙箱根）'),
+  ];
 
   @override
   Future<ToolResult> call(ToolContext ctx) async {
@@ -47,8 +48,10 @@ class RunCommandBackgroundTool extends Tool {
     }
     try {
       final String id = await _service.start(command, cwd: cwd);
-      return ToolResult.success('后台任务 $id 已启动：$command\n'
-          '用 list_background_tasks / background_output 查看进度。');
+      return ToolResult.success(
+        '后台任务 $id 已启动：$command\n'
+        '用 list_background_tasks / background_output 查看进度。',
+      );
     } on BackgroundException catch (error) {
       return ToolResult.failure(
         error.message,
@@ -61,7 +64,7 @@ class RunCommandBackgroundTool extends Tool {
 /// 列出全部后台任务。
 class ListBackgroundTasksTool extends Tool {
   ListBackgroundTasksTool({required BackgroundTaskService service})
-      : _service = service;
+    : _service = service;
 
   final BackgroundTaskService _service;
 
@@ -83,19 +86,22 @@ class ListBackgroundTasksTool extends Tool {
     if (tasks.isEmpty) return ToolResult.success('当前没有后台任务。');
     final StringBuffer buffer = StringBuffer('后台任务（${tasks.length}）：');
     for (final BackgroundTaskView task in tasks) {
-      buffer.write('\n  ${task.id} [${task.status.name}] ${task.command}'
-          '（${_seconds(task.elapsedMs)}，输出 ${task.outputBytes}B）');
+      buffer.write(
+        '\n  ${task.id} [${task.status.name}] ${task.command}'
+        '（${_seconds(task.elapsedMs)}，输出 ${task.outputBytes}B）',
+      );
     }
     return ToolResult.success(buffer.toString());
   }
 
-  static String _seconds(int ms) => ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
+  static String _seconds(int ms) =>
+      ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
 }
 
 /// 读取某后台任务的累计输出。
 class BackgroundOutputTool extends Tool {
   BackgroundOutputTool({required BackgroundTaskService service})
-      : _service = service;
+    : _service = service;
 
   final BackgroundTaskService _service;
 
@@ -110,8 +116,8 @@ class BackgroundOutputTool extends Tool {
 
   @override
   List<ParamSpec> get params => <ParamSpec>[
-        ParamSpec.string('task_id', required: true, description: '后台任务 id（bg-<n>）'),
-      ];
+    ParamSpec.string('task_id', required: true, description: '后台任务 id（bg-<n>）'),
+  ];
 
   @override
   Future<ToolResult> call(ToolContext ctx) async {
@@ -132,7 +138,7 @@ class BackgroundOutputTool extends Tool {
 /// 终止某后台任务。
 class BackgroundKillTool extends Tool {
   BackgroundKillTool({required BackgroundTaskService service})
-      : _service = service;
+    : _service = service;
 
   final BackgroundTaskService _service;
 
@@ -147,8 +153,8 @@ class BackgroundKillTool extends Tool {
 
   @override
   List<ParamSpec> get params => <ParamSpec>[
-        ParamSpec.string('task_id', required: true, description: '后台任务 id（bg-<n>）'),
-      ];
+    ParamSpec.string('task_id', required: true, description: '后台任务 id（bg-<n>）'),
+  ];
 
   @override
   Future<ToolResult> call(ToolContext ctx) async {

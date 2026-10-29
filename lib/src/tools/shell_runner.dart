@@ -3,7 +3,7 @@ library;
 
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-import '../sandbox/protected_command.dart';
+import 'protected_command.dart';
 
 /// 执行命令并映射为工具结果。
 ///
@@ -11,8 +11,8 @@ import '../sandbox/protected_command.dart';
 /// 超时 → `TOOL_TIMEOUT`；非零或 null → `COMMAND_FAILED`（content 合并两路）；
 /// 执行器抛异常 → `SHELL_ERROR`。
 ///
-/// 命令字面写 `.opencode` 时先拒（`READ_ONLY_PATH`）——沙箱关闭时的兜底，
-/// 见 `protected_command.dart`（best-effort，Seatbelt 才是真边界）。
+/// 命令字面写 `.opencode` 时先拒（`READ_ONLY_PATH`），见
+/// `protected_command.dart`（best-effort，不是安全边界）。
 Future<ToolResult> runShellCommand(
   ShellExecutor shell,
   String command, {
@@ -69,8 +69,8 @@ String _merged(String stdout, String stderr, int? exitCode) {
   final String body = stdout.isEmpty
       ? stderr
       : stderr.isEmpty
-          ? stdout
-          : '$stdout\n$stderr';
+      ? stdout
+      : '$stdout\n$stderr';
   if (body.isNotEmpty) return body;
   return '命令失败（exit ${exitCode ?? 'null'}）';
 }

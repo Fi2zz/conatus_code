@@ -14,9 +14,7 @@ import '../agents/agent_resolver.dart';
 import '../budget/cost_tracker.dart';
 import '../commands/command_registry.dart';
 import '../permissions/permission_wiring.dart';
-import '../sandbox/jailed_file_system.dart';
-import '../sandbox/rejecting_shell.dart';
-import '../sandbox/sandboxed_shell.dart';
+import '../tools/guarded_shell.dart';
 
 /// 一项体检结果。
 class DoctorCheck {
@@ -57,7 +55,6 @@ List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
     hint: '工具未装配',
   ),
   _shellCheck(app),
-  _fsCheck(app),
   _permissionCheck(app),
   _discoveryCheck(app),
   _configDeprecationCheck(app),
@@ -213,32 +210,14 @@ DoctorCheck _modelProfileCheck(Context app) {
 
 DoctorCheck _shellCheck(Context app) {
   final ShellExecutor? shell = app.get<ShellExecutor>('shell');
-  if (shell is SandboxedShellExecutor) {
-    return const DoctorCheck(name: 'OS 沙箱（Layer 2）', ok: true);
-  }
-  if (shell is RejectingShellExecutor) {
-    return const DoctorCheck(
-      name: 'OS 沙箱（Layer 2）',
-      ok: false,
-      hint: '沙箱后端不可用，命令执行已禁用（[sandbox] enabled=false 可关闭）',
-    );
+  if (shell is GuardedShellExecutor) {
+    return const DoctorCheck(name: '命令审查', ok: true, hint: 'shape scan 生效');
   }
   return const DoctorCheck(
-    name: 'OS 沙箱（Layer 2）',
+    name: '命令审查',
     ok: true,
     warning: true,
-    hint: '未启用（本地直执）',
-  );
-}
-
-DoctorCheck _fsCheck(Context app) {
-  final FileSystem? fs = app.get<FileSystem>('fs');
-  final bool jailed = fs is JailedFileSystem;
-  return DoctorCheck(
-    name: '文件 jail（Layer 1）',
-    ok: true,
-    warning: !jailed,
-    hint: jailed ? '生效' : '未启用（fs_jail=false）',
+    hint: '未装配（命令不经 shape scan）',
   );
 }
 

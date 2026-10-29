@@ -107,7 +107,7 @@ system prompt 常驻段（而非一次性消息，压缩后仍在）；或加配
   nava 对应 `spawn_agent` / `run_command` / `read_file` 等，名字足够接近，
   模型一般能自行对上；严格要求可在项目 `.conatus/skills/` 放一份映射说明
   技能兜底
-- 涉及写操作的技能（TDD、git worktree）触到的工具照常走审批与沙箱，
+- 涉及写操作的技能（TDD、git worktree）触到的工具照常走审批与命令审查，
   不需要特殊处理
 
 ## 形态二：MCP server
@@ -136,8 +136,8 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${KEY} 经凭据服务解析
 `claude_desktop_config.json`、项目级的 `.mcp.json`）。nava 现在**直接读取项目根
 的 `.mcp.json`**（最近的含 `.git` 的祖先目录），把 `mcpServers` 映射进现有
 `McpServerSpec` 装配；同名 `[mcp.servers.*]` 优先，坏条目只告警跳过。
-`.mcp.json` 是项目文件，stdio 子进程不经 Layer 2 沙箱，启动时会提示来源——
-只在你信任该仓库时使用。全局 `claude_desktop_config.json` 仍建议转成
+`.mcp.json` 是项目文件，stdio 子进程与本地命令同权（不经命令审查），启动时会
+提示来源——只在你信任该仓库时使用。全局 `claude_desktop_config.json` 仍建议转成
 config.toml（或放到项目 `.mcp.json`）。
 
 ### 注意事项
@@ -147,16 +147,16 @@ config.toml（或放到项目 `.mcp.json`）。
    临时尝鲜。
 2. **版本即信任级别**：`npx -y` 拉远端最新代码 vs 本地锁版本，风险完全不同。
    前者只在你审过包的情况下用。
-3. stdio server 的子进程**不走 Layer 2 OS 沙箱**（MCP server 是用户显式声明
-   的受信端，见 README「安全边界」）。接入第三方 server 等同于安装一个
+3. stdio server 的子进程**不经命令审查**（MCP server 是用户显式声明的受信端，
+   见 README「安全边界」）。接入第三方 server 等同于安装一个
    本地程序，按这个信任级别对待。
 
 ## 形态三：CLI 或可执行脚本
 
 插件是一个能跑命令的程序（lint 器、生成器、检查脚本）：
 
-- **偶尔调用**：让模型走 `run_command` 直接调，照常过 CommandPolicy 裁决与
-  沙箱——无需任何配置
+- **偶尔调用**：让模型走 `run_command` 直接调，照常过命令审查与审批——
+  无需任何配置
 - **每次工具调用前后固定跑**：配成 hook。hook 经 `/bin/sh -c` 直连运行，
   写 JS/Python/任何脚本语言都可以：
 
@@ -170,8 +170,8 @@ stop = []
 hook 收到环境变量 `NAVA_HOOK_EVENT` / `NAVA_HOOK_TOOL` /
 `NAVA_HOOK_ARGS_JSON`；pre 任一非零退出即拒绝该工具。
 
-**注意**：hook 是**直连 shell、不经沙箱**的本机命令——它的权限等于运行 nava
-的用户本人。只挂你信任的脚本。
+**注意**：hook 是**直连 shell**的本机命令——它的权限等于运行 nava 的用户本人。
+只挂你信任的脚本。
 
 Claude Code 的 `settings.json` hooks 是带 matcher 的结构化 JSON，与 nava 的
 命令列表形状不同——不做自动映射，手工改写即可（事件名对照：
@@ -244,24 +244,24 @@ CLI 从 stdin 收 `{"name":"deploy","arguments":{...}}`，stdout 返回
 
 ## 信任边界速查
 
-| 机制 | 信任级别 | 沙箱 |
+| 机制 | 信任级别 | 命令审查 |
 |---|---|---|
 | 技能（SKILL.md） | 指令文本，进模型上下文 = prompt 注入面 | n/a（只读文件） |
-| MCP stdio server | 等同安装本地程序 | **不走 Layer 2** |
+| MCP stdio server | 等同安装本地程序 | **不经审查** |
 | MCP http/sse server | 远端端点，凭据经 headers | n/a |
-| hooks | 等同你本人跑 shell | **直连，不经沙箱** |
-| `[[tools]]` CLI | 等同安装本地程序 | **不走 Layer 2** |
+| hooks | 等同你本人跑 shell | **直连，不经审查** |
+| `[[tools]]` CLI | 等同安装本地程序 | **不经审查** |
 | `[[tools]]` HTTP | 远端端点，凭据经 headers | n/a |
-| 形态三 `run_command` | 模型发起的命令 | 走 Layer 2 + 审批 |
+| 形态三 `run_command` | 模型发起的命令 | 走审查 + 审批 |
 
 原则：凡是你写进配置的受信端（MCP / hooks），nava 按你的显式声明放行；
-凡是模型运行时发起的动作，走沙箱与审批。两类风险面不混。
+凡是模型运行时发起的动作，走命令审查与审批。两类风险面不混。
 
 ## 排查清单
 
 - `/mcp`：各 server 就绪状态与工具数；连接失败时启动期 stderr 有提示
 - `/tools`：当前工具表全貌，确认 `server__tool` 前缀工具已注册
-- `/doctor`：配置 / 沙箱 / 工具表 / MCP 逐项体检
+- `/doctor`：配置 / 命令审查 / 工具表 / MCP 逐项体检
 - 技能没生效：确认发现根路径与 frontmatter（`name` / `description` 必填），
   项目根按最近的 `.git` 祖先判定
 - MCP server 行为异常：先用独立 MCP 客户端（如官方 inspector）单独验 server

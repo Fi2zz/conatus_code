@@ -1,6 +1,6 @@
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-import '../sandbox/protected_command.dart';
+import 'protected_command.dart';
 
 /// 单次只读 git 命令的输出上限（字节）。
 const int _maxOutputBytes = 1024 * 1024;

@@ -116,14 +116,6 @@ void main() {
       expect(config.agent.workdir, isNull);
       expect(config.agent.projectDir, isNull);
       expect(config.approval.mode, ApprovalMode.askWhenNeeded);
-      expect(config.sandbox.enabled, isTrue);
-      expect(config.sandbox.preset, SandboxPreset.workspaceWrite);
-      expect(config.sandbox.allowNetwork, isFalse);
-      expect(config.sandbox.networkAllowlist, <String>[
-        'git fetch',
-        'git pull',
-      ]);
-      expect(config.sandbox.allowedExecutables, isEmpty);
       expect(config.credentials, isEmpty);
     });
 
@@ -141,12 +133,6 @@ project_dir = ".state"
 [approval]
 mode = "never_ask"
 
-[sandbox]
-preset = "danger_full_access"
-allow_network = true
-network_allowlist = ["api.example.com"]
-allowed_executables = ["git", "dart"]
-
 [credentials]
 ARK_API_KEY = "from-file"
 '''),
@@ -157,10 +143,6 @@ ARK_API_KEY = "from-file"
       expect(config.agent.workdir, '/tmp/work');
       expect(config.agent.projectDir, '.state');
       expect(config.approval.mode, ApprovalMode.neverAsk);
-      expect(config.sandbox.preset, SandboxPreset.dangerFullAccess);
-      expect(config.sandbox.allowNetwork, isTrue);
-      expect(config.sandbox.networkAllowlist, <String>['api.example.com']);
-      expect(config.sandbox.allowedExecutables, <String>['git', 'dart']);
       expect(config.credentials, <String, String>{'ARK_API_KEY': 'from-file'});
     });
 
@@ -177,17 +159,22 @@ ARK_API_KEY = "from-file"
       _expectConfigError('[llm] 必须是表', () {
         loadConfig(path: _writeConfig('llm = "x"\n'));
       });
-      _expectConfigError('allow_network 必须是布尔值', () {
-        loadConfig(path: _writeConfig('[sandbox]\nallow_network = "yes"\n'));
-      });
+    });
+
+    test('已废弃的 [sandbox] 段静默忽略（不报错、不影响其它字段）', () {
+      final ConatusCodeConfig ignored = loadConfig(
+        path: _writeConfig(
+          '[agent]\nmax_steps = 9\n\n[sandbox]\n'
+          'enabled = false\nfs_jail = false\nallow_network = "yes"\n',
+        ),
+      );
+
+      expect(ignored.agent.maxSteps, 9);
     });
 
     test('枚举取值非法 → ConfigException', () {
       _expectConfigError('permission 模式 "sometimes" 不合法', () {
         loadConfig(path: _writeConfig('[approval]\nmode = "sometimes"\n'));
-      });
-      _expectConfigError('sandbox.preset 取值 "nope" 不合法', () {
-        loadConfig(path: _writeConfig('[sandbox]\npreset = "nope"\n'));
       });
     });
   });

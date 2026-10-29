@@ -14,7 +14,7 @@
 - 🔍 文件读写与搜索（read_file / write_file / edit_file / rg / glob；read_file 支持目录列举、png/jpg/gif/webp 图片与 PDF 附件）
 - 🧠 技能沉淀（重复轨迹自动抽象为可复用工具）
 - 🤝 多智能体协作（任务板 + 成员运行时）
-- 🔒 审批与沙箱（高危操作走审批；默认 Seatbelt 进程沙箱 + 文件 jail）
+- 🔒 审批与命令审查（高危操作走审批；命令执行前过 `command_shield` 形状审查）
 - 🗺️ 计划闭环（plan_write 建计划、update_plan 执行中推进、计划面板实时渲染）
 - 🩹 失败自愈（工具失败自动反思重试，可按需重规划）
 - ⏱️ 预算护栏（每轮墙钟 + 上下文 token 估算 + 成本跟踪）
@@ -51,9 +51,6 @@ export PATH="$PWD/dist:$PATH"
 `<包根>/dist/nava`；第一个参数可覆盖输出路径，例如把产物写到
 `/tmp/nava`。
 
-注意：OS 沙箱后端（launcher）仍在运行时从 pub 缓存定位，换机器或清理 pub
-缓存后沙箱会 fail-closed（命令执行被禁用，文件 jail 保留），这与源码运行
-时的行为一致。
 
 ## 配置
 
@@ -102,7 +99,7 @@ type = "openai"
 
 [agent]
 max_steps = 8                 # 单轮最大模型步数
-workdir = "/path/to/project"  # 工作目录（沙箱根）；缺省当前目录
+workdir = "/path/to/project"  # 工作目录；缺省当前目录
 # subagent_permission = "inherit"  # 子代理默认权限：inherit/readonly/ask/auto（模型只能收紧）
 # project_dir = ".conatus"    # 项目数据目录（会话/记忆/数据库/检查点）；缺省不放工作区，
                               # 落 ~/.nava/workspaces/<basename>-<短哈希>；显式设置才
@@ -138,16 +135,8 @@ mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
 # enabled = false             # 人机双写故事层（可选）：开启后写工具先成待定补丁，
                               # /story 查看时间轴并 apply/reject；见 docs/story.md
 
-[sandbox]
-enabled = true                # Layer 2：OS 级沙箱（命令执行）；默认开启
-fs_jail = true                # Layer 1：应用层文件 jail（防误操作）；默认开启
-preset = "workspace_write"    # workspace_write / danger_full_access（无 OS 沙箱）
-allow_network = false         # true = 全部命令放行网络（默认拒绝，见 network_allowlist）
-network_allowlist = ["git fetch", "git pull"]
-allowed_executables = ["npx"] # 与内置默认白名单合并（扩展语义，只增不减）
-writable_paths = []           # 额外可写路径（~ 展开、相对基于工作目录）
-command_timeout_ms = 120000
-max_output_bytes = 64000
+# 旧的 [sandbox] 段已废弃：nava 不再提供 OS 级沙箱，
+# 该段被静默忽略（见「命令执行与隔离」）。
 
 [budget]
 max_turn_seconds = 600        # 单轮墙钟上限（秒）；0 = 不限
@@ -245,7 +234,7 @@ description = "产品文档，用于术语与行为说明"
 切点事件 id。`/rewind [N]` 把工作区恢复到 N 轮前（缺省 1）的文件状态，**并同步
 把对话回滚到该轮**：从切点事件 `Session.fork` 出新会话（append-only 不变式，
 旧会话保留为记录），`/rewind list` 查看本会话可用检查点。快照/恢复走应用级
-dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
+dart:io，不经 fs 接缝；`/rewind` 是用户命令，不挂审批。
 
 - 快照时机：会话绑定（turn 0）+ 每轮收口后；保留 base + 最近 `keep-1` 个差量。
 - 排除：内置 `.git` / `.conatus` / `build` / `.dart_tool` / `node_modules`
@@ -329,8 +318,7 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
   `NAVA_HOME=.opencode`、父目录符号链接指向 `.opencode` 都在创建文件之前拒绝；
   `~/.nava/oauth` 在派生阶段就校验，令牌绝不会落到只读目录。
 - 命令侧（`run_command` / git 写工具）有字面识别兜底：**best-effort**，不是
-  安全边界；变量拼接、`sh -c`、读脚本再执行都能绕过。真正的边界是 Seatbelt
-  （`deny file-write*`），sandbox 关闭时请自行确认风险。
+  安全边界；变量拼接、`sh -c`、读脚本再执行都能绕过。
 
 ## 人机双写故事层（可选）
 
@@ -346,10 +334,10 @@ dart:io，不受 fs jail 约束；`/rewind` 是用户命令，不挂审批。
 
 ## 后台任务（`/background`）
 
-`run_command_background` 在沙箱中后台启动命令（不阻塞对话），返回 `bg-<n>`；
+`run_command_background` 后台启动命令（不阻塞对话），返回 `bg-<n>`；
 `list_background_tasks` / `background_output` / `background_kill` 管理之。
 `/background [list|output <id>|kill <id>]` 是用户侧入口。任务走 `'shell'` 缝的
-`start()`，照常受沙箱 CommandPolicy 裁决；并发上限读 `[background]
+`start()`，照常受命令审查裁决；并发上限读 `[background]
 max_running_tasks`（缺省 4）。缺省 `keep_alive_on_exit = false`：nava 退出时
 终止所有在跑任务；置 `true` 则退出时不杀、任务保活脱离——**脱离后不再受
 `/background` 管理**（list/output/kill 找不到它），且输出管道随进程退出关闭，
@@ -429,7 +417,7 @@ Agent 之外。
   提交（high 风险走审批）。
 - `/review`：审查当前未提交改动（命名/边界/安全/性能，**只审不改**），
   提交/提 PR 前自检。
-- `/doctor`：体检——配置 / 提供商 / 回退链 / 模型窗口与费率 / 沙箱（Layer 1/2）/
+- `/doctor`：体检——配置 / 提供商 / 回退链 / 模型窗口与费率 / 命令审查 /
   工具表 / MCP / Agent 与命令发现（坏文件、未知 Agent `model:`）/ rg 逐项
   ✓/✗ + 修复提示，自查用；发现告警启动时也会上屏（前 5 条）。
 
@@ -455,7 +443,7 @@ Agent 之外。
 - 不可读的事件（`agent/round` / `plan/updated` 等）跳过，不产生噪声行
 - 压缩事件标出来（压缩失败也会显式提示）
 
-`/doctor` 查的是**装配**（配置、沙箱、工具表）；`/trace` 查的是**这一轮发生了什么**。
+`/doctor` 查的是**装配**（配置、命令审查、工具表）；`/trace` 查的是**这一轮发生了什么**。
 
 ### `/export` 导出
 
@@ -495,8 +483,8 @@ curl -fsSL https://xerj.org/get | sh    # 装 xerj（不装也能用 nava）
 
 默认 embedder 是**词法哈希**而非神经语义；索引时关闭 semantic 与 graph
 （`--no-semantic --no-graph`），更快更小。检索走本地节点，数据不出本机。命令统一带
-`--disable-feedback`。XERJ 不在模型命令沙箱的可执行白名单里，适配层直接经本地
-shell 执行它（参数由适配层拼装，`index_project` 的路径限制在工作区内）。
+`--disable-feedback`。XERJ 不经模型命令审查：适配层直接经本地 shell 执行它
+（参数由适配层拼装，`index_project` 的路径限制在工作区内）。
 
 ```toml
 [xerj]
@@ -540,7 +528,7 @@ OS Error: Path does not exist, path = 'lib/…/nope.dart'
 
 ## `!` 快捷 shell 与 lint-on-edit
 
-- `!<命令>`：直接执行 shell 命令（**不进模型、不烧 token**），走沙箱缝；
+- `!<命令>`：直接执行 shell 命令（**不进模型、不烧 token**），走 `'shell'` 缝；
   `!!` 重跑上一条。
 - **shell 模式**（与 OpenCode 一致）：在**空提示符**打 `!` 进入 shell 模式——
   输入框前缀变 `!`（黄）、占位提示「输入 shell 命令，Esc 退出」、状态栏提示
@@ -554,7 +542,7 @@ OS Error: Path does not exist, path = 'lib/…/nope.dart'
   `command` / `timeout_ms` / `extensions` 可覆盖），编辑成功后先格式化再交给
   linter；探测 pubspec→`dart format`、go.mod→`gofmt -w`、Cargo.toml→`rustfmt`、
   package.json 含 prettier→`prettier --write`、pyproject 含 `[tool.ruff]`→
-  `ruff format`。表缺失时完全不启用；失败 / 超时 / 沙箱白名单拒绝只追加
+  `ruff format`。表缺失时完全不启用；失败 / 超时 / 审查拒绝只追加
   `[Formatter] skipped` 提示，不影响工具成功。一次编辑涉及超过 20 个文件时只
   格式化前 20 个，其余在提示里报数量（整批跳过会让大补丁带来的文件全不格式化）。
 
@@ -608,7 +596,7 @@ format = markdown | text | html   # 默认 markdown
 
 config.toml `[hooks]` 表：`pre_tool_use`（任一非零退出即拒绝该工具）、
 `post_tool_use`（失败追加提示）、`stop`（轮次收口，失败只提示）。hook 命令
-经 `/bin/sh -c` 直连运行（**不走** `'shell'` 沙箱缝）；注入环境变量
+经 `/bin/sh -c` 直连运行（**不走** `'shell'` 缝）；注入环境变量
 `NAVA_HOOK_EVENT` / `NAVA_HOOK_TOOL` / `NAVA_HOOK_ARGS_JSON`。
 
 ```toml
@@ -629,7 +617,7 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
   形状会被读取并映射成同样的声明（`command` / `args` / `env` / `url` /
   `headers` / `oauth`）；同名 `[mcp.servers.*]` 优先，坏条目只告警跳过，
   `nava mcp list` 与 `/mcp` 都会包含它们。`.mcp.json` 是**项目文件**，stdio
-  子进程不经沙箱，启动时会提示来源——只在你信任该仓库时使用。
+  子进程与本地命令同权，启动时会提示来源——只在你信任该仓库时使用。
 - **全局 Claude Desktop 配置**：运行时还会读取
   `~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）、
   `~/.config/Claude/claude_desktop_config.json` 或 `%APPDATA%/Claude/...`；
@@ -647,7 +635,7 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
 - `env` / `headers` 支持 `${KEY}` 占位符，经凭据服务（`[credentials]` / 环境变量）
   解析；**解析结果不得写进日志**。
 - **安全边界**：MCP server 是用户在配置里显式声明的受信端，其 stdio 子进程
-  **不走** Layer 2 OS 沙箱（沙箱管的是模型临时写出的命令，二者风险面不同）。
+  **不经**命令审查（审查管的是模型临时写出的命令，二者风险面不同）。
 - 接入第三方插件（Markdown 技能包 / MCP server / CLI 脚本 / 纯库）的分档指南：
   [docs/plugin-integration.md](docs/plugin-integration.md)。
 
@@ -683,8 +671,8 @@ description = "target environment"
   支持 `${KEY}` 凭据占位符。
 - **参数 schema** 用 `[[tools.params]]` 显式声明，模型据此调用；支持
   `string` / `integer` / `number` / `boolean` / `enum`。
-- **安全**：自定义工具是用户显式配置的受信端，CLI 子进程**不走** Layer 2 沙箱，
-  HTTP 请求也不受命令沙箱约束；缺省 `high` 风险，走审批。只接你信任的脚本/端点。
+- **安全**：自定义工具是用户显式配置的受信端，CLI 子进程**不经**命令审查，
+  HTTP 请求同样不受约束；缺省 `high` 风险，走审批。只接你信任的脚本/端点。
 - OpenCode 插件里的 `ctx.tool.transform` 自定义工具无法自动转换；把它的入口
   写成 CLI（读 stdin JSON、写 stdout JSON）或用 MCP 包装即可复用。
 
@@ -871,7 +859,7 @@ max_attempts = 4
 - `inherit`（默认）：走宿主同一条审批管线。
 - `readonly`：仅 low 风险工具，medium/high 直接拒（不弹审批）。
 - `ask`：每个子工具调用都要确认（阈值 low）。
-- `auto`：子调用免审批（仍在 Layer 2 沙箱内；high 工具仍被白名单风险上限挡掉）。
+- `auto`：子调用免审批（high 工具仍被白名单风险上限挡掉）。
 
 无审批人时（headless 不装审批服务）`ask` **退化为只读**：写 / 执行类拒绝，低风险
 读取照常，而不是把所有子工具静默拒掉。
@@ -934,8 +922,8 @@ nava --harness harnesses/std.json      # 本次运行装配（TUI 与 -p 共用�
 
 ## headless（`-p`）与安全姿态
 
-`nava -p <任务>` 跑**无人值守的单轮**：装配完整运行时（工具 / 沙箱 / MCP /
-预算）但不启动 TUI，输出回复即退出（`--output-format text|json`）。
+`nava -p <任务>` 跑**无人值守的单轮**：装配完整运行时（工具 / MCP / 预算）
+但不启动 TUI，输出回复即退出（`--output-format text|json`）。
 
 **权限在 headless 下仍然生效**：权限中间件照常挂在最外层，只是没有审批人。
 `[approval] mode` 直接落到兜底阈值：
@@ -945,69 +933,47 @@ nava --harness harnesses/std.json      # 本次运行装配（TUI 与 -p 共用�
   （不是静默执行）；显式 `[[permissions]] allow` 仍然放行。
 - `always_ask`：阈值更低，更多工具被拒；启动时 stderr 说明。
 - `never_ask`：`askThreshold: null`，没有规则命中时全部放行——无人值守场景的
-  **显式 opt-in**，只在沙箱照常时使用。
+  **显式 opt-in**。
 
-> **headless 的安全兜底是「权限规则 + OS 沙箱（Layer 2）」两层。** 需要
-> 无人值守执行的工具请写 `[[permissions]] allow`（最小面），或明确接受风险后
-> 设 `[approval] mode = "never_ask"`。默认 `ask_when_needed` 下被拒是设计
-> 行为；启动时 stderr 会有一行提示，避免「模型说它要跑命令，然后什么也没
-> 发生」。
+> **headless 的兜底只有「权限规则 + 命令审查」两层，没有操作系统级隔离。**
+> 需要无人值守执行的工具请写 `[[permissions]] allow`（最小面），或明确接受
+> 风险后设 `[approval] mode = "never_ask"`。默认 `ask_when_needed` 下被拒是
+> 设计行为；启动时 stderr 会有一行提示，避免「模型说它要跑命令，然后什么也
+> 没发生」。
 
-因此启动期设了一道闸门（`validateHeadlessSafety`）：
+未声明风险的 MCP 工具缺省提级 `high`（见 conatus_mcp 的 `mcpToolRisk`）：
+stdio 子进程与本地命令同权，审批是未知风险的唯一防线，缺省必须进得去审批阈值。
 
-- 沙箱照常（`enabled = true` 且 `preset = "workspace_write"`）→ 正常启动；
-- `enabled = false` 或 `preset = "danger_full_access"`（两者最终都让命令
-  回本地直执）→ **拒绝启动**，退出码 2：无人值守 + 无审批 + 无沙箱 =
-  模型可无人监督执行任意命令，交互模式能接受的配置在这里不能；
-- 确知风险要在无沙箱环境跑 headless（如已受控的容器），显式传
-  `--allow-unsafe-headless` 放行——把「危险」变成调用方当场做出的决定，
-  而不是配置文件里一处早已遗忘的设置。
+## 命令执行与隔离（没有沙箱）
 
-同理，未声明风险的 MCP 工具缺省提级 `high`（见 conatus_mcp 的
-`mcpToolRisk`）：stdio 子进程不经本地沙箱，审批是未知风险的唯一防线，
-缺省必须进得去审批阈值。
+**nava 不做沙箱隔离**：`run_command` 等工具以当前用户的权限直接在本机执行，
+与 OpenCode / Kimi Code 同姿态。需要强隔离时，请把整个 nava 放进容器或虚拟机
+里跑——那是环境层面的选择，不是本工具的能力。
 
-沙箱（`lib/src/sandbox/`）分两层，各自独立开关、独立失败语义：
+模型发起的命令在执行前过一次**形状审查**（`lib/src/tools/command_policy.dart`，
+基于 `command_shield` 的语义分析）：
 
-- **Layer 1 · 应用层文件 jail**（`fs_jail`，默认开启）：
-  `JailedFileSystem` 把 conatus `FileSystem` 接上 `dart_io_sandbox` 的 bound
-  jail，读写限定在沙箱根内，越界映射为 `sandboxDenied`。纯应用层防误操作，
-  **不依赖 OS 后端**，任何平台可用。
-- **Layer 2 · OS 级沙箱**（`enabled`，默认开启，macOS / Linux）：
-  `CommandPolicy` 裁决命令形状（管道 / 重定向放行；`&&`、`;`、`$()` 触发
-  review，TUI 内经人工复核裁决、headless 按拒绝），再由
-  `SandboxedShellExecutor` 调用平台后端：
-  - **macOS**：`/usr/bin/sandbox-exec` + 自建 Seatbelt profile，deny-default
-    基线、可写根经 `-D` 参数注入、mach-lookup 收敛为系统服务白名单；
-  - **Linux**：`bwrap`（bubblewrap），`--unshare-all` 断网（按命令放行时
-    `--share-net`）、`--ro-bind / /` 只读根、工作区与缓存 `--bind` 可写、
-    `.opencode` 等受保护路径 `--ro-bind-try`。
-  两者都使用最小环境变量、不继承父进程环境。设计对齐 OpenAI Codex CLI /
-  Claude Code 的 seatbelt 方案。
+- `allow`：直接执行；
+- `review`：TUI 内经选项浮层人工复核（展示命令与理由，NeverAsk 视同放行），
+  批准后照常执行；headless 无浮层，**按拒绝处理**（fail-closed）；
+- `deny`：不执行，把理由回给模型。
 
-**fail-closed 只作用于 Layer 2 后端**：sandbox-exec / bwrap 不可用时，
-命令执行被拒斥执行器禁用（不降级为本地 shell），应用照常启动、Layer 1 文件
-jail 继续生效。Layer 1 与 Layer 2 可独立关闭；`preset = "danger_full_access"`
-显式关闭 OS 沙箱回本地直执（Layer 1 与命令策略仍生效）。
+审查只判断「这行命令的形状是否危险」，**不限制路径、不维护可执行白名单、
+不限制网络**——`bash seed.sh`、`node x.js` 这类「先写文件再执行」的做法它看不
+见内容，这也是为什么需要隔离时要靠容器/虚拟机。
+
+`.opencode` 与 `~/.config/opencode` 另有一道**字面**兜底
+（`lib/src/tools/protected_command.dart` 与 `fs_tools/read_only_path_guard.dart`）：
+命令里字面出现受保护目录 + 写类操作符会被拒；fs 写操作经接缝上的闸门拦截。
+同样是 best-effort：变量拼接、`sh -c "$CMD"` 都能绕过。
 
 已知边界：
 
-- `sandbox-exec` 在 macOS 上标记 deprecated 但系统自带可用；启动预检会 smoke
-  试跑，失败时命令执行禁用（stderr 会提示，可在 config.toml 设
-  `[sandbox] enabled = false` 关闭 Layer 2，保留 Layer 1 文件 jail）。
-- Linux 需要安装 `bwrap`，且内核允许非特权 user namespace；预检试跑失败时
-  命令执行禁用（fail-closed）。容器内常因 seccomp 禁用 userns，需要显式
-  调整或关闭 Layer 2。
-- 沙箱定位是防 LLM 乱跑命令的**护栏**：写默认限定在工作区 + 缓存目录，网络
-  默认拒绝，读不限面（与 Codex / Claude Code 同姿态）；对抗决心攻击者不是其目标。
-- mach-lookup 白名单是维护点：个别工具若因缺服务报错，按报错扩展
-  `seatbeltMachAllowlist` 即可（TLS 所需的 trustd/ocspd 已内置）。
-- CommandPolicy 的 REVIEW 已接线人工复核：TUI 内经选项浮层征询（NeverAsk
-  视同放行），批准后在平台沙箱内照常执行；headless 无浮层，REVIEW 仍按
-  拒绝处理（fail-closed）。白名单/路径越界这类确定性违规不受复核豁免，
-  优先按 deny 拒绝。
-- Layer 2 支持 macOS / Linux；Windows 命令执行会禁用，请显式设
-  `[sandbox] enabled = false`。
+- 命令审查基于命令文本，不检查被执行文件的内容与行为；
+- `review` 只在交互模式有效，headless 一律按拒绝；
+- 旧的 `[sandbox]` 配置段（`enabled` / `fs_jail` / `preset` /
+  `network_allowlist` / `allowed_executables` / `writable_paths` 等）**已废弃并被
+  静默忽略**。
 
 ## 预算护栏
 
@@ -1076,8 +1042,7 @@ Loop、工具系统、技能沉淀等底座；coding 相关能力（终端 UI、
 ## CI
 
 `.github/workflows/test.yml` 在每次 push / PR 跑：静态检查（`--fatal-infos`）
-→ 全部测试 → 打包二进制。跑在 `macos-latest`——Seatbelt 集成测试需要 macOS；
-Linux `bwrap` 后端当前只有参数单测，未在 CI 真跑。
+→ 全部测试 → 打包二进制。跑在 `macos-latest`。
 
 CI 验的是**独立形态**：checkout 拿到的是提交态 pubspec（`resolution:
 workspace` 被 git filter 注释掉，依赖经 git 拉 conatus master），也就是

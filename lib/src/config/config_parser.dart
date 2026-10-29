@@ -26,7 +26,6 @@ class ConfigParser extends ConfigValues {
     agent: _readAgent(),
     approval: _readApproval(),
     permissions: _readPermissions(),
-    sandbox: _readSandbox(),
     budget: _readBudget(),
     credentials: _readCredentials(),
     mcp: _readMcp(),
@@ -87,9 +86,7 @@ class ConfigParser extends ConfigValues {
         if (value is! Map) continue;
         for (final String key in _deprecatedModelFields) {
           if (value.containsKey(key)) {
-            warnings.add(
-              '$source：models."${entry.key}" 的 $key 已废弃（当前无效果）。',
-            );
+            warnings.add('$source：models."${entry.key}" 的 $key 已废弃（当前无效果）。');
           }
         }
       }
@@ -226,7 +223,8 @@ class ConfigParser extends ConfigValues {
   }
 
   /// 顶层 `[[permissions]]`：`action` / `resource` / `effect` 三项必填。
-  PermissionConfig _readPermissions() {    final List<Map<String, dynamic>> tables = readTableList('permissions');
+  PermissionConfig _readPermissions() {
+    final List<Map<String, dynamic>> tables = readTableList('permissions');
     return PermissionConfig(
       rules: <PermissionRule>[
         for (final Map<String, dynamic> table in tables) _readPermission(table),
@@ -263,21 +261,6 @@ class ConfigParser extends ConfigValues {
     }
     throw ConfigException(
       '$source：permissions 的 effect "$value" 不合法（allow/ask/deny）。',
-    );
-  }
-
-  SandboxSettings _readSandbox() {
-    final Map<String, dynamic> table = readTable('sandbox');
-    return SandboxSettings(
-      enabled: readBool(table, 'enabled', true),
-      fsJail: readBool(table, 'fs_jail', true),
-      preset: _sandboxPreset(table),
-      allowNetwork: readBool(table, 'allow_network', false),
-      networkAllowlist: readStringList(table, 'network_allowlist'),
-      allowedExecutables: readStringList(table, 'allowed_executables'),
-      writablePaths: readStringList(table, 'writable_paths'),
-      commandTimeoutMs: readPositiveInt(table, 'command_timeout_ms', 120000),
-      maxOutputBytes: readPositiveInt(table, 'max_output_bytes', 64000),
     );
   }
 
@@ -327,8 +310,7 @@ class ConfigParser extends ConfigValues {
   }
 
   /// 顶层 `[[tools]]`：声明式 CLI / HTTP 工具。
-  List<CustomToolConfig> _readTools() =>
-      ToolConfigParser(raw, source).parse();
+  List<CustomToolConfig> _readTools() => ToolConfigParser(raw, source).parse();
 
   /// `[references.<别名>]`：本地目录；git 引用暂不支持。
   List<ReferenceConfig> _readReferences() {
@@ -358,7 +340,8 @@ class ConfigParser extends ConfigValues {
     );
   }
 
-  McpConfig _readMcp() {    final Map<String, dynamic> table = readTable('mcp');
+  McpConfig _readMcp() {
+    final Map<String, dynamic> table = readTable('mcp');
     final Object? servers = table['servers'];
     if (servers == null) return const McpConfig();
     if (servers is! Map) {
@@ -663,16 +646,6 @@ class ConfigParser extends ConfigValues {
       'yolo' ||
       'bypassPermissions' => ApprovalMode.neverAsk,
       _ => throw ConfigException('$source：permission 模式 "$value" 不合法。'),
-    };
-  }
-
-  SandboxPreset _sandboxPreset(Map<String, dynamic> table) {
-    final String? value = readString(table, 'preset');
-    if (value == null) return SandboxPreset.workspaceWrite;
-    return switch (value) {
-      'workspace_write' => SandboxPreset.workspaceWrite,
-      'danger_full_access' => SandboxPreset.dangerFullAccess,
-      _ => throw ConfigException('$source：sandbox.preset 取值 "$value" 不合法。'),
     };
   }
 }

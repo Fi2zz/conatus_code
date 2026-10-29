@@ -38,7 +38,7 @@ void main() {
         'nava-pending-jail-',
       );
       addTearDown(() => dir.deleteSync(recursive: true));
-      final FileSystem fs = JailedFileSystem(root: dir.path);
+      final FileSystem fs = LocalFileSystem(cwd: dir.path);
       final StoryPending pending = StoryPending();
 
       await pending.feed(

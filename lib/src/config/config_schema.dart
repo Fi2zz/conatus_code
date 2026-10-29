@@ -164,57 +164,6 @@ class PermissionConfig {
   final List<PermissionRule> rules;
 }
 
-/// 沙箱预设。
-enum SandboxPreset { workspaceWrite, dangerFullAccess }
-
-/// 沙箱策略；由沙箱层（`src/sandbox/`）消费。
-///
-/// 分两层：Layer 1 应用层文件 jail（[fsJail]，防误操作，不依赖 OS 后端）；
-/// Layer 2 OS 级沙箱（[enabled]，命令执行经 Seatbelt 隔离，后端不可用时
-/// fail-closed 而非降级）。
-class SandboxSettings {
-  const SandboxSettings({
-    this.enabled = true,
-    this.fsJail = true,
-    this.preset = SandboxPreset.workspaceWrite,
-    this.allowNetwork = false,
-    this.networkAllowlist = const <String>[],
-    this.allowedExecutables = const <String>[],
-    this.writablePaths = const <String>[],
-    this.commandTimeoutMs = 120000,
-    this.maxOutputBytes = 64000,
-  });
-
-  /// 是否启用 OS 级沙箱（命令执行）；缺省开启。后端不可用时命令执行
-  /// fail-closed（注入拒斥执行器，不降级本地 shell）。
-  final bool enabled;
-
-  /// 是否启用应用层文件系统 jail（`JailedFileSystem`）；缺省开启。
-  /// 纯应用层防误操作，任何平台可用，不依赖 OS 沙箱后端。
-  final bool fsJail;
-
-  /// 缺省「工作区内可写」。
-  final SandboxPreset preset;
-
-  /// 命令执行是否放行网络；缺省关闭。为 true 时所有命令都不附加网络拒绝规则。
-  final bool allowNetwork;
-
-  /// 放行网络的命令前缀白名单（[allowNetwork] 为 false 时生效）。
-  final List<String> networkAllowlist;
-
-  /// 可执行文件白名单；与内置缺省集合**合并**（扩展语义，只增不减）。
-  final List<String> allowedExecutables;
-
-  /// 额外可写路径（`~` 展开、相对路径基于沙箱根解析），进 Seatbelt 可写根。
-  final List<String> writablePaths;
-
-  /// 单条命令的超时上限（毫秒）。
-  final int commandTimeoutMs;
-
-  /// 单条命令的输出上限（字节）。
-  final int maxOutputBytes;
-}
-
 /// 预算护栏配置；对应 `[budget]` 表。
 class BudgetConfig {
   const BudgetConfig({this.maxTurnSeconds = 600, this.maxTurnTokens});
@@ -489,7 +438,6 @@ class HooksConfig {
   final List<String> stop;
 }
 
-
 /// 一个 LSP server 配置；对应 `[lsp.servers.<name>]`。
 class LspServerConfig {
   const LspServerConfig({
@@ -618,7 +566,6 @@ class ConatusCodeConfig {
     this.agent = const AgentConfig(),
     this.approval = const ApprovalConfig(),
     this.permissions = const PermissionConfig(),
-    this.sandbox = const SandboxSettings(),
     this.budget = const BudgetConfig(),
     this.credentials = const <String, String>{},
     this.mcp = const McpConfig(),
@@ -654,7 +601,6 @@ class ConatusCodeConfig {
   /// 顶层 `[[permissions]]`：`config` 层的只读规则基线。
   final PermissionConfig permissions;
 
-  final SandboxSettings sandbox;
   final BudgetConfig budget;
 
   /// `[credentials]` 表：任意键值，作为凭据来源（环境变量优先）。

@@ -1,8 +1,7 @@
 /// `.opencode` 只读策略的单一事实来源：目录名、保护根与错误文案。
 ///
-/// fs 闸门（`fs_tools/read_only_path_guard.dart`）、命令兜底
-/// （`sandbox/protected_command.dart`）与 Seatbelt 装配
-/// （`sandbox/sandbox_assembly.dart`）共用，避免多处各写一份而漂移。
+/// fs 闸门（`fs_tools/read_only_path_guard.dart`）与命令兜底
+/// （`tools/protected_command.dart`）共用，避免多处各写一份而漂移。
 library;
 
 import 'dart:io';
@@ -17,14 +16,8 @@ const String kReadOnlyPathMessage =
 /// 项目内 OpenCode 目录名。
 const String kOpenCodeDirName = '.opencode';
 
-/// 全局 OpenCode 目录（`~` 未展开形式，供命令检查 / Seatbelt 解析）。
+/// 全局 OpenCode 目录（`~` 未展开形式，供命令检查解析）。
 const String kGlobalOpenCodePath = '~/.config/opencode';
-
-/// Seatbelt 的受保护写路径：项目级用相对形式（由沙箱按 root 解析）。
-const List<String> kShellReadOnlyRoots = <String>[
-  kOpenCodeDirName,
-  kGlobalOpenCodePath,
-];
 
 /// 项目级与全局 OpenCode 目录（绝对路径）。
 ///

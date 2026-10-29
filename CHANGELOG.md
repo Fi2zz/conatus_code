@@ -4,6 +4,23 @@
 
 ## [未发布]
 
+- **移除沙箱层（破坏性）**：删除 Layer 1（`JailedFileSystem`）与 Layer 2
+  （Seatbelt / bubblewrap）两层隔离，`run_command` 等工具改为以当前用户权限
+  直接在本机执行，与 OpenCode / Kimi Code 同姿态；需要隔离时请把 nava 放进
+  容器或虚拟机。连带移除：
+  - `[sandbox]` 配置段（`enabled` / `fs_jail` / `preset` / `allow_network` /
+    `network_allowlist` / `allowed_executables` / `writable_paths` /
+    `command_timeout_ms` / `max_output_bytes`）——旧配置**静默忽略**，不报错；
+  - `validateHeadlessSafety`、`sandboxDisabledReason` 与
+    `--allow-unsafe-headless`（headless 仍受权限规则约束，`ask` 一律拒绝）；
+  - `dart_io_sandbox` 依赖。
+  **保留并前移**命令形状审查：`CommandPolicy` 迁到 `lib/src/tools/`，只保留
+  `command_shield` 语义扫描（不再有可执行白名单与路径越界判定），经新的
+  `GuardedShellExecutor` 装饰器在本地执行器外面生效；`review` 在 TUI 内经浮层
+  复核，headless 按拒绝。`protected_command.dart`（`.opencode` 字面写保护）迁到
+  `lib/src/tools/` 继续生效。`/doctor` 的沙箱两项检查合并为「命令审查」。
+  评估背景见 `docs/superpowers/specs/2026-10-29-opensandbox-integration-assessment.md`。
+
 - **git worktree 管理**：`/worktree new|list|remove`；worktree 表新增
   `strategy`（DB v2 自动迁移），删除只允许 nava 管理目录下的 `git` worktree。
 

@@ -141,8 +141,6 @@ export 'src/config/config_schema.dart'
         ProviderType,
         ReferenceConfig,
         RetrySettings,
-        SandboxPreset,
-        SandboxSettings,
         StoryConfig,
         TuiConfig,
         XerjConfig;
@@ -188,11 +186,7 @@ export 'src/format/formatter_service.dart'
 export 'src/fs_tools/spill_dir.dart'
     show kNavaProjectDirName, toolResultSpillDir;
 export 'src/headless/headless_guard.dart'
-    show
-        approvalModeIgnoredNotice,
-        headlessAskNotice,
-        sandboxDisabledReason,
-        validateHeadlessSafety;
+    show approvalModeIgnoredNotice, headlessAskNotice;
 export 'src/headless/headless_runner.dart'
     show HeadlessFormat, HeadlessResult, renderHeadless, runHeadless;
 export 'src/hooks/hooks.dart' show HookResult, Hooks, provideHooks, runHooks;
@@ -288,36 +282,6 @@ export 'src/references/references.dart'
 export 'src/revert/revert_service.dart' show RevertService;
 export 'src/revert/revert_stage.dart'
     show RedoResult, RevertException, RevertStage, UndoResult;
-export 'src/sandbox/bubblewrap_args.dart' show buildBubblewrapArgs;
-export 'src/sandbox/command_policy.dart'
-    show
-        CommandDecision,
-        CommandPolicy,
-        CommandVerdict,
-        resolveAllowedExecutables,
-        resolveReadAllowedPaths;
-export 'src/sandbox/jailed_file_system.dart' show JailedFileSystem;
-export 'src/sandbox/protected_command.dart'
-    show
-        gitWriteViolation,
-        kReadOnlyCommandCode,
-        kReadOnlyCommandMessage,
-        readOnlyCommandViolation;
-export 'src/sandbox/rejecting_shell.dart'
-    show RejectingShellExecutor, kSandboxUnavailable;
-export 'src/sandbox/sandbox_assembly.dart'
-    show SandboxLayers, resolveSandboxLayers;
-export 'src/sandbox/sandbox_probe.dart'
-    show SandboxBackend, SandboxException, probeSandboxBackend;
-export 'src/sandbox/sandboxed_shell.dart'
-    show SandboxedShellExecutor, SandboxReviewPrompter;
-export 'src/sandbox/sandboxed_shell_options.dart' show SandboxedShellOptions;
-export 'src/sandbox/seatbelt_profile.dart'
-    show
-        buildSandboxParams,
-        buildSeatbeltProfile,
-        defaultWritableCaches,
-        seatbeltMachAllowlist;
 export 'src/story/story.dart' show StoryRecorder, kStoryToolNames, provideStory;
 export 'src/story/story_blocks.dart'
     show
@@ -365,12 +329,26 @@ export 'src/subagent/swarm_member.dart'
     show SwarmMember, SwarmProjection, SwarmSink;
 export 'src/tools/apply_patch.dart' show ApplyPatchTool;
 export 'src/tools/code_tools.dart' show provideCodeTools;
+export 'src/tools/command_policy.dart'
+    show CommandDecision, CommandPolicy, CommandVerdict;
 export 'src/tools/custom_tools.dart' show CustomTool, provideCustomTools;
 export 'src/tools/git_tools.dart'
     show GitCommitTool, GitDiffTool, GitRun, GitStatusTool, gitQuote, runGit;
 export 'src/tools/git_write_tools.dart'
     show GitAddTool, GitBranchTool, GitStashTool;
+export 'src/tools/guarded_shell.dart'
+    show
+        CommandReviewPrompter,
+        GuardedShellExecutor,
+        RejectedShellProcess,
+        rejectedRun;
 export 'src/tools/list_files.dart' show ListFilesTool;
+export 'src/tools/protected_command.dart'
+    show
+        gitWriteViolation,
+        kReadOnlyCommandCode,
+        kReadOnlyCommandMessage,
+        readOnlyCommandViolation;
 export 'src/tools/run_command.dart' show RunCommandTool;
 export 'src/tools/run_tests.dart' show RunTestsTool;
 export 'src/tools/update_plan.dart' show UpdatePlanTool, provideUpdatePlanTool;

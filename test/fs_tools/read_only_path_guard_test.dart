@@ -3,7 +3,6 @@ library;
 
 import 'dart:io';
 
-import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/fs_tools.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
@@ -181,7 +180,7 @@ void main() {
     final Directory jail = Directory('${dir.path}/jail')..createSync();
     final String canonical = jail.resolveSymbolicLinksSync();
     final ReadOnlyPathGuard jailGuard = ReadOnlyPathGuard(
-      inner: JailedFileSystem(root: canonical),
+      inner: LocalFileSystem(cwd: canonical),
       protectedRoots: defaultReadOnlyRoots(jail.path, home: '/home/u'),
     );
 
