@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/fs_tools.dart';
+import 'package:conatus_code/src/tui/session_ui_state.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -92,6 +93,7 @@ class RenameFixture {
 Future<RenameFixture> buildRenameFixture({
   bool start = true,
   bool storyEnabled = true,
+  SessionUiStateStore? uiState,
 }) async {
   final Directory dir = Directory.systemTemp.createTempSync(
     'nava-rename-delete-',
@@ -131,6 +133,7 @@ Future<RenameFixture> buildRenameFixture({
     config: const CheckpointConfig(),
   );
   app.provide('checkpointManager', checkpoint);
+  if (uiState != null) app.provide('sessionUiState', uiState);
 
   final Session current = sessions.create(id: renameCurrentId);
   current.append(kUserMessageEvent, data: <String, Object?>{'text': '当前会话的问题'});

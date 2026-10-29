@@ -157,6 +157,26 @@ void main() {
     }
   });
 
+  test('输入框为空时 ↑ 取回上一条提交的输入', () async {
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui();
+    try {
+      await controller.handleLine('历史消息');
+      await tester.pump();
+
+      await tester.sendKeyEvent(
+        const KeyboardEvent(logicalKey: LogicalKey.arrowUp),
+      );
+      await tester.pump();
+
+      expect(tester.terminalState, containsText('历史消息'));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('输入框非空时 Ctrl+C 清空输入框', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();

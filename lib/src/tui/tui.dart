@@ -78,6 +78,7 @@ class _AgentTuiState extends State<AgentTui> {
   int _selectionEpoch = 0;
   String _location = '';
   final List<TuiAttachment> _attachments = <TuiAttachment>[];
+  bool _historyNavigating = false;
 
   @override
   void initState() {
@@ -110,6 +111,7 @@ class _AgentTuiState extends State<AgentTui> {
 
   @override
   void dispose() {
+    _saveTabScroll();
     _spin?.cancel();
     _exitTimer?.cancel();
     _keys.dispose();
@@ -128,6 +130,8 @@ class _AgentTuiState extends State<AgentTui> {
 
   /// 输入变化：同步 `/` 菜单与 `@` 文件补全并重绘。
   void _onInputChanged() {
+    if (_historyNavigating) return;
+    if (_controller.inputHistoryActive) _controller.resetInputHistory();
     if (_enterShellMode()) {
       return;
     }
@@ -197,6 +201,7 @@ class _AgentTuiState extends State<AgentTui> {
       return;
     }
     _input.clear();
+    _controller.resetInputHistory();
     // 占位标记映射回附件：文本里未出现的占位对应的附件（悬空）随清空丢弃。
     final AttachmentRefs refs = extractAttachmentRefs(raw);
     final List<TuiAttachment> attachments = <TuiAttachment>[
@@ -491,7 +496,35 @@ class _AgentTuiState extends State<AgentTui> {
       _runSelected();
       return true;
     }
+    if (!_menu.open && !_atMenu.open) {
+      if (event.logicalKey == LogicalKey.arrowUp && _input.text.isEmpty) {
+        final String? previous = _controller.previousInput('');
+        if (previous != null) {
+          _setHistoryInput(previous);
+          return true;
+        }
+      }
+      if (event.logicalKey == LogicalKey.arrowDown &&
+          _controller.inputHistoryActive) {
+        final String? next = _controller.nextInput();
+        if (next != null) {
+          _setHistoryInput(next);
+          return true;
+        }
+      }
+    }
     return false;
+  }
+
+  /// 用历史项替换输入框；标记为程序写入，避免监听器把浏览状态清掉。
+  void _setHistoryInput(String text) {
+    _historyNavigating = true;
+    _input.text = text;
+    _input.selection = TextSelection.collapsed(offset: text.length);
+    _historyNavigating = false;
+    _menu.close();
+    _atMenu.close();
+    _refresh();
   }
 
   /// 表单浮层按键：Tab / ↑↓ 切字段、Enter 下一字段（末字段提交）、Esc 取消。
@@ -948,16 +981,19 @@ class _AgentTuiState extends State<AgentTui> {
   /// 离开标签前记录聊天滚动位置（切换成功后由 [_restoreTabScroll] 恢复）。
   void _saveTabScroll() {
     if (_controller.ready) {
-      _controller.tabs.saveScroll(_scroll.offset);
+      _controller.recordScroll(_scroll.offset);
     }
   }
 
   /// 切回标签后恢复滚动位置：等目标会话内容完成布局再跳。
   void _restoreTabScroll(double offset) {
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (!mounted) return;
+      if (!offset.isFinite) {
         _scroll.jumpTo(offset);
+        return;
       }
+      _scroll.jumpTo(offset.clamp(0, _scroll.maxScrollExtent));
     });
   }
 

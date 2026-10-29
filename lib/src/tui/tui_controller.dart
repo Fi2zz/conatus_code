@@ -68,6 +68,7 @@ import 'definition_watcher.dart';
 import 'keymap/keymap.dart';
 import 'keymap/keymap_view.dart';
 import 'session_exporter.dart';
+import 'session_ui_state.dart';
 import 'team_snapshot.dart';
 import 'team_subscription.dart';
 import 'theme/nava_theme.dart';
@@ -450,6 +451,12 @@ class ConatusTuiController implements TuiUserPromptHost {
   GoalService? _goal;
   Disposer? _eventSub;
 
+  /// 当前会话的 UI sidecar（滚动 / 输入历史）。
+  SessionUiState _uiState = SessionUiState.empty;
+  int _historyIndex = -1;
+  String _historyDraft = '';
+  double? _pendingScroll;
+
   /// turn 0 基线快照的落盘门闩：`_bind` 起拍、`submit` 与 `/rewind` 等待。
   ///
   /// 非空表示有一轮基线在飞（会话刚绑定）。解除绑定时置 `null`，免得旧门闩
@@ -728,6 +735,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     _applyStartInPlanMode();
     _persistAgentSelection();
     _syncTabState();
+    _restoreActiveScroll();
     _addKeybindWarnings();
     _addDiscoveryWarnings();
     _refresh();
@@ -995,6 +1003,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     if (line.isEmpty) {
       return;
     }
+    _recordInput(line);
     if (line.startsWith('!')) {
       // `!命令` 直接执行 shell，不经模型（busy 时拒绝）。
       await _runShellBang(line);
@@ -1619,6 +1628,74 @@ class ConatusTuiController implements TuiUserPromptHost {
     system: system,
   );
 
+  /// 是否正在用 ↑/↓ 浏览输入历史。
+  bool get inputHistoryActive => _historyIndex >= 0;
+
+  /// 取上一条输入；[draft] 是开始浏览前的输入框内容。
+  String? previousInput(String draft) {
+    final List<String> history = _uiState.history;
+    if (history.isEmpty) return null;
+    if (_historyIndex < 0) {
+      _historyDraft = draft;
+      _historyIndex = history.length - 1;
+    } else if (_historyIndex > 0) {
+      _historyIndex--;
+    }
+    return history[_historyIndex];
+  }
+
+  /// 取下一条输入；越过最后一条时返回浏览前的草稿。
+  String? nextInput() {
+    final List<String> history = _uiState.history;
+    if (_historyIndex < 0 || history.isEmpty) return null;
+    if (_historyIndex < history.length - 1) {
+      _historyIndex++;
+      return history[_historyIndex];
+    }
+    _historyIndex = -1;
+    final String draft = _historyDraft;
+    _historyDraft = '';
+    return draft;
+  }
+
+  /// 退出历史浏览（提交、编辑输入后调用）。
+  void resetInputHistory() {
+    _historyIndex = -1;
+    _historyDraft = '';
+  }
+
+  /// 记录聊天滚动位置并落盘；由视图在离开标签 / 退出时调用。
+  void recordScroll(double offset) {
+    tabs.saveScroll(offset);
+    _uiState = _uiState.withScroll(offset);
+    _persistUiState();
+  }
+
+  /// 立即把当前 UI 状态写入 sidecar；无存储服务时只保留内存态。
+  void persistUiState() => _persistUiState();
+
+  void _recordInput(String text) {
+    _resetHistoryNavigation();
+    _uiState = _uiState.withInput(text);
+    _persistUiState();
+  }
+
+  void _resetHistoryNavigation() {
+    _historyIndex = -1;
+    _historyDraft = '';
+  }
+
+  void _persistUiState() {
+    final SessionUiStateStore? store = _app.get<SessionUiStateStore>(
+      'sessionUiState',
+    );
+    if (store == null || _sessionId.isEmpty) return;
+    unawaited(store.save(_sessionId, _uiState).catchError((Object _) {}));
+  }
+
+  SessionUiStateStore? get _uiStore =>
+      _app.get<SessionUiStateStore>('sessionUiState');
+
   /// 切换会话的实现；[saveTabScroll] 为 `false` 时由调用方已保存滚动位置
   /// （关闭活跃标签后目标标签的偏移不能被当前会话的位置覆盖）。
   Future<bool> _switchSession(
@@ -1686,8 +1763,11 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// 目标标签有保存过的滚动位置时恢复；新标签跳到会话末尾（不是顶部）。
   void _restoreActiveScroll() {
+    final double? pending = _pendingScroll;
+    _pendingScroll = null;
     onTabRestore?.call(
-      tabs.activeScrollSaved ? tabs.restoreScroll() : double.infinity,
+      pending ??
+          (tabs.activeScrollSaved ? tabs.restoreScroll() : double.infinity),
     );
   }
 
@@ -2401,7 +2481,8 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 启动默认 Plan Mode：会话没有历史 `plan/mode` 事件时才生效。
   void _applyStartInPlanMode() {
     if (!startInPlanMode) return;
-    final bool hasEvent = _session?.ownEvents.any(
+    final bool hasEvent =
+        _session?.ownEvents.any(
           (SessionEvent event) => event.type == kPlanModeEvent,
         ) ??
         false;
@@ -3941,6 +4022,10 @@ class ConatusTuiController implements TuiUserPromptHost {
       transcript.apply(event);
       _refresh();
     });
+    final SessionUiStateStore? uiStore = _uiStore;
+    _uiState = uiStore == null ? SessionUiState.empty : await uiStore.load(id);
+    _resetHistoryNavigation();
+    _pendingScroll = _uiState.scrollOffset;
     _bindTeam(ctx);
     // 检查点：绑定会话即接管已有时间线（无历史时写 turn 0 初始快照，供回滚
     // 到「全部轮次之前」）。同行重开时不抹掉旧轮次——redo / diff 要用。

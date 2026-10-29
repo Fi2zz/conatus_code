@@ -59,6 +59,7 @@ import '../tools/command_policy.dart';
 import '../tools/custom_tools.dart';
 import '../tools/guarded_shell.dart';
 import 'ask_user_tool.dart';
+import 'session_ui_state.dart';
 import 'system_notifier.dart';
 import 'tui_choice.dart';
 import 'tui_controller.dart';
@@ -725,6 +726,10 @@ class ConatusTuiRuntime {
       ),
     );
     final SessionStore sessions = provideSessions(app);
+    app.provide(
+      'sessionUiState',
+      SessionUiStateStore(dir: '$resolvedBaseDir${sep}ui-state'),
+    );
     // 故事层日志（doc/* 事件）：启用时才装配服务（关闭时零副作用）。
     // 目录本身始终登记：删除会话时即使故事层已关闭，也要能找到并清掉历史
     // 故事线文件（见 `_clearSessionArtifacts`）。
