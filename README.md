@@ -443,6 +443,14 @@ git clone --depth 1 https://github.com/obra/superpowers ~/.config/superpowers
 `read` 等），并提示模型把 `superpowers:` 前缀归一成裸技能名。普通技能
 仍按需通过 `skill` 工具加载；bootstrap 只影响列出的技能。
 
+**技能沉淀（只暴露，不自动触发）**：nava 装配了 `conatus_agent` 的
+`SkillLibrary`（服务键 `'skill'`，`ctx.skills`），但**不在轮次里自动记录轨迹或
+抽取技能**：何时 `recordTools(...)`、何时 `maybeExtract(tools: ...)` 由宿主或
+插件决定。抽取出的技能是普通工具——同一工具序列重复达到 `threshold`（缺省 3
+次）、不含 `high` 风险步骤、配了审批时先获批——并可写入 `MemoryStore`。
+nava 启动时只做 `restore()`：把记忆里 `tags: {'skill'}` 的技能重新注册进工具表，
+不会产生新技能。
+
 **定义热重载**：`.nava` / `.opencode` 的 `agents/`、`commands/` 目录发生变更
 后，会在 250ms 防抖后自动重载；也可 `/reload` 手动触发。当前 Agent 被删除时
 回退到 `[agent] default_agent`；配置文件变更仍需重启 nava（避免半套服务重建）。

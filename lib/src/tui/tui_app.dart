@@ -873,7 +873,17 @@ class ConatusTuiRuntime {
     provideMemoryTools(app);
     provideMemoryRecorder(app);
     provideCompaction(app);
-    provideSkillLibrary(app);
+    // 技能沉淀只暴露服务（`'skill'` / `ctx.skills`）：装配期不记录轨迹、不抽取，
+    // 由宿主或插件自行调用 `recordTools` / `maybeExtract`。这里只恢复上一次
+    // 持久化的结果，否则 `maybeExtract` 写入记忆的技能重启后会丢失。
+    final SkillLibrary skillLibrary = provideSkillLibrary(app);
+    try {
+      await skillLibrary.restore(tools: app.tools);
+    } on FormatException catch (error) {
+      stderr.writeln('技能恢复跳过：记忆文件损坏（$error）');
+    } on FileSystemException catch (error) {
+      stderr.writeln('技能恢复跳过：${error.message}');
+    }
     if (skills) {
       await provideSkillRegistry(app);
       provideSkillCatalog(app, includeAll: mergeAllSkills);
