@@ -10,6 +10,9 @@
   模型只剩最近工具事件、看起来像空上下文。
 - **预算与空回复**：预算流式收口改为返回明确文本，用户每轮开始时重置预算；
   压缩摘要请求不再占用单轮预算，避免把「预算已达上限」写进历史摘要。
+- **技能沉淀恢复**：`SkillLibrary`（服务键 `'skill'`）只暴露不自动触发——装配期
+  不记录轨迹、不抽取；启动时调用 `restore()` 把记忆里 `tags: {'skill'}` 的技能
+  注册回工具表，记忆文件损坏只提示不阻塞启动。
 - **技能 bootstrap**：顶层 `bootstrap_skills` 在装配期注入指定技能正文，
   支持 Superpowers 的 `using-superpowers` 协议，并附带 nava 工具映射。
 - **跨平台**：Windows 优先加载同目录 `sqlite3.dll`，新增 `platform_smoke_test.dart`
