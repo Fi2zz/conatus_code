@@ -298,7 +298,6 @@
   用户思考超过 30s 按下 Enter 时，模型收到 `TOOL_TIMEOUT` 而 `read_file` 其实
   已经读完。`run_command` / `run_tests` 未自声明 timeout，仍由 30s 默认预算兜底。
 
-
 - 修两个**必然发生**的装配级 bug。两者都曾因「测试绕开真实装配」而长期漏网：
   - **读大文件直接失败**：工具结果超过 80 000 字符时，`ToolResultEviction` 用
     **被 jail 的** `fs` 往 `systemTemp` 写溢出文件，而 fs jail 默认以工作目录为根
@@ -322,11 +321,13 @@
   诊断回灌。实测同仓库全仓 `dart analyze` 2.55s → 单文件
   `dart analyze --format=machine <file>` 0.35s（约 7 倍），且诊断带稳定码
   （`RETURN_OF_INVALID_TYPE` / `UNUSED_IMPORT` …）与精确行列，回灌文本从纯文本升级为：
+
   ```
   lib/svc2.dart
     ERROR [4:10] RETURN_OF_INVALID_TYPE: A value of type 'int' can't be returned...
     WARNING [2:8] UNUSED_IMPORT: Unused import: 'dart:math'.
   ```
+
   - 新增 `LintProbe` / `LintOutputFormat` 抽象：探针自己声明是否支持按文件限定。
     Go（package 级）、Rust（crate 级）的校验单位不是单文件，ESLint 尚无实测，因此
     这两者维持原样跑全项目，不硬套单文件。
@@ -787,8 +788,7 @@
     `TeamView`（成员列表 + 任务板）
   - 会话装配团队服务（`provideAgentTeam` + `provideTeamTools`），模型可用团队
     协作工具；`Ctrl+T` 切换对话 / 团队视图（输入框内优先于文本域转置快捷键）
-  - 新增 `VoiceReporter`（订阅团队事件经 TTS 播报，`minInterval` 节流 + 可选
-    音频目标）与 `summarizeTeamProgress` 进度摘要
+  - 新增 `summarizeTeamProgress` 进度摘要
   - 新增斜杠命令 `/team`（status / interrupt）与 `/task`（claim / release）
 - `conatus_tui` `/cron add` 支持中文规则词（每天 / 每周X）与间隔单位
   （秒 / 分钟 / 小时）。
