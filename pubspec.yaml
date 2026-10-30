@@ -24,6 +24,8 @@ dependencies:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: 5912828376ba9c5d2194256762c4d0dfbf82656c}
   conatus_agent:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: 5912828376ba9c5d2194256762c4d0dfbf82656c, path: packages/conatus_agent}
+  conatus_checkpoint:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 259e438fa06d3ebb0c4801a72b207d8846d15de2, path: packages/conatus_checkpoint}
   conatus_compaction:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: 5912828376ba9c5d2194256762c4d0dfbf82656c, path: packages/conatus_compaction}
   conatus_core:
@@ -84,6 +86,8 @@ dependency_overrides:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: 5912828376ba9c5d2194256762c4d0dfbf82656c, path: packages/conatus_asr}
   conatus_browser_use:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: 5912828376ba9c5d2194256762c4d0dfbf82656c, path: packages/conatus_browser_use}
+  conatus_checkpoint:
+    git: {url: https://github.com/Fi2zz/conatus.git, ref: 259e438fa06d3ebb0c4801a72b207d8846d15de2, path: packages/conatus_checkpoint}
   conatus_compaction:
     git: {url: https://github.com/Fi2zz/conatus.git, ref: 5912828376ba9c5d2194256762c4d0dfbf82656c, path: packages/conatus_compaction}
   conatus_computer_use:

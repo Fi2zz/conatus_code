@@ -5,6 +5,7 @@ library;
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/src/checkpoint_config_adapter.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';
@@ -176,13 +177,16 @@ void main() {
     expect(File('${dir.path}/notes.txt').readAsStringSync(), 'hello');
   });
 
-  test('checkpoint 默认忽略 .opencode（rewind 不写回）', () {
-    expect(kCheckpointDefaultIgnores, contains('.opencode'));
+  test('checkpoint 产品策略忽略 .opencode（rewind 不写回）', () {
+    final CheckpointPolicy policy = checkpointOptions(
+      const CheckpointConfig(),
+    ).policy;
+    expect(policy.readOnlyPrefixes, contains('.opencode'));
     expect(
       checkpointExcluded(
         '.opencode${Platform.pathSeparator}commands${Platform.pathSeparator}x.md',
         'other',
-        const <String>[],
+        policy,
       ),
       isTrue,
     );

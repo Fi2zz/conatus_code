@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/src/checkpoint_config_adapter.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
@@ -24,6 +25,27 @@ void _write(String root, String rel, String content) {
 
 String _read(String root, String rel) =>
     File('$root${Platform.pathSeparator}$rel').readAsStringSync();
+
+/// 按产品配置造检查点管理器（注入 `.opencode` 策略）。
+CheckpointManager _checkpointManager(
+  String root,
+  String projectDir, {
+  bool enabled = true,
+  int keep = 5,
+}) {
+  final CheckpointOptions options = checkpointOptions(
+    CheckpointConfig(enabled: enabled, keep: keep),
+  );
+  return CheckpointManager(
+    store: ArchiveCheckpointStore(
+      root: root,
+      projectDir: projectDir,
+      keep: keep,
+      policy: options.policy,
+    ),
+    options: options,
+  );
+}
 
 /// 一次用例的装配：两轮会话 + 两轮检查点。
 class _Env {
@@ -52,13 +74,11 @@ Future<_Env> _twoTurns({
   bool touchesFiles = true,
 }) async {
   final (String root, String projectDir) = _workspace();
-  final CheckpointManager manager = CheckpointManager(
-    store: ArchiveCheckpointStore(
-      root: root,
-      projectDir: projectDir,
-      keep: keep,
-    ),
-    config: CheckpointConfig(enabled: enabled, keep: keep),
+  final CheckpointManager manager = _checkpointManager(
+    root,
+    projectDir,
+    enabled: enabled,
+    keep: keep,
   );
   final SessionStore sessions = SessionStore();
   final Session session = sessions.create(id: 's1');
@@ -132,9 +152,10 @@ void main() {
 
   test('checkpoint 关闭且没有用户消息：报错且不建会话', () async {
     final (String root, String projectDir) = _workspace();
-    final CheckpointManager manager = CheckpointManager(
-      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-      config: const CheckpointConfig(enabled: false),
+    final CheckpointManager manager = _checkpointManager(
+      root,
+      projectDir,
+      enabled: false,
     );
     final SessionStore sessions = SessionStore();
     final Session session = sessions.create(id: 's1');
@@ -205,10 +226,7 @@ void main() {
 
   test('没有可撤销的轮次：报错且不改会话与文件', () async {
     final (String root, String projectDir) = _workspace();
-    final CheckpointManager manager = CheckpointManager(
-      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-      config: const CheckpointConfig(),
-    );
+    final CheckpointManager manager = _checkpointManager(root, projectDir);
     final SessionStore sessions = SessionStore();
     final Session session = sessions.create(id: 's1');
     _write(root, 'a.txt', 'v0');

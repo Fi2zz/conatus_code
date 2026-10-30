@@ -74,4 +74,34 @@ backend = "archive"
       throwsA(isA<ConfigException>()),
     );
   });
+
+  group('CheckpointBackend.parse', () {
+    test('三个字面量', () {
+      expect(CheckpointBackend.parse('auto'), CheckpointBackend.auto);
+      expect(CheckpointBackend.parse('git'), CheckpointBackend.git);
+      expect(CheckpointBackend.parse('archive'), CheckpointBackend.archive);
+    });
+
+    test('容错：null / 空白 / 未知值都回 auto', () {
+      for (final String? raw in <String?>[
+        null,
+        '',
+        '  ',
+        'GIT',
+        'shadow',
+        'x',
+      ]) {
+        expect(
+          CheckpointBackend.parse(raw),
+          CheckpointBackend.auto,
+          reason: '拼错不该让检查点整个失效',
+        );
+      }
+    });
+
+    test('大小写与空白容忍', () {
+      expect(CheckpointBackend.parse('  git '), CheckpointBackend.git);
+      expect(CheckpointBackend.parse('archive'), CheckpointBackend.archive);
+    });
+  });
 }

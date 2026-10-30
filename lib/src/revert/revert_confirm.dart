@@ -5,8 +5,8 @@
 /// 里给出改动规模。
 library;
 
-import '../checkpoint/checkpoint_changes.dart';
-import '../checkpoint/checkpoint_manager.dart';
+import 'package:conatus_checkpoint/conatus_checkpoint.dart';
+
 import 'revert_stage.dart';
 
 /// 一次撤销的确认器。

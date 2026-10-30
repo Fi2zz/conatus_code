@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/src/checkpoint_config_adapter.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -65,6 +66,25 @@ Future<void> _disposeAfterSettle(
   app.dispose();
 }
 
+/// 按产品配置造检查点管理器（注入 `.opencode` 策略）。
+CheckpointManager _checkpointManager(
+  String root,
+  String projectDir, {
+  bool enabled = true,
+}) {
+  final CheckpointOptions options = checkpointOptions(
+    CheckpointConfig(enabled: enabled),
+  );
+  return CheckpointManager(
+    store: ArchiveCheckpointStore(
+      root: root,
+      projectDir: projectDir,
+      policy: options.policy,
+    ),
+    options: options,
+  );
+}
+
 /// 装配带 checkpointManager 的控制器。
 ///
 /// [initialSessionId] 非空时预置一个带历史事件的会话并绑定（模拟重开会话）；
@@ -83,13 +103,7 @@ Future<(ConatusTuiController, Context, String)> _build({
     seeded.append('user/message', data: <String, Object?>{'text': '历史问题'});
     seeded.append('assistant/message', data: <String, Object?>{'text': '历史回答'});
   }
-  app.provide(
-    'checkpointManager',
-    CheckpointManager(
-      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-      config: const CheckpointConfig(),
-    ),
-  );
+  app.provide('checkpointManager', _checkpointManager(root, projectDir));
   final ConatusTuiController controller = ConatusTuiController(
     app: app,
     sessions: sessions,
@@ -170,13 +184,7 @@ void main() {
     );
     final Session seeded = sessions1.create(id: seededId);
     seeded.append('user/message', data: <String, Object?>{'text': '历史问题'});
-    app1.provide(
-      'checkpointManager',
-      CheckpointManager(
-        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-        config: const CheckpointConfig(),
-      ),
-    );
+    app1.provide('checkpointManager', _checkpointManager(root, projectDir));
     final ConatusTuiController first = ConatusTuiController(
       app: app1,
       sessions: sessions1,
@@ -204,10 +212,7 @@ void main() {
       app2,
       persistence: JsonlSessionPersistence(dir: storeDir.path),
     );
-    final CheckpointManager checkpoint = CheckpointManager(
-      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-      config: const CheckpointConfig(),
-    );
+    final CheckpointManager checkpoint = _checkpointManager(root, projectDir);
     app2.provide('checkpointManager', checkpoint);
     final ConatusTuiController resumed = ConatusTuiController(
       app: app2,
@@ -237,10 +242,7 @@ void main() {
     final SessionStore sessions = provideSessions(app);
     app.provide(
       'checkpointManager',
-      CheckpointManager(
-        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-        config: const CheckpointConfig(enabled: false),
-      ),
+      _checkpointManager(root, projectDir, enabled: false),
     );
     final ConatusTuiController controller = ConatusTuiController(
       app: app,
@@ -287,13 +289,7 @@ void main() {
     provideTools(app);
     provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
     final SessionStore sessions = provideSessions(app);
-    app.provide(
-      'checkpointManager',
-      CheckpointManager(
-        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-        config: const CheckpointConfig(),
-      ),
-    );
+    app.provide('checkpointManager', _checkpointManager(root, projectDir));
     final ConatusTuiController controller = ConatusTuiController(
       app: app,
       sessions: sessions,

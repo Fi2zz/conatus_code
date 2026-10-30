@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/src/checkpoint_config_adapter.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -87,6 +88,9 @@ Future<(ConatusTuiController, Context, String)> _build({
     llm: FallbackLlm(<LlmProvider>[provider ?? _ScriptedProvider()]),
   );
   final SessionStore sessions = provideSessions(app);
+  final CheckpointOptions options = checkpointOptions(
+    CheckpointConfig(enabled: enabled, keep: keep),
+  );
   app.provide(
     'checkpointManager',
     CheckpointManager(
@@ -94,8 +98,9 @@ Future<(ConatusTuiController, Context, String)> _build({
         root: root,
         projectDir: projectDir,
         keep: keep,
+        policy: options.policy,
       ),
-      config: CheckpointConfig(enabled: enabled, keep: keep),
+      options: options,
     ),
   );
   final ConatusTuiController controller = ConatusTuiController(

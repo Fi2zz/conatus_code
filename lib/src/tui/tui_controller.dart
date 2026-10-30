@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
+import 'package:conatus_checkpoint/conatus_checkpoint.dart';
 import 'package:conatus_compaction/conatus_compaction.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_cron/conatus_cron.dart';
@@ -32,8 +33,6 @@ import '../autonomous/autonomous_assembly.dart';
 import '../background/background_tasks.dart';
 import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
-import '../checkpoint/checkpoint_manager.dart';
-import '../checkpoint/checkpoint_types.dart';
 import '../commands/command_definition.dart';
 import '../commands/command_dispatcher.dart';
 import '../commands/command_registry.dart';
@@ -41,7 +40,6 @@ import '../config/config_path.dart';
 import '../config/config_writer.dart';
 import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
-import '../diff/diff_source.dart';
 import '../hooks/hooks.dart';
 import '../lsp/lsp_manager.dart';
 import '../permissions/permission_wiring.dart';
@@ -386,7 +384,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   late final TuiPlanPrompt planPrompt = TuiPlanPrompt(onChanged: _refresh);
 
   /// 设置面板（`/settings`；分页列表，选中后跳到对应命令面板）。
-  late final SettingsPrompt settingsPrompt = SettingsPrompt(onChanged: _refresh);
+  late final SettingsPrompt settingsPrompt = SettingsPrompt(
+    onChanged: _refresh,
+  );
 
   /// 设置面板是否打开。
   bool get settingsOpen => settingsPrompt.open;

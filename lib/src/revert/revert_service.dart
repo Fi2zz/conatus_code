@@ -7,10 +7,9 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:conatus_checkpoint/conatus_checkpoint.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-import '../checkpoint/checkpoint_manager.dart';
-import '../checkpoint/checkpoint_types.dart';
 import 'revert_compensate.dart';
 import 'revert_confirm.dart';
 import 'revert_prompts.dart';

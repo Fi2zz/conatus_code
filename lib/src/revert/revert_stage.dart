@@ -4,7 +4,7 @@
 /// 或 `/redo` 之后即清空，不做持久化。
 library;
 
-import '../checkpoint/checkpoint_types.dart';
+import 'package:conatus_checkpoint/conatus_checkpoint.dart';
 
 /// 一次撤销留下的状态，供 `/redo` 回到撤销前。
 class RevertStage {

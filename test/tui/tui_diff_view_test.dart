@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/src/checkpoint_config_adapter.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -81,11 +82,16 @@ Future<(ConatusTuiController, Context, String)> _build({
   provideTools(app);
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
   final SessionStore sessions = provideSessions(app);
+  final CheckpointOptions options = checkpointOptions(const CheckpointConfig());
   app.provide(
     'checkpointManager',
     CheckpointManager(
-      store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-      config: const CheckpointConfig(),
+      store: ArchiveCheckpointStore(
+        root: root,
+        projectDir: projectDir,
+        policy: options.policy,
+      ),
+      options: options,
     ),
   );
   final ConatusTuiController controller = ConatusTuiController(
@@ -415,11 +421,18 @@ void main() {
     provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider()]));
     final SessionStore sessions = provideSessions(app);
     app.provide('workdir', root);
+    final CheckpointOptions options = checkpointOptions(
+      const CheckpointConfig(),
+    );
     app.provide(
       'checkpointManager',
       CheckpointManager(
-        store: ArchiveCheckpointStore(root: root, projectDir: projectDir),
-        config: const CheckpointConfig(),
+        store: ArchiveCheckpointStore(
+          root: root,
+          projectDir: projectDir,
+          policy: options.policy,
+        ),
+        options: options,
       ),
     );
     final ConatusTuiController controller = ConatusTuiController(

@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/fs_tools.dart';
+import 'package:conatus_code/src/checkpoint_config_adapter.dart';
 import 'package:conatus_code/src/tui/session_ui_state.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
@@ -124,13 +125,15 @@ Future<RenameFixture> buildRenameFixture({
     app,
     persistence: JsonlSessionPersistence(dir: sessionsDir.path),
   );
+  final CheckpointOptions options = checkpointOptions(const CheckpointConfig());
   final ArchiveCheckpointStore store = ArchiveCheckpointStore(
     root: dir.path,
     projectDir: projectDir.path,
+    policy: options.policy,
   );
   final CheckpointManager checkpoint = CheckpointManager(
     store: store,
-    config: const CheckpointConfig(),
+    options: options,
   );
   app.provide('checkpointManager', checkpoint);
   if (uiState != null) app.provide('sessionUiState', uiState);

@@ -12,6 +12,7 @@
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
+import 'package:conatus_code/src/checkpoint_config_adapter.dart';
 
 const String _tmpRoot = '/tmp';
 
@@ -65,7 +66,7 @@ Future<void> survey(String root) async {
   await for (final FileSystemEntity e in checkpointWalk(
     root,
     projectRel,
-    const <String>[],
+    kCheckpointPolicy,
   )) {
     final String rel = checkpointRelativeTo(e, root);
     conatus.add(rel);

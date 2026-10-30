@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
+import 'package:conatus_checkpoint/conatus_checkpoint.dart';
 import 'package:conatus_compaction/conatus_compaction.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_credentials/conatus_credentials.dart';
@@ -30,8 +31,7 @@ import '../background/background_tools.dart';
 import '../budget/budgeted_llm.dart';
 import '../budget/cost_tracker.dart';
 import '../budget/turn_budget.dart';
-import '../checkpoint/checkpoint_backend.dart';
-import '../checkpoint/checkpoint_manager.dart';
+import '../checkpoint_config_adapter.dart';
 import '../commands/command_registry.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
@@ -849,15 +849,16 @@ class ConatusTuiRuntime {
     // 取 baseDir（缺省 ~/.nava/workspaces/<basename>-<hash>，不在工作区内），快照/
     // 恢复走 dart:io 直连。
     if (checkpoint != null) {
+      final CheckpointOptions options = checkpointOptions(checkpoint);
       app.provide(
         'checkpointManager',
         CheckpointManager(
           store: await openCheckpointStore(
-            config: checkpoint,
+            options: options,
             root: resolvedWorkdir,
             projectDir: Directory(resolvedBaseDir).absolute.path,
           ),
-          config: checkpoint,
+          options: options,
         ),
       );
     }

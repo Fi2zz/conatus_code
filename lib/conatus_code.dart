@@ -5,6 +5,49 @@
 /// conatus_code 自身新增能力的入口（配置、沙箱、新增工具）。
 library;
 
+export 'package:conatus_checkpoint/conatus_checkpoint.dart'
+    show
+        ArchiveCheckpointStore,
+        CheckpointArchiveEntry,
+        CheckpointArchiveWriter,
+        CheckpointException,
+        CheckpointFileChange,
+        CheckpointFileEntry,
+        CheckpointInfo,
+        CheckpointManager,
+        CheckpointManifest,
+        CheckpointOptions,
+        CheckpointPolicy,
+        CheckpointRestore,
+        CheckpointRewindResult,
+        CheckpointStore,
+        DiffSource,
+        GitResult,
+        GitRunner,
+        GitShadowStore,
+        ProcessGitRunner,
+        UnavailableGitRunner,
+        WorkingDiff,
+        checkpointArchiveName,
+        checkpointExcluded,
+        checkpointHashesFile,
+        checkpointIncluded,
+        checkpointRelativeTo,
+        checkpointWalk,
+        deleteCheckpointHashes,
+        kCheckpointArchiveTempSuffix,
+        kCheckpointDefaultIgnores,
+        kCheckpointVcsDir,
+        kDiffNoTurnNotice,
+        openCheckpointStore,
+        readCheckpointArchive,
+        readCheckpointEntries,
+        readCheckpointManifest,
+        readCheckpointHashes,
+        resolveGlobalGitIgnore,
+        restoreArchiveCheckpoint,
+        writeCheckpointArchive,
+        writeCheckpointHashes;
 export 'package:conatus_diff/conatus_diff.dart'
     show
         DiffFile,
@@ -50,49 +93,6 @@ export 'src/budget/budgeted_llm.dart'
     show BudgetedLlmProvider, kBudgetExhaustedReply, provideBudgetedLlm;
 export 'src/budget/cost_tracker.dart' show CostTrackerImpl, TokenUsage;
 export 'src/budget/turn_budget.dart' show TurnBudget;
-export 'src/checkpoint/checkpoint_archive.dart'
-    show
-        CheckpointArchiveEntry,
-        CheckpointArchiveWriter,
-        checkpointArchiveName,
-        kCheckpointArchiveTempSuffix,
-        readCheckpointArchive,
-        readCheckpointEntries,
-        readCheckpointManifest,
-        writeCheckpointArchive;
-export 'src/checkpoint/checkpoint_backend.dart' show openCheckpointStore;
-export 'src/checkpoint/checkpoint_changes.dart' show CheckpointFileChange;
-export 'src/checkpoint/checkpoint_hashes.dart'
-    show
-        checkpointHashesFile,
-        deleteCheckpointHashes,
-        readCheckpointHashes,
-        writeCheckpointHashes;
-export 'src/checkpoint/checkpoint_manager.dart' show CheckpointManager;
-export 'src/checkpoint/checkpoint_paths.dart'
-    show
-        checkpointExcluded,
-        checkpointRelativeTo,
-        kCheckpointDefaultIgnores,
-        kCheckpointVcsDir;
-export 'src/checkpoint/checkpoint_restore.dart' show restoreArchiveCheckpoint;
-export 'src/checkpoint/checkpoint_scan.dart'
-    show checkpointIncluded, checkpointWalk;
-export 'src/checkpoint/checkpoint_store.dart' show CheckpointStore;
-export 'src/checkpoint/checkpoint_store_archive.dart'
-    show ArchiveCheckpointStore;
-export 'src/checkpoint/checkpoint_store_git.dart' show GitShadowStore;
-export 'src/checkpoint/checkpoint_types.dart'
-    show
-        CheckpointException,
-        CheckpointFileEntry,
-        CheckpointInfo,
-        CheckpointManifest,
-        CheckpointRestore,
-        CheckpointRewindResult;
-export 'src/checkpoint/global_git_ignore.dart' show resolveGlobalGitIgnore;
-export 'src/checkpoint/shadow_git_runner.dart'
-    show GitResult, GitRunner, ProcessGitRunner, UnavailableGitRunner;
 export 'src/cli/harness_command.dart' show kHarnessUsage, runHarnessCommand;
 export 'src/cli/import_command.dart' show kImportUsage, runImportCli;
 export 'src/cli/jsonc.dart' show decodeJsonc, stripJsonc;
@@ -181,7 +181,6 @@ export 'src/config/mcp_json.dart'
 export 'src/config/project_data_dir.dart'
     show defaultProjectDataDir, projectDirProtected, resolveProjectDataDir;
 export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;
-export 'src/diff/diff_source.dart' show DiffSource;
 export 'src/format/formatter_path.dart'
     show formatterExtension, resolveFormatterTarget;
 export 'src/format/formatter_probe.dart' show FormatterProbe, detectFormatter;
