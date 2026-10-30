@@ -66,4 +66,28 @@ void main() {
     expect(() => freshGuard.writeText(target, 'x'), throwsA(isA<FsError>()));
     expect(Directory('${fresh.path}/.OPENCODE').existsSync(), isFalse);
   });
+
+  test('tui 装配传入的产品文案原样透出（deniedMessage → FsError.message）', () async {
+    final ReadOnlyPathGuard guarded = ReadOnlyPathGuard(
+      inner: LocalFileSystem(),
+      deniedMessage: kReadOnlyPathMessage,
+      protectedRoots: defaultReadOnlyRoots(dir.path, home: '/home/u'),
+    );
+
+    final FsTarget target = await guarded.resolve(
+      '${dir.path}/.opencode/commands/new.md',
+    );
+
+    expect(
+      () => guarded.writeText(target, 'x'),
+      throwsA(
+        isA<FsError>().having(
+          (FsError e) => e.message,
+          'message',
+          kReadOnlyPathMessage,
+        ),
+      ),
+    );
+    expect(File('${dir.path}/.opencode/commands/new.md').existsSync(), isFalse);
+  });
 }

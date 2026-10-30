@@ -21,5 +21,4 @@ export 'src/read_only_policy.dart'
         kOpenCodeDirName,
         kReadOnlyPathCode,
         kReadOnlyPathMessage,
-        readOnlyRelativePath,
-        readOnlyWritePath;
+        readOnlyRelativePath;

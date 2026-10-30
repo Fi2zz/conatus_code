@@ -1012,7 +1012,8 @@ stdio 子进程与本地命令同权，审批是未知风险的唯一防线，�
 见内容，这也是为什么需要隔离时要靠容器/虚拟机。
 
 `.opencode` 与 `~/.config/opencode` 另有一道**字面**兜底
-（`lib/src/tools/protected_command.dart` 与 `fs_tools/read_only_path_guard.dart`）：
+（`lib/src/tools/protected_command.dart` 与 `conatus_foundation` 的
+`ReadOnlyPathGuard`）：
 命令里字面出现受保护目录 + 写类操作符会被拒；fs 写操作经接缝上的闸门拦截。
 同样是 best-effort：变量拼接、`sh -c "$CMD"` 都能绕过。
 
