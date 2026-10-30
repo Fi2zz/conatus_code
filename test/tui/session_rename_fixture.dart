@@ -112,7 +112,7 @@ Future<RenameFixture> buildRenameFixture({
     app,
     fs: LocalFileSystem(cwd: dir.path),
   );
-  provideFsTools(app, fs: fs, enableSearch: false);
+  provideFsTools(app, options: FsToolOptions(fs: fs, enableSearch: false));
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[StubProvider()]));
   final InMemorySessionLog storyLog = InMemorySessionLog();
   final Directory storyLogDir = Directory(

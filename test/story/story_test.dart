@@ -43,7 +43,7 @@ Future<(Context, DocEngine, InMemorySessionLog, Directory)> _build() async {
     app,
     fs: LocalFileSystem(cwd: dir.path),
   );
-  provideFsTools(app, fs: fs, enableSearch: false);
+  provideFsTools(app, options: FsToolOptions(fs: fs, enableSearch: false));
   app.effect(() => app.tools.register(ApplyPatchTool(fs: fs)));
   final InMemorySessionLog log = InMemorySessionLog();
   provideSessionLog(app, log: log);
@@ -215,7 +215,7 @@ void main() {
       provideTools(app);
       provideLlm(app, llm: FallbackLlm(<LlmProvider>[_StubProvider()]));
       provideFileSystemLocal(app, fs: LocalFileSystem(cwd: dir.path));
-      provideFsTools(app, enableSearch: false);
+      provideFsTools(app, options: const FsToolOptions(enableSearch: false));
       final SessionStore sessions = provideSessions(app);
       final ConatusTuiController controller = ConatusTuiController(
         app: app,

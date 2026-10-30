@@ -5,6 +5,23 @@
 /// conatus_code 自身新增能力的入口（配置、沙箱、新增工具）。
 library;
 
+export 'package:conatus_diff/conatus_diff.dart'
+    show
+        DiffFile,
+        DiffHunk,
+        DiffOp,
+        DiffOpKind,
+        DiffScope,
+        FileDiff,
+        PatchContextException,
+        applyDiffFile,
+        applyEditText,
+        buildUnifiedDiff,
+        kMaxDiffLines,
+        parseUnifiedDiff,
+        splitLines;
+export 'package:conatus_fs_tools/conatus_fs_tools.dart'
+    show ApplyPatchTool, ListFilesTool, buildApprovalPreview, kPreviewMaxChars;
 export 'src/agents/agent_builtins.dart' show kBuiltinAgents;
 export 'src/agents/agent_definition.dart' show AgentDefinition, AgentMode;
 export 'src/agents/agent_parser.dart'
@@ -164,15 +181,7 @@ export 'src/config/mcp_json.dart'
 export 'src/config/project_data_dir.dart'
     show defaultProjectDataDir, projectDirProtected, resolveProjectDataDir;
 export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;
-export 'src/diff/apply.dart'
-    show PatchContextException, applyDiffFile, applyEditText;
-export 'src/diff/diff_model.dart' show DiffScope, FileDiff;
-export 'src/diff/diff_parse.dart' show parseUnifiedDiff;
 export 'src/diff/diff_source.dart' show DiffSource;
-export 'src/diff/diff_types.dart' show DiffFile, DiffHunk, DiffOp, DiffOpKind;
-export 'src/diff/preview.dart' show buildApprovalPreview, kPreviewMaxChars;
-export 'src/diff/unified_diff.dart'
-    show buildUnifiedDiff, kMaxDiffLines, splitLines;
 export 'src/format/formatter_path.dart'
     show formatterExtension, resolveFormatterTarget;
 export 'src/format/formatter_probe.dart' show FormatterProbe, detectFormatter;
@@ -183,8 +192,6 @@ export 'src/format/formatter_service.dart'
         kFormatterReasonChars,
         kFormatterToolNames,
         provideFormatter;
-export 'src/fs_tools/spill_dir.dart'
-    show kNavaProjectDirName, toolResultSpillDir;
 export 'src/headless/headless_guard.dart'
     show approvalModeIgnoredNotice, headlessAskNotice;
 export 'src/headless/headless_runner.dart'
@@ -327,7 +334,8 @@ export 'src/subagent/subagent_progress.dart'
     show SubAgentLine, SubAgentProgressStore;
 export 'src/subagent/swarm_member.dart'
     show SwarmMember, SwarmProjection, SwarmSink;
-export 'src/tools/apply_patch.dart' show ApplyPatchTool;
+export 'src/tool_result_spill.dart'
+    show kNavaProjectDirName, toolResultSpillDir;
 export 'src/tools/code_tools.dart' show provideCodeTools;
 export 'src/tools/command_policy.dart'
     show CommandDecision, CommandPolicy, CommandVerdict;
@@ -342,7 +350,6 @@ export 'src/tools/guarded_shell.dart'
         GuardedShellExecutor,
         RejectedShellProcess,
         rejectedRun;
-export 'src/tools/list_files.dart' show ListFilesTool;
 export 'src/tools/protected_command.dart'
     show
         gitWriteViolation,

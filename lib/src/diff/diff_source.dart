@@ -6,11 +6,11 @@ library;
 
 import 'dart:convert';
 
+import 'package:conatus_diff/conatus_diff.dart';
+
 import '../checkpoint/checkpoint_changes.dart';
 import '../checkpoint/checkpoint_manager.dart';
 import '../checkpoint/checkpoint_types.dart';
-import 'diff_model.dart';
-import 'diff_parser.dart';
 import 'working_diff.dart';
 
 /// 「还没有可比较的轮次」的说明（turn 0 只表示基线，没有上一轮可比）。

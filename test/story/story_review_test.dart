@@ -191,7 +191,7 @@ void main() {
       provideTools(app);
       provideLlm(app, llm: FallbackLlm(<LlmProvider>[_StubProvider()]));
       provideFileSystemLocal(app, fs: LocalFileSystem(cwd: dir.path));
-      provideFsTools(app, enableSearch: false);
+      provideFsTools(app, options: const FsToolOptions(enableSearch: false));
       final _SpyGate spy = _SpyGate();
       app.provide('approval', spy);
       final SessionStore sessions = provideSessions(app);
@@ -241,7 +241,7 @@ void main() {
       provideTools(app);
       provideLlm(app, llm: FallbackLlm(<LlmProvider>[_StubProvider()]));
       provideFileSystemLocal(app, fs: LocalFileSystem(cwd: dir.path));
-      provideFsTools(app, enableSearch: false);
+      provideFsTools(app, options: const FsToolOptions(enableSearch: false));
       final SessionStore sessions = provideSessions(app);
       final ConatusTuiController controller = ConatusTuiController(
         app: app,

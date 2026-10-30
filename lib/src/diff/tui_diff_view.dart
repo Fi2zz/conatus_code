@@ -3,10 +3,10 @@
 /// 按键与临时状态（当前文件、已读集合、滚动位置）在这里，关闭即丢弃。
 library;
 
+import 'package:conatus_diff/conatus_diff.dart';
 import 'package:nocterm/nocterm.dart';
 
 import '../tui/theme/nava_theme.dart';
-import 'diff_model.dart';
 import 'tui_diff_panels.dart';
 import 'tui_diff_parts.dart';
 

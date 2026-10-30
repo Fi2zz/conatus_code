@@ -19,7 +19,7 @@ Future<(Context, DocEngine, Directory)> _build() async {
     app,
     fs: LocalFileSystem(cwd: dir.path),
   );
-  provideFsTools(app, fs: fs, enableSearch: false);
+  provideFsTools(app, options: FsToolOptions(fs: fs, enableSearch: false));
   provideSessionLog(app, log: InMemorySessionLog());
   final DocEngine engine = await provideStory(app, sessionId: 's1');
   return (app, engine, dir);

@@ -4,8 +4,7 @@
 /// 与 `binary` 一律只给文件级结论，不把空 hunk 渲染成看似正常的差异。
 library;
 
-import 'diff_model.dart';
-import 'diff_types.dart';
+import 'package:conatus_diff/conatus_diff.dart';
 
 /// diff 面板中的一行及其着色类别。
 enum TuiDiffLineKind { header, context, addition, deletion, note }

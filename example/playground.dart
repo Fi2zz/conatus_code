@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:conatus/conatus.dart';
 import 'package:conatus_code/coding.dart';
-import 'package:conatus_code/fs_tools.dart';
 import 'package:conatus_code/providers.dart';
 import 'package:conatus_code/tui.dart';
 
@@ -62,7 +61,11 @@ void provideCodingForPlayground(Context app, {required String cwd}) {
   final ShellExecutor shell = provideShellLocal(app);
   final RipgrepBinary? rg = RipgrepBinary.discover();
   if (rg != null) {
-    app.effect(() => app.tools.register(RipgrepTool(shell: shell, binary: rg)));
+    app.effect(
+      () => app.tools.register(
+        RipgrepTool(runner: ShellRipgrepRunner(shell), binary: rg),
+      ),
+    );
   }
   final SubprocessCodeRuntime codeRuntime = SubprocessCodeRuntime(
     shell: shell,

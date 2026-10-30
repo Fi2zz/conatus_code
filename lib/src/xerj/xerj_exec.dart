@@ -4,7 +4,6 @@
 /// 交给 [XerjEndpoint]，这里只关心「一次调用」。
 library;
 
-import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
 import 'xerj_endpoint.dart';

@@ -4,10 +4,10 @@
 /// [TuiDiffView] 的 state 决定。
 library;
 
+import 'package:conatus_diff/conatus_diff.dart';
 import 'package:nocterm/nocterm.dart';
 
 import '../tui/theme/nava_theme.dart';
-import 'diff_model.dart';
 import 'tui_diff_parts.dart';
 
 Map<TuiDiffLineKind, Color> get _lineColors => <TuiDiffLineKind, Color>{

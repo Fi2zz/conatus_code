@@ -10,8 +10,8 @@ import 'dart:async';
 
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
+import 'package:conatus_fs_tools/conatus_fs_tools.dart';
 
-import '../diff/preview.dart';
 import '../permissions/permission_rule_pattern.dart';
 import 'tui_choice.dart';
 import 'tui_permission.dart';

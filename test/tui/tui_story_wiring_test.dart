@@ -48,7 +48,7 @@ Future<(ConatusTuiController, Context, Directory)> _buildController({
     app,
     fs: LocalFileSystem(cwd: dir.path),
   );
-  provideFsTools(app, fs: fs, enableSearch: false);
+  provideFsTools(app, options: FsToolOptions(fs: fs, enableSearch: false));
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_StubProvider()]));
   provideSessionLog(app, log: InMemorySessionLog());
   final SessionStore sessions = provideSessions(app);
@@ -137,7 +137,7 @@ void main() {
       ctx,
       fs: LocalFileSystem(cwd: dir.path),
     );
-    provideFsTools(ctx, fs: fs, enableSearch: false);
+    provideFsTools(ctx, options: FsToolOptions(fs: fs, enableSearch: false));
     provideSessionLog(ctx, log: InMemorySessionLog());
     final SessionStore sessions = provideSessions(ctx);
     final Session session = sessions.create();

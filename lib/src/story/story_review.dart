@@ -8,12 +8,10 @@
 library;
 
 import 'package:conatus_core/conatus_core.dart';
+import 'package:conatus_diff/conatus_diff.dart';
 import 'package:conatus_doc/conatus_doc.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-import '../diff/apply.dart';
-import '../diff/diff_parse.dart';
-import '../diff/diff_types.dart';
 import 'story.dart';
 import 'story_pending.dart';
 

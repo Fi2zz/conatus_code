@@ -352,7 +352,13 @@ class ConatusTuiRuntime {
     // 'shellInteractive'：用户直发命令（`!` shell 模式）的交互缝——本地直执、
     // 不过模型命令审查（对齐 OpenCode）；模型命令仍走上面的 'shell' 缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
-    provideFsTools(app);
+    provideFsTools(
+      app,
+      options: const FsToolOptions(
+        enablePatch: true,
+        skipDirs: <String>{...kDefaultSkipDirs, kNavaProjectDirName},
+      ),
+    );
     LspManager? lspManager;
     if (lsp.enabled) {
       final LspManager manager = LspManager(

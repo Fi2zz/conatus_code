@@ -45,13 +45,16 @@ List<Tool> provideCoding(
   final ToolRegistry registry = tools ?? ctx.tools;
   final List<Tool> registered = provideFsTools(
     ctx,
-    fs: fs,
-    tools: registry,
-    shell: shell,
-    eviction: eviction,
-    ripgrep: ripgrep,
-    rgLimit: rgLimit,
-    enableSearch: enableSearch,
+    options: FsToolOptions(
+      fs: fs,
+      tools: registry,
+      shell: shell,
+      eviction: eviction,
+      ripgrep: ripgrep,
+      rgLimit: rgLimit,
+      enableSearch: enableSearch,
+      skipDirs: <String>{...kDefaultSkipDirs, kNavaProjectDirName},
+    ),
   );
   if (xerj != null) {
     registered.addAll(

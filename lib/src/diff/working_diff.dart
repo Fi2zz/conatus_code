@@ -7,9 +7,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'diff_model.dart';
-import 'diff_parser.dart';
-import 'diff_types.dart';
+import 'package:conatus_diff/conatus_diff.dart';
 
 /// 单次最多读取多少个未跟踪文件的内容；其余只给文件级截断条目。
 const int kMaxUntrackedFiles = 200;

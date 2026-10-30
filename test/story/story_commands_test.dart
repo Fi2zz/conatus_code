@@ -21,7 +21,7 @@ Future<(Context, DocEngine, Directory)> _build() async {
     app,
     fs: LocalFileSystem(cwd: dir.path),
   );
-  provideFsTools(app, fs: fs, enableSearch: false);
+  provideFsTools(app, options: FsToolOptions(fs: fs, enableSearch: false));
   provideSessionLog(app, log: InMemorySessionLog());
   final DocEngine engine = await provideStory(app, sessionId: 's1');
   return (app, engine, dir);
@@ -152,7 +152,7 @@ void main() {
       provideTools(app);
       provideLlm(app, llm: FallbackLlm(<LlmProvider>[_StubProvider()]));
       provideFileSystemLocal(app, fs: LocalFileSystem(cwd: dir.path));
-      provideFsTools(app, enableSearch: false);
+      provideFsTools(app, options: const FsToolOptions(enableSearch: false));
       provideSessionLog(app, log: InMemorySessionLog());
       final SessionStore sessions = provideSessions(app);
       final ConatusTuiController controller = ConatusTuiController(

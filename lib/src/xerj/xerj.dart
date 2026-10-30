@@ -7,7 +7,6 @@ library;
 
 import 'dart:io';
 
-import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
