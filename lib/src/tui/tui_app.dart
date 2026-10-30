@@ -319,7 +319,7 @@ class ConatusTuiRuntime {
     // `.opencode`（项目级 + 全局）是用户 OpenCode 自己的目录：nava 只做兼容
     // 读取，绝不创建 / 写入 / 删除。闸门包在 fs 接缝上，write /
     // edit / apply_patch / story 写回等一切经 'fs' 的写操作自动继承
-    // （见 read_only_path_guard.dart）；读操作透传。
+    // （见 ReadOnlyPathGuard，conatus_foundation）；读操作透传。
     //
     // 受保护根同时用字面 workdir 与规范 workdir 两种拼写：`--workdir /tmp/x`
     // 经符号链接（macOS `/var` → `/private/var`）时，模型看到的 displayPath
@@ -331,6 +331,7 @@ class ConatusTuiRuntime {
       app,
       fs: ReadOnlyPathGuard(
         inner: fs ?? LocalFileSystem(cwd: resolvedWorkdir),
+        deniedMessage: kReadOnlyPathMessage,
         protectedRoots: <String>{
           ...defaultReadOnlyRoots(resolvedWorkdir),
           ...defaultReadOnlyRoots(canonicalWorkdir),

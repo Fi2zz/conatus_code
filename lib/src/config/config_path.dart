@@ -5,7 +5,7 @@ library;
 
 import 'dart:io';
 
-import '../read_only_paths.dart';
+import '../read_only_policy.dart';
 
 /// 用户级配置目录名，放在系统默认位置（macOS 为 `$HOME`）下。
 const String kConfigDirName = '.nava';

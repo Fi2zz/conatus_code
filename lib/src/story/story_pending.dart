@@ -11,7 +11,7 @@ import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_doc/conatus_doc.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 
-import '../read_only_paths.dart';
+import '../read_only_policy.dart';
 import 'story_blocks.dart';
 import 'story_conflict.dart';
 import 'story_sync.dart';

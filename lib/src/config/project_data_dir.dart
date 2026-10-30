@@ -14,7 +14,9 @@ library;
 
 import 'dart:io';
 
-import '../read_only_paths.dart';
+import 'package:conatus_foundation/conatus_foundation.dart';
+
+import '../read_only_policy.dart';
 import 'config_path.dart';
 
 /// 解析项目数据目录；[projectDir] 为 `[agent] project_dir` 原值（未配置为 null）。

@@ -7,7 +7,7 @@ library;
 
 import 'dart:io';
 
-import '../read_only_paths.dart';
+import '../read_only_policy.dart';
 import 'checkpoint_types.dart';
 
 /// 实体相对 [root] 的相对路径（分隔符规范化）。
@@ -30,7 +30,7 @@ List<String> checkpointPathSegments(String path) {
 /// 用户 OpenCode 安装目录。与 [ignore]（用户配置）取并集——无论配置如何这些
 /// 都不进快照。
 ///
-/// `.opencode` 必须在这里：nava 对它只读（见 `read_only_path_guard.dart`），
+/// `.opencode` 必须在这里：nava 对它只读（见 `ReadOnlyPathGuard`），
 /// 但 rewind 是 dart:io 直连、不走 fs 接缝——不排除就会把旧内容写回去。
 const List<String> kCheckpointDefaultIgnores = <String>[
   'build',

@@ -1,10 +1,14 @@
 /// `.opencode` 只读策略的单一事实来源：目录名、保护根与错误文案。
 ///
-/// fs 闸门（`fs_tools/read_only_path_guard.dart`）与命令兜底
-/// （`tools/protected_command.dart`）共用，避免多处各写一份而漂移。
+/// 通用闸门（`ReadOnlyPathGuard`）与路径判定在 `conatus_foundation`；
+/// 这里只保留 nava 的产品策略：哪些目录只读、按工作区相对路径如何识别。
+/// fs 闸门装配与命令兜底（`tools/protected_command.dart`）共用本文件，
+/// 避免多处各写一份而漂移。
 library;
 
 import 'dart:io';
+
+import 'package:conatus_foundation/conatus_foundation.dart';
 
 /// 稳定错误码：fs 侧配 [FsErrorCode.permissionDenied]，命令侧作工具错误码。
 const String kReadOnlyPathCode = 'READ_ONLY_PATH';
@@ -38,22 +42,6 @@ List<String> defaultReadOnlyRoots(String workdir, {String? home}) {
   ];
 }
 
-/// 段级「相同或子孙」判定：`.opencode-backup` 不算 `.opencode`。
-///
-/// macOS / Windows 默认文件系统大小写不敏感，统一按小写比较——
-/// `.OPENCODE/x` 在 APFS 上就是 `.opencode/x`，不能放过。代价是
-/// 大小写敏感卷上会略微多拒（`.OPENCODE` 也会被当成受保护），可接受。
-bool underReadOnlyRoot(String path, String root) {
-  if (path.isEmpty || root.isEmpty) return false;
-  final String candidate = _comparable(path);
-  final String base = _comparable(root);
-  if (candidate == base) return true;
-  final String prefix = base.endsWith(Platform.pathSeparator)
-      ? base
-      : '$base${Platform.pathSeparator}';
-  return candidate.startsWith(prefix);
-}
-
 /// 相对路径是否指向 OpenCode 目录（`.opencode` 或 `.config/opencode` 段）。
 ///
 /// 用于「登记时就拒绝」的场景（story 待定补丁、`/init` 目标）：这些路径按
@@ -72,28 +60,6 @@ bool readOnlyRelativePath(String path) {
     }
   }
   return false;
-}
-
-/// 取 [path] 的真实路径：存在则直接解析；否则解析**最近的已存在祖先**
-/// 再拼回余下段（与 `fs_local_paths.dart` 的 `_identityViaAncestor` 同法）。
-///
-/// 受保护根常常尚未创建（用户还没装 `.opencode`），此时整个解析会抛
-/// `FileSystemException`；必须退回祖先解析，否则规范拼写为空、闸门 fail-open。
-/// 没有任何已存在祖先时返回 null（调用方退回字面拼写）。
-String? realPathViaAncestor(String path) {
-  final List<String> trailing = <String>[];
-  String current = normalizeReadOnlyPath(path);
-  while (true) {
-    try {
-      final String real = Directory(current).resolveSymbolicLinksSync();
-      return trailing.isEmpty ? real : _join(real, trailing.reversed);
-    } on FileSystemException {
-      final int cut = current.lastIndexOf(Platform.pathSeparator);
-      if (cut <= 0) return null;
-      trailing.add(current.substring(cut + 1));
-      current = current.substring(0, cut);
-    }
-  }
 }
 
 /// 待写入路径是否命中只读的 OpenCode 目录。
@@ -123,40 +89,3 @@ bool readOnlyWritePath(String path, {String? workdir, String? home}) {
   }
   return false;
 }
-
-/// 去掉冗余的 `.` / `..` 与末尾分隔符（不解析符号链接）。
-///
-/// Windows 盘符单独保留：`C:\foo` 不能变成 `\C:\foo`（多了前缀分隔符后
-/// 既不像绝对路径，也不再与 `Directory(path).absolute.path` 的拼写一致）。
-String normalizeReadOnlyPath(String path) {
-  final RegExp separators = RegExp(r'[/\\]');
-  final String value = path.trim().replaceAll('\\', '/');
-  final RegExpMatch? drive = RegExp(r'^([A-Za-z]:)').firstMatch(value);
-  final String drivePrefix = drive?.group(1) ?? '';
-  final String rest = drivePrefix.isEmpty
-      ? value
-      : value.substring(drivePrefix.length);
-  final bool absolute = rest.startsWith('/');
-  final List<String> parts = <String>[];
-  for (final String part in rest.split(separators)) {
-    if (part.isEmpty || part == '.') continue;
-    if (part == '..' && parts.isNotEmpty && parts.last != '..') {
-      parts.removeLast();
-    } else {
-      parts.add(part);
-    }
-  }
-  final String joined = parts.join(Platform.pathSeparator);
-  if (drivePrefix.isNotEmpty) {
-    final String separator = Platform.pathSeparator;
-    return absolute ? '$drivePrefix$separator$joined' : '$drivePrefix$joined';
-  }
-  return absolute ? '${Platform.pathSeparator}$joined' : joined;
-}
-
-String _comparable(String path) =>
-    Platform.isMacOS || Platform.isWindows ? path.toLowerCase() : path;
-
-String _join(String base, Iterable<String> segments) => normalizeReadOnlyPath(
-  '$base${Platform.pathSeparator}${segments.join(Platform.pathSeparator)}',
-);

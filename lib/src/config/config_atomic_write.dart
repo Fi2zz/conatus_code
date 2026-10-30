@@ -6,7 +6,7 @@ library;
 
 import 'dart:io';
 
-import '../read_only_paths.dart';
+import '../read_only_policy.dart';
 
 /// 0600（`rw-------`）的十进制值；Dart 没有八进制字面量。
 const int kOwnerOnlyMode = 0x180;

@@ -16,7 +16,7 @@ import '../config/config_parser.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
 import '../config/mcp_json.dart';
-import '../read_only_paths.dart';
+import '../read_only_policy.dart';
 
 part 'mcp_cli_add.dart';
 part 'mcp_cli_auth.dart';

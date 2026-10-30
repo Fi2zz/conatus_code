@@ -5,7 +5,6 @@ library;
 import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
-import 'package:conatus_code/fs_tools.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:conatus_llm/conatus_llm.dart';

@@ -6,7 +6,7 @@ import 'dart:io';
 
 import '../config/config_atomic_write.dart';
 import '../config/config_path.dart';
-import '../read_only_paths.dart';
+import '../read_only_policy.dart';
 import 'project_database.dart';
 import 'project_identity.dart';
 import 'project_paths.dart';
