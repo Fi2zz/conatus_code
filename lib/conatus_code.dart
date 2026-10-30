@@ -48,6 +48,8 @@ export 'package:conatus_checkpoint/conatus_checkpoint.dart'
         restoreArchiveCheckpoint,
         writeCheckpointArchive,
         writeCheckpointHashes;
+export 'package:conatus_checkpoint/revert.dart'
+    show RedoResult, RevertException, RevertService, RevertStage, UndoResult;
 export 'package:conatus_diff/conatus_diff.dart'
     show
         DiffFile,
@@ -285,9 +287,6 @@ export 'src/references/references.dart'
         provideReferencePrompt,
         renderReferences,
         resolveReferences;
-export 'src/revert/revert_service.dart' show RevertService;
-export 'src/revert/revert_stage.dart'
-    show RedoResult, RevertException, RevertStage, UndoResult;
 export 'src/story/story.dart' show StoryRecorder, kStoryToolNames, provideStory;
 export 'src/story/story_blocks.dart'
     show

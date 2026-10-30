@@ -11,6 +11,7 @@ import 'dart:io';
 
 import 'package:conatus_agent/conatus_agent.dart';
 import 'package:conatus_checkpoint/conatus_checkpoint.dart';
+import 'package:conatus_checkpoint/revert.dart';
 import 'package:conatus_compaction/conatus_compaction.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_cron/conatus_cron.dart';
@@ -46,9 +47,6 @@ import '../permissions/permission_wiring.dart';
 import '../project/project_database.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
-import '../revert/revert_compensate.dart';
-import '../revert/revert_service.dart';
-import '../revert/revert_stage.dart';
 import '../story/story.dart';
 import '../story/story_commands.dart';
 import '../story/story_notices.dart';
