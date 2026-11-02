@@ -81,6 +81,41 @@ String _tomlValue(Object? value) {
   return _tomlString('$value');
 }
 
+/// 从 npm/git spec 里取包名；无法判断返回 `null`。
+String? packageNameOf(String source) {
+  final String value = source.trim();
+  if (value.startsWith('@')) {
+    final int slash = value.indexOf('/');
+    if (slash < 0) return null;
+    final int at = value.indexOf('@', slash);
+    return at < 0 ? value : value.substring(0, at);
+  }
+  if (value.startsWith('git') ||
+      value.startsWith('github:') ||
+      value.startsWith('http')) {
+    return null;
+  }
+  final int at = value.indexOf('@');
+  return at <= 0 ? value : value.substring(0, at);
+}
+
+/// 从 npm/git spec 里取可 `import()` 的包名。
+///
+/// `superpowers@git+https://...` → `superpowers`；`@scope/pkg@1.2` → `@scope/pkg`；
+/// `github:me/repo` → `repo`（npm 安装后以 package.json name 为准，这一层只做
+/// 常规推导）。
+String packageImportName(String source) {
+  final String value = source.trim();
+  final String noSelector = value.split('::').first.split('#').first;
+  final String? name = packageNameOf(noSelector);
+  if (name != null) return name;
+  final String last = noSelector.split(RegExp(r'[/\\]')).last;
+  if (last.endsWith('.git')) {
+    return last.substring(0, last.length - 4);
+  }
+  return last;
+}
+
 /// 从根 Context 取插件服务；未装配返回 `null`。
 PluginServiceLike? pluginServiceOf(Context ctx) =>
     ctx.get<PluginServiceLike>(kPluginServiceKey);

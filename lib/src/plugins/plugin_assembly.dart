@@ -57,7 +57,7 @@ class PluginAssembly {
               options: config.options,
             ),
             origin: 'config',
-            entry: config.source,
+            entry: packageImportName(config.source),
             fingerprint: config.source,
             local: false,
           ),

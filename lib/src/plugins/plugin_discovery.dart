@@ -177,7 +177,7 @@ class PluginDiscovery {
           projectScoped: true,
         ),
         origin: origin,
-        entry: source,
+        entry: packageImportName(source),
         fingerprint: source,
         local: false,
       ),

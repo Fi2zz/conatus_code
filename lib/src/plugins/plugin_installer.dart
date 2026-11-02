@@ -6,6 +6,8 @@ import 'dart:io';
 
 import 'plugin_config.dart';
 
+export 'plugin_config.dart' show packageImportName, packageNameOf;
+
 /// 命令执行结果的最小投影，便于测试注入。
 class PluginCommandResult {
   const PluginCommandResult(this.exitCode, this.stdout, this.stderr);
@@ -166,22 +168,4 @@ class PluginInstaller {
       '${result.stderr}',
     );
   }
-}
-
-/// 从 npm/git spec 里取包名；无法判断返回 `null`。
-String? packageNameOf(String source) {
-  final String value = source.trim();
-  if (value.startsWith('@')) {
-    final int slash = value.indexOf('/');
-    if (slash < 0) return null;
-    final int at = value.indexOf('@', slash);
-    return at < 0 ? value : value.substring(0, at);
-  }
-  if (value.startsWith('git') ||
-      value.startsWith('github:') ||
-      value.startsWith('http')) {
-    return null;
-  }
-  final int at = value.indexOf('@');
-  return at <= 0 ? value : value.substring(0, at);
 }

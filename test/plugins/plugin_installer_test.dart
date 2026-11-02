@@ -64,4 +64,17 @@ void main() {
     expect(packageNameOf('pkg'), 'pkg');
     expect(packageNameOf('github:me/repo'), isNull);
   });
+
+  test('packageImportName 把 git spec 还原成包名', () {
+    expect(
+      packageImportName('superpowers@git+https://github.com/obra/superpowers.git'),
+      'superpowers',
+    );
+    expect(packageImportName('@scope/pkg@1.2.3'), '@scope/pkg');
+    expect(packageImportName('github:me/opencode-plugin'), 'opencode-plugin');
+    expect(
+      packageImportName('git+ssh://git@github.com/me/plugin.git#main'),
+      'plugin',
+    );
+  });
 }
