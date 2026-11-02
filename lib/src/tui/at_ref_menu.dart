@@ -1,38 +1,26 @@
-/// @ 文件补全菜单状态：输入框光标前的 `@<前缀>` 触发，列举匹配的文件 / 目录。
+/// @ 文件补全菜单状态：输入框光标前的 `@<前缀>` 触发，递归联想文件 / 目录。
 ///
 /// 只做状态与候选列举（同步 `dart:io`，cwd 可注入以便测试）；按键与渲染由
 /// 根组件和 [AtRefMenuView] 负责。补全插入 `@<路径>`，发送时再由
 /// [expandAtRefs] 展开为 `<file>` 块。
+///
+/// 与 OpenCode 对齐的行为：
+/// - `@` 后为空时只列顶层，避免一上来铺满整棵树；
+/// - 有前缀时在整棵树里做大小写不敏感的子串 / 子序列匹配，展示完整相对路径；
+/// - `dir/` 只列直接子项，方便逐级浏览；
+/// - 跳过隐藏项与 `.git` / `node_modules` 等可再生目录。
 library;
 
-import 'dart:io';
-
-/// 一个补全候选。
-class AtRefCandidate {
-  const AtRefCandidate({required this.path, required this.isDir});
-
-  /// 相对 cwd 的补全路径；目录以 `/` 结尾。
-  final String path;
-
-  /// 是否目录（补全后继续列举子项）。
-  final bool isDir;
-
-  /// 列表右列展示的名字（末段，目录不带尾 `/`）。
-  String get name {
-    final String trimmed =
-        path.endsWith('/') ? path.substring(0, path.length - 1) : path;
-    final int slash = trimmed.lastIndexOf('/');
-    return slash < 0 ? trimmed : trimmed.substring(slash + 1);
-  }
-}
+import 'at_ref_index.dart';
+import 'at_ref_match.dart';
 
 /// `@` 文件补全菜单状态。
 class AtRefMenu {
   /// 构造菜单；[cwd] 每次列举时提供基准目录，[maxMatches] 限制候选数量。
   AtRefMenu({required String Function() cwd, this.maxMatches = 20})
-      : _cwd = cwd;
+    : _refIndex = AtRefIndex(cwd);
 
-  final String Function() _cwd;
+  final AtRefIndex _refIndex;
 
   /// 最多展示的候选数。
   final int maxMatches;
@@ -81,8 +69,9 @@ class AtRefMenu {
       return;
     }
     final int next = _index + delta;
-    _index =
-        next < 0 ? 0 : (next >= _matches.length ? _matches.length - 1 : next);
+    _index = next < 0
+        ? 0
+        : (next >= _matches.length ? _matches.length - 1 : next);
   }
 
   /// 补全：把 `@<前缀>` 换成选中路径；返回 (新文本, 新光标)；无选中返回 null。
@@ -94,8 +83,9 @@ class AtRefMenu {
     if (candidate == null) {
       return null;
     }
-    final String replacement =
-        candidate.isDir ? '@${candidate.path}' : '@${candidate.path} ';
+    final String replacement = candidate.isDir
+        ? '@${candidate.path}'
+        : '@${candidate.path} ';
     return (
       text.replaceRange(_tokenStart, cursor, replacement),
       _tokenStart + replacement.length,
@@ -110,6 +100,7 @@ class AtRefMenu {
     _query = '';
     _matches = const <AtRefCandidate>[];
     _index = 0;
+    _refIndex.clear();
   }
 
   /// 光标前最近的触发 `@` 下标（`@` 前是行首或空白，且到光标无空白）；无则 -1。
@@ -126,35 +117,47 @@ class AtRefMenu {
     return -1;
   }
 
-  /// 按 [query] 列举：`lib/re` → `<cwd>/lib` 下以 `re` 开头的条目。
+  /// 按 [query] 列举候选。
   List<AtRefCandidate> _list(String query) {
+    if (query.isEmpty) return _topLevel();
     final int slash = query.lastIndexOf('/');
     final String dirPart = slash < 0 ? '' : query.substring(0, slash + 1);
     final String prefix = slash < 0 ? query : query.substring(slash + 1);
-    final Directory dir = Directory('${_cwd()}${Platform.pathSeparator}$dirPart');
-    if (!dir.existsSync()) {
-      return const <AtRefCandidate>[];
-    }
+    final bool browse = query.endsWith('/');
     final List<AtRefCandidate> found = <AtRefCandidate>[];
-    for (final FileSystemEntity entity in dir.listSync()) {
-      final String name = entity.path.split(Platform.pathSeparator).last;
-      if (name.startsWith('.') || !name.startsWith(prefix)) {
+    for (final AtRefCandidate candidate in _all()) {
+      if (!candidate.path.startsWith(dirPart)) continue;
+      final String rest = candidate.path.substring(dirPart.length);
+      if (rest.isEmpty) continue;
+      if (browse) {
+        final String trimmed = rest.endsWith('/')
+            ? rest.substring(0, rest.length - 1)
+            : rest;
+        if (!trimmed.contains('/')) found.add(candidate);
         continue;
       }
-      final bool isDir = entity is Directory;
-      found.add(AtRefCandidate(
-        path: '$dirPart$name${isDir ? '/' : ''}',
-        isDir: isDir,
-      ));
-    }
-    found.sort((AtRefCandidate a, AtRefCandidate b) {
-      if (a.isDir != b.isDir) {
-        return a.isDir ? -1 : 1;
+      if (atRefMatches(prefix, candidate)) {
+        found.add(candidate);
       }
-      return a.name.compareTo(b.name);
-    });
+    }
+    sortAtRefCandidates(found, prefix);
     return found.length > maxMatches ? found.sublist(0, maxMatches) : found;
   }
+
+  /// 顶层：`@` 后为空时只列直接子项。
+  List<AtRefCandidate> _topLevel() {
+    final List<AtRefCandidate> found = <AtRefCandidate>[
+      for (final AtRefCandidate candidate in _all())
+        if (!_withoutSlash(candidate.path).contains('/')) candidate,
+    ];
+    sortAtRefCandidates(found, '');
+    return found.length > maxMatches ? found.sublist(0, maxMatches) : found;
+  }
+
+  List<AtRefCandidate> _all() => _refIndex.all();
+
+  static String _withoutSlash(String path) =>
+      path.endsWith('/') ? path.substring(0, path.length - 1) : path;
 
   static bool _isSpace(String ch) => RegExp(r'\s').hasMatch(ch);
 }

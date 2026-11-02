@@ -729,6 +729,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     _agentId = _startupAgentId();
     _modelBaseline = _currentModelChoice();
     await _applyStartupAgentModel();
+    await _pruneEmptySessions();
     if (_sessionId.isEmpty) {
       _sessionId = _sessions.create().id;
     }
@@ -751,6 +752,48 @@ class ConatusTuiController implements TuiUserPromptHost {
       if (registry != null) {
         providerPrompt.show(providerItems(registry));
       }
+    }
+  }
+
+  /// 清理超过 1 小时、没有用户消息也没有标题的空会话。
+  ///
+  /// 每次启动都会先绑定一个新会话（plan/mode + agent/selected 两条事件），
+  /// 用户没发消息就退出时会在磁盘留下“未命名会话”。这里只清理陈旧空壳，
+  /// 当前启动会话与已命名的会话不动；另一个进程正在使用的会话通常不会
+  /// 超过 1 小时还没有用户消息。
+  Future<void> _pruneEmptySessions() async {
+    final List<String> ids;
+    try {
+      ids = await _sessions.persistedIds();
+    } catch (_) {
+      return;
+    }
+    int removed = 0;
+    for (final String id in ids) {
+      if (id == _sessionId) continue;
+      final Session session;
+      try {
+        session = await _sessions.open(id);
+      } catch (_) {
+        continue;
+      }
+      final bool hasUser = session.events.any(
+        (SessionEvent event) => event.type == kUserMessageEvent,
+      );
+      final DateTime? last =
+          session.events.isEmpty ? null : session.events.last.time;
+      final bool stale = last == null ||
+          DateTime.now().difference(last) > const Duration(hours: 1);
+      if (hasUser || session.title != null || !stale) continue;
+      try {
+        await _sessions.remove(id);
+        removed++;
+      } catch (_) {
+        // 删除失败不影响启动；下次再试。
+      }
+    }
+    if (removed > 0) {
+      stderr.writeln('已清理 $removed 个空会话。');
     }
   }
 

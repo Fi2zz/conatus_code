@@ -420,7 +420,8 @@ macOS Terminal.app 不区分 Ctrl+Tab 与 Tab（都发 `0x09`），此时单独
 **会话 UI 状态**：每个会话的聊天滚动位置和最近 100 条输入保存在
 `<项目数据目录>/ui-state/<sessionId>.json`（原子写、0600）；切回旧会话或重启
 nava 后恢复，输入框为空时用 `↑` / `↓` 浏览历史。侧边栏是 OpenCode 的界面形态，
-nava 没有对应状态；会话入口仍是 `/sessions` 和标签栏。
+nava 没有对应状态；会话入口仍是 `/sessions` 和标签栏。面板不会列出没有用户
+消息的空壳会话（当前会话除外）；启动时还会清理超过 1 小时、无标题的空会话。
 
 **主题**：`/theme` 切换 `default` / `dark` / `light` / `tokyonight`（仅当前进程）；
 也可在 `[tui]` 写 `theme` 与 `animations`。

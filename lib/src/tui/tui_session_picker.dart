@@ -11,6 +11,8 @@ class TuiSessionInfo {
     required this.events,
     this.updatedAt,
     this.title,
+    this.hasUserMessage = false,
+    this.loadFailed = false,
   });
 
   /// 会话 id。
@@ -27,6 +29,13 @@ class TuiSessionInfo {
 
   /// 展示标题：会话标题事件；旧会话回退首条用户消息的前 40 字符。
   final String? title;
+
+  /// 是否已有用户消息。没有用户消息的会话是启动/切换产生的空壳，
+  /// 除当前会话外不进入面板。
+  final bool hasUserMessage;
+
+  /// 读取失败（损坏 JSONL 等）；保留该行以便用户删除。
+  final bool loadFailed;
 }
 
 /// 面板标题预览的最大字符数。
@@ -108,9 +117,21 @@ class TuiSessionPicker {
           events: events.length,
           updatedAt: events.isEmpty ? null : events.last.time,
           title: session?.title ?? deriveSessionTitle(events),
+          hasUserMessage: events.any(
+            (SessionEvent event) => event.type == kUserMessageEvent,
+          ),
+          loadFailed: session == null,
         ),
       );
     }
+    // 空壳会话（启动 / 切换产生，只有 plan/mode、agent/selected）不进面板；
+    // 当前会话与读取失败的行保留。
+    infos.removeWhere(
+      (TuiSessionInfo info) =>
+          !info.hasUserMessage &&
+          !info.loadFailed &&
+          info.id != (selectedId ?? currentId),
+    );
     infos.sort((TuiSessionInfo a, TuiSessionInfo b) => a.id.compareTo(b.id));
     list = infos;
     index = list.indexWhere(

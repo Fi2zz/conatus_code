@@ -18,6 +18,10 @@ void main() {
     File('${dir.path}/LICENSE').writeAsStringSync('license');
     File('${dir.path}/lib/main.dart').writeAsStringSync('main');
     File('${dir.path}/lib/menu.dart').writeAsStringSync('menu');
+    Directory('${dir.path}/docs/plans').createSync(recursive: true);
+    File('${dir.path}/docs/plans/conatus-code.md').writeAsStringSync('x');
+    Directory('${dir.path}/node_modules/pkg').createSync(recursive: true);
+    File('${dir.path}/node_modules/pkg/secret.dart').writeAsStringSync('x');
     File('${dir.path}/.env').writeAsStringSync('x');
     menu = AtRefMenu(cwd: () => dir.path);
   });
@@ -27,29 +31,59 @@ void main() {
   test('输入 @ 打开并列举顶层（目录在前，跳过隐藏项）', () {
     menu.syncInput('@', cursor: 1);
     expect(menu.open, isTrue);
+    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(), <String>[
+      'demo/',
+      'docs/',
+      'lib/',
+      'LICENSE',
+    ]);
+  });
+
+  test('前缀过滤递归联想，展示完整路径', () {
+    menu.syncInput('@li', cursor: 3);
+    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(), <String>[
+      'lib/',
+      'LICENSE',
+      'lib/main.dart',
+      'lib/menu.dart',
+    ]);
+    expect(menu.selected!.name, 'lib');
+  });
+
+  test('递归联想：@conatus 命中嵌套路径', () {
+    menu.syncInput('@conatus', cursor: 8);
     expect(
-      menu.matches.map((AtRefCandidate c) => c.path).toList(),
-      <String>['demo/', 'lib/', 'LICENSE'],
+      menu.matches.map((AtRefCandidate c) => c.path),
+      contains('docs/plans/conatus-code.md'),
     );
   });
 
-  test('前缀过滤与路径补全', () {
-    menu.syncInput('@li', cursor: 3);
-    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(),
-        <String>['lib/']);
-    expect(menu.selected!.name, 'lib');
+  test('子序列联想：@mn 命中 main.dart', () {
+    menu.syncInput('@mn', cursor: 3);
+    expect(
+      menu.matches.map((AtRefCandidate c) => c.path),
+      contains('lib/main.dart'),
+    );
+  });
+
+  test('跳过隐藏目录与 node_modules', () {
+    menu.syncInput('@secret', cursor: 7);
+    expect(menu.matches, isEmpty);
   });
 
   test('目录前缀列举子项', () {
     menu.syncInput('@lib/', cursor: 5);
-    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(),
-        <String>['lib/main.dart', 'lib/menu.dart']);
+    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(), <String>[
+      'lib/main.dart',
+      'lib/menu.dart',
+    ]);
   });
 
   test('目录前缀 + 子项过滤', () {
     menu.syncInput('@lib/me', cursor: 7);
-    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(),
-        <String>['lib/menu.dart']);
+    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(), <String>[
+      'lib/menu.dart',
+    ]);
   });
 
   test('补全目录：停在路径末尾，菜单继续打开', () {
@@ -58,8 +92,10 @@ void main() {
     expect(text, '@lib/');
     expect(cursor, 5);
     menu.syncInput(text, cursor: cursor);
-    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(),
-        <String>['lib/main.dart', 'lib/menu.dart']);
+    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(), <String>[
+      'lib/main.dart',
+      'lib/menu.dart',
+    ]);
   });
 
   test('补全文件：追加空格并关闭', () {
@@ -90,8 +126,12 @@ void main() {
 
   test('光标越界按文本末尾处理', () {
     menu.syncInput('@li', cursor: 99);
-    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(),
-        <String>['lib/']);
+    expect(menu.matches.map((AtRefCandidate c) => c.path).toList(), <String>[
+      'lib/',
+      'LICENSE',
+      'lib/main.dart',
+      'lib/menu.dart',
+    ]);
   });
 
   test('移动与越界钳制', () {
