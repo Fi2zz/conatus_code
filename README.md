@@ -343,6 +343,12 @@ dart:io，不经 fs 接缝；`/rewind` 是用户命令，不挂审批。
   （符号链接按目标身份比较）。`edit "src/*"` 能拦住
   `write("/abs/work/src/x")`，工作区里指向 `/etc/hosts` 的链接也逃不过
   `deny read "/etc/*"`。
+- **默认阈值**：没有规则命中时按风险阈值判定。`ask_when_needed`（缺省）
+  阈值 `high`，所以 `read` / `list` / `glob` / `grep`（low）与
+  `write` / `edit` / `task`（medium）直接放行；只有 `bash` / `apply_patch`
+  等 high 风险工具询问。路径参数本身不再触发审批——需要目录信任时，在真正
+  被 ask 的工具上选择「信任此文件夹」即可。`always_ask` 把阈值降到 medium，
+  写操作才会询问。
 - **工作区外**：路径落到 workdir 外时追加 `external_directory` 判定；`grep` 的
   `path` 参数也参与边界检查（但不会把每次 grep 变成路径信任提示）。
 - **MCP 资源**：`action = "list_mcp_resources"` / `"read_mcp_resource"` 配合

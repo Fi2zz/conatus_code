@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **审批噪声**：路径参数不再默认触发审批。`ask_when_needed` 下
+  `read` / `list` / `glob` / `grep`（low）与 `write` / `edit` / `task`（medium）
+  直接放行，只有 high 风险工具询问；`always_ask` 仍会让写操作询问。
 - **预算误收口**：token 护栏改为比较**当前请求的上下文大小**，不再把多步请求
   的完整上下文重复累加（长工具链会在远未接近窗口时误报）。`max_turn_tokens = 0`
   现在显式关闭 token 护栏；`max_turn_seconds = 0` 关闭墙钟护栏。
