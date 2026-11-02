@@ -114,6 +114,7 @@ export 'src/cli/opencode_import_types.dart'
         ImportedCommand,
         ImportedModel,
         ImportedPermission,
+        ImportedPlugin,
         ImportedProvider,
         ImportedReference,
         OpenCodeImport;

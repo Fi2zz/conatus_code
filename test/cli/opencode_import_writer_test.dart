@@ -202,6 +202,28 @@ type = "openai"
     expect(plan.added, <String>['reference docs']);
   });
 
+  test('plugins 写入 [[plugins]] 并可解析', () {
+    const OpenCodeImport imported = OpenCodeImport(
+      plugins: <ImportedPlugin>[
+        ImportedPlugin(source: '@acme/plugin'),
+        ImportedPlugin(
+          source: './local',
+          options: <String, Object?>{'strict': true},
+        ),
+      ],
+    );
+
+    final OpenCodeImportPlan plan = planOpenCodeImport(
+      toml: '',
+      import: imported,
+    );
+
+    _expectParseable(plan.updatedToml);
+    expect(plan.updatedToml, contains('[[plugins]]'));
+    expect(plan.updatedToml, contains('source = "@acme/plugin"'));
+    expect(plan.updatedToml, contains('options = { strict = true }'));
+  });
+
   test('非法 TOML 抛 FormatException', () {
     expect(
       () => planOpenCodeImport(toml: '[bad', import: _import()),
