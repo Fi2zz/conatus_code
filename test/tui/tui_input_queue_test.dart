@@ -39,7 +39,8 @@ void main() {
       _BusyHarness(key: key, controller: TextEditingController()),
     );
     await tester.pump();
-    expect(tester.terminalState, containsText('模型运行中'));
+    expect(tester.terminalState, isNot(containsText('模型运行中')));
+    expect(tester.terminalState, isNot(containsText('可继续输入')));
 
     key.currentState!.setBusy(false);
     await tester.pump();
@@ -74,7 +75,7 @@ void main() {
     expect(submitted, <String>['排队这条']);
   });
 
-  test('busy 且无排队：占位提示可继续输入', () async {
+  test('busy 且无排队：不显示“模型运行中”占位', () async {
     final NoctermTester tester = await NoctermTester.create(
       size: const Size(80, 12),
     );
@@ -89,7 +90,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(tester.terminalState, containsText('回车排队'));
+    expect(tester.terminalState, isNot(containsText('模型运行中')));
+    expect(tester.terminalState, isNot(containsText('回车排队')));
   });
 
   test('busy 且有排队：占位显示已排队条数', () async {

@@ -55,10 +55,13 @@ class TuiInputBar extends StatelessComponent {
   /// 文本框按键拦截（返回 true 吞掉）：`/` 菜单打开时用于 ↑↓/Enter/Esc/Tab。
   final bool Function(KeyboardEvent event)? onKeyEvent;
 
-  /// 占位提示：排队反馈 / 思考中可输入 / shell 模式 / 普通输入。
+  /// 占位提示：排队反馈 / shell 模式 / 普通输入。
+  ///
+  /// 忙碌且没有排队时不显示「模型运行中…」提示——状态栏已有运行指示，
+  /// 输入框保持干净，也避免占位文本在输入/排队切换时闪烁。
   String _placeholder() {
     if (busy && queuedCount > 0) return '已排队 $queuedCount 条，回车继续排队';
-    if (busy) return '模型运行中…可继续输入，回车排队';
+    if (busy) return '';
     return shellMode
         ? shellInputPlaceholder()
         : '输入消息，/help 查看命令（Shift+Enter 换行）';
