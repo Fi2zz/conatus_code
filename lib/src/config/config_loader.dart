@@ -224,7 +224,8 @@ mode = "ask_when_needed"   # always_ask / ask_when_needed / never_ask
 
 [budget]
 max_turn_seconds = 600
-# max_turn_tokens = 0        # 0 / 省略 = 按模型窗口的 75%；显式值只能更严
+# max_turn_tokens = 0        # 0 = 关闭 token 护栏；省略 = 模型窗口的 75%；
+                            # 显式正数只能更严，不能超过模型窗口
 ''';
 
 /// 加载配置。

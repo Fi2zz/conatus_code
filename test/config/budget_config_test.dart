@@ -38,13 +38,13 @@ void main() {
       expect(config.budget.maxTurnTokens, 100000);
     });
 
-    test('0 表示不限（null）', () {
+    test('0 表示关闭对应护栏', () {
       final ConatusCodeConfig config = _load('[budget]\n'
           'max_turn_seconds = 0\n'
           'max_turn_tokens = 0\n');
 
       expect(config.budget.maxTurnSeconds, isNull);
-      expect(config.budget.maxTurnTokens, isNull);
+      expect(config.budget.maxTurnTokens, 0);
     });
 
     test('负数或类型不符 → ConfigException', () {

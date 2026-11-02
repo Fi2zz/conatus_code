@@ -5,11 +5,11 @@ import 'package:test/test.dart';
 
 void main() {
   group('BudgetedLlmProvider', () {
-    test('预算为 0 时直接收口，不调用底层', () async {
+    test('token 上限极小且当前上下文超限时收口，不调用底层', () async {
       final _FakeProvider provider = _FakeProvider(_reply());
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
-        budget: const TurnBudget(maxTokens: 0),
+        budget: const TurnBudget(maxTokens: 1),
       );
 
       final LlmResult result = await budgeted.chat(<LlmMessage>[
@@ -36,27 +36,45 @@ void main() {
       expect(provider.calls, 0);
     });
 
-    test('同一轮累计 token 超限后收口', () async {
+    test('当前上下文超过 token 上限时收口', () async {
       final _FakeProvider provider = _FakeProvider(_reply());
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
         budget: const TurnBudget(maxTokens: 20),
       );
 
-      await budgeted.chat(<LlmMessage>[LlmMessage('user', 'a' * 40)]);
-      final LlmResult second = await budgeted.chat(<LlmMessage>[
-        LlmMessage('user', 'b' * 40),
+      final LlmResult result = await budgeted.chat(<LlmMessage>[
+        LlmMessage('user', 'a' * 120),
       ]);
 
-      expect(second.content, kBudgetExhaustedReply);
-      expect(provider.calls, 1);
+      expect(result.content, kBudgetExhaustedReply);
+      expect(provider.calls, 0);
     });
 
-    test('空闲超过 idleReset 视为新一轮，累计清零', () async {
+    test('同一轮上下文逐步增长但不超限，不因累计误收口', () async {
       final _FakeProvider provider = _FakeProvider(_reply());
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
-        budget: const TurnBudget(maxTokens: 20),
+        budget: const TurnBudget(maxTokens: 100),
+      );
+
+      for (int i = 0; i < 20; i++) {
+        final LlmResult result = await budgeted.chat(<LlmMessage>[
+          LlmMessage('user', 'a' * 40),
+        ]);
+        expect(result.content, isNot(kBudgetExhaustedReply));
+      }
+      expect(provider.calls, 20);
+    });
+
+    test('空闲超过 idleReset 视为新一轮，墙钟清零', () async {
+      final _FakeProvider provider = _FakeProvider(_reply());
+      final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
+        provider,
+        budget: const TurnBudget(
+          maxDuration: Duration(milliseconds: 50),
+          maxTokens: 0,
+        ),
         idleReset: const Duration(milliseconds: 20),
       );
 
@@ -127,7 +145,7 @@ void main() {
       final _FakeProvider provider = _FakeProvider(_reply());
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
-        budget: const TurnBudget(maxTokens: 0),
+        budget: const TurnBudget(maxTokens: 1),
       );
 
       final List<LlmStreamEvent> events = await budgeted.chatStream(
@@ -141,14 +159,18 @@ void main() {
       expect(provider.calls, 0);
     });
 
-    test('beginTurn 重置累计，不跨用户轮次泄漏', () async {
+    test('beginTurn 重置墙钟，不跨用户轮次泄漏', () async {
       final _FakeProvider provider = _FakeProvider(_reply());
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
-        budget: const TurnBudget(maxTokens: 20),
+        budget: const TurnBudget(
+          maxDuration: Duration(milliseconds: 50),
+          maxTokens: 0,
+        ),
       );
 
       await budgeted.chat(<LlmMessage>[LlmMessage('user', 'a' * 40)]);
+      await Future<void>.delayed(const Duration(milliseconds: 60));
       budgeted.beginTurn();
       final LlmResult second = await budgeted.chat(<LlmMessage>[
         LlmMessage('user', 'b' * 40),
@@ -162,7 +184,7 @@ void main() {
       final _FakeProvider provider = _FakeProvider(_reply());
       final BudgetedLlmProvider budgeted = BudgetedLlmProvider(
         provider,
-        budget: const TurnBudget(maxTokens: 0),
+        budget: const TurnBudget(maxTokens: 1),
       );
 
       final LlmResult result = await budgeted.chat(<LlmMessage>[

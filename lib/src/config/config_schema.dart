@@ -171,7 +171,8 @@ class BudgetConfig {
   /// 单轮墙钟上限（秒）；`0` 表示不限。
   final int? maxTurnSeconds;
 
-  /// 单轮上下文 token 估算上限；`0` 表示不限。
+  /// 单轮上下文 token 上限；`null` = 未配置（按模型窗口 75% 生效），
+  /// `0` = 显式关闭 token 护栏，正数 = 更严的封顶。
   final int? maxTurnTokens;
 }
 

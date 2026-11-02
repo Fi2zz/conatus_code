@@ -314,8 +314,18 @@ class ConfigParser extends ConfigValues {
     final Map<String, dynamic> table = readTable('budget');
     return BudgetConfig(
       maxTurnSeconds: readBudgetLimit(table, 'max_turn_seconds', 600),
-      maxTurnTokens: readBudgetLimit(table, 'max_turn_tokens', 0),
+      maxTurnTokens: _readTokenBudget(table),
     );
+  }
+
+  /// `max_turn_tokens`：缺省 null（按窗口 75%），显式 0 关闭护栏。
+  int? _readTokenBudget(Map<String, dynamic> table) {
+    final Object? value = table['max_turn_tokens'];
+    if (value == null) return null;
+    if (value is! int || value < 0) {
+      throw ConfigException('$source：max_turn_tokens 必须是非负整数。');
+    }
+    return value;
   }
 
   Map<String, String> _readCredentials() {

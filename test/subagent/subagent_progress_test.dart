@@ -127,17 +127,19 @@ void main() {
   });
 
   group('子 Agent 预算独立于主轮次', () {
-    // 护栏计的是**估算的请求消息体量**（chars/4），不是 usage.prompt_tokens。
-    // 额度按实测估算值卡在「一条多一点」，使第一条过、第二条不过。
-    final LlmMessage one = LlmMessage('user', 'x' * 4000);
-    final int cap = estimateMessagesTokens(<LlmMessage>[one]) + 10;
+    // 护栏计的是**当前请求的消息体量**（chars/4），不是 usage.prompt_tokens。
+    // 用一大一小两条消息区分主/子 Agent 的额度。
+    final LlmMessage small = LlmMessage('user', 'x' * 4000);
+    final LlmMessage large = LlmMessage('user', 'x' * 8000);
+    final int smallTokens = estimateMessagesTokens(<LlmMessage>[small]);
+    final int largeTokens = estimateMessagesTokens(<LlmMessage>[large]);
 
-    test('两个包装实例各自计数，互不影响', () async {
-      // 主 Agent 的额度够发两次；子 Agent 的只够发一次。
+    test('两个包装实例各自按自己的上下文上限裁决，互不影响', () async {
+      // 主 Agent 的额度够放 large；子 Agent 只够放 small。
       final TurnBudget mainBudget =
-          TurnBudget(maxTokens: cap * 2, maxDuration: null);
+          TurnBudget(maxTokens: largeTokens + 10, maxDuration: null);
       final TurnBudget childBudget =
-          TurnBudget(maxTokens: cap, maxDuration: null);
+          TurnBudget(maxTokens: smallTokens + 10, maxDuration: null);
       final BudgetedLlmProvider main0 = BudgetedLlmProvider(
         _UsageProvider(<LlmResult>[_text('主 ok')]),
         budget: mainBudget,
@@ -147,15 +149,15 @@ void main() {
         budget: childBudget,
       );
 
-      expect((await main0.chat(<LlmMessage>[one])).content, '主 ok');
-      expect((await child0.chat(<LlmMessage>[one])).content, '子 ok');
+      expect((await main0.chat(<LlmMessage>[large])).content, '主 ok');
+      expect((await child0.chat(<LlmMessage>[small])).content, '子 ok');
       expect(
-        (await child0.chat(<LlmMessage>[one])).content,
+        (await child0.chat(<LlmMessage>[large])).content,
         kBudgetExhaustedReply,
         reason: '撞的是子 Agent 自己的额度',
       );
-      // 主轮次此时只累计了自己那一次——子 Agent 的两次没记到它头上。
-      expect((await main0.chat(<LlmMessage>[one])).content, '主 ok',
+      // 主轮次的额度不受子 Agent 影响。
+      expect((await main0.chat(<LlmMessage>[large])).content, '主 ok',
           reason: '子 Agent 的用量不应推进主轮次的计数器');
     });
 

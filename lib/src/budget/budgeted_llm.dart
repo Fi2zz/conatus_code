@@ -37,15 +37,12 @@ class BudgetedLlmProvider implements LlmProvider {
   final Duration idleReset;
 
   DateTime? _turnStart;
-  int _turnTokens = 0;
 
-  /// 开始新的用户轮次：清零墙钟与 token 累计。
+  /// 开始新的用户轮次：重置墙钟。
   ///
-  /// 仅靠 [idleReset] 推断轮边界不够：用户连续追问时每轮间隔可能都不到
-  /// 2 分钟，旧实现会把上一轮的时间累计进来，最终在正常对话中途误报预算。
+  /// token 护栏看的是**当前请求的上下文大小**，不跨步累加；因此只需重置墙钟。
   void beginTurn() {
     _turnStart = DateTime.now();
-    _turnTokens = 0;
   }
 
   @override
@@ -122,23 +119,21 @@ class BudgetedLlmProvider implements LlmProvider {
     );
   }
 
-  /// 重置新一轮并累计本次估算；超限返回 true。
+  /// 重置新一轮并检查墙钟 / 当前上下文大小。
   ///
-  /// 封顶按**当前模型的真实窗口**算（经 costTracker 查 models.dev），而不是一个
-  /// 写死的常数——32k 窗口的模型上 200k 的封顶永远等不到，1M 窗口的模型上又会
-  /// 在 20% 处过早收口。
+  /// 旧实现把每次请求的完整上下文估算**累加**到 `_turnTokens`：同一批历史在
+  /// 每一步被重复计数，长工具链会在上下文远未接近窗口时误报预算。现在只比较
+  /// **本次请求**的估算（OpenCode 也是按当前上下文与窗口判断）。
   bool _overLimit(int estimated) {
     final DateTime now = DateTime.now();
     final DateTime? start = _turnStart;
     if (start == null || now.difference(start) > idleReset) {
       _turnStart = now;
-      _turnTokens = 0;
     }
-    _turnTokens += estimated;
     final Duration elapsed = now.difference(_turnStart!);
     return budget.exceededClock(elapsed) ||
         budget.exceededTokens(
-          _turnTokens,
+          estimated,
           windowTokens: costTracker?.contextLength ?? 0,
         );
   }

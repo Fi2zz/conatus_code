@@ -1321,7 +1321,7 @@ class ConatusTuiController implements TuiUserPromptHost {
         turnOk = false;
         transcript.add(
           TuiRole.system,
-          '本轮预算已达上限（累计 token 或墙钟），已收口；'
+          '本轮预算已达上限（上下文 token 或墙钟），已收口；'
           '可调 [budget] max_turn_tokens / max_turn_seconds。',
         );
       }

@@ -22,9 +22,15 @@ void main() {
 
     test('自定义上限立即生效', () {
       const TurnBudget budget =
-          TurnBudget(maxDuration: Duration.zero, maxTokens: 0);
+          TurnBudget(maxDuration: Duration.zero, maxTokens: 1);
       expect(budget.exceededClock(const Duration(seconds: 1)), isTrue);
-      expect(budget.exceededTokens(1), isTrue);
+      expect(budget.exceededTokens(2), isTrue);
+    });
+
+    test('maxTokens 0 关闭 token 护栏', () {
+      const TurnBudget budget = TurnBudget(maxTokens: 0);
+      expect(budget.exceededTokens(1 << 30), isFalse);
+      expect(budget.describeTokenLimit(1000000), '不限（已关闭）');
     });
   });
 }

@@ -155,7 +155,7 @@ mode = "ask_when_needed"      # always_ask / ask_when_needed / never_ask
 
 [budget]
 max_turn_seconds = 600        # 单轮墙钟上限（秒）；0 = 不限
-# max_turn_tokens = 0        # 可选的更严上限；0 / 省略 = 按模型窗口的 75%
+# max_turn_tokens = 0        # 0 = 关闭 token 护栏；省略 = 模型窗口的 75%
 
 [checkpoint]
 enabled = true                # 每轮收口后对工作区做文件快照（/rewind 回滚）
@@ -1067,14 +1067,20 @@ stdio 子进程与本地命令同权，审批是未知风险的唯一防线，�
 
 ## 预算护栏
 
-每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 模型窗口 75% 的上下文
+每轮（空闲 2 分钟视为新一轮）默认 10 分钟墙钟 + 模型窗口 75% 的**当前上下文**
 token 护栏；超限时模型收到收口提示而非直接报错，TUI 状态栏显示
 `⚠ 预算收口` 并提示可调的配置项。估算按约 4 字符 1 token 的粗口径
 （`estimateMessagesTokens`），**只作护栏，不用于计费**。
 
 **token 封顶跟模型窗口走**：已知窗口时取 `窗口 × 0.75`（余下 1/4 留给模型
-输出与工具回填）与 `[budget] max_turn_tokens` 的较小者；省略或设为 `0` 时
-只按窗口。窗口来自 models.dev（见下）。
+输出与工具回填）与 `[budget] max_turn_tokens` 的较小者；省略时按窗口，
+**显式设为 `0` 则关闭 token 护栏**。比较的是本次请求的上下文大小，不是把
+多步请求累加——长工具链不会因为同一批历史被重复计数而提前收口。
+`max_turn_seconds = 0` 关闭墙钟护栏。窗口来自 models.dev（见下）。
+
+> OpenCode 本身没有这种单轮硬预算：它按上下文窗口自动压缩（默认 buffer
+> 15%），不设墙钟。需要 nava 跑长任务时，可把两项都设为 `0`，或只保留较宽松
+> 的墙钟。
 
 ## 成本与上下文窗口（models.dev）
 

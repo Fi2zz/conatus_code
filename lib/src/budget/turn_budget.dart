@@ -19,7 +19,8 @@ class TurnBudget {
   /// 单轮墙钟上限；null 表示不限。
   final Duration? maxDuration;
 
-  /// 单轮上下文 token 上限（用户配置）；null 表示不限。
+  /// 单轮上下文 token 上限（用户配置）；`null` = 未配置（按窗口 75%），
+  /// `0` = 显式关闭 token 护栏。
   final int? maxTokens;
 
   /// [elapsed] 是否达到或超过墙钟上限。
@@ -37,17 +38,21 @@ class TurnBudget {
   }
 
   /// 生效封顶：已知模型窗口时取 `窗口 × headroom` 与配置值的较小者。
+  ///
+  /// `maxTokens == 0` 是显式关闭护栏，返回 `null`（不限）。
   int? effectiveTokenLimit(int windowTokens) {
+    final int? configured = maxTokens;
+    if (configured == 0) return null;
     if (windowTokens > 0) {
       final int derived = (windowTokens * kWindowHeadroom).round();
-      final int? configured = maxTokens;
       if (configured == null || derived < configured) return derived;
     }
-    return maxTokens;
+    return configured;
   }
 
   /// 封顶来源的说明，供 `/doctor` 讲清「为什么是这个数」。
   String describeTokenLimit(int windowTokens) {
+    if (maxTokens == 0) return '不限（已关闭）';
     final int? limit = effectiveTokenLimit(windowTokens);
     if (limit == null) return '不限';
     if (windowTokens <= 0) return '$limit（配置值；模型窗口未知）';
