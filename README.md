@@ -349,6 +349,8 @@ dart:io，不经 fs 接缝；`/rewind` 是用户命令，不挂审批。
   等 high 风险工具询问。路径参数本身不再触发审批——需要目录信任时，在真正
   被 ask 的工具上选择「信任此文件夹」即可。`always_ask` 把阈值降到 medium，
   写操作才会询问。
+- **敏感文件默认**：与 OpenCode 对齐，`read` 的 `.env` / `.env.*` 默认 `ask`，
+  `.env.example` 默认 `allow`；显式 `read * = allow` 可以覆盖。
 - **工作区外**：路径落到 workdir 外时追加 `external_directory` 判定；`grep` 的
   `path` 参数也参与边界检查（但不会把每次 grep 变成路径信任提示）。
 - **MCP 资源**：`action = "list_mcp_resources"` / `"read_mcp_resource"` 配合
