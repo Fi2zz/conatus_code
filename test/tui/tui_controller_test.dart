@@ -107,6 +107,7 @@ Future<(ConatusTuiController, Context)> _build(
   TuiPermissionMode initialPermissionMode = TuiPermissionMode.askWhenNeeded,
   String? initialSession = 's1',
   bool startInPlanMode = false,
+  String toolOutput = '12:00',
 }) async {
   final Context app = Context.root();
   provideTools(app);
@@ -114,7 +115,7 @@ Future<(ConatusTuiController, Context)> _build(
     () => app.tools.fn(
       'get_time',
       description: '返回时间',
-      handler: (ToolContext ctx) async => ToolResult.success('12:00'),
+      handler: (ToolContext ctx) async => ToolResult.success(toolOutput),
     ),
   );
   provideLlm(app, llm: FallbackLlm(<LlmProvider>[_ScriptedProvider(replies)]));
@@ -244,6 +245,7 @@ void main() {
         ),
         const LlmResult(content: '好了。', provider: 'scripted', model: 'm'),
       ],
+      toolOutput: List<String>.filled(kToolPreviewLines + 1, '行').join('\n'),
     );
 
     await controller.handleLine('几点？');

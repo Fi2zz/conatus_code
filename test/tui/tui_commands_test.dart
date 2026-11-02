@@ -18,7 +18,7 @@ void main() {
     expect(menu.open, isTrue);
     expect(
       menu.matches.map((TuiCommand c) => c.name),
-      <String>['session', 'sessions'],
+      <String>['session', 'sessions', 'settings'],
     );
   });
 
