@@ -44,6 +44,8 @@ const int kTuiSessionTitlePreview = 40;
 /// 从事件流派生展示标题：首条 `user/message` 的文本前 40 字符。
 ///
 /// 只读派生，不写回会话——旧会话（无标题事件）不会因此多出一条标题事件。
+/// `@` 引用 / 文本附件会展开成 `<file path="...">...</file>` 块；标题里不显示
+/// 这段 XML，只保留用户自己写的文字；纯附件则用文件名。
 String? deriveSessionTitle(List<SessionEvent> events) {
   for (final SessionEvent event in events) {
     if (event.type != kUserMessageEvent) {
@@ -57,7 +59,7 @@ String? deriveSessionTitle(List<SessionEvent> events) {
     if (text is! String) {
       continue;
     }
-    final String flat = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final String flat = _titleText(text).trim().replaceAll(RegExp(r'\s+'), ' ');
     if (flat.isEmpty) {
       continue;
     }
@@ -69,6 +71,24 @@ String? deriveSessionTitle(List<SessionEvent> events) {
     return String.fromCharCodes(runes.take(kTuiSessionTitlePreview));
   }
   return null;
+}
+
+/// 去掉 `<file path="...">...</file>` 块；纯附件时回退为文件名。
+String _titleText(String text) {
+  final RegExp block = RegExp(r'<file path="([^"]*)">[\s\S]*?</file>');
+  final List<String> names = <String>[
+    for (final RegExpMatch match in block.allMatches(text))
+      _baseName(match.group(1) ?? ''),
+  ];
+  final String rest = text.replaceAll(block, ' ').trim();
+  if (rest.isNotEmpty) return rest;
+  if (names.isEmpty) return '';
+  return names.length == 1 ? names.first : '${names.first} 等 ${names.length} 个文件';
+}
+
+String _baseName(String path) {
+  final int slash = path.lastIndexOf('/');
+  return slash < 0 ? path : path.substring(slash + 1);
 }
 
 /// 会话选择面板状态。
