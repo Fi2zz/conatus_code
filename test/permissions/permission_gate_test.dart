@@ -117,6 +117,47 @@ void main() {
       expect(strict.gate.requests, hasLength(1));
     });
 
+    test('.env 读默认询问，.env.example 默认放行', () async {
+      final PermissionRig rig = assemblePermissionRig(
+        scope: const PermissionScope(askThreshold: ToolRisk.high),
+      );
+
+      await rig.tools.call(
+        permissionCall('read', <String, Object?>{'path': '/tmp/.env'}),
+      );
+      await rig.tools.call(
+        permissionCall('read', <String, Object?>{'path': '/tmp/.env.local'}),
+      );
+      expect(rig.gate.requests, hasLength(2));
+
+      await rig.tools.call(
+        permissionCall('read', <String, Object?>{
+          'path': '/tmp/.env.example',
+        }),
+      );
+      expect(rig.gate.requests, hasLength(2));
+    });
+
+    test('显式 read * allow 覆盖 .env 默认询问', () async {
+      final PermissionRig rig = assemblePermissionRig(
+        scope: const PermissionScope(
+          askThreshold: ToolRisk.high,
+          rules: <PermissionRule>[
+            PermissionRule(
+              action: 'read',
+              resource: '*',
+              effect: PermissionEffect.allow,
+            ),
+          ],
+        ),
+      );
+
+      await rig.tools.call(
+        permissionCall('read', <String, Object?>{'path': '/tmp/.env'}),
+      );
+      expect(rig.gate.requests, isEmpty);
+    });
+
     test('preapproved 覆盖路径时直接放行，不打扰用户', () async {
       final PermissionRig rig = assemblePermissionRig(
         scope: const PermissionScope(askThreshold: ToolRisk.high),
