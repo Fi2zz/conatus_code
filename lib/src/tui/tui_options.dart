@@ -88,7 +88,8 @@ class TuiOptions {
       '       nava -p <任务文本> [--output-format text|json] [--session <id>]\n'
       '       nava mcp <add|list|auth|logout> [--config <路径>]\n'
       '       nava import opencode [--write] [--global-only|--project-only]\n       nava project repair|prune        # 修复注册表 / 归档失效项目（--purge 删除）\n       nava worktree list|new|remove    # 管理 nava 自管 git worktree\n       nava plugin add|list|remove      # 管理 OpenCode 插件\n'
-      '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
+      '  --session <id>   打开/恢复指定会话（-s / -r 同义）\n'
+      '  -r, --resume <id> 恢复指定会话（等价 --session）\n'
       '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n'
       '  --trust-plugins  信任项目 .opencode 插件（headless 默认拒绝）\n'
       '  -p, --print <任务>  headless 单轮执行：跑完即退出，不启动 TUI\n'
@@ -132,7 +133,10 @@ class TuiOptions {
         planRequested = true;
       } else if (arg == '--trust-plugins') {
         trustPlugins = true;
-      } else if (arg == '--session') {
+      } else if (arg == '--session' ||
+          arg == '--resume' ||
+          arg == '-r' ||
+          arg == '-s') {
         final bool hasValue =
             index + 1 < args.length && !args[index + 1].startsWith('-');
         if (hasValue) {

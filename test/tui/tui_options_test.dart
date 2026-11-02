@@ -48,6 +48,13 @@ void main() {
     expect(TuiOptions.parse(const <String>['--config']).configPath, isNull);
   });
 
+  test('-r / -s / --resume 都恢复指定会话', () {
+    const String id = 'session_11111111-1111-4111-8111-111111111111';
+    expect(TuiOptions.parse(const <String>['-r', id]).session, id);
+    expect(TuiOptions.parse(const <String>['-s', id]).session, id);
+    expect(TuiOptions.parse(const <String>['--resume', id]).session, id);
+  });
+
   test('--trust-plugins 解析为 true', () {
     expect(
       TuiOptions.parse(const <String>['--trust-plugins']).trustPlugins,

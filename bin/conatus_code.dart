@@ -242,7 +242,12 @@ Future<void> main(List<String> args) async {
     keybinds: config.keybinds,
   );
   await runApp(AgentTui(controller: controller));
+  final String resumeSessionId = controller.sessionId;
   await runtime.dispose();
+  if (switchWorkdir == null && resumeSessionId.isNotEmpty) {
+    stdout.writeln();
+    stdout.writeln('恢复本次会话：nava -r $resumeSessionId');
+  }
   if (switchWorkdir != null) {
     final List<String> childArgs = <String>['--workdir', switchWorkdir!];
     if (options.configPath != null) {
