@@ -88,6 +88,16 @@ class _AgentTuiState extends State<AgentTui> {
   final List<TuiAttachment> _attachments = <TuiAttachment>[];
   bool _historyNavigating = false;
 
+  /// 最近一次看到的内部剪贴板（nocterm 收到 bracketed paste / IME 批量字符时
+  /// 会先写它，再合成 Ctrl+V）。用来区分「真 Ctrl+V」与「终端合成粘贴」。
+  String? _lastInternalClipboard;
+
+  /// 最近一次看到的系统剪贴板。
+  String? _lastSystemClipboard;
+
+  /// 最近一次实际插入/消费的粘贴文本；连续粘贴同一内容时复用它。
+  String? _lastPastedText;
+
   @override
   void initState() {
     super.initState();
@@ -108,6 +118,8 @@ class _AgentTuiState extends State<AgentTui> {
     unawaited(_controller.start());
     unawaited(_resolveLocation());
     _disableLiteralNext();
+    // 以启动时的内部缓冲为基线：终端合成粘贴会在此后改写它，真 Ctrl+V 不会。
+    _lastInternalClipboard = ClipboardManager.paste();
   }
 
   /// 关掉终端的 IEXTEN：否则 Ctrl+V 会被 tty 当作 literal-next 吃掉，
@@ -288,13 +300,35 @@ class _AgentTuiState extends State<AgentTui> {
     if (!event.matches(LogicalKey.keyV, ctrl: true)) {
       return false;
     }
-    // 系统剪贴板优先：连续粘贴时 nocterm 的内部缓冲不会更新，先读它会把
-    // 第二次粘贴吞成第一次的旧内容。
     final String? system =
         (component.clipboardTextReader ?? readClipboardTextSync)();
     final String? internal = ClipboardManager.paste();
-    final String? text = system != null && system.isNotEmpty ? system : internal;
+    final bool internalChanged = internal != _lastInternalClipboard;
+    final bool systemChanged = system != _lastSystemClipboard;
+    _lastInternalClipboard = internal;
+    _lastSystemClipboard = system;
+
+    // 判定优先级：
+    // 1. 内部缓冲刚被改写 → 终端合成粘贴（bracketed paste / IME 批量字符），
+    //    用内部内容，**不能**被旧的系统剪贴板覆盖；
+    // 2. 系统剪贴板刚变 → 用户刚复制过，真 Ctrl+V 读系统；
+    // 3. 两者都没变 → 连续粘贴，复用上一次实际消费的文本；
+    // 4. 兜底按内部 → 系统。
+    String? text;
+    if (internalChanged && internal != null && internal.isNotEmpty) {
+      text = internal;
+    } else if (systemChanged && system != null && system.isNotEmpty) {
+      text = system;
+    } else if (_lastPastedText != null && _lastPastedText!.isNotEmpty) {
+      text = _lastPastedText;
+    } else if (internal != null && internal.isNotEmpty) {
+      text = internal;
+    } else if (system != null && system.isNotEmpty) {
+      text = system;
+    }
+
     if (text != null && text.isNotEmpty) {
+      _lastPastedText = text;
       final List<TuiAttachment> found = extractPathAttachments(
         text,
         _controller.workdir,
@@ -303,13 +337,11 @@ class _AgentTuiState extends State<AgentTui> {
         _addAttachments(found);
         return true;
       }
-      // 系统剪贴板的文本终端没有帮我们插入，这里补插入；内部剪贴板交给
-      // TextField 的 Ctrl+V 默认处理。
-      if (system != null && system.isNotEmpty) {
-        _insertPastedText(system);
-        return true;
-      }
-      return false;
+      // 内部剪贴板交给 TextField 的 Ctrl+V 默认处理；其余（系统剪贴板或
+      // 上一次消费的文本）由这里补插入，避免终端没帮我们插入。
+      if (text == internal) return false;
+      _insertPastedText(text);
+      return true;
     }
     unawaited(_attachClipboardImage());
     return true;

@@ -219,6 +219,32 @@ void main() {
     }
   });
 
+  test('bracketed paste / IME 提交优先使用内部剪贴板，不被系统旧内容覆盖', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('nava-paste-ime-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final File file = File('${dir.path}/old.md')..writeAsStringSync('old');
+    ClipboardManager.clear();
+
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui(clipboardTextReader: () => file.path);
+    try {
+      // 模拟 nocterm 收到 bracketed paste / IME 提交：先写内部剪贴板，再合成 Ctrl+V。
+      ClipboardManager.copy('你好世界');
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyV,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+
+      expect(tester.terminalState, containsText('你好世界'));
+      expect(tester.terminalState, isNot(containsText('[file #1')));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('ctrl+v 粘贴文件路径生成附件占位', () async {
     final Directory dir = Directory.systemTemp.createTempSync('nava-paste-');
     addTearDown(() => dir.deleteSync(recursive: true));

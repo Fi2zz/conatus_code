@@ -4,6 +4,9 @@
 
 ## [未发布]
 
+- **输入法 / 粘贴误触**：终端把多字符输入（中文 IME 提交、bracketed paste）
+  合成为 Ctrl+V 时，优先使用 nocterm 的内部剪贴板；只有系统剪贴板刚变化时
+  才读取系统剪贴板。修复「打完拼音切到下一个键，输入框插入旧剪贴板内容」。
 - **插件宿主（P4.1）**：新增 `nava plugin add|list|remove` 与 `[[plugins]]` 配置。
   通过 Node 子进程加载 OpenCode V1/V2 插件，支持技能根 / `ctx.skill.transform`、
   上下文注入、自定义工具、`tool.execute.before|after`、`event`、`shell.env`。
