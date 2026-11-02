@@ -34,5 +34,8 @@ doc/api/
 *.js.deps
 *.js.map
 
+# 插件测试 fixtures 是源码，不是生成物。
+!test/plugins/fixtures/**/*.js
+
 .flutter-plugins
 .flutter-plugins-dependencies
