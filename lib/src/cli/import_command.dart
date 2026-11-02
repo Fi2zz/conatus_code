@@ -26,9 +26,9 @@ const String kImportUsage = '''
   --help                  显示本帮助
 
 支持：model / default_agent / mcp.servers / permissions / instructions，
-      agents / commands（物化为 .nava/agents 与 .nava/commands 下的 Markdown）。
-providers / plugins / references / policies / formatter / tools /
-skills 暂不支持，会列出告警。''';
+      agents / commands（物化为 .nava/agents 与 .nava/commands 下的 Markdown），
+      providers / references / lsp / plugins（写入 [[plugins]]）。
+policies / formatter / tools 暂不支持，会列出告警。''';
 
 /// 解析并执行导入，返回进程退出码。
 Future<int> runImportCli(

@@ -1,12 +1,13 @@
 /// OpenCode 配置 → nava 导入模型（model / agent / MCP / permissions / instructions）。
 ///
-/// 只映射 nava 真正支持的字段；`agents` / `commands` / `providers` / `plugins`
-/// 等先告警跳过，避免写出运行时不生效的配置。
+/// 只映射 nava 真正支持的字段；`policies` / `formatter` / `tools` 等先告警跳过，
+/// 避免写出运行时不生效的配置。
 library;
 
 import 'dart:io';
 
 import '../config/config_schema.dart';
+import '../plugins/plugin_config.dart';
 import 'opencode_import_command_defs.dart';
 import 'opencode_import_definitions.dart';
 import 'opencode_import_lsp.dart';
@@ -18,7 +19,6 @@ import 'opencode_import_source.dart';
 import 'opencode_import_types.dart';
 
 const List<String> _ignoredKeys = <String>[
-  'plugins',
   'policies',
   'formatter',
   'tools',
@@ -38,6 +38,7 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
   final Set<String> ignored = <String>{};
   final Map<String, ImportedAgent> agents = <String, ImportedAgent>{};
   final Map<String, ImportedCommand> commands = <String, ImportedCommand>{};
+  final Map<String, ImportedPlugin> plugins = <String, ImportedPlugin>{};
   String? model;
   String? defaultAgent;
   LspConfig lsp = const LspConfig();
@@ -86,6 +87,13 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     )) {
       commands[command.name] = command;
     }
+    for (final ImportedPlugin plugin in _plugins(
+      values['plugins'],
+      document.path,
+      warnings,
+    )) {
+      plugins[plugin.source] = plugin;
+    }
     ignored.addAll(_ignoredKeys.where(values.containsKey));
     for (final ImportedProvider provider in mapOpenCodeProviders(
       values['providers'],
@@ -106,10 +114,6 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
   }
   for (final String key in _ignoredKeys) {
     if (!ignored.contains(key)) continue;
-    if (key == 'plugins') {
-      warnings.add('opencode 的 plugins 暂不支持（自定义工具请用 [[tools]] 或 MCP 包装）。');
-      continue;
-    }
     warnings.add('opencode 的 $key 暂不支持，已忽略。');
   }
   return OpenCodeImport(
@@ -123,9 +127,49 @@ OpenCodeImport buildOpenCodeImport(OpenCodeSources sources) {
     references: references.values.toList(growable: false),
     agents: agents.values.toList(growable: false),
     commands: commands.values.toList(growable: false),
+    plugins: plugins.values.toList(growable: false),
     lsp: lsp,
     warnings: List<String>.unmodifiable(warnings),
   );
+}
+
+/// OpenCode `plugins`：字符串或 `{package, options}`；本地路径转绝对。
+List<ImportedPlugin> _plugins(
+  Object? raw,
+  String source,
+  List<String> warnings,
+) {
+  if (raw == null) return const <ImportedPlugin>[];
+  if (raw is! List) {
+    warnings.add('$source: plugins 必须是数组，已忽略。');
+    return const <ImportedPlugin>[];
+  }
+  final List<ImportedPlugin> result = <ImportedPlugin>[];
+  for (final Object? item in raw) {
+    String? pluginSource;
+    Map<String, Object?> options = const <String, Object?>{};
+    if (item is String) {
+      pluginSource = item;
+    } else if (item is Map && item['package'] is String) {
+      pluginSource = item['package'] as String;
+      final Object? rawOptions = item['options'];
+      if (rawOptions is Map) {
+        options = rawOptions.cast<String, Object?>();
+      }
+    }
+    if (pluginSource == null || pluginSource.trim().isEmpty) {
+      warnings.add('$source: plugins 项格式不支持，已跳过。');
+      continue;
+    }
+    final String value = isLocalPluginSource(pluginSource)
+        ? resolveLocalPluginSource(
+            pluginSource,
+            base: File(source).parent.path,
+          )
+        : pluginSource;
+    result.add(ImportedPlugin(source: value, options: options));
+  }
+  return result;
 }
 
 String? _model(Object? raw, String source, List<String> warnings) {

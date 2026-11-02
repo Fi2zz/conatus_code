@@ -6,6 +6,7 @@ import 'package:toml/toml.dart';
 import '../config/config_schema.dart';
 import '../config/config_toml.dart';
 import '../config/config_writer.dart';
+import '../plugins/plugin_config.dart';
 import 'opencode_import_render.dart';
 import 'opencode_import_types.dart';
 
@@ -20,11 +21,18 @@ String applyOpenCodeImport(
   List<String> skillDirs = const <String>[],
   List<ImportedProvider> providers = const <ImportedProvider>[],
   List<ImportedReference> references = const <ImportedReference>[],
+  List<ImportedPlugin> plugins = const <ImportedPlugin>[],
   LspConfig lsp = const LspConfig(),
 }) {
   String out = base;
   if (model != null) out = upsertDefaultModel(out, model);
   if (agent != null) out = _upsertAgentDefault(out, agent);
+  for (final ImportedPlugin plugin in plugins) {
+    out = _append(
+      out,
+      pluginTomlSnippet(plugin.source, options: plugin.options),
+    );
+  }
   for (final ImportedReference reference in references) {
     out = _append(out, _renderReference(reference));
   }

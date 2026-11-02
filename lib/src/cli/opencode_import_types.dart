@@ -29,6 +29,7 @@ class OpenCodeImport {
     this.references = const <ImportedReference>[],
     this.agents = const <ImportedAgent>[],
     this.commands = const <ImportedCommand>[],
+    this.plugins = const <ImportedPlugin>[],
     this.lsp = const LspConfig(),
     this.warnings = const <String>[],
   });
@@ -43,6 +44,7 @@ class OpenCodeImport {
   final List<ImportedReference> references;
   final List<ImportedAgent> agents;
   final List<ImportedCommand> commands;
+  final List<ImportedPlugin> plugins;
   final LspConfig lsp;
   final List<String> warnings;
 
@@ -57,8 +59,20 @@ class OpenCodeImport {
       references.isEmpty &&
       agents.isEmpty &&
       commands.isEmpty &&
+      plugins.isEmpty &&
       !lsp.enabled &&
       lsp.servers.isEmpty;
+}
+
+/// OpenCode `plugins` 里的一项。
+class ImportedPlugin {
+  const ImportedPlugin({
+    required this.source,
+    this.options = const <String, Object?>{},
+  });
+
+  final String source;
+  final Map<String, Object?> options;
 }
 
 /// OpenCode `references.<name>` 里的一个本地目录。

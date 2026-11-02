@@ -267,4 +267,24 @@ void main() {
     expect(warnings, contains('agents'));
     expect(warnings, contains('commands'));
   });
+
+  test('plugins 字符串与 {package, options} 映射为 ImportedPlugin', () {
+    final OpenCodeImport result = _build(<Map<String, Object?>>[
+      <String, Object?>{
+        'plugins': <Object?>[
+          './local-plugin',
+          <String, Object?>{
+            'package': '@acme/plugin',
+            'options': <String, Object?>{'strict': true},
+          },
+        ],
+      },
+    ]);
+
+    expect(result.plugins, hasLength(2));
+    expect(result.plugins.first.source, contains('local-plugin'));
+    expect(result.plugins.last.source, '@acme/plugin');
+    expect(result.plugins.last.options['strict'], isTrue);
+    expect(result.warnings.join('\n'), isNot(contains('plugins')));
+  });
 }

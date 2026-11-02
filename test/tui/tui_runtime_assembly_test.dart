@@ -44,6 +44,31 @@ void main() {
     await runtime.dispose();
   });
 
+  test('[[plugins]] 装配后注册插件工具与技能', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
+    final Directory home = Directory.systemTemp.createTempSync('nava-home');
+    addTearDown(() {
+      dir.deleteSync(recursive: true);
+      home.deleteSync(recursive: true);
+    });
+    final String sep = Platform.pathSeparator;
+    final String fixture =
+        '${Directory.current.path}/test/plugins/fixtures/v1_plugin.js';
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      baseDir: dir.path,
+      sessionDir: dir.path,
+      memoryFile: '${dir.path}${sep}memory.json',
+      webTools: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      workdir: dir.path,
+      plugins: <PluginConfig>[PluginConfig(source: fixture)],
+      pluginHome: home.path,
+    );
+
+    expect(runtime.tools.names, contains('plugin_echo'));
+    await runtime.dispose();
+  });
+
   test('[[tools]] 装配后进入工具表并带参数 schema', () async {
     final Directory dir = Directory.systemTemp.createTempSync('conatus-tui');
     addTearDown(() => dir.deleteSync(recursive: true));

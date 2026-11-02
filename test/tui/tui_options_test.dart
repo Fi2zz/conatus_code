@@ -48,6 +48,14 @@ void main() {
     expect(TuiOptions.parse(const <String>['--config']).configPath, isNull);
   });
 
+  test('--trust-plugins 解析为 true', () {
+    expect(
+      TuiOptions.parse(const <String>['--trust-plugins']).trustPlugins,
+      isTrue,
+    );
+    expect(TuiOptions.parse(const <String>[]).trustPlugins, isFalse);
+  });
+
   test('--help 与 -h 都置 helpRequested，且不打断其余解析', () {
     expect(TuiOptions.parse(const <String>['--help']).helpRequested, isTrue);
     expect(TuiOptions.parse(const <String>['-h']).helpRequested, isTrue);

@@ -156,6 +156,7 @@ export 'src/config/config_schema.dart'
         McpServerType,
         ModelConfig,
         PermissionConfig,
+        PluginConfig,
         ProviderConfig,
         ProviderType,
         ReferenceConfig,
@@ -266,6 +267,8 @@ export 'src/mcp/mcp_prompt_commands.dart'
 export 'src/permissions/permission_rule_pattern.dart'
     show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;
+export 'src/plugins/plugin_cli.dart' show runPluginCli;
+export 'src/plugins/plugin_usage.dart' show kPluginUsage;
 export 'src/project/project_cli.dart' show runProjectCli;
 export 'src/project/project_database.dart'
     show ProjectDatabase, ProjectRecord, WorktreeRecord;

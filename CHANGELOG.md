@@ -4,6 +4,13 @@
 
 ## [未发布]
 
+- **插件宿主（P4.1）**：新增 `nava plugin add|list|remove` 与 `[[plugins]]` 配置。
+  通过 Node 子进程加载 OpenCode V1/V2 插件，支持技能根 / `ctx.skill.transform`、
+  上下文注入、自定义工具、`tool.execute.before|after`、`event`、`shell.env`。
+  项目 `.opencode/plugins` 与 `opencode.json(c)` 自动发现，首次加载前审批；
+  headless 默认拒绝（`--trust-plugins` 放行）。无 node 时插件 no-op，不影响启动。
+  `nava import opencode` 现在把 `plugins` 映射为 `[[plugins]]`。
+
 - **会话 UI 状态**：每个会话持久化聊天滚动位置与最近 100 条输入，切回/重启
   后恢复；输入框为空时 `↑` / `↓` 浏览输入历史。
 - **会话恢复**：压缩摘要为空时拒绝提交并 fail-open，保留原历史，避免切回长会话后

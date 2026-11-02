@@ -47,6 +47,8 @@ class ConfigParser extends ConfigValues {
     mergeAllSkills: readBool(raw, 'merge_all_available_skills', false),
     bootstrapSkills: _readBootstrapSkills(),
     instructions: _readInstructions(),
+    plugins: _readPlugins(),
+    trustProjectPlugins: readBool(raw, 'trust_project_plugins', false),
     deprecations: _readDeprecations(),
   );
 
@@ -61,6 +63,32 @@ class ConfigParser extends ConfigValues {
     for (final String entry in readStringList(raw, 'instructions'))
       if (entry.trim().isNotEmpty) entry.trim(),
   ];
+
+  /// 顶层 `[[plugins]]`：source 必填；options 必须是表。
+  List<PluginConfig> _readPlugins() {
+    final List<Map<String, dynamic>> tables = readTableList('plugins');
+    return <PluginConfig>[
+      for (final Map<String, dynamic> table in tables) _readPlugin(table),
+    ];
+  }
+
+  PluginConfig _readPlugin(Map<String, dynamic> table) {
+    final String? pluginSource = readString(table, 'source');
+    if (pluginSource == null) {
+      throw ConfigException('$source：plugins 的 source 不能为空。');
+    }
+    final Object? rawOptions = table['options'];
+    if (rawOptions != null && rawOptions is! Map) {
+      throw ConfigException('$source：plugins 的 options 必须是表。');
+    }
+    return PluginConfig(
+      source: pluginSource,
+      enabled: readBool(table, 'enabled', true),
+      options: rawOptions == null
+          ? const <String, Object?>{}
+          : (rawOptions as Map).cast<String, Object?>(),
+    );
+  }
 
   static const List<String> _deprecatedTopLevel = <String>[
     'thinking',

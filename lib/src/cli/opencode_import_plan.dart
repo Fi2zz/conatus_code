@@ -71,6 +71,12 @@ OpenCodeImportPlan planOpenCodeImport({
     added,
     skipped,
   );
+  final List<ImportedPlugin> plugins = _planPlugins(
+    import.plugins,
+    existing,
+    added,
+    skipped,
+  );
   final List<ImportedReference> references = _planReferences(
     import.references,
     existing,
@@ -88,6 +94,7 @@ OpenCodeImportPlan planOpenCodeImport({
     skillDirs: skillDirs,
     providers: providers,
     references: references,
+    plugins: plugins,
     lsp: lsp ?? const LspConfig(),
   );
   ensureImportParseable(updated);
@@ -103,6 +110,7 @@ OpenCodeImportPlan planOpenCodeImport({
       skillDirs: skillDirs,
       providers: providers,
       references: references,
+      plugins: plugins,
       lsp: lsp ?? const LspConfig(),
     ).trim(),
     added: List<String>.unmodifiable(added),
@@ -230,6 +238,30 @@ List<String> _planSkillDirs(
   }
   added.add('extra_skill_dirs');
   return skillDirs;
+}
+
+List<ImportedPlugin> _planPlugins(
+  List<ImportedPlugin> plugins,
+  Map<String, Object?> existing,
+  List<String> added,
+  List<String> skipped,
+) {
+  final Object? raw = existing['plugins'];
+  final Set<String> sources = <String>{
+    if (raw is List)
+      for (final Object? item in raw)
+        if (item is Map && item['source'] is String) item['source'] as String,
+  };
+  final List<ImportedPlugin> keep = <ImportedPlugin>[];
+  for (final ImportedPlugin plugin in plugins) {
+    if (sources.contains(plugin.source)) {
+      skipped.add('plugin ${plugin.source}（已有）');
+      continue;
+    }
+    keep.add(plugin);
+    added.add('plugin ${plugin.source}');
+  }
+  return keep;
 }
 
 List<ImportedProvider> _planProviders(

@@ -558,6 +558,27 @@ class TuiConfig {
 }
 
 /// 完整配置。
+/// 一个插件声明；对应顶层 `[[plugins]]`。
+///
+/// [source] 是本地目录（`.` / `/` / `~` 开头）或 npm / git 包 spec；
+/// [options] 原样传给插件函数。
+class PluginConfig {
+  const PluginConfig({
+    required this.source,
+    this.enabled = true,
+    this.options = const <String, Object?>{},
+  });
+
+  /// 本地目录或包 spec。
+  final String source;
+
+  /// 是否启用；缺省 true。
+  final bool enabled;
+
+  /// 传给插件的 options 表。
+  final Map<String, Object?> options;
+}
+
 class ConatusCodeConfig {
   const ConatusCodeConfig({
     this.llm = const LlmConfig(),
@@ -586,6 +607,8 @@ class ConatusCodeConfig {
     this.mergeAllSkills = false,
     this.bootstrapSkills = const <String>[],
     this.instructions = const <String>[],
+    this.plugins = const <PluginConfig>[],
+    this.trustProjectPlugins = false,
     this.deprecations = const <String>[],
   });
 
@@ -670,6 +693,13 @@ class ConatusCodeConfig {
   /// 顶层 `instructions`：额外指令来源（路径 / glob / URL），按书写顺序追加在
   /// 项目 `AGENTS.md` 之后；相对路径以工作目录为基准，`~` 展开家目录。
   final List<String> instructions;
+
+  /// 顶层 `[[plugins]]`：全局插件声明（默认信任）。
+  final List<PluginConfig> plugins;
+
+  /// 顶层 `trust_project_plugins`：项目 `.opencode` 插件自动信任，跳过首次审批。
+  /// headless 下仍默认拒绝，除非同时传 `--trust-plugins`。
+  final bool trustProjectPlugins;
 
   /// 已废弃但仍在配置文件里出现的键（启动时上屏，`/doctor` 可见）。
   final List<String> deprecations;

@@ -44,6 +44,7 @@ import '../diagnose/doctor.dart';
 import '../hooks/hooks.dart';
 import '../lsp/lsp_manager.dart';
 import '../permissions/permission_wiring.dart';
+import '../plugins/plugin_config.dart';
 import '../project/project_database.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
@@ -3989,6 +3990,11 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _bind(String id) async {
     final Session session = await _sessions.open(id);
     _session = session;
+    unawaited(
+      pluginServiceOf(_app)?.notify('session.created', <String, Object?>{
+        'sessionID': id,
+      }) ?? Future<void>.value(),
+    );
     // Agent 选择按会话恢复：标签之间互不继承（_firstBind 只用于启动会话）。
     // 自定义命令的临时覆盖优先于会话事件，回合结束后再还原。
     final String fallback = _firstBind ? _startupAgentId() : _defaultAgentId();
@@ -4169,6 +4175,11 @@ class ConatusTuiController implements TuiUserPromptHost {
         transcript.add(TuiRole.system, 'Stop hook 失败：$hookError');
       }
     }
+    unawaited(
+      pluginServiceOf(_app)?.notify('session.idle', <String, Object?>{
+        'sessionID': _session?.id ?? '',
+      }) ?? Future<void>.value(),
+    );
   }
 
   /// SteeringSource：合并两个来源——先 storyNotices（人的编辑通报，先感知

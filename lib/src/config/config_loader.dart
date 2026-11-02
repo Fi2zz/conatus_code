@@ -67,6 +67,15 @@ const String kDefaultConfigToml = '''
 # BRAVE_API_KEY = "..."
 # FIRECRAWL_API_KEY = "fc-..."
 
+# OpenCode 插件（可选）：需要 node（或 NAVA_NODE 指向它）。
+# 项目 .opencode/plugins/ 与 opencode.json(c) 的 plugins 会自动发现，
+# 首次加载前询问；headless 默认拒绝，需要 --trust-plugins。
+# 也可用 `nava plugin add <目录|npm/git spec>` 管理。
+# [[plugins]]
+# source = "superpowers@git+https://github.com/obra/superpowers.git"
+# options = { agent = "reviewer" }
+# trust_project_plugins = false
+
 # 声明式自定义工具（可选）：CLI 或 HTTP 后端，参数 schema 显式声明。
 # CLI：模型参数以 JSON 从 stdin 传入；stdout 支持 {"content": "..."} 或纯文本。
 # 自定义工具是用户显式配置的受信端，默认 risk = "high"（进审批）。

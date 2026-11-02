@@ -16,6 +16,7 @@
 - 🤝 多智能体协作（任务板 + 成员运行时）
 - 🔒 审批与命令审查（高危操作走审批；命令执行前过 `command_shield` 形状审查）
 - 🗺️ 计划闭环（todowrite 建计划并在执行中推进、计划面板实时渲染）
+- 🔌 插件（可选）：加载 OpenCode V1/V2 JS 插件，技能 / 工具 / hook / 事件接入
 - 🩹 失败自愈（工具失败自动反思重试，可按需重规划）
 - ⏱️ 预算护栏（每轮墙钟 + 上下文 token 估算 + 成本跟踪）
 - 📜 故事层（可选，默认关闭）：编辑即补丁、事前审阅、`/story` 时间轴与分叉
@@ -218,10 +219,41 @@ nava import opencode --global-only   # 只读 ~/.config/opencode
 - **不覆盖已有配置**：已有 `default_model` / `default_agent` / 同名 MCP /
   重复 permission 会跳过；顶层 `instructions` / `extra_skill_dirs` 已存在时
   整项跳过（不合并数组）。
-- `plugins` / `policies` / `formatter` / `tools`
+- `plugins` 映射为 `[[plugins]]`；`policies` / `formatter` / `tools`
   暂不支持，逐项告警；`lsp` 会映射为 `[lsp]`（`true` 仅在 Dart 项目里生成 dart server）。
 - `--write` 走 `writeConfigFile`：原子写、权限 0600；写入前先校验合并结果仍是
   合法 TOML。
+
+## 插件（OpenCode 兼容）
+
+nava 通过一个 Node 子进程宿主加载 OpenCode 插件；**没有 node 时插件整体跳过**，
+TUI 与其余功能不受影响（`NAVA_NODE` 可指定 node 路径）。
+
+```bash
+nava plugin add <本地目录|npm/git spec>   # 安装并写入 config.toml
+nava plugin list                         # 全局插件 + 项目插件
+nava plugin remove <spec> [--purge]      # 移除；--purge 同时卸载包
+```
+
+```toml
+[[plugins]]
+source = "superpowers@git+https://github.com/obra/superpowers.git"
+# options = { agent = "reviewer" }
+# enabled = false
+```
+
+- **项目插件自动发现**：`<workdir>/.opencode/plugins/*.{js,mjs,cjs}`、同名目录，
+  以及 `opencode.json(c)` 的 `plugins`。首次加载前在终端询问 `always / once / deny`；
+  信任记录落 `plugin-trust.json`（0600），插件内容变化会重新询问。
+- **headless 默认拒绝项目插件**；`--trust-plugins` 或顶层
+  `trust_project_plugins = true` 才加载。全局 `[[plugins]]` 默认信任。
+- **兼容面（P4.1）**：V1 命名导出与 V2 `default.setup`；技能根 /
+  `ctx.skill.transform`；`ctx.session.hook("context")` 与
+  `experimental.chat.messages.transform` 的上下文注入；自定义工具；
+  `tool.execute.before`（可拒绝）/ `after`（可改结果）；`event`；
+  `shell.env`。`tool.execute.before` 暂不替换参数；`.ts` 插件需先转成 JS。
+- 插件是任意代码执行；只加载你信任的包。`.opencode` 始终只读，安装与缓存只落
+  `~/.nava/plugins`。
 
 ## 命名外部目录（`[references.*]`）
 

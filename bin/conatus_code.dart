@@ -33,6 +33,9 @@ Future<void> main(List<String> args) async {
   if (args.isNotEmpty && args.first == 'worktree') {
     exit(await runWorktreeCli(args.sublist(1)));
   }
+  if (args.isNotEmpty && args.first == 'plugin') {
+    exit(await runPluginCli(args.sublist(1)));
+  }
   final TuiOptions options = TuiOptions.parse(args);
   if (options.helpRequested) {
     stdout.write(TuiOptions.usage);
@@ -191,6 +194,9 @@ Future<void> main(List<String> args) async {
     configWarnings: config.deprecations,
     references: references,
     harness: harness,
+    plugins: config.plugins,
+    trustProjectPlugins: options.trustPlugins || config.trustProjectPlugins,
+    pluginHome: Platform.environment['HOME'],
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。

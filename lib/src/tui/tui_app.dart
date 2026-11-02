@@ -48,6 +48,11 @@ import '../lsp/lsp_tool.dart';
 import '../mcp/mcp_assembly.dart';
 import '../mcp/mcp_prompt_commands.dart';
 import '../permissions/permission_wiring.dart';
+import '../plugins/plugin_assembly.dart';
+import '../plugins/plugin_inline_skills.dart';
+import '../plugins/plugin_service.dart';
+import '../plugins/plugin_trust.dart';
+import '../plugins/plugin_types.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
 import '../references/references.dart';
@@ -240,6 +245,10 @@ class ConatusTuiRuntime {
     List<ResolvedReference> references = const <ResolvedReference>[],
     String? instructionHome,
     HarnessManifest? harness,
+    List<PluginConfig> plugins = const <PluginConfig>[],
+    bool trustProjectPlugins = false,
+    PluginTrustPrompter? trustPrompter,
+    String? pluginHome,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
@@ -348,7 +357,28 @@ class ConatusTuiRuntime {
             inner: shell ?? LocalShellExecutor(),
             policy: CommandPolicy(),
           );
-    provideShellLocal(app, executor: guardedShell);
+    // ── 插件：Node 宿主 + 技能/工具/上下文/hook 接线 ─────────────
+    // 必须在 shell 与技能装配之前启动：插件可以注入 shell 环境变量，
+    // 也可以注册技能根与内联技能。
+    final PluginService pluginService = await PluginAssembly.assemble(
+      plugins: plugins,
+      workdir: resolvedWorkdir,
+      baseDir: resolvedBaseDir,
+      tools: app.tools,
+      interactive: interactive,
+      trustProjectPlugins: trustProjectPlugins,
+      prompter: trustPrompter,
+      configPath: configPath,
+      homeDir: pluginHome,
+      warn: stderr.writeln,
+    );
+    app.provide(kPluginServiceKey, pluginService);
+    app.onDispose(pluginService.close);
+
+    provideShellLocal(
+      app,
+      executor: pluginService.wrapShell(guardedShell),
+    );
     // 'shellInteractive'：用户直发命令（`!` shell 模式）的交互缝——本地直执、
     // 不过模型命令审查（对齐 OpenCode）；模型命令仍走上面的 'shell' 缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
@@ -751,6 +781,14 @@ class ConatusTuiRuntime {
 
     // ── system prompt / 记忆 / 压缩 / 技能 ──────────────────────
     final SystemPrompt prompt = provideSystemPrompt(app);
+    if (pluginService.contextText.isNotEmpty) {
+      prompt.section(
+        PromptSection(
+          name: 'plugins',
+          text: () => pluginService.contextText,
+        ),
+      );
+    }
     // permissions.json 载入失败时 deny 规则会静默消失：把这件事写进系统提示
     // （模型与用户都会看到），并在 `/doctor` 里再报一次。
     final String? permissionLoadError = permissionWiring.loadError;
@@ -885,12 +923,18 @@ class ConatusTuiRuntime {
       stderr.writeln('技能恢复跳过：${error.message}');
     }
     if (skills) {
-      await provideSkillRegistry(app);
+      await provideSkillRegistry(
+        app,
+        inlineSkills: pluginService.result.inlineSkills,
+      );
       provideSkillCatalog(app, includeAll: mergeAllSkills);
       provideSkillTool(app, includeAll: mergeAllSkills);
       await provideSkillFilesystem(
         app,
-        roots: _skillRoots(resolvedWorkdir, extraSkillDirs),
+        roots: _skillRoots(
+          resolvedWorkdir,
+          <String>[...extraSkillDirs, ...pluginService.skillRoots],
+        ),
       );
       if (bootstrapSkills.isNotEmpty) {
         final SkillBootstrapSection section = SkillBootstrapSection(

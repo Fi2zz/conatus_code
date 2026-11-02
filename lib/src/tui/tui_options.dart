@@ -35,6 +35,7 @@ class TuiOptions {
     this.printRequested = false,
     this.harnessPath,
     this.workdir,
+    this.trustPlugins = false,
   });
 
   /// 要打开/恢复的会话 id；`null` 表示新建会话（缺省）。
@@ -76,15 +77,20 @@ class TuiOptions {
   /// `--workdir <路径>` 覆盖工作目录；`null` 表示用配置或当前目录。
   final String? workdir;
 
+  /// `--trust-plugins`：信任项目 `.opencode` 插件（否则 headless 默认拒绝，
+  /// 交互模式首次仍会询问）。
+  final bool trustPlugins;
+
   /// 用法文案。
   static const String usage =
       '用法：nava '
       '[--session <id>] [--config <路径>]\n'
       '       nava -p <任务文本> [--output-format text|json] [--session <id>]\n'
       '       nava mcp <add|list|auth|logout> [--config <路径>]\n'
-      '       nava import opencode [--write] [--global-only|--project-only]\n       nava project repair|prune        # 修复注册表 / 归档失效项目（--purge 删除）\n       nava worktree list|new|remove    # 管理 nava 自管 git worktree\n'
+      '       nava import opencode [--write] [--global-only|--project-only]\n       nava project repair|prune        # 修复注册表 / 归档失效项目（--purge 删除）\n       nava worktree list|new|remove    # 管理 nava 自管 git worktree\n       nava plugin add|list|remove      # 管理 OpenCode 插件\n'
       '  --session <id>   打开/恢复指定会话（缺省新建会话，格式 session_<uuid>）\n'
       '  --config <路径>  配置文件路径（默认 ~/.nava/config.toml）\n'
+      '  --trust-plugins  信任项目 .opencode 插件（headless 默认拒绝）\n'
       '  -p, --print <任务>  headless 单轮执行：跑完即退出，不启动 TUI\n'
       '       注意：headless 不装审批链——需要确认的工具会被直接拒绝\n'
       '       （PERMISSION_ASK_UNATTENDED），要用请在 [[permissions]] 显式 allow\n'
@@ -113,6 +119,7 @@ class TuiOptions {
     bool printRequested = false;
     String? harnessPath;
     String? workdir;
+    bool trustPlugins = false;
     for (int index = 0; index < args.length; index++) {
       final String arg = args[index];
       if (arg == '--help' || arg == '-h') {
@@ -123,6 +130,8 @@ class TuiOptions {
         continueRequested = true;
       } else if (arg == '--plan') {
         planRequested = true;
+      } else if (arg == '--trust-plugins') {
+        trustPlugins = true;
       } else if (arg == '--session') {
         final bool hasValue =
             index + 1 < args.length && !args[index + 1].startsWith('-');
@@ -164,6 +173,7 @@ class TuiOptions {
       printRequested: printRequested,
       harnessPath: harnessPath,
       workdir: workdir,
+      trustPlugins: trustPlugins,
     );
   }
 }
