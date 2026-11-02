@@ -3,9 +3,13 @@ library;
 
 import 'dart:io';
 
+import 'package:conatus_code/src/config/config_schema.dart';
+import 'package:conatus_code/src/plugins/plugin_assembly.dart';
 import 'package:conatus_code/src/plugins/plugin_entry.dart';
 import 'package:conatus_code/src/plugins/plugin_host.dart';
+import 'package:conatus_code/src/plugins/plugin_inline_skills.dart';
 import 'package:conatus_code/src/plugins/plugin_types.dart';
+import 'package:conatus_foundation/conatus_foundation.dart';
 import 'package:test/test.dart';
 
 String? _findSuperpowers() {
@@ -50,5 +54,32 @@ void main() {
     expect(result.skills.map((s) => s.name), contains('using-superpowers'));
     expect(result.context, contains('EXTREMELY_IMPORTANT'));
     await host.close();
+  });
+
+  test('superpowers 经 PluginService 注册为运行时技能', () async {
+    final String? entry = _findSuperpowers();
+    if (entry == null) return;
+    final String? node = await PluginHost.resolveNode();
+    if (node == null) return;
+    final Directory home = Directory.systemTemp.createTempSync('nava-superpowers');
+    final Directory work = Directory.systemTemp.createTempSync('nava-superpowers-work');
+    addTearDown(() {
+      if (home.existsSync()) home.deleteSync(recursive: true);
+      if (work.existsSync()) work.deleteSync(recursive: true);
+    });
+    final ToolRegistry tools = ToolRegistry();
+    final service = await PluginAssembly.assemble(
+      plugins: <PluginConfig>[PluginConfig(source: entry)],
+      workdir: work.path,
+      baseDir: work.path,
+      tools: tools,
+      interactive: false,
+      homeDir: home.path,
+      warn: (String message) {},
+    );
+    expect(service.available, isTrue);
+    expect(service.result.skills.map((s) => s.name), contains('using-superpowers'));
+    expect(service.result.inlineSkills, isNotEmpty);
+    await service.close();
   });
 }
