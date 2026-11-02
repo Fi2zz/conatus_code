@@ -53,13 +53,14 @@ class PluginService implements PluginServiceLike {
     required ToolRegistry tools,
     void Function(String message)? warn,
     PluginHost? hostOverride,
+    Future<String?> Function()? nodeResolver,
   }) async {
     final void Function(String) log = warn ?? ((String message) {});
     if (candidates.isEmpty) {
       return PluginService._disabled(warnings: const <String>[], warn: log);
     }
     final String? node = hostOverride == null
-        ? await PluginHost.resolveNode()
+        ? await (nodeResolver ?? PluginHost.resolveNode)()
         : 'node';
     if (node == null) {
       log('插件不可用：未找到 node（可用 NAVA_NODE 指定）。');
