@@ -86,7 +86,7 @@ void main() {
       expect(rig.runs, isEmpty);
     });
 
-    test('声明路径参数的低风险工具仍会询问（目录信任的前提）', () async {
+    test('声明路径参数的低风险工具按阈值直接放行（不再为目录信任询问）', () async {
       final PermissionRig rig = assemblePermissionRig(
         scope: const PermissionScope(askThreshold: ToolRisk.high),
       );
@@ -95,9 +95,26 @@ void main() {
         permissionCall('read', <String, Object?>{'path': '/tmp/a.txt'}),
       );
       expect(result.isError, isFalse);
-      expect(rig.gate.requests, hasLength(1));
-      expect(rig.gate.requests.single.pathArgs, <String>['/tmp/a.txt']);
-      expect(rig.gate.requests.single.resources, <String>['/tmp/a.txt']);
+      expect(rig.gate.requests, isEmpty);
+      expect(rig.runs, <String>['read']);
+    });
+
+    test('medium 写操作在 askWhenNeeded 下放行，在 alwaysAsk 下询问', () async {
+      final PermissionRig relaxed = assemblePermissionRig(
+        scope: const PermissionScope(askThreshold: ToolRisk.high),
+      );
+      await relaxed.tools.call(
+        permissionCall('write', <String, Object?>{'path': '/tmp/a.txt'}),
+      );
+      expect(relaxed.gate.requests, isEmpty);
+
+      final PermissionRig strict = assemblePermissionRig(
+        scope: const PermissionScope(askThreshold: ToolRisk.medium),
+      );
+      await strict.tools.call(
+        permissionCall('write', <String, Object?>{'path': '/tmp/a.txt'}),
+      );
+      expect(strict.gate.requests, hasLength(1));
     });
 
     test('preapproved 覆盖路径时直接放行，不打扰用户', () async {
