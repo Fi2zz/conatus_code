@@ -578,6 +578,43 @@ void main() {
     }
   });
 
+  test('退出钩子把恢复提示同步写入 tty', () async {
+    final Directory dir = Directory.systemTemp.createTempSync('nava-hint-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final String path = '${dir.path}/tty';
+    File(path).writeAsStringSync('');
+
+    late final ConatusTuiController controller;
+    final (ConatusTuiController c, NoctermTester tester, Context app) =
+        await _launchAgentTui(
+      onExit: () => writeResumeHint(
+        controller.sessionId,
+        ttyPath: path,
+        fallback: StringBuffer(),
+      ),
+    );
+    controller = c;
+    try {
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyC,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyC,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+
+      final String text = File(path).readAsStringSync();
+      expect(text, contains('nava -r ${controller.sessionId}'));
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('/exit 命令触发 onExit 钩子', () async {
     bool exited = false;
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
