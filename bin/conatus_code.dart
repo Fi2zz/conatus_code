@@ -207,6 +207,8 @@ Future<void> main(List<String> args) async {
     // 交互式：MCP 握手放首帧之后（首轮请求前由控制器等齐）；headless 必须
     // 在跑任务前拿到完整工具面。
     deferMcpConnect: !headless,
+    // 文件工具 / 技能 / 检查点也挪到首帧后（首轮请求前等齐）。
+    deferStartup: !headless,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。

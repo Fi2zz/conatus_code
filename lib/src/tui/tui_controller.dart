@@ -63,6 +63,7 @@ import '../tools/update_plan.dart';
 import '../version.dart';
 import 'ask_user_tool.dart';
 import 'at_ref.dart';
+import 'deferred_startup.dart';
 import 'definition_watcher.dart';
 import 'keymap/keymap.dart';
 import 'keymap/keymap_view.dart';
@@ -736,6 +737,13 @@ class ConatusTuiController implements TuiUserPromptHost {
       'modelProfiles',
     );
     if (profiles != null) unawaited(profiles.warmUp());
+    // 文件工具 / 技能 / 检查点同样挪到首帧后；完成后刷新一次菜单与状态。
+    final DeferredStartup? deferred = _app.get<DeferredStartup>(
+      'deferredStartup',
+    );
+    if (deferred != null) {
+      unawaited(deferred.start().then((_) => _refresh()));
+    }
   }
 
   /// 绑定初始会话；未配置 provider 时自动打开引导面板。
@@ -1357,8 +1365,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 后台 MCP 握手可能还没完：等工具挂齐再发请求，否则模型第一轮看不到它们。
     // 注意：没有待等连接时不能有 `await`，否则排队消息的「收尾 → 下一轮」
     // 之间会多出一个空闲窗口，切会话/打断会撞进去。
-    final Future<void>? mcpWait = _pendingMcpWait();
-    if (mcpWait != null) await mcpWait;
+    final Future<void>? startupWait = _pendingStartupWait();
+    if (startupWait != null) await startupWait;
     _beginTurn();
     busy = true;
     _refresh();
@@ -1966,7 +1974,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'quit' || 'exit':
         onExit?.call();
       case 'help':
-        // prompt 命令是按需加载的：帮助里要能看到它们，先补拉一次。
+        // prompt / 技能命令是按需或延后装配的：帮助里要能看到它们。
+        await _awaitDeferredStartup();
         await ensurePromptCommands();
         transcript.openHelp(
           buildTuiHelpText(
@@ -1998,7 +2007,7 @@ class ConatusTuiController implements TuiUserPromptHost {
           await switchSession(arg);
         }
       case 'tools':
-        _showTools();
+        await _showTools();
       case 'reload':
         await reloadDefinitions();
       case 'mcp':
@@ -2034,7 +2043,7 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'background':
         await _handleBackground(arg);
       case 'doctor':
-        _showDoctor();
+        await _showDoctor();
       case 'story':
         await _handleStory(arg);
       case 'cost':
@@ -2100,13 +2109,31 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 后台 MCP 连接未完成时返回要等的 Future（并上屏一句提示）；否则 `null`。
   ///
   /// 连接失败也会 resolve，不阻塞对话。返回 `null` 而非已完成 Future，是为了
-  /// 让调用方在没有待等连接时**不产生挂起点**（见 `submit` 里的说明）。
-  Future<void>? _pendingMcpWait() {
+  /// 让调用方在没有待等任务时**不产生挂起点**（见 `submit` 里的说明）。
+  Future<void>? _pendingStartupWait({bool announce = true}) {
     final McpBoot? boot = _app.get<McpBoot>('mcpBoot');
-    if (boot == null || boot.done) return null;
-    transcript.add(TuiRole.system, 'MCP server 连接中，工具就绪后开始…');
-    _refresh();
-    return boot.ready;
+    final DeferredStartup? deferred = _app.get<DeferredStartup>(
+      'deferredStartup',
+    );
+    final bool mcpPending = boot != null && !boot.done;
+    final bool deferredPending = deferred != null && !deferred.completed;
+    if (!mcpPending && !deferredPending) return null;
+    if (announce) {
+      transcript.add(TuiRole.system, '正在完成启动装配（工具 / 技能 / MCP）…');
+      _refresh();
+    }
+    return Future.wait(<Future<void>>[
+      if (mcpPending) boot.ready,
+      if (deferredPending) deferred.start(),
+    ]);
+  }
+
+  /// 静默等首帧后装配（不含后台 MCP——那可能还要等网络，自检命令不该卡住）。
+  Future<void> _awaitDeferredStartup() async {
+    final DeferredStartup? deferred = _app.get<DeferredStartup>(
+      'deferredStartup',
+    );
+    if (deferred != null && !deferred.completed) await deferred.start();
   }
 
   /// 当前可用的斜杠命令：静态表 + 技能注册表投影 + 自定义命令。
@@ -2658,7 +2685,8 @@ class ConatusTuiController implements TuiUserPromptHost {
     return true;
   }
 
-  void _showTools() {
+  Future<void> _showTools() async {
+    await _awaitDeferredStartup();
     final ToolRegistry? tools = _app.get<ToolRegistry>('tools');
     if (tools == null || tools.names.isEmpty) {
       transcript.add(TuiRole.system, '当前没有已注册工具。');
@@ -3246,6 +3274,8 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// `/rewind list` 列出本会话可用检查点。对话回滚用 `Session.fork`（append-only
   /// 不变式，非破坏派生）+ `SessionStore.adopt` 注册，再切到 fork 会话。
   Future<void> _handleRewind(String arg) async {
+    // 检查点存储可能还在首帧后的装配队列里：先等基线（含装配）落定。
+    await _checkpointBase;
     final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
       'checkpointManager',
     );
@@ -3398,7 +3428,8 @@ class ConatusTuiController implements TuiUserPromptHost {
   }
 
   /// `/doctor`：聚合体检（不经模型，只读）。
-  void _showDoctor() {
+  Future<void> _showDoctor() async {
+    await _awaitDeferredStartup();
     final List<DoctorCheck> checks = doctorChecks(_app);
     final StringBuffer buffer = StringBuffer('nava 体检：');
     int failed = 0;
@@ -4185,6 +4216,12 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 写 turn 0 基线；错误说明补进 transcript（基线未就绪时 `/rewind` 不可用，
   /// 属降级不属阻塞）。
   Future<void> _startCheckpoint(String id, String? lastEventId) async {
+    // 检查点存储可能还在「首帧后装配」队列里：等它跑完再接管（这里只等，
+    // 不主动启动——否则会把首帧后的装配又拉回首帧前）。
+    final DeferredStartup? deferred = _app.get<DeferredStartup>(
+      'deferredStartup',
+    );
+    if (deferred != null && !deferred.completed) await deferred.done;
     final CheckpointManager? checkpoint = _app.get<CheckpointManager>(
       'checkpointManager',
     );

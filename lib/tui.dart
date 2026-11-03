@@ -27,6 +27,7 @@ export 'src/tui/at_ref.dart' show expandAtRefs, kAtRefMaxBytes, kAtRefMaxCount;
 export 'src/tui/at_ref_index.dart';
 export 'src/tui/at_ref_menu.dart';
 export 'src/tui/at_ref_menu_view.dart';
+export 'src/tui/deferred_startup.dart' show DeferredStartup;
 export 'src/tui/keymap/key_binding.dart';
 export 'src/tui/keymap/keymap.dart';
 export 'src/tui/keymap/keymap_dispatcher.dart';

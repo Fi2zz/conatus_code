@@ -66,6 +66,7 @@ import '../tools/command_policy.dart';
 import '../tools/custom_tools.dart';
 import '../tools/guarded_shell.dart';
 import 'ask_user_tool.dart';
+import 'deferred_startup.dart';
 import 'session_ui_state.dart';
 import 'system_notifier.dart';
 import 'tui_choice.dart';
@@ -118,6 +119,7 @@ class ConatusTuiRuntime {
     required this.storyEnabled,
     required this.lspManager,
     required this.mcpBoot,
+    required this.deferredStartup,
     required void Function(FallbackLlm llm) switchLlm,
   }) : _switchLlm = switchLlm;
 
@@ -153,6 +155,9 @@ class ConatusTuiRuntime {
 
   /// 后台 MCP 连接的状态；同步装配（headless / 库用法）为 null。
   final McpBoot? mcpBoot;
+
+  /// 首帧后执行的装配任务；同步装配（headless / 库用法）为 null。
+  final DeferredStartup? deferredStartup;
 
   /// 后台 MCP 连接完成时 resolve；没有后台连接时立即完成。
   Future<void> get mcpReady => mcpBoot?.ready ?? Future<void>.value();
@@ -274,12 +279,29 @@ class ConatusTuiRuntime {
     String? pluginHome,
     StartupTiming? startupTiming,
     bool deferMcpConnect = false,
+    bool deferStartup = false,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
     // 启动耗时：只有 main 传了采样器才接线。库用法没有真实时间点，
     // `/doctor` 如实显示「未采集」，不伪造一段耗时。
     if (startupTiming != null) app.provide('startupTiming', startupTiming);
+    // 首帧后再跑的装配（文件工具 / 技能 / 检查点）：交互式只要求界面先出来。
+    final DeferredStartup? deferred = deferStartup
+        ? DeferredStartup(warn: stderr.writeln)
+        : null;
+    if (deferred != null) app.provide('deferredStartup', deferred);
+    Future<void> later(String label, Future<void> Function() run) async {
+      if (deferred != null) {
+        deferred.add(label, run);
+        return;
+      }
+      try {
+        await run();
+      } on Object catch (error) {
+        stderr.writeln('$label装配失败：$error');
+      }
+    }
     final String sep = Platform.pathSeparator;
     final String resolvedWorkdir = workdir ?? Directory.current.path;
     // 规范化形式：与 bin 传给 fs jail 的根保持同一拼写。解析失败（如目录不存在）
@@ -414,13 +436,15 @@ class ConatusTuiRuntime {
     // 'shellInteractive'：用户直发命令（`!` shell 模式）的交互缝——本地直执、
     // 不过模型命令审查（对齐 OpenCode）；模型命令仍走上面的 'shell' 缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
-    provideFsTools(
-      app,
-      options: const FsToolOptions(
-        enablePatch: true,
-        skipDirs: <String>{...kDefaultSkipDirs, kNavaProjectDirName},
-      ),
-    );
+    await later('文件工具', () async {
+      provideFsTools(
+        app,
+        options: const FsToolOptions(
+          enablePatch: true,
+          skipDirs: <String>{...kDefaultSkipDirs, kNavaProjectDirName},
+        ),
+      );
+    });
     LspManager? lspManager;
     if (lsp.enabled) {
       final LspManager manager = LspManager(
@@ -950,17 +974,19 @@ class ConatusTuiRuntime {
     // 恢复走 dart:io 直连。
     if (checkpoint != null) {
       final CheckpointOptions options = checkpointOptions(checkpoint);
-      app.provide(
-        'checkpointManager',
-        CheckpointManager(
-          store: await openCheckpointStore(
+      await later('检查点', () async {
+        app.provide(
+          'checkpointManager',
+          CheckpointManager(
+            store: await openCheckpointStore(
+              options: options,
+              root: resolvedWorkdir,
+              projectDir: Directory(resolvedBaseDir).absolute.path,
+            ),
             options: options,
-            root: resolvedWorkdir,
-            projectDir: Directory(resolvedBaseDir).absolute.path,
           ),
-          options: options,
-        ),
-      );
+        );
+      });
     }
     provideTimePrompt(app);
     provideReferencePrompt(app, references);
@@ -985,29 +1011,33 @@ class ConatusTuiRuntime {
       stderr.writeln('技能恢复跳过：${error.message}');
     }
     if (skills) {
-      await provideSkillRegistry(
-        app,
-        inlineSkills: pluginService.result.inlineSkills,
-      );
-      provideSkillCatalog(app, includeAll: mergeAllSkills);
-      provideSkillTool(app, includeAll: mergeAllSkills);
-      await provideSkillFilesystem(
-        app,
-        roots: _skillRoots(
-          resolvedWorkdir,
-          <String>[...extraSkillDirs, ...pluginService.skillRoots],
-        ),
-      );
-      if (bootstrapSkills.isNotEmpty) {
-        final SkillBootstrapSection section = SkillBootstrapSection(
-          registry: app.require<SkillRegistry>('skillRegistry'),
-          prompt: prompt,
-          names: bootstrapSkills,
-          appendix: kNavaSkillToolMapping,
+      // 技能目录扫描（多层磁盘遍历）挪到首帧后；首轮请求前由控制器等齐，
+      // 保证 system prompt 的目录段与 `skill` 工具对模型可见。
+      await later('技能', () async {
+        await provideSkillRegistry(
+          app,
+          inlineSkills: pluginService.result.inlineSkills,
         );
-        app.onDispose(section.dispose);
-        await section.start();
-      }
+        provideSkillCatalog(app, includeAll: mergeAllSkills);
+        provideSkillTool(app, includeAll: mergeAllSkills);
+        await provideSkillFilesystem(
+          app,
+          roots: _skillRoots(
+            resolvedWorkdir,
+            <String>[...extraSkillDirs, ...pluginService.skillRoots],
+          ),
+        );
+        if (bootstrapSkills.isNotEmpty) {
+          final SkillBootstrapSection section = SkillBootstrapSection(
+            registry: app.require<SkillRegistry>('skillRegistry'),
+            prompt: prompt,
+            names: bootstrapSkills,
+            appendix: kNavaSkillToolMapping,
+          );
+          app.onDispose(section.dispose);
+          await section.start();
+        }
+      });
     }
 
     // ── 恢复：数据库（JSON 后端，集中在 baseDir）+ 快照服务 ─────────
@@ -1054,6 +1084,7 @@ class ConatusTuiRuntime {
       storyEnabled: storyEnabled,
       lspManager: lspManager,
       mcpBoot: mcpBoot,
+      deferredStartup: deferred,
       switchLlm: switchLlm,
     );
   }
