@@ -145,4 +145,40 @@ void main() {
       await runtime.dispose();
     }
   });
+
+  test('传入已解析的 workspace：直接复用，不再重复 resolve', () async {
+    final Directory temp = _tempDir();
+    final Directory work = _tempDir();
+    final Directory data = _tempDir();
+    final ProjectRegistry registry = _registry(temp);
+    final WorkspaceInfo resolved = WorkspaceInfo(
+      projectId: 'p1',
+      projectName: 'precomputed',
+      worktreeId: 'w1',
+      worktreePath: work.path,
+      dataDir: data.path,
+    );
+
+    final ConatusTuiRuntime runtime = await ConatusTuiRuntime.create(
+      projectRegistry: registry,
+      workspace: resolved,
+      workdir: work.path,
+      webTools: false,
+      skills: false,
+      llm: FallbackLlm(const <LlmProvider>[]),
+      interactive: false,
+    );
+    try {
+      expect(runtime.app.get<String>('projectDataDir'), data.path);
+      expect(
+        runtime.app.get<WorkspaceInfo>('projectInfo')?.projectName,
+        'precomputed',
+      );
+      // 没有走 resolve：注册表里不该出现这个 worktree。
+      expect(registry.database.worktreeAt(work.path), isNull);
+    } finally {
+      await runtime.dispose();
+      registry.close();
+    }
+  });
 }

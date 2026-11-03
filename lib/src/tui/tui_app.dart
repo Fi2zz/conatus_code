@@ -157,6 +157,17 @@ class ConatusTuiRuntime {
   /// 后台 MCP 连接完成时 resolve；没有后台连接时立即完成。
   Future<void> get mcpReady => mcpBoot?.ready ?? Future<void>.value();
 
+  /// 解析 / 刷新 models.dev 档案（上下文窗口 + 费率）。
+  ///
+  /// 交互式装配不会自动调用（缓存解析要几十毫秒，放在首帧后）；headless 已
+  /// 在装配期热身。库用法自己决定何时调用。
+  void startModelWarmup() {
+    final ModelProfileStore? store = app.get<ModelProfileStore>(
+      'modelProfiles',
+    );
+    if (store != null) unawaited(store.warmUp());
+  }
+
   final void Function(FallbackLlm llm) _switchLlm;
 
   /// 运行时替换 LLM 提供商（`/model`、`/provider` 切换用）。
@@ -196,6 +207,8 @@ class ConatusTuiRuntime {
   ///
   /// 显式 [baseDir] 会绕过项目注册表；若同时传入 [projectRegistry]，该
   /// registry 被忽略且由调用方负责关闭。
+  /// [workspace] 是调用方已解析好的工作区：传入即跳过内部的 registry.resolve
+  /// （bin 为了先拿 dataDir 已经解析过一次，重复解析要再跑 git 与写事务）。
   /// [defaultAgent] 是新会话默认 Agent（`[agent] default_agent`）；未知或仅子
   /// Agent 的定义回退到注册表默认的 `build`。
   /// [instructions] 是顶层 `instructions` 的额外来源（路径 / glob / URL），
@@ -240,6 +253,7 @@ class ConatusTuiRuntime {
     String? commandHome,
     bool interactive = true,
     String? workdir,
+    WorkspaceInfo? workspace,
     CheckpointConfig? checkpoint,
     XerjConfig? xerj,
     BackgroundConfig? background,
@@ -280,10 +294,14 @@ class ConatusTuiRuntime {
       projectRegistryService = null;
     } else {
       projectRegistryService = projectRegistry ?? ProjectRegistry.open();
-      projectInfo = projectRegistryService.resolve(
-        resolvedWorkdir,
-        dataDirOverride: projectDir,
-      );
+      // 宿主已经解析过（bin 必须先拿 dataDir 才能继续）时直接复用，避免二次
+      // resolve：一次 resolve 要跑 git + 写注册表事务，是启动里最贵的两步之一。
+      projectInfo =
+          workspace ??
+          projectRegistryService.resolve(
+            resolvedWorkdir,
+            dataDirOverride: projectDir,
+          );
       resolvedBaseDir = projectInfo.dataDir;
     }
 
@@ -636,7 +654,9 @@ class ConatusTuiRuntime {
     );
     app.provide('modelProfiles', modelProfiles);
     app.onDispose(modelProfiles.close);
-    unawaited(modelProfiles.warmUp());
+    // 交互式：缓存解析（models.dev 5MB 级 JSON）挪到首帧之后（`startModelWarmup`），
+    // 不然这段同步解析会占掉几十毫秒启动预算。headless 没有首帧可等，直接热身。
+    if (!interactive) unawaited(modelProfiles.warmUp());
 
     // 预算护栏：包装 `'llm'` 服务（每轮墙钟 + 上下文 token 估算），并把首个
     // CostTracker 实现注册到 `'costTracker'`（供未来 autonomous runner 消费）。

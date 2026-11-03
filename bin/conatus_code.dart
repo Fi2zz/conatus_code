@@ -202,6 +202,8 @@ Future<void> main(List<String> args) async {
     trustProjectPlugins: options.trustPlugins || config.trustProjectPlugins,
     pluginHome: Platform.environment['HOME'],
     startupTiming: startupTiming,
+    // bin 已经解析过（要先拿 dataDir），传回来避免二次 resolve。
+    workspace: workspace,
     // 交互式：MCP 握手放首帧之后（首轮请求前由控制器等齐）；headless 必须
     // 在跑任务前拿到完整工具面。
     deferMcpConnect: !headless,

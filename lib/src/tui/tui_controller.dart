@@ -728,8 +728,15 @@ class ConatusTuiController implements TuiUserPromptHost {
   ///
   /// 采样器由 `main` 注入根上下文（见 `ConatusTuiRuntime.create`）；库用法
   /// 没装采样器时静默跳过。
-  void markFirstFrame() =>
-      _app.get<StartupTiming>('startupTiming')?.markFirstFrame();
+  void markFirstFrame() {
+    final StartupTiming? timing = _app.get<StartupTiming>('startupTiming');
+    timing?.markFirstFrame();
+    // 首帧已上屏：现在才解析 models.dev 缓存（5MB 级 JSON），不占启动预算。
+    final ModelProfileStore? profiles = _app.get<ModelProfileStore>(
+      'modelProfiles',
+    );
+    if (profiles != null) unawaited(profiles.warmUp());
+  }
 
   /// 绑定初始会话；未配置 provider 时自动打开引导面板。
   ///

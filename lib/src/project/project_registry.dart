@@ -7,6 +7,7 @@ import 'dart:io';
 import '../config/config_atomic_write.dart';
 import '../config/config_path.dart';
 import '../read_only_policy.dart';
+import 'file_permissions.dart';
 import 'project_database.dart';
 import 'project_identity.dart';
 import 'project_paths.dart';
@@ -57,9 +58,7 @@ class ProjectRegistry {
       workspacesDir: resolvedWorkspaces,
     );
     Directory(registry.workspacesDir).createSync(recursive: true);
-    if (!Platform.isWindows) {
-      Process.runSync('chmod', <String>['700', registry.workspacesDir]);
-    }
+    restrictPermissions(registry.workspacesDir, kPrivateDirMode);
     return registry;
   }
 
@@ -87,9 +86,7 @@ class ProjectRegistry {
       throw StateError(kReadOnlyPathMessage);
     }
     Directory(dataDir).createSync(recursive: true);
-    if (!Platform.isWindows) {
-      Process.runSync('chmod', <String>['700', dataDir]);
-    }
+    restrictPermissions(dataDir, kPrivateDirMode);
     final WorkspaceInfo info = WorkspaceInfo(
       projectId: identity.projectId,
       projectName: registration.projectName,

@@ -5,6 +5,8 @@ import 'dart:io';
 
 import 'package:sqlite3/sqlite3.dart';
 
+import 'file_permissions.dart';
+
 import 'sqlite_library.dart';
 
 /// `project` 表的一行。
@@ -282,7 +284,7 @@ ON CONFLICT(id) DO UPDATE SET
     for (final String suffix in <String>['', '-wal', '-shm']) {
       final File file = File('$path$suffix');
       if (file.existsSync()) {
-        Process.runSync('chmod', <String>['600', file.path]);
+        restrictPermissions(file.path, kPrivateFileMode);
       }
     }
   }

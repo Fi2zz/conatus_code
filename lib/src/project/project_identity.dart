@@ -53,7 +53,9 @@ ProjectIdentity resolveProjectIdentity(String workdir) {
           'remote.origin.url',
         ]);
   final String? remote = rawRemote == null ? null : normalizeRemote(rawRemote);
-  final String? rootCommit = root == null
+  // 有 remote 时 projectId 就定了（按 remote 归一）；`rev-list` 只服务无 remote
+  // 的仓库，别让有 remote 的常见情况白起一个 git 进程。
+  final String? rootCommit = root == null || remote != null
       ? null
       : _gitValue(worktreePath, <String>[
           'rev-list',
