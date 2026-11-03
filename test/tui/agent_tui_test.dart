@@ -554,6 +554,30 @@ void main() {
     }
   });
 
+  test('Ctrl+C 连按两次触发 AgentTui.onExit 钩子', () async {
+    bool exited = false;
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui(onExit: () => exited = true);
+    try {
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyC,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+      expect(exited, isFalse);
+      await tester.sendKeyEvent(const KeyboardEvent(
+        logicalKey: LogicalKey.keyC,
+        modifiers: ModifierKeys(ctrl: true),
+      ));
+      await tester.pump();
+      expect(exited, isTrue);
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('/help 弹出可用 Esc 关闭', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();
@@ -616,6 +640,7 @@ void main() {
 Future<(ConatusTuiController, NoctermTester, Context)> _launchAgentTui({
   LlmProvider? provider,
   String? Function()? clipboardTextReader,
+  void Function()? onExit,
 }) async {
   final Context app = Context.root();
   provideTools(app);
@@ -630,12 +655,13 @@ Future<(ConatusTuiController, NoctermTester, Context)> _launchAgentTui({
     name: '测试',
     initialSession: 'smoke',
     modelLabel: 'mock',
-    onExit: () {},
+    onExit: onExit ?? () {},
   );
   final NoctermTester tester = await NoctermTester.create();
   await tester.pumpComponent(AgentTui(
     controller: controller,
     clipboardTextReader: clipboardTextReader,
+    onExit: onExit,
   ));
   await tester.pump();
   return (controller, tester, app);

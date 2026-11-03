@@ -1,5 +1,6 @@
 // conatus_code — 基于 conatus 运行时的终端编码智能体
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -229,25 +230,31 @@ Future<void> main(List<String> args) async {
   // 回退链与重试策略已在 runtime 上（`/model` 切换主模型时要跟着重建），
   // `createController` 直接取用，这里不重复传。
   String? switchWorkdir;
-  final ConatusTuiController controller = runtime.createController(
+  late final ConatusTuiController controller;
+  void exitWithHint() {
+    final String id = controller.sessionId;
+    shutdownApp();
+    if (id.isNotEmpty) {
+      stdout.writeln();
+      stdout.writeln('恢复本次会话：nava -r $id');
+      unawaited(stdout.flush());
+    }
+  }
+
+  controller = runtime.createController(
     initialSession: initialSession,
     planning: true,
     startInPlanMode: options.planRequested || config.defaultPlanMode,
     initialPermissionMode: toTuiPermissionMode(config.approval.mode),
-    onExit: shutdownApp,
+    onExit: exitWithHint,
     onSwitchProject: (String workdir) {
       switchWorkdir = workdir;
       shutdownApp();
     },
     keybinds: config.keybinds,
   );
-  await runApp(AgentTui(controller: controller));
-  final String resumeSessionId = controller.sessionId;
+  await runApp(AgentTui(controller: controller, onExit: exitWithHint));
   await runtime.dispose();
-  if (switchWorkdir == null && resumeSessionId.isNotEmpty) {
-    stdout.writeln();
-    stdout.writeln('恢复本次会话：nava -r $resumeSessionId');
-  }
   if (switchWorkdir != null) {
     final List<String> childArgs = <String>['--workdir', switchWorkdir!];
     if (options.configPath != null) {

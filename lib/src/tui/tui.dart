@@ -54,6 +54,7 @@ class AgentTui extends StatefulComponent {
     super.key,
     required this.controller,
     this.clipboardTextReader,
+    this.onExit,
   });
 
   /// 会话控制器（含屏上记录与斜杠命令状态）。
@@ -61,6 +62,9 @@ class AgentTui extends StatefulComponent {
 
   /// 系统剪贴板文本读取（测试注入点；缺省读真实剪贴板）。
   final String? Function()? clipboardTextReader;
+
+  /// 退出钩子（缺省 `shutdownApp`）；宿主用它打印恢复提示。
+  final void Function()? onExit;
 
   @override
   State<AgentTui> createState() => _AgentTuiState();
@@ -226,7 +230,7 @@ class _AgentTuiState extends State<AgentTui> {
       return;
     }
     _exiting = true;
-    shutdownApp();
+    (component.onExit ?? shutdownApp)();
   }
 
   void _submit() {
