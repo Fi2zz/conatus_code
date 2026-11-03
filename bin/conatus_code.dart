@@ -11,6 +11,8 @@ import 'package:conatus_code/tui.dart';
 import 'package:conatus_harness/conatus_harness.dart';
 
 Future<void> main(List<String> args) async {
+  // 启动耗时从这一行起算；`/doctor` 的「启动耗时」读它（不含 VM / AOT 映像加载）。
+  final StartupTiming startupTiming = StartupTiming();
   // `nava mcp ...` 与 `nava harness ...` 都是独立子命令：在 TUI 选项解析前分流。
   if (args.isNotEmpty && args.first == 'mcp') {
     exit(
@@ -64,6 +66,7 @@ Future<void> main(List<String> args) async {
     stderr.writeln('配置错误：无法写入 ${error.path ?? '配置文件'}（${error.message}）');
     exit(2);
   }
+  startupTiming.markConfigLoaded();
 
   // 主题是进程级全局状态：装配前落定，界面与浮层取色都用同一套 token。
   NavaTheme.use(config.tui.theme);
@@ -198,6 +201,7 @@ Future<void> main(List<String> args) async {
     plugins: config.plugins,
     trustProjectPlugins: options.trustPlugins || config.trustProjectPlugins,
     pluginHome: Platform.environment['HOME'],
+    startupTiming: startupTiming,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。

@@ -41,6 +41,7 @@ import '../config/config_path.dart';
 import '../config/config_writer.dart';
 import '../config/project_data_dir.dart';
 import '../diagnose/doctor.dart';
+import '../diagnose/startup_timing.dart';
 import '../hooks/hooks.dart';
 import '../lsp/lsp_manager.dart';
 import '../permissions/permission_wiring.dart';
@@ -720,6 +721,13 @@ class ConatusTuiController implements TuiUserPromptHost {
       ),
     );
   }
+
+  /// 标记 TUI 首帧已绘制：`/doctor` 的启动耗时以此为终点。
+  ///
+  /// 采样器由 `main` 注入根上下文（见 `ConatusTuiRuntime.create`）；库用法
+  /// 没装采样器时静默跳过。
+  void markFirstFrame() =>
+      _app.get<StartupTiming>('startupTiming')?.markFirstFrame();
 
   /// 绑定初始会话；未配置 provider 时自动打开引导面板。
   ///

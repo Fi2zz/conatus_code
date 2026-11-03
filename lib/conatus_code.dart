@@ -185,6 +185,7 @@ export 'src/config/mcp_json.dart'
 export 'src/config/project_data_dir.dart'
     show defaultProjectDataDir, projectDirProtected, resolveProjectDataDir;
 export 'src/diagnose/doctor.dart' show DoctorCheck, doctorChecks;
+export 'src/diagnose/startup_timing.dart' show StartupTiming;
 export 'src/format/formatter_path.dart'
     show formatterExtension, resolveFormatterTarget;
 export 'src/format/formatter_probe.dart' show FormatterProbe, detectFormatter;

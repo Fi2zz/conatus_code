@@ -35,6 +35,7 @@ import '../checkpoint_config_adapter.dart';
 import '../commands/command_registry.dart';
 import '../config/config_path.dart';
 import '../config/config_schema.dart';
+import '../diagnose/startup_timing.dart';
 import '../format/formatter_service.dart';
 import '../hooks/hooks.dart';
 import '../instructions/instruction_loader.dart';
@@ -249,9 +250,13 @@ class ConatusTuiRuntime {
     bool trustProjectPlugins = false,
     PluginTrustPrompter? trustPrompter,
     String? pluginHome,
+    StartupTiming? startupTiming,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
+    // 启动耗时：只有 main 传了采样器才接线。库用法没有真实时间点，
+    // `/doctor` 如实显示「未采集」，不伪造一段耗时。
+    if (startupTiming != null) app.provide('startupTiming', startupTiming);
     final String sep = Platform.pathSeparator;
     final String resolvedWorkdir = workdir ?? Directory.current.path;
     // 规范化形式：与 bin 传给 fs jail 的根保持同一拼写。解析失败（如目录不存在）
@@ -975,6 +980,9 @@ class ConatusTuiRuntime {
     );
 
     if (harness != null) applyHarness(app, harness);
+
+    // 装配完成：`/doctor` 的「装配」一段到此为止。
+    startupTiming?.markRuntimeReady();
 
     return ConatusTuiRuntime._(
       app: app,

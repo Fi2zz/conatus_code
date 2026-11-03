@@ -15,6 +15,7 @@ import '../budget/cost_tracker.dart';
 import '../commands/command_registry.dart';
 import '../permissions/permission_wiring.dart';
 import '../tools/guarded_shell.dart';
+import 'startup_timing.dart';
 
 /// 一项体检结果。
 class DoctorCheck {
@@ -59,7 +60,20 @@ List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
   _discoveryCheck(app),
   _configDeprecationCheck(app),
   DoctorCheck(name: 'rg', ok: _rgAvailable(), hint: 'PATH 里没有 rg（搜索工具会降级/报错）'),
+  _startupCheck(app),
 ];
+
+/// 启动耗时：`main` 入口 → 配置装载 → runtime 装配 → TUI 首帧。
+///
+/// 只报应用内耗时（不含 VM / AOT 映像加载）；没传采样器（库用法）时如实
+/// 说「未采集」，不编数字。
+DoctorCheck _startupCheck(Context app) {
+  final StartupTiming? timing = app.get<StartupTiming>('startupTiming');
+  if (timing == null) {
+    return const DoctorCheck(name: '启动耗时', ok: true, hint: '未采集');
+  }
+  return DoctorCheck(name: '启动耗时', ok: true, hint: timing.describe());
+}
 
 /// Agent / 命令发现的跳过项与 Agent 模型回退。
 ///

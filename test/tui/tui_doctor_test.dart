@@ -82,12 +82,39 @@ void main() {
     expect(tuiCommands.any((TuiCommand c) => c.name == 'doctor'), isTrue);
   });
 
+  test('未采集启动耗时时 /doctor 标注未采集', () async {
+    final (ConatusTuiController controller, Context app) = await _build();
+    addTearDown(app.dispose);
+
+    await controller.handleLine('/doctor');
+
+    final String text = controller.transcript.messages.last.text;
+    expect(text, contains('启动耗时 — 未采集'));
+  });
+
+  test('启动耗时进入 /doctor：总耗时与分阶段明细', () async {
+    final (ConatusTuiController controller, Context app) = await _build();
+    addTearDown(app.dispose);
+    Duration fake = Duration.zero;
+    final StartupTiming timing = StartupTiming(now: () => fake);
+    fake = const Duration(milliseconds: 38);
+    timing.markConfigLoaded();
+    fake = const Duration(milliseconds: 358);
+    timing.markRuntimeReady();
+    fake = const Duration(milliseconds: 412);
+    timing.markFirstFrame();
+    app.provide('startupTiming', timing);
+
+    await controller.handleLine('/doctor');
+
+    final String text = controller.transcript.messages.last.text;
+    expect(text, contains('启动耗时 — 总 412ms（配置 38 · 装配 320 · 首帧 54）'));
+  });
+
   test('配置废弃项进入 /doctor', () async {
     final (ConatusTuiController controller, Context app) = await _build();
     addTearDown(app.dispose);
-    app.provide('configWarnings', <String>[
-      'config.toml：thinking 已废弃（当前无效果）。',
-    ]);
+    app.provide('configWarnings', <String>['config.toml：thinking 已废弃（当前无效果）。']);
 
     await controller.handleLine('/doctor');
 

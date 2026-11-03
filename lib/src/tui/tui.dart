@@ -124,6 +124,10 @@ class _AgentTuiState extends State<AgentTui> {
     _disableLiteralNext();
     // 以启动时的内部缓冲为基线：终端合成粘贴会在此后改写它，真 Ctrl+V 不会。
     _lastInternalClipboard = ClipboardManager.paste();
+    // 首帧绘制完成即启动耗时的终点（`/doctor` 读取）；早于布局会低估。
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _controller.markFirstFrame();
+    });
   }
 
   /// 关掉终端的 IEXTEN：否则 Ctrl+V 会被 tty 当作 literal-next 吃掉，
