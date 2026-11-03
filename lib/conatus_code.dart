@@ -266,6 +266,7 @@ export 'src/mcp/mcp_prompt_commands.dart'
         kMcpReservedServerName,
         loadMcpPromptCommands,
         registerMcpPromptCommands;
+export 'src/mcp/mcp_prompt_service.dart' show McpPromptCommands;
 export 'src/permissions/permission_rule_pattern.dart'
     show kRememberedRuleSource, permissionRuleFor, permissionRulesFor;
 export 'src/permissions/permission_wiring.dart' show PermissionWiring;

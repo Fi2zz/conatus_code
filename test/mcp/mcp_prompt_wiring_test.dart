@@ -58,7 +58,7 @@ Future<ConatusTuiRuntime> _bootRuntime(Directory dir) async {
 }
 
 void main() {
-  test('tui_app 装配：资源工具 + prompt 命令进注册表', () async {
+  test('tui_app 装配：资源工具就绪；prompt 命令按需加载', () async {
     final Directory dir = Directory.systemTemp.createTempSync('nava-prompt');
     addTearDown(() => dir.deleteSync(recursive: true));
     final ConatusTuiRuntime rt = await _bootRuntime(dir);
@@ -68,8 +68,12 @@ void main() {
     final CommandRegistry registry = rt.app.require<CommandRegistry>(
       'commandRegistry',
     );
+    // 装配期不联网拉 prompts 目录（见 McpPromptCommands）。
+    expect(registry.byName('docs:review'), isNull);
+
+    await rt.app.require<McpPromptCommands>('mcpPromptCommands').ensureLoaded();
     final CommandDefinition? def = registry.byName('docs:review');
-    expect(def, isNotNull, reason: 'prompt 命令应进注册表');
+    expect(def, isNotNull, reason: '按需加载后 prompt 命令应进注册表');
     expect(def!.executor, isNotNull);
   });
 }

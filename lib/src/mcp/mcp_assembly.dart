@@ -41,7 +41,8 @@ Future<McpRegistry?> attachMcpServers(
   final McpRegistry registry = await provideMcp(app, const <McpServerConfig>[]);
   final void Function(String) report = onError ?? stderr.writeln;
   final McpOAuthStore? store = _oauthStore(oauthStore, report);
-  for (final McpServerSpec spec in specs) {
+
+  Future<void> attachOne(McpServerSpec spec) async {
     try {
       final McpServerConfig config = toMcpServerConfig(spec, credentials);
       reportUnresolvedPlaceholders(spec.name, config, report);
@@ -68,6 +69,10 @@ Future<McpRegistry?> attachMcpServers(
       report('MCP server ${spec.name} 连接失败，已跳过：$error');
     }
   }
+
+  // 并发装配：远端 server 一次握手要几百毫秒到数秒，串行等待会全部叠加到
+  // 首帧之前。各台互不依赖（失败也只影响自己），串行没有收益。
+  await Future.wait(<Future<void>>[for (final McpServerSpec s in specs) attachOne(s)]);
   return registry;
 }
 

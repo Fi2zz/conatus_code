@@ -47,7 +47,7 @@ import '../lsp/lsp_navigation.dart';
 import '../lsp/lsp_navigation_tools.dart';
 import '../lsp/lsp_tool.dart';
 import '../mcp/mcp_assembly.dart';
-import '../mcp/mcp_prompt_commands.dart';
+import '../mcp/mcp_prompt_service.dart';
 import '../permissions/permission_wiring.dart';
 import '../plugins/plugin_assembly.dart';
 import '../plugins/plugin_inline_skills.dart';
@@ -670,11 +670,17 @@ class ConatusTuiRuntime {
       workdir: resolvedWorkdir,
       home: commandHome,
     );
-    // MCP prompt → `/<server>:<prompt>`；同名磁盘命令优先，不覆盖已发现定义。
+    // MCP prompt → `/<server>:<prompt>`：这里只放加载器，首次打开命令菜单 /
+    // 执行这类命令时才拉 prompts 目录。一次 `prompts/list` 是网络往返，放在
+    // 首帧前没有意义（见 `McpPromptCommands`）。
     if (mcpRegistry != null) {
-      registerMcpPromptCommands(
-        commandRegistry,
-        await loadMcpPromptCommands(mcpRegistry, onWarning: stderr.writeln),
+      app.provide(
+        'mcpPromptCommands',
+        McpPromptCommands(
+          registry: mcpRegistry,
+          commands: commandRegistry,
+          warn: stderr.writeln,
+        ),
       );
     }
     app.provide('commandRegistry', commandRegistry);

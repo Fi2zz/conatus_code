@@ -1,6 +1,8 @@
 /// MCP 装配：逐台挂载、失败跳过、占位符解析、默认传输分派。
 library;
 
+import 'dart:async';
+
 import 'package:conatus_agent/conatus_agent.dart'
     show AutoApproval, provideApproval;
 import 'package:conatus_code/conatus_code.dart';
@@ -45,6 +47,38 @@ void main() {
   test('空列表返回 null，不占 mcp 服务键', () async {
     expect(await attachMcpServers(ctx, const <McpServerSpec>[]), isNull);
     expect(ctx.get<McpRegistry>('mcp'), isNull);
+  });
+
+  test('多台 server 并发装配：一台握手卡住不挡另一台', () async {
+    final List<String> started = <String>[];
+    final Completer<void> gate = Completer<void>();
+    final Future<McpRegistry?> future = attachMcpServers(
+      ctx,
+      twoSpecs,
+      transportFactory: (McpServerConfig config) {
+        final FakeMcpTransport transport = fakes.build(config);
+        final Future<void> Function(McpMessage) reply = transport.onSend!;
+        transport.onSend = (McpMessage message) async {
+          if (message.method == 'initialize') {
+            started.add(config.name);
+            await gate.future;
+          }
+          await reply(message);
+        };
+        return transport;
+      },
+    );
+
+    // 两台都必须已经发出 initialize；串行实现此刻只会有第一台。
+    for (int i = 0; i < 200 && started.length < 2; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(started, unorderedEquals(<String>['fs', 'net']));
+
+    gate.complete();
+    final McpRegistry registry = (await future)!;
+    // 完成顺序可能与配置顺序不同，对外仍按配置顺序。
+    expect(registry.servers, <String>['fs', 'net']);
   });
 
   test('两台 server 全部挂载：工具进 ctx.tools，client 就绪', () async {

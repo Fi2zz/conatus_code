@@ -188,12 +188,27 @@ class _AgentTuiState extends State<AgentTui> {
       return;
     }
     _menu.syncInput(_input.text);
+    _preloadPromptCommands();
     final int cursor = _input.selection.baseOffset;
     _atMenu.syncInput(
       _input.text,
       cursor: cursor < 0 ? _input.text.length : cursor,
     );
     _refresh();
+  }
+
+  /// 输入 `/` 时后台补拉 MCP prompt 命令；到达后重算菜单再重绘。
+  ///
+  /// 加载是幂等的，键盘每敲一个字符都调一次也只是取同一个 Future。
+  void _preloadPromptCommands() {
+    if (!_input.text.startsWith('/')) return;
+    unawaited(
+      _controller.ensurePromptCommands().then((bool added) {
+        if (!added || !mounted) return;
+        _menu.syncInput(_input.text);
+        _refresh();
+      }),
+    );
   }
 
   /// 输入以 `!` 开头 → 进入 shell 模式并剥掉 `!` 前缀（回显在输入框前缀上）；

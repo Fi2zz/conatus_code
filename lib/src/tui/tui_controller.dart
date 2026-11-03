@@ -44,6 +44,7 @@ import '../diagnose/doctor.dart';
 import '../diagnose/startup_timing.dart';
 import '../hooks/hooks.dart';
 import '../lsp/lsp_manager.dart';
+import '../mcp/mcp_prompt_service.dart';
 import '../permissions/permission_wiring.dart';
 import '../plugins/plugin_config.dart';
 import '../project/project_database.dart';
@@ -1952,6 +1953,8 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'quit' || 'exit':
         onExit?.call();
       case 'help':
+        // prompt 命令是按需加载的：帮助里要能看到它们，先补拉一次。
+        await ensurePromptCommands();
         transcript.openHelp(
           buildTuiHelpText(
             extra: <TuiCommand>[..._skillCommands, ..._customCommands],
@@ -2046,13 +2049,36 @@ class ConatusTuiController implements TuiUserPromptHost {
       case 'settings':
         openSettings();
       default:
-        // 内置命令优先；未命中再查自定义命令，最后才把命令词当技能名试一次。
-        if (!await runCustomCommand(command, arg) &&
-            !await _runSkill(command, arg)) {
-          transcript.add(TuiRole.system, '未知命令：/$command（/help 查看可用命令）');
-        }
+        await _dispatchDynamicCommand(command, arg);
     }
     _refresh();
+  }
+
+  /// 内置命令未命中时的动态命令分发：自定义命令 → 技能 → MCP prompt。
+  ///
+  /// MCP prompt 命令按需加载，首次执行前补拉一次再重试。
+  Future<void> _dispatchDynamicCommand(String command, String arg) async {
+    // 内置命令优先；未命中再查自定义命令，最后才把命令词当技能名试一次。
+    if (await runCustomCommand(command, arg)) return;
+    if (await _runSkill(command, arg)) return;
+    if (await ensurePromptCommands() && await runCustomCommand(command, arg)) {
+      return;
+    }
+    transcript.add(TuiRole.system, '未知命令：/$command（/help 查看可用命令）');
+  }
+
+  /// 按需加载 MCP prompt 命令（`/<server>:<prompt>`）。
+  ///
+  /// 装配期不拉 prompts 目录（网络往返）；首次打开命令菜单、执行这类命令或
+  /// `/help` 时才加载一次。返回是否新登记了命令（调用方据此重绘菜单）。
+  Future<bool> ensurePromptCommands() async {
+    final McpPromptCommands? prompts = _app.get<McpPromptCommands>(
+      'mcpPromptCommands',
+    );
+    if (prompts == null || prompts.loaded) return false;
+    await prompts.ensureLoaded();
+    _refresh();
+    return true;
   }
 
   /// 当前可用的斜杠命令：静态表 + 技能注册表投影 + 自定义命令。
