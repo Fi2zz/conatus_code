@@ -134,6 +134,15 @@ abstract class PluginServiceLike {
   /// 注入 shell 的环境变量。
   Map<String, String> get shellEnv;
 
+  /// 已登记 / 待加载的插件数量（诊断用）。
+  int get pluginCount => 0;
+
+  /// 插件注册的工具数（诊断用）。
+  int get toolCount => 0;
+
+  /// 启动 / 加载阶段的告警（诊断用）。
+  List<String> get warnings => const <String>[];
+
   /// 发送一个事件。
   Future<void> notify(String event, [Map<String, Object?> data = const {}]);
 }

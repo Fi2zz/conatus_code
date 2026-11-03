@@ -252,6 +252,8 @@ source = "superpowers@git+https://github.com/obra/superpowers.git"
   `experimental.chat.messages.transform` 的上下文注入；自定义工具；
   `tool.execute.before`（可拒绝）/ `after`（可改结果）；`event`；
   `shell.env`。`tool.execute.before` 暂不替换参数；`.ts` 插件需先转成 JS。
+- **诊断**：`/doctor` 的「插件」格显示已加载数量、注册工具数与技能根数；缺 node /
+  宿主启动失败会带原因。`/tools` 可直接确认插件工具进没进工具表。
 - 插件是任意代码执行；只加载你信任的包。`.opencode` 始终只读，安装与缓存只落
   `~/.nava/plugins`。
 

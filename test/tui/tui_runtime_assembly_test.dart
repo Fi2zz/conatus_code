@@ -66,6 +66,12 @@ void main() {
     );
 
     expect(runtime.tools.names, contains('plugin_echo'));
+    final DoctorCheck plugin = doctorChecks(
+      runtime.app,
+    ).firstWhere((DoctorCheck check) => check.name == '插件');
+    expect(plugin.ok, isTrue);
+    expect(plugin.hint, contains('工具 1'));
+    expect(plugin.hint, contains('技能根 1'));
     await runtime.dispose();
   });
 

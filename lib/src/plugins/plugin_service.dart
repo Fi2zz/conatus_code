@@ -18,12 +18,16 @@ class PluginService implements PluginServiceLike {
     required this.result,
     required this.warnings,
     required this.warn,
+    required this.pluginCount,
   }) : available = true;
 
-  PluginService._disabled({required this.warnings, required this.warn})
-    : host = null,
-      result = const PluginInitResult(),
-      available = false;
+  PluginService._disabled({
+    required this.warnings,
+    required this.warn,
+    this.pluginCount = 0,
+  }) : host = null,
+       result = const PluginInitResult(),
+       available = false;
 
   final PluginHost? host;
   final PluginInitResult result;
@@ -32,7 +36,15 @@ class PluginService implements PluginServiceLike {
   final bool available;
 
   /// 启动/加载阶段的告警。
+  @override
   final List<String> warnings;
+
+  /// 参与加载的插件数量（含未启动成功 / 缺 node 的情况）。
+  @override
+  final int pluginCount;
+
+  @override
+  int get toolCount => result.tools.length;
 
   final void Function(String message) warn;
 
@@ -67,6 +79,7 @@ class PluginService implements PluginServiceLike {
       return PluginService._disabled(
         warnings: <String>['未找到 node，插件未加载。'],
         warn: log,
+        pluginCount: candidates.length,
       );
     }
     final String script = hostOverride == null
@@ -88,6 +101,7 @@ class PluginService implements PluginServiceLike {
         result: result,
         warnings: result.warnings,
         warn: log,
+        pluginCount: candidates.length,
       );
       service._register(tools);
       return service;
@@ -97,6 +111,7 @@ class PluginService implements PluginServiceLike {
       return PluginService._disabled(
         warnings: <String>['插件宿主启动失败：$error'],
         warn: log,
+        pluginCount: candidates.length,
       );
     }
   }

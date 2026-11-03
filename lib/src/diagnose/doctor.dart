@@ -15,6 +15,8 @@ import '../budget/cost_tracker.dart';
 import '../commands/command_registry.dart';
 import '../mcp/mcp_boot.dart';
 import '../permissions/permission_wiring.dart';
+import '../plugins/plugin_config.dart';
+import '../plugins/plugin_types.dart';
 import '../tools/guarded_shell.dart';
 import 'startup_timing.dart';
 
@@ -51,6 +53,7 @@ List<DoctorCheck> doctorChecks(Context app) => <DoctorCheck>[
   _llmChainCheck(app),
   _modelProfileCheck(app),
   _mcpCheck(app),
+  _pluginCheck(app),
   DoctorCheck(
     name: '工具表',
     ok: (app.get<ToolRegistry>('tools')?.names.isNotEmpty) ?? false,
@@ -74,6 +77,57 @@ DoctorCheck _startupCheck(Context app) {
     return const DoctorCheck(name: '启动耗时', ok: true, hint: '未采集');
   }
   return DoctorCheck(name: '启动耗时', ok: true, hint: timing.describe());
+}
+
+/// 插件：宿主是否起来、挂了几个工具/技能根；缺 node 这类降级要能看见。
+///
+/// 插件是任意代码执行且默认静默降级（没 node 就整体跳过），不报出来的话
+/// 用户会以为「插件写了但没生效」。
+DoctorCheck _pluginCheck(Context app) {
+  final PluginServiceLike? plugins = app.get<PluginServiceLike>(
+    kPluginServiceKey,
+  );
+  if (plugins == null) {
+    return const DoctorCheck(name: '插件', ok: true, hint: '未装配');
+  }
+  if (!plugins.available) return _pluginDisabledCheck(plugins.warnings);
+  return _pluginLoadedCheck(plugins);
+}
+
+DoctorCheck _pluginDisabledCheck(List<String> warnings) {
+  if (warnings.isEmpty) {
+    return const DoctorCheck(
+      name: '插件',
+      ok: true,
+      hint: '未配置（[[plugins]] / .opencode/plugins）',
+    );
+  }
+  return DoctorCheck(
+    name: '插件',
+    ok: false,
+    warning: true,
+    hint: _warningHead(warnings),
+  );
+}
+
+DoctorCheck _pluginLoadedCheck(PluginServiceLike plugins) {
+  final String summary =
+      '${plugins.pluginCount} 个 · 工具 ${plugins.toolCount}'
+      ' · 技能根 ${plugins.skillRoots.length}';
+  if (plugins.warnings.isEmpty) {
+    return DoctorCheck(name: '插件', ok: true, hint: summary);
+  }
+  return DoctorCheck(
+    name: '插件',
+    ok: true,
+    warning: true,
+    hint: '$summary；${_warningHead(plugins.warnings)}',
+  );
+}
+
+String _warningHead(List<String> warnings) {
+  final String head = warnings.take(2).join('；');
+  return warnings.length > 2 ? '$head（另有 ${warnings.length - 2} 条）' : head;
 }
 
 /// Agent / 命令发现的跳过项与 Agent 模型回退。

@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:conatus_code/conatus_code.dart';
 import 'package:conatus_code/providers.dart';
+import 'package:conatus_code/src/plugins/plugin_config.dart';
 import 'package:conatus_code/tui.dart';
 import 'package:conatus_core/conatus_core.dart';
 import 'package:conatus_foundation/conatus_foundation.dart';
@@ -31,6 +32,44 @@ class _StubProvider implements LlmProvider {
 
   @override
   void close() {}
+}
+
+/// 假插件服务：只覆盖 `/doctor` 用到的诊断字段。
+class _FakePlugins implements PluginServiceLike {
+  _FakePlugins({
+    this.available = true,
+    this.warnings = const <String>[],
+    this.pluginCount = 0,
+    this.toolCount = 0,
+    this.skillRoots = const <String>[],
+  });
+
+  @override
+  final bool available;
+
+  @override
+  final List<String> warnings;
+
+  @override
+  final int pluginCount;
+
+  @override
+  final int toolCount;
+
+  @override
+  final List<String> skillRoots;
+
+  @override
+  String get contextText => '';
+
+  @override
+  Map<String, String> get shellEnv => const <String, String>{};
+
+  @override
+  Future<void> notify(
+    String event, [
+    Map<String, Object?> data = const <String, Object?>{},
+  ]) async {}
 }
 
 Future<(ConatusTuiController, Context)> _build() async {
@@ -163,5 +202,55 @@ void main() {
     expect(text, contains('Agent / 命令发现'));
     expect(text, contains('bad.md'));
     expect(text, contains('nope/gpt-x'));
+  });
+
+  test('插件未装配：/doctor 如实标注', () async {
+    final (ConatusTuiController controller, Context app) = await _build();
+    addTearDown(app.dispose);
+
+    await controller.handleLine('/doctor');
+
+    expect(
+      controller.transcript.messages.last.text,
+      contains('✓ 插件 — 未装配'),
+    );
+  });
+
+  test('插件未加载（如缺 node）：⚠ 并带上原因', () async {
+    final (ConatusTuiController controller, Context app) = await _build();
+    addTearDown(app.dispose);
+    app.provide(
+      'plugins',
+      _FakePlugins(
+        available: false,
+        warnings: <String>['未找到 node，插件未加载。'],
+      ),
+    );
+
+    await controller.handleLine('/doctor');
+
+    final String text = controller.transcript.messages.last.text;
+    expect(text, contains('⚠ 插件'));
+    expect(text, contains('未找到 node'));
+  });
+
+  test('插件已加载：显示数量与工具/技能根', () async {
+    final (ConatusTuiController controller, Context app) = await _build();
+    addTearDown(app.dispose);
+    app.provide(
+      'plugins',
+      _FakePlugins(
+        pluginCount: 2,
+        toolCount: 3,
+        skillRoots: const <String>['/plugins/skills'],
+      ),
+    );
+
+    await controller.handleLine('/doctor');
+
+    expect(
+      controller.transcript.messages.last.text,
+      contains('✓ 插件 — 2 个 · 工具 3 · 技能根 1'),
+    );
   });
 }
