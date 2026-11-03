@@ -259,6 +259,7 @@ export 'src/lsp/lsp_types.dart'
     show LspDiagnostic, LspDiagnosticsSource, LspException, LspSeverity;
 export 'src/mcp/mcp_assembly.dart'
     show attachMcpServers, toMcpServerConfig, toMcpTransport;
+export 'src/mcp/mcp_boot.dart' show McpBoot;
 export 'src/mcp/mcp_cli.dart' show McpCliDeps, runMcpCli;
 export 'src/mcp/mcp_oauth_runtime.dart' show McpOAuthRuntime;
 export 'src/mcp/mcp_prompt_commands.dart'

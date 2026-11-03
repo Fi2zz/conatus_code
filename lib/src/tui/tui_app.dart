@@ -47,6 +47,7 @@ import '../lsp/lsp_navigation.dart';
 import '../lsp/lsp_navigation_tools.dart';
 import '../lsp/lsp_tool.dart';
 import '../mcp/mcp_assembly.dart';
+import '../mcp/mcp_boot.dart';
 import '../mcp/mcp_prompt_service.dart';
 import '../permissions/permission_wiring.dart';
 import '../plugins/plugin_assembly.dart';
@@ -116,6 +117,7 @@ class ConatusTuiRuntime {
     required this.retryPolicy,
     required this.storyEnabled,
     required this.lspManager,
+    required this.mcpBoot,
     required void Function(FallbackLlm llm) switchLlm,
   }) : _switchLlm = switchLlm;
 
@@ -148,6 +150,12 @@ class ConatusTuiRuntime {
 
   /// 已启用的 LSP 管理器；未启用为 null。
   final LspManager? lspManager;
+
+  /// 后台 MCP 连接的状态；同步装配（headless / 库用法）为 null。
+  final McpBoot? mcpBoot;
+
+  /// 后台 MCP 连接完成时 resolve；没有后台连接时立即完成。
+  Future<void> get mcpReady => mcpBoot?.ready ?? Future<void>.value();
 
   final void Function(FallbackLlm llm) _switchLlm;
 
@@ -251,6 +259,7 @@ class ConatusTuiRuntime {
     PluginTrustPrompter? trustPrompter,
     String? pluginHome,
     StartupTiming? startupTiming,
+    bool deferMcpConnect = false,
   }) async {
     final bool storyEnabled = story?.enabled ?? false;
     final Context app = Context.root(name: 'conatus');
@@ -530,15 +539,25 @@ class ConatusTuiRuntime {
 
     // ── MCP server（config.toml [mcp.servers.*]）─────────────────
     // 逐台挂载、单台失败跳过；工具经 server__tool 前缀进注册表，高危走审批。
-    final McpRegistry? mcpRegistry = await attachMcpServers(
-      app,
-      mcpServers ?? const <McpServerSpec>[],
-      credentials: resolvedCredentials,
-      transportFactory: mcpTransportFactory,
-    );
-    // 资源清单 / 读取是本地内置工具：挂上注册表即对模型可见（只读、低风险）。
-    if (mcpRegistry != null) {
-      provideMcpResourceTools(app, registry: mcpRegistry);
+    // 交互式（`deferMcpConnect`）先返回、握手放首帧后：远端 server 一次握手
+    // 要几百毫秒到数秒，不该卡在窗口出现之前。
+    final List<McpServerSpec> mcpSpecs = mcpServers ?? const <McpServerSpec>[];
+    McpBoot? mcpBoot;
+    McpRegistry? mcpRegistry;
+    if (deferMcpConnect && mcpSpecs.isNotEmpty) {
+      mcpBoot = McpBoot();
+      app.provide('mcpBoot', mcpBoot);
+    } else {
+      mcpRegistry = await attachMcpServers(
+        app,
+        mcpSpecs,
+        credentials: resolvedCredentials,
+        transportFactory: mcpTransportFactory,
+      );
+      // 资源清单 / 读取是本地内置工具：挂上注册表即对模型可见（只读、低风险）。
+      if (mcpRegistry != null) {
+        provideMcpResourceTools(app, registry: mcpRegistry);
+      }
     }
 
     // ── 模型 / 自省 / 子 Agent ─────────────────────────────────
@@ -680,6 +699,18 @@ class ConatusTuiRuntime {
           registry: mcpRegistry,
           commands: commandRegistry,
           warn: stderr.writeln,
+        ),
+      );
+    } else if (mcpBoot != null) {
+      // 后台握手完成后再挂资源工具与 prompt 加载器（见 `_connectMcpDeferred`）。
+      unawaited(
+        _connectMcpDeferred(
+          app: app,
+          boot: mcpBoot,
+          specs: mcpSpecs,
+          credentials: resolvedCredentials,
+          commands: commandRegistry,
+          transportFactory: mcpTransportFactory,
         ),
       );
     }
@@ -1002,6 +1033,7 @@ class ConatusTuiRuntime {
       retryPolicy: retryPolicy ?? const RetryPolicy(),
       storyEnabled: storyEnabled,
       lspManager: lspManager,
+      mcpBoot: mcpBoot,
       switchLlm: switchLlm,
     );
   }
@@ -1043,9 +1075,25 @@ class ConatusTuiRuntime {
 
   /// 结束运行时：等待在途写入落定后释放根上下文。
   Future<void> dispose() async {
+    await _settleMcp();
     await lspManager?.close();
     await sessions.flush();
     app.dispose();
+  }
+
+  /// 后台 MCP 握手还在飞时给一个短暂窗口收尾。
+  ///
+  /// 先置 `cancelled`（后台任务据此不再往上下文挂工具 / 服务），再最多等
+  /// 800ms；超时交给进程退出兜底，不让坏 server 拖慢退出。
+  Future<void> _settleMcp() async {
+    final McpBoot? boot = mcpBoot;
+    if (boot == null || boot.done) return;
+    boot.cancel();
+    try {
+      await boot.ready.timeout(const Duration(milliseconds: 800));
+    } on TimeoutException {
+      // 放弃等待：连接随进程退出回收。
+    }
   }
 
   static String _modelLabel(
@@ -1119,4 +1167,48 @@ String? _extraSkillDir(String raw, String workdir) {
   }
   if (value.startsWith('/')) return value;
   return '$workdir${Platform.pathSeparator}$value';
+}
+
+/// 首帧之后连接 MCP：握手完成再挂资源工具与 prompt 加载器。
+///
+/// 握手失败只告警（单台失败由 `attachMcpServers` 逐台隔离）；上下文已释放
+/// （[McpBoot.cancelled]）时不再接线，并关掉刚建立的连接。
+Future<void> _connectMcpDeferred({
+  required Context app,
+  required McpBoot boot,
+  required List<McpServerSpec> specs,
+  required Credentials credentials,
+  required CommandRegistry commands,
+  McpTransport Function(McpServerConfig config)? transportFactory,
+}) async {
+  try {
+    final McpRegistry? registry = await attachMcpServers(
+      app,
+      specs,
+      credentials: credentials,
+      transportFactory: transportFactory,
+    );
+    if (boot.cancelled) {
+      await registry?.close();
+      return;
+    }
+    if (registry != null) {
+      provideMcpResourceTools(app, registry: registry);
+      app.provide(
+        'mcpPromptCommands',
+        McpPromptCommands(
+          registry: registry,
+          commands: commands,
+          warn: stderr.writeln,
+        ),
+      );
+      app.get<ConatusTuiController>('tuiController')?.showSystemNotice(
+        'MCP server 已连接（${registry.servers.length} 台）。',
+      );
+    }
+  } catch (error) {
+    stderr.writeln('MCP 后台连接失败：$error');
+  } finally {
+    boot.complete();
+  }
 }

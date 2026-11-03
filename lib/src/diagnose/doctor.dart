@@ -13,6 +13,7 @@ import '../agents/agent_registry.dart';
 import '../agents/agent_resolver.dart';
 import '../budget/cost_tracker.dart';
 import '../commands/command_registry.dart';
+import '../mcp/mcp_boot.dart';
 import '../permissions/permission_wiring.dart';
 import '../tools/guarded_shell.dart';
 import 'startup_timing.dart';
@@ -173,6 +174,15 @@ String _chainHint(LlmChain chain, LlmNotices? notices) {
 }
 
 DoctorCheck _mcpCheck(Context app) {
+  final McpBoot? boot = app.get<McpBoot>('mcpBoot');
+  if (boot != null && !boot.done) {
+    return const DoctorCheck(
+      name: 'MCP server',
+      ok: true,
+      warning: true,
+      hint: '连接中…',
+    );
+  }
   final McpRegistry? mcp = app.get<McpRegistry>('mcp');
   if (mcp != null && mcp.servers.isNotEmpty) {
     return DoctorCheck(

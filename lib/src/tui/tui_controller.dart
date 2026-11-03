@@ -44,6 +44,7 @@ import '../diagnose/doctor.dart';
 import '../diagnose/startup_timing.dart';
 import '../hooks/hooks.dart';
 import '../lsp/lsp_manager.dart';
+import '../mcp/mcp_boot.dart';
 import '../mcp/mcp_prompt_service.dart';
 import '../permissions/permission_wiring.dart';
 import '../plugins/plugin_config.dart';
@@ -1346,6 +1347,11 @@ class ConatusTuiController implements TuiUserPromptHost {
     // 新 prompt 即提交：撤销点与待回填内容作废（/redo 不再可用）。
     _revertStage = null;
     _prefill = null;
+    // 后台 MCP 握手可能还没完：等工具挂齐再发请求，否则模型第一轮看不到它们。
+    // 注意：没有待等连接时不能有 `await`，否则排队消息的「收尾 → 下一轮」
+    // 之间会多出一个空闲窗口，切会话/打断会撞进去。
+    final Future<void>? mcpWait = _pendingMcpWait();
+    if (mcpWait != null) await mcpWait;
     _beginTurn();
     busy = true;
     _refresh();
@@ -2072,6 +2078,9 @@ class ConatusTuiController implements TuiUserPromptHost {
   /// 装配期不拉 prompts 目录（网络往返）；首次打开命令菜单、执行这类命令或
   /// `/help` 时才加载一次。返回是否新登记了命令（调用方据此重绘菜单）。
   Future<bool> ensurePromptCommands() async {
+    // 后台 MCP 连接还没完成：先等它把 prompt 加载器挂上，否则会误判为未装配。
+    final McpBoot? boot = _app.get<McpBoot>('mcpBoot');
+    if (boot != null && !boot.done) await boot.ready;
     final McpPromptCommands? prompts = _app.get<McpPromptCommands>(
       'mcpPromptCommands',
     );
@@ -2079,6 +2088,18 @@ class ConatusTuiController implements TuiUserPromptHost {
     await prompts.ensureLoaded();
     _refresh();
     return true;
+  }
+
+  /// 后台 MCP 连接未完成时返回要等的 Future（并上屏一句提示）；否则 `null`。
+  ///
+  /// 连接失败也会 resolve，不阻塞对话。返回 `null` 而非已完成 Future，是为了
+  /// 让调用方在没有待等连接时**不产生挂起点**（见 `submit` 里的说明）。
+  Future<void>? _pendingMcpWait() {
+    final McpBoot? boot = _app.get<McpBoot>('mcpBoot');
+    if (boot == null || boot.done) return null;
+    transcript.add(TuiRole.system, 'MCP server 连接中，工具就绪后开始…');
+    _refresh();
+    return boot.ready;
   }
 
   /// 当前可用的斜杠命令：静态表 + 技能注册表投影 + 自定义命令。
@@ -2644,6 +2665,11 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   /// `/mcp`：列出已接入的 MCP server 与各自工具数（不经模型，只读）。
   void _showMcp() {
+    final McpBoot? boot = _app.get<McpBoot>('mcpBoot');
+    if (boot != null && !boot.done) {
+      transcript.add(TuiRole.system, 'MCP server 连接中…（/doctor 可查看状态）');
+      return;
+    }
     final McpRegistry? registry = _app.get<McpRegistry>('mcp');
     if (registry == null || registry.servers.isEmpty) {
       transcript.add(

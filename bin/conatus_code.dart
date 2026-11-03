@@ -202,6 +202,9 @@ Future<void> main(List<String> args) async {
     trustProjectPlugins: options.trustPlugins || config.trustProjectPlugins,
     pluginHome: Platform.environment['HOME'],
     startupTiming: startupTiming,
+    // 交互式：MCP 握手放首帧之后（首轮请求前由控制器等齐）；headless 必须
+    // 在跑任务前拿到完整工具面。
+    deferMcpConnect: !headless,
   );
 
   // headless：`-p <任务>` 单轮执行，跑完输出即退出（不启动 TUI）。
