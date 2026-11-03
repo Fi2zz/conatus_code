@@ -234,23 +234,7 @@ Future<void> main(List<String> args) async {
   void exitWithHint() {
     final String id = controller.sessionId;
     shutdownApp();
-    if (id.isNotEmpty) {
-      // 直接写 /dev/tty：shutdownApp 已经离开 alternate screen，但它的
-      // requestExit 会在 stdout.flush 后立刻 exit；走 stdout 的异步 flush
-      // 可能赶不上，导致提示丢失。同步写控制终端最可靠。
-      final String text = '\n恢复本次会话：nava -r $id\n';
-      try {
-        final File tty = File('/dev/tty');
-        if (tty.existsSync()) {
-          tty.writeAsStringSync(text);
-          return;
-        }
-      } on FileSystemException {
-        // 没有控制终端时回退 stdout。
-      }
-      stdout.write(text);
-      unawaited(stdout.flush());
-    }
+    if (id.isNotEmpty) writeResumeHint(id);
   }
 
   controller = runtime.createController(

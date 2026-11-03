@@ -31,6 +31,7 @@ export 'src/tui/keymap/key_binding.dart';
 export 'src/tui/keymap/keymap.dart';
 export 'src/tui/keymap/keymap_dispatcher.dart';
 export 'src/tui/keymap/keymap_view.dart';
+export 'src/tui/resume_hint.dart' show resumeHintText, writeResumeHint;
 export 'src/tui/session_display.dart' show shortSessionId;
 export 'src/tui/session_exporter.dart';
 export 'src/tui/settings_prompt.dart';

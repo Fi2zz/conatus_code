@@ -578,6 +578,21 @@ void main() {
     }
   });
 
+  test('/exit 命令触发 onExit 钩子', () async {
+    bool exited = false;
+    final (ConatusTuiController controller, NoctermTester tester, Context app) =
+        await _launchAgentTui(onExit: () => exited = true);
+    try {
+      await controller.handleLine('/exit');
+      await tester.pump();
+      expect(exited, isTrue);
+    } finally {
+      tester.dispose();
+      controller.dispose();
+      app.dispose();
+    }
+  });
+
   test('/help 弹出可用 Esc 关闭', () async {
     final (ConatusTuiController controller, NoctermTester tester, Context app) =
         await _launchAgentTui();
