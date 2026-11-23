@@ -108,7 +108,7 @@ class RunCodeTool extends Tool {
       final CodeRunResult result = await _runtime.run(
         CodeRunRequest(program: program, bindings: bindings),
       );
-      return _finish(result, taskId, stopwatch);
+      return await _finish(result, taskId, stopwatch);
     } catch (error) {
       await _fail(error, taskId);
       rethrow;

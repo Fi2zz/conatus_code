@@ -85,7 +85,7 @@ class LspNavigator {
     if (client == null) return null;
     try {
       await client.ensureDocument(path);
-      return client.sendRequest(
+      return await client.sendRequest(
         method,
         <String, Object?>{
           'textDocument': <String, Object?>{'uri': _uri(path)},
