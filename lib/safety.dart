@@ -3,3 +3,4 @@ library;
 
 export 'src/paths/canonical_path.dart'
     show canonicalToolPath, canonicalizeBestEffortPath, expandToolHome;
+export 'src/safety/patch_paths.dart' show PatchTarget, patchTargets;
