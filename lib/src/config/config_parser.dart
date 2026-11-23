@@ -36,6 +36,7 @@ class ConfigParser extends ConfigValues {
     checkpoint: _readCheckpoint(),
     xerj: _readXerj(),
     hooks: _readHooks(),
+    safety: _readSafety(),
     lint: _readLint(),
     formatter: _readFormatter(),
     lsp: _readLsp(),
@@ -117,8 +118,9 @@ class ConfigParser extends ConfigValues {
     }
     for (final Map<String, dynamic> table in readTableList('permissions')) {
       final String? action = readString(table, 'action');
-      final String? replacement =
-          action == null ? null : legacyPermissionAction(action);
+      final String? replacement = action == null
+          ? null
+          : legacyPermissionAction(action);
       if (replacement != null) {
         warnings.add(
           '$source：permissions 的 action "$action" 已不再命中，请改为 "$replacement"。',
@@ -536,6 +538,30 @@ class ConfigParser extends ConfigValues {
       preToolUse: readStringList(table, 'pre_tool_use'),
       postToolUse: readStringList(table, 'post_tool_use'),
       stop: readStringList(table, 'stop'),
+    );
+  }
+
+  SafetyConfig _readSafety() {
+    final Map<String, dynamic> table = readTable('safety');
+    final int warn = readNonNegativeInt(table, 'repeat_warn_at', 3);
+    final int deny = readNonNegativeInt(table, 'repeat_deny_at', 5);
+    if (warn > 0 && deny > 0 && deny <= warn) {
+      throw ConfigException(
+        '$source：safety.repeat_deny_at 必须大于 repeat_warn_at。',
+      );
+    }
+    return SafetyConfig(
+      requireReadBeforeWrite: readBool(
+        table,
+        'require_read_before_write',
+        true,
+      ),
+      repeatWarnAt: warn,
+      repeatDenyAt: deny,
+      repeatExemptTools: readStringList(table, 'repeat_exempt_tools'),
+      protectPrivateKeys: readBool(table, 'protect_private_keys', true),
+      denyDotenvWrites: readBool(table, 'deny_dotenv_writes', true),
+      extraSensitivePaths: readStringList(table, 'extra_sensitive_paths'),
     );
   }
 

@@ -148,6 +148,16 @@ keep = 5                    # 每会话保留最近 N 个检查点（0 = 不限�
 # post_tool_use = []
 # stop = []
 
+# 工具层安全护栏：读后写 / 重复调用熔断 / 敏感文件硬阻断。
+[safety]
+require_read_before_write = true   # 覆盖已有文件前必须先 read 且未被外部改动
+repeat_warn_at = 3                 # 连续相同调用第 N 次起附加告警（0 关闭）
+repeat_deny_at = 5                 # 连续相同调用第 N 次起拒绝执行（0 关闭）
+# repeat_exempt_tools = ["bash"]   # 豁免轮询类命令
+protect_private_keys = true        # 私钥 / 凭据硬拒
+deny_dotenv_writes = true          # .env 族写入硬拒（读仍走权限 ask）
+# extra_sensitive_paths = ["secrets"]
+
 # 人机双写故事层（可选，默认关闭）：开启后写工具先成待定补丁，
 # /story 查看时间轴、apply/reject 待定补丁。关闭时行为与普通编码会话一致。
 # [story]

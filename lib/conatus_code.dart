@@ -162,6 +162,7 @@ export 'src/config/config_schema.dart'
         ProviderType,
         ReferenceConfig,
         RetrySettings,
+        SafetyConfig,
         StoryConfig,
         TuiConfig,
         XerjConfig;

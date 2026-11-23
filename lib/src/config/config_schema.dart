@@ -421,6 +421,43 @@ class XerjConfig {
   final bool autoIndex;
 }
 
+/// 工具层安全护栏；对应 `[safety]` 表。
+///
+/// 三项能力独立开关：读后写守卫、重复调用熔断、敏感文件硬阻断。缺省全开；
+/// 全关时行为与未引入护栏时一致。
+class SafetyConfig {
+  const SafetyConfig({
+    this.requireReadBeforeWrite = true,
+    this.repeatWarnAt = 3,
+    this.repeatDenyAt = 5,
+    this.repeatExemptTools = const <String>[],
+    this.protectPrivateKeys = true,
+    this.denyDotenvWrites = true,
+    this.extraSensitivePaths = const <String>[],
+  });
+
+  /// 覆盖已有文件前必须在本会话 read 过，且读后文件未变化。
+  final bool requireReadBeforeWrite;
+
+  /// 连续相同调用第 N 次起在结果后附加告警；0 关闭告警。
+  final int repeatWarnAt;
+
+  /// 连续相同调用第 N 次起拒绝执行；0 关闭拒绝。
+  final int repeatDenyAt;
+
+  /// 不参与重复计数的工具名（例如轮询用的 `bash`）。
+  final List<String> repeatExemptTools;
+
+  /// 私钥 / 凭据文件硬拒（`id_*`、`credentials`、`.aws/credentials` 等）。
+  final bool protectPrivateKeys;
+
+  /// `.env` 族写入硬拒；读仍走权限层的 ask。
+  final bool denyDotenvWrites;
+
+  /// 追加的敏感路径（含分隔符按路径段后缀，否则按 basename）。
+  final List<String> extraSensitivePaths;
+}
+
 /// Hooks 配置；对应 `[hooks]` 表（事件 → 命令列表）。
 class HooksConfig {
   const HooksConfig({
@@ -597,6 +634,7 @@ class ConatusCodeConfig {
     this.checkpoint = const CheckpointConfig(),
     this.xerj = const XerjConfig(),
     this.hooks = const HooksConfig(),
+    this.safety = const SafetyConfig(),
     this.lint = const LintConfig(),
     this.formatter = const FormatterConfig(),
     this.lsp = const LspConfig(),
@@ -653,6 +691,9 @@ class ConatusCodeConfig {
 
   /// `[hooks]` 表。
   final HooksConfig hooks;
+
+  /// `[safety]` 表：工具层安全护栏。
+  final SafetyConfig safety;
 
   /// `[lint]` 表。
   final LintConfig lint;
