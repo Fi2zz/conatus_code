@@ -6,5 +6,7 @@ export 'src/paths/canonical_path.dart'
 export 'src/safety/patch_paths.dart' show PatchTarget, patchTargets;
 export 'src/safety/read_ledger.dart'
     show ReadLedger, ReadLedgerMiddleware, fileFingerprint;
+export 'src/safety/repeat_breaker.dart'
+    show RepeatTracker, RepeatWarning, callSignature, kRepeatBlockedCode;
 export 'src/safety/write_guard.dart'
     show ReadBeforeWriteGuard, kWriteStaleReadCode, kWriteWithoutReadCode;
