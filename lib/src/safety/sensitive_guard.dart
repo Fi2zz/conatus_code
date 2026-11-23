@@ -14,6 +14,18 @@ const Set<String> _writeTools = <String>{'write', 'edit', 'apply_patch'};
 
 final RegExp _tokenSeparators = RegExp(r'''[\s"'`|&;<>()]+''');
 
+final RegExp _writeOperators = RegExp(
+  r'(>>?|\btee\b|\bsed\s+-i|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\btouch\b|\bdd\b)',
+);
+
+/// 只把「看起来像路径」的 token 当候选：普通单词（`credentials`、
+/// `id_rsa`）出现在提交信息或搜索词里时不能误伤。
+bool _looksPathLike(String token) =>
+    token.contains('/') ||
+    token.contains('\\') ||
+    token.startsWith('~') ||
+    token.startsWith('.');
+
 /// 敏感文件守卫。
 // REASON: 装配入口需要一次性收齐四个开关与三个路径上下文，拆对象只会多一层转发。
 class SensitivePathGuard {
@@ -57,17 +69,25 @@ class SensitivePathGuard {
         extraPaths: extraPaths,
       );
       if (match == null) continue;
-      if (!_denied(match.kind, call.name)) continue;
+      if (!_denied(match.kind, call)) continue;
       return sensitiveMessage(match);
     }
     return null;
   }
 
-  bool _denied(SensitiveKind kind, String tool) {
+  bool _denied(SensitiveKind kind, ToolCall call) {
     if (kind == SensitiveKind.dotenv) {
-      return denyDotenvWrites && _writeTools.contains(tool);
+      if (call.name == 'bash') {
+        return denyDotenvWrites && _looksWriteCommand(call);
+      }
+      return denyDotenvWrites && _writeTools.contains(call.name);
     }
     return protectPrivateKeys;
+  }
+
+  bool _looksWriteCommand(ToolCall call) {
+    final Object? command = call.arguments['command'];
+    return command is String && _writeOperators.hasMatch(command);
   }
 
   List<String> _candidates(ToolCall call) {
@@ -80,11 +100,7 @@ class SensitivePathGuard {
     if (call.name == 'bash') {
       final Object? command = call.arguments['command'];
       if (command is String) {
-        found.addAll(
-          command
-              .split(_tokenSeparators)
-              .where((String token) => token.isNotEmpty),
-        );
+        found.addAll(command.split(_tokenSeparators).where(_looksPathLike));
       }
     }
     if (call.name == 'apply_patch') {

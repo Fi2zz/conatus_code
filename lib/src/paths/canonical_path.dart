@@ -21,8 +21,9 @@ String expandToolHome(String value, String? home) {
 /// 工具常读「尚不存在的路径」或只读目录里的单个文件；不这样做，未解析的
 /// `/var/...` 与 canonical 的 `/private/var/...` 会让越界判定误伤合法路径。
 String canonicalizeBestEffortPath(String path) {
+  final String normalized = _normalizeLexical(path);
   final String sep = Platform.pathSeparator;
-  final List<String> parts = path.split(sep);
+  final List<String> parts = normalized.split(sep);
   String suffix = '';
   while (parts.length > 1) {
     final String candidate = parts.join(sep);
@@ -33,7 +34,7 @@ String canonicalizeBestEffortPath(String path) {
       suffix = '$sep${parts.removeLast()}$suffix';
     }
   }
-  return path;
+  return normalized;
 }
 
 /// 把工具传入的路径解析为 canonical 绝对路径；相对路径以 [workdir] 为基准。
@@ -46,9 +47,9 @@ String? canonicalToolPath(String workdir, String? home, String rawPath) {
   final String expanded = expandToolHome(trimmed, home);
   if (expanded.isEmpty) return null;
   final File probe = File(expanded);
-  final String absolute = probe.isAbsolute
-      ? expanded
-      : '$workdir${Platform.pathSeparator}$expanded';
+  final String absolute = _normalizeLexical(
+    probe.isAbsolute ? expanded : '$workdir${Platform.pathSeparator}$expanded',
+  );
   try {
     return FileSystemEntity.typeSync(absolute) == FileSystemEntityType.directory
         ? Directory(absolute).resolveSymbolicLinksSync()
@@ -56,4 +57,30 @@ String? canonicalToolPath(String workdir, String? home, String rawPath) {
   } on FileSystemException {
     return canonicalizeBestEffortPath(absolute);
   }
+}
+
+/// 词法归一化：去掉空段与 `.`，折叠 `..`（不触盘）。
+///
+/// `resolveSymbolicLinks` 只对**存在**的路径有效；`nope/../a.txt` 这类
+/// 「中间目录不存在」的写法会保留 `..`，导致台账键与 fs 层不一致。
+String _normalizeLexical(String path) {
+  final String sep = Platform.pathSeparator;
+  final bool unc = path.startsWith('$sep$sep');
+  final bool absolute = path.startsWith(sep);
+  final List<String> parts = <String>[];
+  for (final String part in path.split(sep)) {
+    if (part.isEmpty || part == '.') continue;
+    if (part == '..') {
+      if (parts.isNotEmpty && parts.last != '..') {
+        parts.removeLast();
+      } else if (!absolute) {
+        parts.add('..');
+      }
+      continue;
+    }
+    parts.add(part);
+  }
+  final String joined = parts.join(sep);
+  if (unc) return '$sep$sep$joined';
+  return absolute ? '$sep$joined' : joined;
 }

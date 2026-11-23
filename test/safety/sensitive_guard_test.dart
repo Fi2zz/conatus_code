@@ -138,4 +138,48 @@ void main() {
     );
     expect(relaxed.check(call('read', '~/.ssh/id_rsa')), isNull);
   });
+
+  test('bash 普通消息里的敏感词不误伤', () {
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'bash',
+          arguments: <String, Object?>{
+            'command': 'git commit -m "update credentials doc"',
+          },
+        ),
+      ),
+      isNull,
+    );
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'bash',
+          arguments: <String, Object?>{'command': 'grep -rn credentials src/'},
+        ),
+      ),
+      isNull,
+    );
+  });
+
+  test('bash 写 .env 拒绝；读 .env 放行', () {
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'bash',
+          arguments: <String, Object?>{'command': 'echo KEY=1 > .env'},
+        ),
+      ),
+      startsWith('SENSITIVE_PATH:'),
+    );
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'bash',
+          arguments: <String, Object?>{'command': 'cat .env'},
+        ),
+      ),
+      isNull,
+    );
+  });
 }

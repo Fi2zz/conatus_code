@@ -449,6 +449,9 @@ class ConatusTuiController implements TuiUserPromptHost {
 
   String _sessionId;
   Session? _session;
+
+  /// 最近一次清空安全护栏台账的会话 id；rebind 同一会话不清台账。
+  String? _safetySessionId;
   Context? _sessionCtx;
   AgentLoop? _agent;
   PlanMode? _planMode;
@@ -4134,7 +4137,10 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _bind(String id) async {
     final Session session = await _sessions.open(id);
     _session = session;
-    _app.get<ToolSafety>('toolSafety')?.resetSession();
+    if (_safetySessionId != session.id) {
+      _app.get<ToolSafety>('toolSafety')?.resetSession();
+      _safetySessionId = session.id;
+    }
     unawaited(
       pluginServiceOf(
             _app,
@@ -4278,7 +4284,6 @@ class ConatusTuiController implements TuiUserPromptHost {
     _planMode = null;
     _goal = null;
     _session = null;
-    _app.get<ToolSafety>('toolSafety')?.resetSession();
     ready = false;
   }
 

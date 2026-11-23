@@ -12,4 +12,13 @@ void main() {
     expect(await fix.controller.switchSession(renameOtherId), isTrue);
     expect(safety.ledger.length, 0);
   });
+
+  test('rebind 同一会话不清空台账', () async {
+    final RenameFixture fix = await buildRenameFixture();
+    provideToolSafety(fix.app, workdir: fix.sessionsDir.parent.path);
+    final ToolSafety safety = fix.app.require<ToolSafety>('toolSafety');
+    safety.ledger.note('/x', 'v');
+    expect(await fix.controller.rebind(), isTrue);
+    expect(safety.ledger.length, 1);
+  });
 }

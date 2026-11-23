@@ -52,11 +52,12 @@ class ReadBeforeWriteGuard {
   }
 
   String? _checkTarget(PatchTarget target) {
-    if (target.creates) return null;
     final String? canonical = canonicalToolPath(workdir, home, target.path);
     if (canonical == null) return null;
     final String? current = fileFingerprint(canonical);
-    if (current == null) return null; // 新建文件，无需先读
+    if (current == null) return null; // 真正的新建文件，无需先读
+    // `creates` 只是补丁文本的声明：声称新建但文件已存在时仍按覆盖检查，
+    // 否则模型「以为文件不存在」的误判会直接改坏未读文件。
     final String? recorded = ledger.fingerprintOf(canonical);
     if (recorded == null) {
       return '$kWriteWithoutReadCode: 覆盖已有文件前必须先读取：'

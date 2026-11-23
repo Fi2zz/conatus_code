@@ -41,4 +41,15 @@ void main() {
       target.resolveSymbolicLinksSync(),
     );
   });
+
+  test('词法归一化 .. 与 .（目标不存在也不留残留段）', () {
+    final Directory dir = Directory.systemTemp.createTempSync('nava-dotdot');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final File file = File('${dir.path}${Platform.pathSeparator}a.txt')
+      ..writeAsStringSync('x');
+    expect(
+      canonicalToolPath(dir.path, null, 'nope/../a.txt'),
+      file.resolveSymbolicLinksSync(),
+    );
+  });
 }

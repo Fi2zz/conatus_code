@@ -78,4 +78,25 @@ void main() {
     ledger.note(key, fileFingerprint(key)!);
     expect(guard.check(write('alias.txt')), isNull);
   });
+
+  test('补丁声称新建但文件已存在时仍要求先读', () {
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'apply_patch',
+          arguments: <String, Object?>{
+            'patch': '--- /dev/null\n+++ b/a.txt\n@@ -0,0 +1 @@\n+x\n',
+          },
+        ),
+      ),
+      startsWith('WRITE_WITHOUT_READ:'),
+    );
+  });
+
+  test('含 .. 的未归一化路径命中同一文件', () {
+    expect(
+      guard.check(write('nope/../a.txt')),
+      startsWith('WRITE_WITHOUT_READ:'),
+    );
+  });
 }
