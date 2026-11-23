@@ -91,6 +91,11 @@ void main() {
         ),
       );
       expect(hover.content, contains('fake hover'));
+      // 读后写护栏：覆盖已有文件前先 read（否则会被 WRITE_WITHOUT_READ 拦下）。
+      final ToolResult beforeEdit = await runtime.tools.call(
+        ToolCall(name: 'read', arguments: <String, Object?>{'path': file.path}),
+      );
+      expect(beforeEdit.isError, isFalse);
       final ToolResult edit = await runtime.tools.call(
         ToolCall(
           name: 'write',

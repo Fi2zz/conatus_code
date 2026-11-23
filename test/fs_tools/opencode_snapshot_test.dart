@@ -106,6 +106,8 @@ Future<(HeadlessResult, List<List<LlmMessage>>)> _runSessionWithEdits(
 ) async {
   final String sep = Platform.pathSeparator;
   final _ScriptedProvider provider = _ScriptedProvider(<LlmResult>[
+    _tool('c0', 'read', '{"path":".opencode/commands/x.md"}'),
+    _tool('c0b', 'read', '{"path":".opencode/agents/a.md"}'),
     _tool(
       'c1',
       'write',
