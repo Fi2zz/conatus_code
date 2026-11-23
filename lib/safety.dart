@@ -8,6 +8,7 @@ export 'src/safety/read_ledger.dart'
     show ReadLedger, ReadLedgerMiddleware, fileFingerprint;
 export 'src/safety/repeat_breaker.dart'
     show RepeatTracker, RepeatWarning, callSignature, kRepeatBlockedCode;
+export 'src/safety/safety_assembly.dart' show ToolSafety, provideToolSafety;
 export 'src/safety/sensitive_guard.dart' show SensitivePathGuard;
 export 'src/safety/sensitive_paths.dart'
     show SensitiveKind, SensitiveMatch, matchSensitivePath, sensitiveMessage;

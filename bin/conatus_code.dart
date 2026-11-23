@@ -189,6 +189,7 @@ Future<void> main(List<String> args) async {
     xerj: config.xerj,
     background: config.background,
     hooks: config.hooks,
+    safety: config.safety,
     lint: config.lint,
     formatter: config.formatter,
     story: config.story,

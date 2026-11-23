@@ -51,6 +51,7 @@ import '../plugins/plugin_config.dart';
 import '../project/project_database.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
+import '../safety/safety_assembly.dart';
 import '../story/story.dart';
 import '../story/story_commands.dart';
 import '../story/story_notices.dart';
@@ -805,9 +806,11 @@ class ConatusTuiController implements TuiUserPromptHost {
       final bool hasUser = session.events.any(
         (SessionEvent event) => event.type == kUserMessageEvent,
       );
-      final DateTime? last =
-          session.events.isEmpty ? null : session.events.last.time;
-      final bool stale = last == null ||
+      final DateTime? last = session.events.isEmpty
+          ? null
+          : session.events.last.time;
+      final bool stale =
+          last == null ||
           DateTime.now().difference(last) > const Duration(hours: 1);
       if (hasUser || session.title != null || !stale) continue;
       try {
@@ -4131,10 +4134,12 @@ class ConatusTuiController implements TuiUserPromptHost {
   Future<void> _bind(String id) async {
     final Session session = await _sessions.open(id);
     _session = session;
+    _app.get<ToolSafety>('toolSafety')?.resetSession();
     unawaited(
-      pluginServiceOf(_app)?.notify('session.created', <String, Object?>{
-        'sessionID': id,
-      }) ?? Future<void>.value(),
+      pluginServiceOf(
+            _app,
+          )?.notify('session.created', <String, Object?>{'sessionID': id}) ??
+          Future<void>.value(),
     );
     // Agent 选择按会话恢复：标签之间互不继承（_firstBind 只用于启动会话）。
     // 自定义命令的临时覆盖优先于会话事件，回合结束后再还原。
@@ -4273,6 +4278,7 @@ class ConatusTuiController implements TuiUserPromptHost {
     _planMode = null;
     _goal = null;
     _session = null;
+    _app.get<ToolSafety>('toolSafety')?.resetSession();
     ready = false;
   }
 
@@ -4324,8 +4330,9 @@ class ConatusTuiController implements TuiUserPromptHost {
     }
     unawaited(
       pluginServiceOf(_app)?.notify('session.idle', <String, Object?>{
-        'sessionID': _session?.id ?? '',
-      }) ?? Future<void>.value(),
+            'sessionID': _session?.id ?? '',
+          }) ??
+          Future<void>.value(),
     );
   }
 

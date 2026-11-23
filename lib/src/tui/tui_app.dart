@@ -39,6 +39,7 @@ import '../diagnose/startup_timing.dart';
 import '../format/formatter_service.dart';
 import '../hooks/hooks.dart';
 import '../instructions/instruction_loader.dart';
+import '../instructions/instruction_paths.dart' show defaultInstructionHome;
 import '../instructions/instruction_prompt.dart';
 import '../instructions/instruction_wiring.dart';
 import '../lint/linter.dart';
@@ -58,6 +59,7 @@ import '../plugins/plugin_types.dart';
 import '../project/project_registry.dart';
 import '../project/worktree_service.dart';
 import '../references/references.dart';
+import '../safety/safety_assembly.dart';
 import '../skills/bootstrap_skills.dart';
 import '../subagent/subagent_progress.dart';
 import '../subagent/swarm_member.dart';
@@ -263,6 +265,7 @@ class ConatusTuiRuntime {
     XerjConfig? xerj,
     BackgroundConfig? background,
     HooksConfig? hooks,
+    SafetyConfig safety = const SafetyConfig(),
     LintConfig? lint,
     FormatterConfig? formatter,
     StoryConfig? story,
@@ -302,6 +305,7 @@ class ConatusTuiRuntime {
         stderr.writeln('$label装配失败：$error');
       }
     }
+
     final String sep = Platform.pathSeparator;
     final String resolvedWorkdir = workdir ?? Directory.current.path;
     // 规范化形式：与 bin 传给 fs jail 的根保持同一拼写。解析失败（如目录不存在）
@@ -329,6 +333,12 @@ class ConatusTuiRuntime {
 
     // ── 工具：时间 / 回显 / 文件读取 / 联网（可选）──────────────
     provideTools(app, timeout: const Duration(seconds: 30));
+    provideToolSafety(
+      app,
+      workdir: canonicalWorkdir,
+      home: instructionHome ?? defaultInstructionHome(),
+      config: safety,
+    );
     app.effect(
       () => app.tools.fn(
         'get_time',
@@ -429,10 +439,7 @@ class ConatusTuiRuntime {
     app.provide(kPluginServiceKey, pluginService);
     app.onDispose(pluginService.close);
 
-    provideShellLocal(
-      app,
-      executor: pluginService.wrapShell(guardedShell),
-    );
+    provideShellLocal(app, executor: pluginService.wrapShell(guardedShell));
     // 'shellInteractive'：用户直发命令（`!` shell 模式）的交互缝——本地直执、
     // 不过模型命令审查（对齐 OpenCode）；模型命令仍走上面的 'shell' 缝。
     app.provide('shellInteractive', shellInteractive ?? LocalShellExecutor());
@@ -869,10 +876,7 @@ class ConatusTuiRuntime {
     final SystemPrompt prompt = provideSystemPrompt(app);
     if (pluginService.contextText.isNotEmpty) {
       prompt.section(
-        PromptSection(
-          name: 'plugins',
-          text: () => pluginService.contextText,
-        ),
+        PromptSection(name: 'plugins', text: () => pluginService.contextText),
       );
     }
     // permissions.json 载入失败时 deny 规则会静默消失：把这件事写进系统提示
@@ -1022,10 +1026,10 @@ class ConatusTuiRuntime {
         provideSkillTool(app, includeAll: mergeAllSkills);
         await provideSkillFilesystem(
           app,
-          roots: _skillRoots(
-            resolvedWorkdir,
-            <String>[...extraSkillDirs, ...pluginService.skillRoots],
-          ),
+          roots: _skillRoots(resolvedWorkdir, <String>[
+            ...extraSkillDirs,
+            ...pluginService.skillRoots,
+          ]),
         );
         if (bootstrapSkills.isNotEmpty) {
           final SkillBootstrapSection section = SkillBootstrapSection(
@@ -1253,9 +1257,9 @@ Future<void> _connectMcpDeferred({
           warn: stderr.writeln,
         ),
       );
-      app.get<ConatusTuiController>('tuiController')?.showSystemNotice(
-        'MCP server 已连接（${registry.servers.length} 台）。',
-      );
+      app
+          .get<ConatusTuiController>('tuiController')
+          ?.showSystemNotice('MCP server 已连接（${registry.servers.length} 台）。');
     }
   } catch (error) {
     stderr.writeln('MCP 后台连接失败：$error');

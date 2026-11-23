@@ -698,6 +698,35 @@ pre_tool_use = ["echo 工具前钩子 >> /tmp/nava-hook.log"]
 # stop = []
 ```
 
+## 安全护栏（`[safety]`）
+
+工具执行前的三道同步守卫（先于权限 / 审批，子代理继承同一份状态）：
+
+- **读后写**：`write` / `edit` / `apply_patch` 覆盖已有文件前，必须在本会话
+  用 `read` 读过且读后文件未变化；否则拒绝（`WRITE_WITHOUT_READ` /
+  `WRITE_STALE_READ`）。新建文件豁免；切换会话后台账清空，恢复旧会话的
+  第一次修改需要重新 `read`。
+- **重复调用熔断**：连续相同的 `(工具, 参数)` 第 `repeat_warn_at` 次起在结果后
+  附加告警，第 `repeat_deny_at` 次起不再执行（`REPEAT_CALL_BLOCKED`）。出现
+  不同调用即清零；轮询命令可用 `repeat_exempt_tools` 豁免。
+- **敏感文件**：私钥（`id_rsa*` / `id_ed25519*` 等）、`credentials`、
+  `.aws/credentials`、`.gcp/credentials` 读写硬拒（`SENSITIVE_PATH`）；
+  `.env` 族读仍走权限 `ask`，写默认硬拒。`*.pub` 与 `.env.example` 等豁免。
+
+```toml
+[safety]
+require_read_before_write = true
+repeat_warn_at = 3
+repeat_deny_at = 5
+# repeat_exempt_tools = ["bash"]
+protect_private_keys = true
+deny_dotenv_writes = true
+# extra_sensitive_paths = ["secrets"]
+```
+
+已知盲区：`bash` 只做字面路径 token 扫描，变量拼接、`sh -c "$CMD"`、读脚本
+再执行仍可绕过；护栏是防误操作与误覆盖，不是安全沙箱。
+
 ## MCP（`/mcp`）
 
 `[mcp.servers.<名字>]` 表声明 MCP server，启动时逐台挂载、**单台连接失败提示并
