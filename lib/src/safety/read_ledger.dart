@@ -74,7 +74,7 @@ class ReadLedgerMiddleware {
         case 'read':
           _recordRead(result);
         case 'write' || 'edit':
-          _refresh(_pathArgument(call));
+          _refreshCall(call);
         case 'apply_patch':
           _refreshPatch(call);
       }
@@ -90,10 +90,16 @@ class ReadLedgerMiddleware {
     final Object? path = value['path'];
     final Object? version = value['version'];
     if (path is! String || version is! String) return;
-    final String? canonical = canonicalToolPath(workdir, home, path);
+    final String? canonical = canonicalToolPath(
+      workdir,
+      home,
+      path,
+      expandHome: false,
+    );
     if (canonical == null) return;
-    final String? fingerprint = fileFingerprint(canonical);
-    if (fingerprint != null) ledger.note(canonical, fingerprint);
+    // 用 read 返回的 version（与 fs 的指纹同一元组），而不是事后重新 stat：
+    // 读与 stat 之间文件变化时，后者会把新指纹当成「模型看过的版本」。
+    ledger.note(canonical, version);
   }
 
   void _refreshPatch(ToolCall call) {
@@ -104,9 +110,20 @@ class ReadLedgerMiddleware {
     }
   }
 
+  void _refreshCall(ToolCall call) {
+    // append 只写增量，模型没看过原内容；不能因此授权后续整文件覆盖。
+    if (call.name == 'write' && call.arguments['mode'] == 'append') return;
+    _refresh(_pathArgument(call));
+  }
+
   void _refresh(String? rawPath) {
     if (rawPath == null) return;
-    final String? canonical = canonicalToolPath(workdir, home, rawPath);
+    final String? canonical = canonicalToolPath(
+      workdir,
+      home,
+      rawPath,
+      expandHome: false,
+    );
     if (canonical == null) return;
     final String? fingerprint = fileFingerprint(canonical);
     if (fingerprint == null) {

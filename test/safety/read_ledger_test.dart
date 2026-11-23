@@ -32,7 +32,6 @@ class _ReadTool extends Tool {
 
 class _FailingReadTool extends Tool {
   const _FailingReadTool();
-
   @override
   String get name => 'read';
 
@@ -49,6 +48,36 @@ class _FailingReadTool extends Tool {
     'boom',
     error: const ToolError('FS_NOT_FOUND', 'boom'),
   );
+}
+
+class _WriteTool extends Tool {
+  const _WriteTool(this.dir);
+
+  final String dir;
+
+  @override
+  String get name => 'write';
+
+  @override
+  String get description => '写入测试工具';
+
+  @override
+  List<ParamSpec> get params => <ParamSpec>[
+    ParamSpec.string('path', required: true),
+    ParamSpec.string('content', required: true),
+    ParamSpec.enumeration('mode', <String>['create', 'overwrite', 'append']),
+  ];
+
+  @override
+  Future<ToolResult> call(ToolContext ctx) async {
+    final File file = File('$dir${Platform.pathSeparator}${ctx.str('path')}');
+    final String mode = ctx.optional<String>('mode') ?? 'create';
+    file.writeAsStringSync(
+      ctx.str('content'),
+      mode: mode == 'append' ? FileMode.append : FileMode.write,
+    );
+    return ToolResult.success('ok');
+  }
 }
 
 void main() {
@@ -111,5 +140,62 @@ void main() {
       fileFingerprint('${dir.path}${Platform.pathSeparator}missing.txt'),
       isNull,
     );
+  });
+
+  test('登记 read 返回的 version，而不是事后 stat', () async {
+    final ToolRegistry tools = ToolRegistry()..register(const _ReadTool());
+    tools.use(ReadLedgerMiddleware(ledger: ledger, workdir: dir.path).call);
+    await tools.call(
+      const ToolCall(
+        name: 'read',
+        arguments: <String, Object?>{'path': 'a.txt'},
+      ),
+    );
+    final String key = canonicalToolPath(dir.path, null, 'a.txt')!;
+    expect(ledger.fingerprintOf(key), 'v1');
+  });
+
+  test('无 version 的读取不能授权覆盖', () async {
+    final ToolRegistry tools = ToolRegistry()
+      ..register(const _ReadTool(withVersion: false));
+    tools.use(ReadLedgerMiddleware(ledger: ledger, workdir: dir.path).call);
+    await tools.call(
+      const ToolCall(
+        name: 'read',
+        arguments: <String, Object?>{'path': 'a.txt'},
+      ),
+    );
+    final ReadBeforeWriteGuard guard = ReadBeforeWriteGuard(
+      ledger: ledger,
+      workdir: dir.path,
+    );
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'write',
+          arguments: <String, Object?>{'path': 'a.txt'},
+        ),
+      ),
+      startsWith('WRITE_WITHOUT_READ:'),
+    );
+  });
+
+  test('append 写成功不刷新台账', () async {
+    final ToolRegistry tools = ToolRegistry()..register(_WriteTool(dir.path));
+    tools.use(ReadLedgerMiddleware(ledger: ledger, workdir: dir.path).call);
+    final String key = canonicalToolPath(dir.path, null, 'a.txt')!;
+    final String before = fileFingerprint(key)!;
+    ledger.note(key, before);
+    await tools.call(
+      const ToolCall(
+        name: 'write',
+        arguments: <String, Object?>{
+          'path': 'a.txt',
+          'content': 'more',
+          'mode': 'append',
+        },
+      ),
+    );
+    expect(ledger.fingerprintOf(key), before);
   });
 }

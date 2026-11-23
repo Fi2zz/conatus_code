@@ -52,4 +52,22 @@ void main() {
   test('无法识别时返回空列表', () {
     expect(patchTargets('not a patch'), isEmpty);
   });
+
+  test('OpenCode 路径保留 b/ 前缀', () {
+    final List<PatchTarget> targets = patchTargets(
+      '*** Update File: b/foo.txt\n',
+    );
+    expect(targets.single.path, 'b/foo.txt');
+  });
+
+  test('hunk 内以 --- / +++ 开头的内容行不当文件头', () {
+    final List<PatchTarget> targets = patchTargets('''
+--- a/x.sql
++++ b/x.sql
+@@ -1 +1 @@
+--- old comment
++++ new comment
+''');
+    expect(targets.map((PatchTarget t) => t.path), <String>['x.sql']);
+  });
 }

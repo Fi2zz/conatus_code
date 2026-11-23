@@ -60,5 +60,12 @@ void main() {
       )?.kind,
       SensitiveKind.extra,
     );
+    expect(
+      matchSensitivePath(
+        '/work/secrets/token.txt',
+        extraPaths: <String>{'/work/secrets'},
+      )?.kind,
+      SensitiveKind.extra,
+    );
   });
 }

@@ -40,11 +40,17 @@ String canonicalizeBestEffortPath(String path) {
 /// 把工具传入的路径解析为 canonical 绝对路径；相对路径以 [workdir] 为基准。
 ///
 /// 路径不存在时退回拼接后的绝对路径（后续读取自然失败），符号链接按真实
-/// 目标返回，供调用方做越界判定与台账键。
-String? canonicalToolPath(String workdir, String? home, String rawPath) {
+/// 目标返回，供调用方做越界判定与台账键。[expandHome] 为 `false` 时把 `~`
+/// 当普通相对段处理，与 `LocalFileSystem` 的字面语义一致（工具不做 `~` 展开）。
+String? canonicalToolPath(
+  String workdir,
+  String? home,
+  String rawPath, {
+  bool expandHome = true,
+}) {
   final String trimmed = rawPath.trim();
   if (trimmed.isEmpty) return null;
-  final String expanded = expandToolHome(trimmed, home);
+  final String expanded = expandHome ? expandToolHome(trimmed, home) : trimmed;
   if (expanded.isEmpty) return null;
   final File probe = File(expanded);
   final String absolute = _normalizeLexical(

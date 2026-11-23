@@ -46,6 +46,19 @@ class _PatchTool extends Tool {
   Future<ToolResult> call(ToolContext ctx) async => ToolResult.success('ok');
 }
 
+class _GrepTool extends Tool {
+  const _GrepTool();
+
+  @override
+  String get name => 'grep';
+
+  @override
+  String get description => '未声明 pathParams 的搜索工具';
+
+  @override
+  Future<ToolResult> call(ToolContext ctx) async => ToolResult.success('ok');
+}
+
 void main() {
   late Directory home;
   late ToolRegistry tools;
@@ -57,7 +70,8 @@ void main() {
       ..register(const _PathTool('read'))
       ..register(const _PathTool('write'))
       ..register(const _BashTool())
-      ..register(const _PatchTool());
+      ..register(const _PatchTool())
+      ..register(const _GrepTool());
     guard = SensitivePathGuard(
       tools: tools,
       workdir: home.path,
@@ -180,6 +194,18 @@ void main() {
         ),
       ),
       isNull,
+    );
+  });
+
+  test('未声明 pathParams 的工具按常见路径参数名扫描', () {
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'grep',
+          arguments: <String, Object?>{'path': '~/.ssh/id_rsa'},
+        ),
+      ),
+      startsWith('SENSITIVE_PATH:'),
     );
   });
 }

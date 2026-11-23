@@ -105,4 +105,15 @@ void main() {
       expect(r.content, isNot(contains('repeat-breaker')));
     }
   });
+
+  test('签名是 64 位且不同参数不同', () {
+    final String a = callSignature(
+      const ToolCall(name: 'probe', arguments: <String, Object?>{'a': 1}),
+    );
+    final String b = callSignature(
+      const ToolCall(name: 'probe', arguments: <String, Object?>{'a': 2}),
+    );
+    expect(a.split('\u0000').last, hasLength(16));
+    expect(a, isNot(b));
+  });
 }

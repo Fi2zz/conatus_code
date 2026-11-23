@@ -99,4 +99,26 @@ void main() {
       startsWith('WRITE_WITHOUT_READ:'),
     );
   });
+
+  test('OpenCode Delete 要求先读', () {
+    expect(
+      guard.check(
+        const ToolCall(
+          name: 'apply_patch',
+          arguments: <String, Object?>{
+            'patch': '*** Begin Patch\n*** Delete File: a.txt\n*** End Patch',
+          },
+        ),
+      ),
+      startsWith('WRITE_WITHOUT_READ:'),
+    );
+  });
+
+  test('~ 按 fs 字面语义解析，与真实写入路径一致', () {
+    Directory('${dir.path}${Platform.pathSeparator}~').createSync();
+    File(
+      '${dir.path}${Platform.pathSeparator}~${Platform.pathSeparator}n.txt',
+    ).writeAsStringSync('x');
+    expect(guard.check(write('~/n.txt')), startsWith('WRITE_WITHOUT_READ:'));
+  });
 }

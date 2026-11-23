@@ -52,4 +52,17 @@ void main() {
       file.resolveSymbolicLinksSync(),
     );
   });
+
+  test('expandHome=false 时 ~ 按字面相对路径解析', () {
+    final Directory dir = Directory.systemTemp.createTempSync('nava-tilde');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    Directory('${dir.path}${Platform.pathSeparator}~').createSync();
+    final File file = File(
+      '${dir.path}${Platform.pathSeparator}~${Platform.pathSeparator}x.txt',
+    )..writeAsStringSync('x');
+    expect(
+      canonicalToolPath(dir.path, '/home/u', '~/x.txt', expandHome: false),
+      file.resolveSymbolicLinksSync(),
+    );
+  });
 }

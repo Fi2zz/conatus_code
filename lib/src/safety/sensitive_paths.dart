@@ -109,7 +109,9 @@ bool _matchesExtra(
   for (final String raw in extraPaths) {
     final String entry = raw.replaceAll('\\', '/').trim().toLowerCase();
     if (entry.isEmpty) continue;
-    if (entry.contains('/')) {
+    if (entry.startsWith('/')) {
+      if (lower == entry || lower.startsWith('$entry/')) return true;
+    } else if (entry.contains('/')) {
       if (lower == entry || lower.endsWith('/$entry')) return true;
     } else if (segments.contains(entry)) {
       return true;

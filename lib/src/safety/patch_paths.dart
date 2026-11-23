@@ -19,20 +19,43 @@ class PatchTarget {
 List<PatchTarget> patchTargets(String patch) {
   final Map<String, bool> found = <String, bool>{};
   String? pendingOld;
+  bool inHunk = false;
   for (final String rawLine in patch.split('\n')) {
     final String line = rawLine.trimRight();
     if (line.startsWith('*** ')) {
+      inHunk = false;
       pendingOld = _openCodeLine(found, line.substring(4));
       continue;
     }
+    if (line.startsWith('@@')) {
+      inHunk = true;
+      continue;
+    }
+    if (line.startsWith('diff --git ')) {
+      inHunk = false;
+      continue;
+    }
     if (line.startsWith('--- ')) {
-      pendingOld = _cleanPath(line.substring(4));
+      if (inHunk &&
+          !line.startsWith('--- a/') &&
+          !line.startsWith('--- /dev/null')) {
+        continue; // hunk 内被删除的、以 `-- ` 开头的内容行
+      }
+      inHunk = false;
+      pendingOld = _cleanPath(line.substring(4), stripGitPrefix: true);
       continue;
     }
     if (line.startsWith('+++ ')) {
-      _unifiedPlus(found, _cleanPath(line.substring(4)), pendingOld);
+      if (inHunk) continue; // hunk 内被新增的、以 `++ ` 开头的内容行
+      _unifiedPlus(
+        found,
+        _cleanPath(line.substring(4), stripGitPrefix: true),
+        pendingOld,
+      );
       pendingOld = null;
+      continue;
     }
+    if (inHunk) continue;
   }
   return <PatchTarget>[
     for (final MapEntry<String, bool> entry in found.entries)
@@ -64,17 +87,22 @@ void _unifiedPlus(Map<String, bool> found, String plus, String? pendingOld) {
     if (pendingOld != null) _add(found, pendingOld, creates: false);
     return;
   }
-  _add(found, plus, creates: pendingOld == '/dev/null');
+  _add(found, plus, creates: pendingOld == '/dev/null', stripGitPrefix: true);
 }
 
-void _add(Map<String, bool> found, String raw, {required bool creates}) {
-  final String path = _cleanPath(raw);
+void _add(
+  Map<String, bool> found,
+  String raw, {
+  required bool creates,
+  bool stripGitPrefix = false,
+}) {
+  final String path = _cleanPath(raw, stripGitPrefix: stripGitPrefix);
   if (path.isEmpty || path == '/dev/null') return;
   final bool? existing = found[path];
   found[path] = existing == false ? false : creates;
 }
 
-String _cleanPath(String raw) {
+String _cleanPath(String raw, {bool stripGitPrefix = false}) {
   String path = raw.split('\t').first.trim();
   if (path.length >= 2) {
     final bool quoted =
@@ -82,7 +110,7 @@ String _cleanPath(String raw) {
         (path.startsWith("'") && path.endsWith("'"));
     if (quoted) path = path.substring(1, path.length - 1);
   }
-  if (path.startsWith('a/') || path.startsWith('b/')) {
+  if (stripGitPrefix && (path.startsWith('a/') || path.startsWith('b/'))) {
     path = path.substring(2);
   }
   return path;

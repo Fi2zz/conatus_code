@@ -52,7 +52,12 @@ class ReadBeforeWriteGuard {
   }
 
   String? _checkTarget(PatchTarget target) {
-    final String? canonical = canonicalToolPath(workdir, home, target.path);
+    final String? canonical = canonicalToolPath(
+      workdir,
+      home,
+      target.path,
+      expandHome: false,
+    );
     if (canonical == null) return null;
     final String? current = fileFingerprint(canonical);
     if (current == null) return null; // 真正的新建文件，无需先读

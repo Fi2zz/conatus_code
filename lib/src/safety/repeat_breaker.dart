@@ -24,12 +24,25 @@ String callSignature(ToolCall call) {
 }
 
 String _digest(String value) {
-  int hash = 0x811c9dc5;
-  for (final int unit in value.codeUnits) {
+  final List<int> units = value.codeUnits;
+  final String forward = _fnv32(
+    units,
+    0x811c9dc5,
+  ).toRadixString(16).padLeft(8, '0');
+  final String backward = _fnv32(
+    units.reversed,
+    0x01000193,
+  ).toRadixString(16).padLeft(8, '0');
+  return '$forward$backward';
+}
+
+int _fnv32(Iterable<int> units, int basis) {
+  int hash = basis;
+  for (final int unit in units) {
     hash ^= unit;
     hash = (hash * 0x01000193) & 0xFFFFFFFF;
   }
-  return hash.toRadixString(16).padLeft(8, '0');
+  return hash;
 }
 
 /// 连续调用状态机。

@@ -63,7 +63,8 @@ class SensitivePathGuard {
     }
     for (final String candidate in _candidates(call)) {
       final String probe =
-          canonicalToolPath(workdir, home, candidate) ?? candidate;
+          canonicalToolPath(workdir, home, candidate, expandHome: false) ??
+          candidate;
       final SensitiveMatch? match = matchSensitivePath(
         probe,
         extraPaths: extraPaths,
@@ -93,7 +94,10 @@ class SensitivePathGuard {
   List<String> _candidates(ToolCall call) {
     final Set<String> found = <String>{};
     final Tool? tool = tools.get(call.name);
-    for (final String param in tool?.pathParams ?? const <String>[]) {
+    final List<String> params = tool == null || tool.pathParams.isEmpty
+        ? const <String>['path', 'file', 'dir', 'cwd', 'directory']
+        : tool.pathParams;
+    for (final String param in params) {
       final Object? value = call.arguments[param];
       if (value is String) found.add(value);
     }
