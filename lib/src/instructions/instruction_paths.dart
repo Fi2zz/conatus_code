@@ -3,15 +3,11 @@ library;
 
 import 'dart:io';
 
+import '../paths/canonical_path.dart';
+
 /// `~/x` 展开；没有家目录时返回空串（调用方跳过该条）。
-String expandInstructionHome(String value, String? home) {
-  if (value != '~' && !value.startsWith('~${Platform.pathSeparator}')) {
-    return value;
-  }
-  if (home == null || home.isEmpty) return '';
-  if (value == '~') return home;
-  return '$home${value.substring(1)}';
-}
+String expandInstructionHome(String value, String? home) =>
+    expandToolHome(value, home);
 
 /// [child] 是否等于 [root] 或位于其下。
 bool isWithinWorkdir(String child, String root) {
@@ -47,21 +43,7 @@ String canonicalDir(String path) {
 ///
 /// 工具常读「尚不存在的路径」或只读目录里的单个文件；不这样做，未解析的
 /// `/var/...` 与 canonical 的 `/private/var/...` 会让越界判定误伤合法路径。
-String canonicalizeBestEffort(String path) {
-  final String sep = Platform.pathSeparator;
-  final List<String> parts = path.split(sep);
-  String suffix = '';
-  while (parts.length > 1) {
-    final String candidate = parts.join(sep);
-    try {
-      final String base = Directory(candidate).resolveSymbolicLinksSync();
-      return '$base$suffix';
-    } on FileSystemException {
-      suffix = '$sep${parts.removeLast()}$suffix';
-    }
-  }
-  return path;
-}
+String canonicalizeBestEffort(String path) => canonicalizeBestEffortPath(path);
 
 /// 父目录；根目录返回自身。
 String parentDir(String path) {
@@ -117,20 +99,4 @@ String? resolveInstructionTargetPath(
   String workdir,
   String? home,
   String rawPath,
-) {
-  final String trimmed = rawPath.trim();
-  if (trimmed.isEmpty) return null;
-  final String expanded = expandInstructionHome(trimmed, home);
-  if (expanded.isEmpty) return null;
-  final File probe = File(expanded);
-  final String absolute = probe.isAbsolute
-      ? expanded
-      : joinInstructionPath(workdir, expanded);
-  try {
-    return FileSystemEntity.typeSync(absolute) == FileSystemEntityType.directory
-        ? Directory(absolute).resolveSymbolicLinksSync()
-        : File(absolute).resolveSymbolicLinksSync();
-  } on FileSystemException {
-    return canonicalizeBestEffort(absolute);
-  }
-}
+) => canonicalToolPath(workdir, home, rawPath);
